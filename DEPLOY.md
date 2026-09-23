@@ -106,6 +106,12 @@ repository Git, pengaturannya otomatis benar.
 
 ## 2. Vercel — gratis, cocok kalau mau hubungkan Git
 
+Cara paling mudah: impor repository-nya dari dashboard <https://vercel.com/new>,
+lalu biarkan Vercel mendeteksi framework-nya (Vite). Tidak ada yang perlu
+diisi manual.
+
+Kalau lewat CLI:
+
 ```bash
 npm i -g vercel
 cd drillkit
@@ -113,7 +119,27 @@ vercel        # ikuti pertanyaan; framework detection: Vite
 vercel --prod # untuk versi final
 ```
 
-Atau impor repository-nya dari dashboard <https://vercel.com/new>.
+### Berkas `vercel.json`
+
+Berkas ini disertakan supaya pengaturannya tidak perlu diisi ulang setiap
+kali membuat proyek baru. Tiga baris pertama hanya menegaskan apa yang
+memang sudah ditebak Vercel; yang **penting** ada dua:
+
+1. **`installCommand`** memasang `PUPPETEER_SKIP_DOWNLOAD=1`. Tanpa itu,
+   Vercel mengunduh peramban Chrome sebesar ~200 MB untuk `puppeteer`
+   padahal peramban itu hanya dipakai rangkaian uji di folder `qa/`,
+   bukan oleh aplikasinya.
+2. **`headers`** menyalin aturan yang sama dengan `public/_headers`
+   (berkas itu hanya dibaca Netlify, tidak dibaca Vercel). Isinya:
+   `sw.js`, `registerSW.js`, dan `index.html` **jangan pernah
+   disimpan** oleh peramban. Alasannya sama dengan keterangan panjang di
+   `public/_headers` — setiap unggahan baru adalah PENGGANTIAN, dan
+   peramban yang masih menyimpan `index.html` lama akan meminta berkas
+   ber-hash yang sudah terhapus, lalu menampilkan "link rusak" padahal
+   situsnya sehat.
+
+Berkas ber-hash di dalam `/assets/` sengaja tidak diatur: namanya berubah
+setiap kali isinya berubah, jadi aman disimpan lama.
 
 ---
 
