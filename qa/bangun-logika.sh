@@ -68,4 +68,7 @@ rakit src/lib/csvKoordinat.ts csvk
 # oleh yang lain.
 rakit src/lib/riwayat.ts    riwayat
 rakit src/db/db.ts          dbk
+# 1b — simpan otomatis ke berkas. Modulnya mengimpor `backup.ts`,
+# jadi ikut terbawa ke dalam bundelnya.
+rakit src/lib/simpanOtomatis.ts simpanOtomatis
 echo "== selesai =="

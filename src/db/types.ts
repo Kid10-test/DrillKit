@@ -340,6 +340,24 @@ export interface RiwayatSnapshot {
   isiSet: DrillSet[]
 }
 
+/**
+ * 1b — berkas backup yang ditulisi sendiri oleh aplikasi.
+ *
+ * `pegangan` bertipe `unknown` dengan sengaja: ia adalah
+ * `FileSystemFileHandle`, yang tidak punya tipe di pustaka standar
+ * TypeScript. Tipenya ditulis sendiri di `lib/simpanOtomatis.ts`, dan
+ * dipakai dengan penyesuaian tipe di sana — bukan di sini, supaya lapisan
+ * penyimpanan tidak perlu tahu tentang API peramban.
+ */
+export interface Simpanan {
+  key: 'utama'
+  pegangan: unknown
+  /** nama berkas, untuk ditampilkan saja */
+  nama: string
+  /** kapan terakhir berhasil disimpan; 0 = belum pernah */
+  at: number
+}
+
 export interface DrillSet {
   id: string
   drillId: string
