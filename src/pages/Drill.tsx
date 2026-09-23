@@ -29,6 +29,8 @@ import {
   Toggle,
   useToast,
 } from '../components/ui'
+import { RiwayatDrill } from '../components/RiwayatDrill'
+import { JEDA_OTOMATIS_MS, foto, terakhirDipotret } from '../lib/riwayat'
 import {
   IconCheck,
   IconDownload,
@@ -250,6 +252,8 @@ export default function DrillPage() {
   const members = useLiveQuery(() => db.members.toArray(), [], [])
 
   const [drillId, setDrillId] = useState<string>('')
+  /** 1a — panel riwayat formasi. */
+  const [bukaRiwayat, setBukaRiwayat] = useState(false)
 
   // Pilih drill terakhir yang diedit saat data pertama kali muncul.
   useEffect(() => {
@@ -312,6 +316,10 @@ export default function DrillPage() {
   }
 
   async function removeDrill(d: Drill) {
+    // 1a — difoto lebih dulu, dan fotonya SENGAJA tidak ikut dihapus:
+    // inilah satu-satunya jejak drill yang terlanjur hilang. Menumpuknya
+    // perlahan dan dibatasi pemangkasan per drill, jadi tidak meledak.
+    await foto(d.id, 'sebelum-hapus-drill')
     await db.drills.delete(d.id)
     const ids = await db.sets.where('drillId').equals(d.id).primaryKeys()
     await db.sets.bulkDelete(ids)
@@ -361,6 +369,9 @@ export default function DrillPage() {
             <Button onClick={() => duplicateDrill(drill)}>
               Salin
             </Button>
+            <Button variant="ghost" size="md" onClick={() => setBukaRiwayat(true)}>
+              Riwayat
+            </Button>
             <ConfirmButton size="md" label="Hapus" message="Hapus drill ini?" onConfirm={() => removeDrill(drill)} />
           </>
         }
@@ -372,6 +383,15 @@ export default function DrillPage() {
         sets={orderedSets}
         members={(members ?? []).filter((m) => m.active)}
         onGantiDrill={setDrillId}
+      />
+
+      {/* 1a — riwayat formasi. Sengaja dipasang di tingkat halaman, bukan
+          di dalam editor: panel ini hanya perlu id drill, dan dengan begini
+          ia tidak ikut digambar ulang setiap kali titik digeser. */}
+      <RiwayatDrill
+        drillId={drill.id}
+        open={bukaRiwayat}
+        onClose={() => setBukaRiwayat(false)}
       />
     </div>
   )
@@ -968,6 +988,10 @@ function Editor({
 
   async function removeSet() {
     if (!set || sets.length <= 1) return
+    // 1a — difoto dulu: menghapus set bersama semua titiknya adalah
+    // kehilangan yang paling sering disesali, dan paling sering baru
+    // disadari besoknya.
+    await foto(drill.id, 'sebelum-hapus-set')
     await db.sets.delete(set.id)
     // K3 — centang untuk set ini tidak ada gunanya lagi.
     await hapusTandaSet(drill.id, set.id)
@@ -1266,6 +1290,37 @@ function Editor({
     const u = clientToUser(e.clientX, e.clientY)
     dragRef.current = { startX: u.x, startY: u.y, orig, moved: false }
   }
+
+  /**
+   * 1a — pemotretan otomatis.
+   *
+   * Dicek tiap menit, tetapi hanya memotret bila sudah lewat jeda sejak foto
+   * terakhir DAN keadaannya benar-benar berubah — `foto()` sendiri yang
+   * menolak kembaran, jadi duduk sambil membaca tidak menghasilkan apa-apa.
+   *
+   * Halaman yang sedang tidak terlihat dilewati: tidak ada gunanya memotret
+   * keadaan yang tidak sedang dikerjakan, lagipula browser menunda timer di
+   * tab yang disembunyikan sehingga waktu bacanya bisa menyesatkan.
+   */
+  useEffect(() => {
+    if (!drill?.id) return
+    let batal = false
+    const timer = window.setInterval(async () => {
+      if (batal || document.hidden) return
+      try {
+        const terakhir = await terakhirDipotret(drill.id)
+        if (terakhir && Date.now() - terakhir < JEDA_OTOMATIS_MS) return
+        await foto(drill.id, 'otomatis')
+      } catch {
+        // Pemotretan yang gagal tidak boleh mengganggu orang yang sedang
+        // menyusun formasi. Keadaannya dicoba lagi satu menit berikutnya.
+      }
+    }, 60_000)
+    return () => {
+      batal = true
+      window.clearInterval(timer)
+    }
+  }, [drill?.id])
 
   /**
    * Kotak pilih (marquee). Sama seperti menggeser titik: kotaknya digambar

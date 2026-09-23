@@ -9,7 +9,10 @@
 #
 # Pakai: bash /home/user/drillkit/qa/bangun-logika.sh
 set -eu
-cd /home/user/drillkit
+# Mengapa tidak lagi `cd /home/user/drillkit`: alamat itu hanya benar di satu
+# mesin. Skrip ini terletak di dalam folder `qa/`, jadi folder proyeknya
+# selalu satu tingkat di atasnya — di mana pun proyeknya disalin.
+cd "$(dirname "$0")/.."
 ESBUILD=./node_modules/.bin/esbuild
 [ -x "$ESBUILD" ] || { echo "esbuild tidak ketemu"; exit 1; }
 
@@ -59,4 +62,13 @@ rakit src/lib/sesi.ts         sesi
 rakit src/lib/gerak.ts        gerak
 # Nama berkasnya `csvk`, bukan `csvKoordinat` — mengikuti impor ujinya.
 rakit src/lib/csvKoordinat.ts csvk
+# 1a — riwayat formasi. Ujinya butuh DUA modul: mesin riwayatnya sendiri,
+# dan `db` untuk menyiapkan drill & set yang akan difoto. Keduanya membuka
+# basis data IndexedDB bernama sama, jadi tulisan dari yang satu terbaca
+# oleh yang lain.
+rakit src/lib/riwayat.ts    riwayat
+rakit src/db/db.ts          dbk
+# 1b — simpan otomatis ke berkas. Modulnya mengimpor `backup.ts`,
+# jadi ikut terbawa ke dalam bundelnya.
+rakit src/lib/simpanOtomatis.ts simpanOtomatis
 echo "== selesai =="

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { db } from './db/db'
 import Layout from './components/Layout'
 import PenandaRilis from './components/PenandaRilis'
+import { PenjagaSimpanOtomatis } from './components/SimpanOtomatis'
 import { ErrorBoundary, ToastProvider } from './components/ui'
 import { KioskProvider } from './hooks/useKiosk'
 import { useBootstrap } from './hooks/useSettings'
@@ -77,6 +78,9 @@ export default function App() {
           tampil di halaman mana pun, dan sengaja di bawah supaya tidak
           menutupi apa yang sedang dikerjakan pemakai. */}
       <PenandaRilis />
+      {/* 1b — penyimpan otomatis ke berkas. Tidak menampilkan apa pun;
+          ia hanya menulis bila berkasnya sudah dipasang. */}
+      <PenjagaSimpanOtomatis />
       <Layout>
         <ErrorBoundary>
         <Routes>

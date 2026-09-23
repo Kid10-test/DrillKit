@@ -13,6 +13,8 @@ import type {
   Song,
   Kemajuan,
   TeamSettings,
+  RiwayatSnapshot,
+  Simpanan,
 } from './types'
 
 /**
@@ -39,6 +41,10 @@ export class DrillKitDB extends Dexie {
   kemajuan!: Table<Kemajuan, string>
   /** H2 — evaluasi anggota dari pelatih. */
   evaluasi!: Table<Evaluasi, string>
+  /** 1a — foto keadaan formasi, supaya perubahan bisa dikembalikan. */
+  riwayat!: Table<RiwayatSnapshot, string>
+  /** 1b — berkas backup yang ditulisi sendiri (Chromium desktop saja). */
+  simpanan!: Table<Simpanan, string>
 
   constructor() {
     super('drillkit')
@@ -65,6 +71,12 @@ export class DrillKitDB extends Dexie {
     })
     this.version(6).stores({
       evaluasi: 'id, memberId, tanggal',
+    })
+    this.version(7).stores({
+      riwayat: 'id, drillId, at, pin, [drillId+at]',
+    })
+    this.version(8).stores({
+      simpanan: 'key',
     })
   }
 }

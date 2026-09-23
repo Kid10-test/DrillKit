@@ -291,6 +291,73 @@ export interface DrillPoint {
   facingDeg?: number
 }
 
+/**
+ * 1a — Riwayat perubahan formasi: "undo yang tidak hilang".
+ *
+ * Mengapa perlu: `Ctrl+Z` di editor hanya mengingat langkah selama halaman
+ * masih terbuka. Begitu halaman ditutup, drill diganti, atau perangkat
+ * kehabisan baterai, semua langkah itu lenyap — padahal menyusun satu set
+ * bisa makan berjam-jam. Yang paling sering terjadi bukan salah besar,
+ * melainkan salah kecil yang baru disadari besoknya.
+ *
+ * Karena itu keadaan drill difoto **utuh** (bukan sekadar langkah yang
+ * berubah), dan bisa dikembalikan kapan saja. Fotonya disimpan di
+ * IndexedDB yang sama, jadi tetap jalan offline seperti semua fitur lain.
+ */
+export type AlasanRiwayat =
+  /** difoto sendiri oleh aplikasi tiap beberapa menit, bila ada perubahan */
+  | 'otomatis'
+  /** difoto oleh pelatih lewat tombol Tandai */
+  | 'tandai'
+  /** difoto sesaat sebelum sebuah set dihapus */
+  | 'sebelum-hapus-set'
+  /** difoto sesaat sebelum drill dihapus */
+  | 'sebelum-hapus-drill'
+  /** difoto sesaat sebelum show dari pelatih lain ditimpa / digabung */
+  | 'sebelum-impor'
+  /** difoto sesaat sebelum sebuah versi lama dikembalikan */
+  | 'sebelum-kembalikan'
+
+/** Isi drill yang difoto — tanpa id & cap waktu, karena itu milik snapshot. */
+export type IsiDrill = Omit<Drill, 'id' | 'createdAt' | 'updatedAt'>
+
+export interface RiwayatSnapshot {
+  id: string
+  drillId: string
+  /** kapan difoto (epoch ms) */
+  at: number
+  alasan: AlasanRiwayat
+  /** tulisan pelatih; hanya terisi untuk alasan 'tandai' */
+  label?: string
+  /** 1 = jangan dibuang oleh pemangkasan otomatis */
+  pin: 0 | 1
+  /** ringkasan isi, supaya daftar bisa tampil tanpa membongkar fotonya */
+  jumlahSet: number
+  jumlahTitik: number
+  /** sidik jari isi — foto yang sama persis tidak disimpan dua kali */
+  cicip: string
+  isiDrill: IsiDrill
+  isiSet: DrillSet[]
+}
+
+/**
+ * 1b — berkas backup yang ditulisi sendiri oleh aplikasi.
+ *
+ * `pegangan` bertipe `unknown` dengan sengaja: ia adalah
+ * `FileSystemFileHandle`, yang tidak punya tipe di pustaka standar
+ * TypeScript. Tipenya ditulis sendiri di `lib/simpanOtomatis.ts`, dan
+ * dipakai dengan penyesuaian tipe di sana — bukan di sini, supaya lapisan
+ * penyimpanan tidak perlu tahu tentang API peramban.
+ */
+export interface Simpanan {
+  key: 'utama'
+  pegangan: unknown
+  /** nama berkas, untuk ditampilkan saja */
+  nama: string
+  /** kapan terakhir berhasil disimpan; 0 = belum pernah */
+  at: number
+}
+
 export interface DrillSet {
   id: string
   drillId: string

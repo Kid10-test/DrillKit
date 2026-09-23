@@ -37,6 +37,7 @@ import {
   patokOf,
 } from '../lib/field'
 import { backupNotes, daysSince, downloadBackup, formatBytes, lastBackup } from '../lib/backup'
+import { KartuSimpanOtomatis } from '../components/SimpanOtomatis'
 import { AMBANG, AMBANG_LANGKAH } from '../lib/analitik'
 import type { AmbangTingkat } from '../db/types'
 import { KioskPinCard } from '../components/KioskLock'
@@ -411,6 +412,9 @@ export default function Settings() {
             bisa dipakai offline. Konsekuensinya: <b>backup adalah tanggung jawab kamu</b> — ekspor berkala, simpan
             di Google Drive/email, dan pulihkan kalau ganti HP atau hapus data browser.
           </p>
+          {/* 1b — simpan otomatis: sekali pilih berkas, aplikasi menulis sendiri. */}
+          <KartuSimpanOtomatis />
+
           {/* Status & pengingat backup */}
           <div className="mb-4 rounded-xl border border-slate-800 bg-slate-950/40 p-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
