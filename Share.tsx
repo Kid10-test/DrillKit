@@ -1,0 +1,1195 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db, DEFAULT_FIELD } from '../db/db'
+import type { DrillSet, FieldConfig, Member, MemberNote, Session, ShareBundle } from '../db/types'
+import { FieldSurface } from '../components/FieldSurface'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  Modal,
+  PageHeader,
+  Select,
+  StatTile,
+  Toggle,
+  useToast,
+} from '../components/ui'
+import { IconDownload, IconLoop, IconPause, IconPlay, IconShare, IconUpload } from '../components/Icons'
+import { PanelTukarRepertoar } from '../components/TukarRepertoar'
+import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
+import Music from './Music'
+import { bacaMode } from '../lib/modePerangkat'
+import { TombolKeluarModeAnggota, TombolMasukModeAnggota } from '../components/ModePerangkat'
+import { bikinZip } from '../lib/zip'
+import {
+  sectionDot,
+  sectionLabel,
+  STATUS_META,
+  cx,
+  daysFromToday,
+  downloadBlob,
+  downloadFile,
+  formatDateLong,
+  pct,
+  readFileAsText,
+  relativeDay,
+  slugify,
+} from '../lib/utils'
+import { coordText, facingDeg, stepYd, ukurTitik } from '../lib/field'
+
+/**
+ * Halaman berbagi punya dua mode:
+ *  - Pelatih : membuat paket tim (jadwal + formasi + repertoar + daftar anggota)
+ *              yang bisa dibagikan lewat WhatsApp/email, lalu dibuka anggota di HP mereka.
+ *  - Anggota : membuka paket tersebut dan melihat jadwal, posisi formasi sendiri,
+ *              serta rekap kehadiran — tanpa bisa mengubah data pelatih.
+ */
+export default function Share() {
+  const mode = useMemberMode()
+  return mode === 'member' ? <MemberView /> : <CoachExport />
+}
+
+/* ========================================================================== */
+/*  Mode pelatih — buat paket                                                   */
+/* ========================================================================== */
+
+function CoachExport() {
+  const toast = useToast()
+  const members = useLiveQuery(() => db.members.toArray(), [], [])
+  const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
+  const drills = useLiveQuery(() => db.drills.toArray(), [], [])
+  const sets = useLiveQuery(() => db.sets.toArray(), [], [])
+  const songs = useLiveQuery(() => db.songs.toArray(), [], [])
+  const daftarSetList = useLiveQuery(() => db.setlists.toArray(), [], [])
+  const attendance = useLiveQuery(() => db.attendance.toArray(), [], [])
+  const memberNotes = useLiveQuery(() => db.memberNotes.toArray(), [], [])
+  const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
+
+  const [includeSchedule, setIncludeSchedule] = useState(true)
+  const [includeDrills, setIncludeDrills] = useState(true)
+  const [includeSongs, setIncludeSongs] = useState(true)
+  const [includeAttendance, setIncludeAttendance] = useState(true)
+  /** Catatan evaluasi — dulu SELALU ikut berkas tanpa saklar apa pun. */
+  const [includeNotes, setIncludeNotes] = useState(true)
+  const [preview, setPreview] = useState<ShareBundle | null>(null)
+
+  function build(): ShareBundle {
+    return {
+      format: 'drillkit-share',
+      version: 1,
+      exportedAt: Date.now(),
+      team: settings
+        ? {
+            teamName: settings.teamName,
+            coachName: settings.coachName,
+            city: settings.city,
+            logo: settings.logo,
+            defaultField: settings.defaultField,
+            memberMode: 1,
+          }
+        : null,
+      // Token QR tidak ikut dibagikan — hanya pelatih yang perlu memindainya.
+      members: (members ?? []).map(({ token, ...rest }) => ({ ...rest, token: '' })),
+      sessions: includeSchedule ? (sessions ?? []) : [],
+      drills: includeDrills ? (drills ?? []) : [],
+      sets: includeDrills ? (sets ?? []) : [],
+      songs: includeSongs ? (songs ?? []) : [],
+      // Set list mengikuti saklar repertoar: ia tidak ada artinya tanpa lagu.
+      setlists: includeSongs ? (daftarSetList ?? []) : [],
+      attendance: includeAttendance ? (attendance ?? []) : [],
+      // Catatan evaluasi — kini menghormati saklar, seperti jenis data lain.
+      memberNotes: includeNotes ? (memberNotes ?? []) : [],
+      mode: 'member',
+    }
+  }
+
+  function namaBerkas(jenis: string, ekstensi: string) {
+    const tim = slugify(build().team?.teamName ?? 'tim')
+    return `${tim}-${jenis}-${new Date().toISOString().slice(0, 10)}.${ekstensi}`
+  }
+
+  /**
+   * Berkas **grup** — satu berkas untuk semua orang.
+   *
+   * Tidak memuat data pribadi siapa pun, jadi aman dibagikan ke mana saja.
+   */
+  function unduhGrup() {
+    const bundle = paketGrup(build())
+    downloadFile(namaBerkas('grup', 'json'), JSON.stringify(bundle))
+    toast.push('Berkas grup diunduh — tanpa data pribadi, aman dibagikan ke mana saja')
+  }
+
+  /**
+   * Berkas **per anggota** — satu ZIP berisi satu berkas per anggota.
+   *
+   * Tiap berkas hanya memuat absensi & catatan anggota itu sendiri.
+   */
+  function unduhPerAnggota() {
+    const dasar = build()
+    if (dasar.members.length === 0) {
+      toast.push('Belum ada anggota untuk dibagikan', 'err')
+      return
+    }
+    const entri = dasar.members.map((m) => ({
+      nama: namaBerkasAnggota(m),
+      isi: JSON.stringify(paketAnggota(dasar, m.id)),
+    }))
+    downloadBlob(namaBerkas('per-anggota', 'zip'), bikinZip(entri))
+    toast.push(
+      `${entri.length} berkas anggota dibungkus — tiap berkas hanya memuat datanya sendiri, ` +
+        `dan begitu dibuka langsung mengenali namanya`,
+    )
+  }
+
+  const size = useMemo(() => {
+    // Dihitung dari berkas GRUP, karena itulah yang benar-benar diunduh
+    // sebagai satu berkas — bukan dari paket lengkap yang tak pernah dibagikan.
+    const n = JSON.stringify(paketGrup(build())).length
+    return n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`
+  }, [members, sessions, drills, sets, songs, includeSchedule, includeDrills, includeSongs])
+
+  return (
+    <div>
+      <PageHeader
+        title="Berbagi ke anggota"
+        subtitle="Kirim jadwal & formasi ke HP anggota tanpa perlu server atau akun"
+        actions={
+          <>
+            <TombolMasukModeAnggota />
+            <Button data-testid="unduh-grup-atas" onClick={unduhGrup}>
+              <IconDownload size={16} /> Unduh berkas grup
+            </Button>
+            <Button variant="primary" data-testid="unduh-per-anggota-atas" onClick={unduhPerAnggota}>
+              <IconDownload size={16} /> Unduh per anggota (ZIP)
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <h2 className="mb-3 text-sm font-semibold text-slate-200">Isi bersama</h2>
+          <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
+            Ikut di <b>kedua</b> jenis berkas — grup maupun per anggota.
+          </p>
+          <div className="space-y-1.5">
+            <Toggle
+              testId="toggle-jadwal"
+              checked={includeSchedule}
+              onChange={setIncludeSchedule}
+              label={`Jadwal & materi (${sessions?.length ?? 0})`}
+            />
+            <Toggle
+              testId="toggle-drill"
+              checked={includeDrills}
+              onChange={setIncludeDrills}
+              label={`Formasi/drill (${drills?.length ?? 0} drill, ${sets?.length ?? 0} set)`}
+            />
+            <Toggle
+              testId="toggle-repertoar"
+              checked={includeSongs}
+              onChange={setIncludeSongs}
+              label={`Repertoar & tempo (${songs?.length ?? 0})`}
+            />
+          </div>
+          <p className="mt-3 rounded-lg bg-slate-950/50 p-3 text-[11px] leading-relaxed text-slate-500">
+            Yang <b>selalu</b> ikut: daftar anggota (nama, section, instrumen) dan nama tim — diperlukan
+            supaya anggota bisa memilih namanya dan melihat formasinya di antara rekan-rekannya.
+            Yang <b>tidak pernah</b> ikut, ke mana pun: token QR absensi, nomor telepon, catatan
+            pribadi pelatih, dan <b>nilai evaluasi</b> (keputusan Anda — yang sampai ke anggota hanya
+            tulisan pelatih). Perkiraan ukuran berkas grup: <b>{size}</b>.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button onClick={() => setPreview(build())}>Pratinjau isi</Button>
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="mb-3 text-sm font-semibold text-slate-200">Dua cara membagikan</h2>
+
+          <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+            <p className="text-xs font-semibold text-slate-200">Berkas grup</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+              Satu berkas untuk semua orang. <b>Tanpa</b> absensi & catatan siapa pun, jadi aman
+              dibagikan ke mana saja — termasuk grup terbuka.
+            </p>
+            <Button
+              data-testid="unduh-grup"
+              onClick={unduhGrup}
+              className="mt-2 w-full"
+            >
+              <IconDownload size={14} /> Unduh berkas grup
+            </Button>
+            {BISA_AMBIL && (
+              <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                <b>Untuk tombol Perbarui anggota:</b> unggah berkas ini ke situs Anda dengan
+                nama <code className="text-slate-400">paket.json</code>, sejajar dengan
+                aplikasinya. Anggota lalu tinggal satu ketuk — tidak perlu dikirimi berkas
+                lagi. Jangan unggah berkas <b>per anggota</b> ke sini: itu memuat absensi
+                dan catatan pribadi.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-3 rounded-lg border border-emerald-900/50 bg-emerald-950/20 p-3">
+            <p className="text-xs font-semibold text-emerald-200">Berkas per anggota</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+              Satu berkas ZIP berisi <b>{members?.length ?? 0} berkas</b> — satu per anak, sudah
+              diberi nama. Tiap berkas hanya memuat absensi & catatan <b>anak itu sendiri</b>.
+              Butuh satu pesan per orang.
+            </p>
+            <div className="mt-2 space-y-1.5">
+              <Toggle
+                testId="toggle-absensi"
+                checked={includeAttendance}
+                onChange={setIncludeAttendance}
+                label={`Rekap kehadiran (${attendance?.length ?? 0} catatan)`}
+              />
+              <Toggle
+                testId="toggle-catatan"
+                checked={includeNotes}
+                onChange={setIncludeNotes}
+                label={`Catatan evaluasi (${memberNotes?.length ?? 0})`}
+              />
+            </div>
+            <Button
+              variant="primary"
+              data-testid="unduh-per-anggota"
+              onClick={unduhPerAnggota}
+              className="mt-2 w-full"
+            >
+              <IconDownload size={14} /> Unduh {members?.length ?? 0} berkas (ZIP)
+            </Button>
+          </div>
+
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+            Mengapa harus dipisah: selama semua anak menerima <b>satu berkas yang sama</b>, data
+            pribadi semua anak harus ada di dalamnya. Menyaring tampilan tidak mengatasinya — yang
+            bocor adalah berkasnya, bukan layarnya.
+          </p>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <h2 className="mb-1 text-sm font-semibold text-slate-200">
+            Tukar repertoar antar perangkat
+          </h2>
+          <p className="mb-3 text-xs leading-relaxed text-slate-400">
+            Paket di atas mengalir <b>satu arah</b> ke HP anggota dan hanya bisa
+            dibaca. Untuk memindahkan lagu, set list, dan drill yang menautkannya
+            <b> ke perangkat pelatih lain</b>, gunakan berkas repertoar di bawah
+            ini — isinya langsung masuk ke pustaka di perangkat tujuan. Id lagu
+            tetap dipertahankan, jadi tautan drill ke lagu tidak putus.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <PanelTukarRepertoar
+              songs={songs ?? []}
+              setlists={daftarSetList ?? []}
+              ringkas
+            />
+            <button
+              type="button"
+              data-testid="ke-halaman-musik"
+              onClick={() => {
+                location.hash = '#/musik'
+              }}
+              className="text-xs text-emerald-400 underline decoration-dotted hover:text-emerald-300"
+            >
+              Buka di halaman Musik →
+            </button>
+          </div>
+        </Card>
+      </div>
+
+      <Modal open={!!preview} onClose={() => setPreview(null)} title="Pratinjau paket" wide>
+        {preview && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <StatTile label="Anggota" value={preview.members.length} />
+            <StatTile label="Jadwal" value={preview.sessions.length} />
+            <StatTile label="Set formasi" value={preview.sets.length} />
+            <StatTile label="Repertoar" value={preview.songs.length} />
+          </div>
+        )}
+        {preview && (
+          <pre className="scroll-thin max-h-64 overflow-auto rounded-lg bg-slate-950 p-3 text-[11px] leading-relaxed text-slate-400">
+            {JSON.stringify(
+              {
+                format: preview.format,
+                teamName: preview.team?.teamName,
+                members: preview.members.slice(0, 3).map((m) => `${m.code} — ${m.name} (${m.section})`),
+                sessions: preview.sessions.slice(0, 5).map((s: Session) => `${s.date} ${s.title}`),
+                drills: preview.drills.map((d) => d.name),
+                songs: preview.songs.map((s) => `${s.title} @ ${s.bpm}BPM`),
+              },
+              null,
+              2,
+            )}
+          </pre>
+        )}
+      </Modal>
+    </div>
+  )
+}
+
+/* ========================================================================== */
+/*  Mode anggota — baca paket                                                   */
+/* ========================================================================== */
+
+/**
+ * Bolehkah materi diambil dari sebuah alamat?
+ *
+ * Hanya bila aplikasinya memang **disajikan oleh situs**. Dibuka dari berkas
+ * (`file://`) tidak punya asal yang bisa dijadikan pangkal alamat, dan
+ * mengambil lintas-asal dari berkas justru akan diblokir peramban.
+ */
+const BISA_AMBIL = /^https?:$/.test(location.protocol)
+
+function MemberView() {
+  const toast = useToast()
+  const pkg = useLiveQuery(() => db.packages.get('current'), [], undefined)
+  const [tab, setTab] = useState<'jadwal' | 'formasi' | 'absensi' | 'catatan' | 'musik'>('jadwal')
+  const [meId, setMeId] = useState(() => localStorage.getItem('drillkit.meId') ?? '')
+  const [q, setQ] = useState('')
+  const [sedangMuat, setSedangMuat] = useState(false)
+  /**
+   * Alamat berkas materi. Bawaan **`paket.json`** — sebelah aplikasi ini —
+   * sehingga pelatih cukup menaruh berkasnya di situ dan anggota tidak
+   * perlu menyetel apa pun.
+   */
+  const [alamat, setAlamat] = useState('paket.json')
+  const urlPaket = useMemo(() => {
+    try {
+      return new URL(alamat.trim() || 'paket.json', document.baseURI).href
+    } catch {
+      return ''
+    }
+  }, [alamat])
+
+  /**
+   * Ambil materi terbaru dari alamatnya — pengganti "unduh berkas, lalu unggah
+   * lagi" bagi anggota.
+   *
+   * Yang **sengaja tidak ditimpa**: absensi dan catatan milik anggota ini,
+   * serta penanda untuk siapa berkasnya dibuat. Berkas di alamat itu adalah
+   * berkas **GRUP**, yang memang tidak memuat absensi siapa pun — menimpa
+   * seluruhnya akan mengosongkan riwayat kehadiran anggota **setiap kali**
+   * pelatih memperbarui materi.
+   */
+  async function perbarui() {
+    if (!urlPaket) return
+    setSedangMuat(true)
+    try {
+      const res = await fetch(urlPaket, { cache: 'no-store' })
+      if (!res.ok) throw new Error(String(res.status))
+      /*
+       * Banyak penyaji berkas statis menjawab alamat yang tidak ada dengan
+       * `index.html` (200), bukan 404 — termasuk layanan tarik-dan-lepas
+       * tempat aplikasi ini diterbitkan. Karenanya status saja tidak cukup:
+       * isi HTML harus dikenali dan diberitahukan dengan jujur.
+       *
+       * Ini bukan keadaan yang langka. `paket.json` TIDAK ikut di dalam
+       * `dist/`, sedangkan sebuah terbitan adalah *penggantian*, bukan
+       * sinkronisasi: mengunggah ulang isi `dist/` akan menghapus berkas
+       * materi yang sudah ada di situ. Pesan yang menyebut kemungkinan itu
+       * menghemat berjam-jam mencari kesalahan yang tidak pernah diperbuat.
+       */
+      const jenis = res.headers.get('content-type') ?? ''
+      if (jenis.includes('text/html')) {
+        throw new Error('bukan-berkas')
+      }
+      const data = (await res.json()) as ShareBundle
+      if (data?.format !== 'drillkit-share') {
+        toast.push('Berkas di alamat itu bukan paket DrillKit', 'err')
+        return
+      }
+      const lama = pkg?.data
+      await db.packages.put({
+        key: 'current',
+        importedAt: Date.now(),
+        data: {
+          ...data,
+          attendance: lama?.attendance ?? [],
+          memberNotes: lama?.memberNotes ?? [],
+          forMember: lama?.forMember,
+        },
+      })
+      /*
+       * Lagu dan set list harus sampai ke **tabelnya**, bukan sekadar ikut
+       * tersimpan di dalam paket: halaman Musik membaca `db.songs`, bukan
+       * berkasnya. Tanpa dua baris ini anggota melihat repertoar kosong
+       * padahal materinya berisi lagu — kegagalan yang tampak "berhasil".
+       *
+       * Dipakai `bulkPut`, bukan kosongkan-lalu-isi: lagu yang id-nya sama
+       * ditimpa (itulah maksud pembaruan), dan apa pun yang sudah ada di
+       * perangkat ini tetap ada.
+       */
+      if (data.songs?.length) await db.songs.bulkPut(data.songs)
+      if (data.setlists?.length) await db.setlists.bulkPut(data.setlists)
+      toast.push(`Materi diperbarui — ${data.team?.teamName ?? 'tim'}`)
+    } catch (e) {
+      const bukanBerkas = e instanceof Error && e.message === 'bukan-berkas'
+      toast.push(
+        bukanBerkas
+          ? 'Tidak ada berkas materi di alamat itu. Mungkin belum diunggah, atau ikut terhapus saat aplikasi diperbarui — unggah ulang paket.json bersama isi dist/.'
+          : 'Gagal mengambil materi. Periksa koneksi atau alamatnya.',
+        'err',
+      )
+    } finally {
+      setSedangMuat(false)
+    }
+  }
+
+  const bundle = pkg?.data
+  const members: Member[] = bundle?.members ?? []
+
+  useEffect(() => {
+    if (meId) localStorage.setItem('drillkit.meId', meId)
+  }, [meId])
+
+  /**
+   * Buka berkas paket yang dipilih anggota.
+   *
+   * Bila berkasnya menyebut **untuk siapa** ia dibuat (berkas per anggota),
+   * namanya langsung dipakai — anggota tidak disuruh memilih namanya dari
+   * daftar 18 orang padahal berkasnya sudah difilter hanya untuk dia.
+   *
+   * Tetapi tidak pernah dilakukan diam-diam: namanya disebut di pesan dan
+   * ditampilkan di kartu di bawah, lengkap dengan tombol **Ganti nama**.
+   * Kalau pelatih salah kirim berkas, salah orangnya harus kelihatan, bukan
+   * tersembunyi di balik pilihan yang tampak berhasil.
+   */
+  async function openPackage(file: File) {
+    try {
+      const text = await readFileAsText(file)
+      const data = JSON.parse(text) as ShareBundle
+      if (data.format !== 'drillkit-share') {
+        toast.push('Bukan berkas paket DrillKit', 'err')
+        return
+      }
+      const penerima = (data.members ?? []).find(
+        (m) => data.forMember != null && m.id === data.forMember,
+      )
+      await db.packages.put({ key: 'current', data, importedAt: Date.now() })
+      if (penerima) setMeId(penerima.id)
+      toast.push(
+        penerima
+          ? `Paket "${data.team?.teamName ?? 'tim'}" dibuka — hai, ${penerima.name}!`
+          : `Paket "${data.team?.teamName ?? 'tim'}" dibuka`,
+      )
+    } catch {
+      toast.push('Gagal membaca paket', 'err')
+    }
+  }
+
+  if (!bundle) {
+    return (
+      <div>
+        <PageHeader
+          title="Mode anggota"
+          subtitle="Buka paket yang dibagikan pelatih"
+          actions={<TombolKeluarModeAnggota label="Kembali ke mode pelatih" />}
+        />
+        <EmptyState
+          icon={<IconShare size={32} />}
+          title="Belum ada paket dibuka"
+          desc={
+            BISA_AMBIL
+              ? 'Ambil materi terbaru langsung dari situsnya, atau minta file paket .json dari pelatih. Semua data hanya tersimpan di HP ini.'
+              : 'Minta file paket .json dari pelatih, lalu buka di sini. Semua data hanya tersimpan di HP ini.'
+          }
+          action={
+            <>
+              <input
+                id="pkg-input"
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) openPackage(f)
+                  e.target.value = ''
+                }}
+              />
+              {BISA_AMBIL && (
+                <Button
+                  variant="primary"
+                  data-testid="ambil-materi"
+                  disabled={sedangMuat}
+                  onClick={perbarui}
+                >
+                  <IconLoop size={16} /> {sedangMuat ? 'Mengambil…' : 'Ambil materi dari situs'}
+                </Button>
+              )}
+              <Button
+                variant={BISA_AMBIL ? 'ghost' : 'primary'}
+                onClick={() => document.getElementById('pkg-input')?.click()}
+              >
+                <IconUpload size={16} /> Buka paket tim
+              </Button>
+            </>
+          }
+        />
+      </div>
+    )
+  }
+
+  const filtered = members.filter((m) => {
+    const s = q.trim().toLowerCase()
+    return !s || m.name.toLowerCase().includes(s) || m.code.toLowerCase().includes(s)
+  })
+  const me = members.find((m) => m.id === meId)
+
+  return (
+    <div>
+      <PageHeader
+        title={bundle.team?.teamName ?? 'Tim'}
+        subtitle={`Paket dibuat ${new Date(bundle.exportedAt).toLocaleDateString('id-ID')} · ${members.length} anggota`}
+        actions={
+          <>
+            {BISA_AMBIL && (
+              <Button data-testid="perbarui-materi" disabled={sedangMuat} onClick={perbarui}>
+                <IconLoop size={16} /> {sedangMuat ? 'Mengambil…' : 'Perbarui'}
+              </Button>
+            )}
+            <TombolKeluarModeAnggota />
+            <Button onClick={() => document.getElementById('pkg-input2')?.click()}>
+              <IconUpload size={16} /> Ganti paket
+            </Button>
+          </>
+        }
+      />
+      <input
+        id="pkg-input2"
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) openPackage(f)
+          e.target.value = ''
+        }}
+      />
+
+      {/* Pilih nama — cukup sekali, diingat di HP ini */}
+      <Card className="mb-4">
+        {me ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <div
+                className="grid h-10 w-10 place-items-center rounded-full text-xs font-bold text-slate-950"
+                style={{ background: sectionDot(me.section) }}
+              >
+                {me.code}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-100">{me.name}</p>
+                <p className="text-xs text-slate-500">
+                  {sectionLabel(me.section)} · {me.instrument}
+                </p>
+              </div>
+            </div>
+            <Button size="sm" variant="ghost" onClick={() => setMeId('')}>
+              Ganti nama
+            </Button>
+          </div>
+        ) : (
+          <div>
+            <p className="mb-2 text-xs font-medium text-slate-400">Pilih namamu dulu</p>
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Ketik nama atau kode…"
+              className="mb-2"
+            />
+            <div className="scroll-thin max-h-48 space-y-1 overflow-y-auto">
+              {filtered.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setMeId(m.id)}
+                  className="flex w-full items-center gap-2 rounded-lg border border-slate-800 px-3 py-2 text-left hover:bg-slate-800/60"
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ background: sectionDot(m.section) }} />
+                  <span className="text-sm text-slate-200">{m.name}</span>
+                  <Badge className="ml-auto">{m.code}</Badge>
+                </button>
+              ))}
+              {!filtered.length && <p className="text-xs text-slate-500">Tidak ditemukan.</p>}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Alamat materi — tempat tombol Perbarui mengambilnya */}
+      {BISA_AMBIL && (
+        <Card className="mb-4">
+          <h3 className="mb-1 text-sm font-semibold text-slate-200">Alamat materi</h3>
+          <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
+            Tombol <b>Perbarui</b> mengambil materi terbaru dari alamat ini. Absensi dan
+            catatanmu <b>tidak</b> ikut tertimpa.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              data-testid="alamat-materi"
+              value={alamat}
+              onChange={(e) => setAlamat(e.target.value)}
+              placeholder="paket.json"
+              className="flex-1 font-mono text-xs"
+            />
+            <Button
+              data-testid="perbarui-alamat"
+              variant="primary"
+              disabled={sedangMuat || !urlPaket}
+              onClick={perbarui}
+              className="justify-center"
+            >
+              <IconLoop size={16} /> {sedangMuat ? 'Mengambil…' : 'Perbarui'}
+            </Button>
+          </div>
+          <p className="mt-1.5 break-all text-[11px] text-slate-600">{urlPaket}</p>
+        </Card>
+      )}
+
+      {/*
+        Tab — lima buah, dan ukurannya harus Muat di HP.
+
+        Penambahan tab Musik membuat bar ini meluber 12px pada layar 360px:
+        tombol terakhir sebagian keluar dari layar. Seluruh rangkaian uji
+        berjalan di lebar 1300px, jadi cacatnya tidak pernah terlihat —
+        padahal mode anggota justru dipakai di HP.
+
+        Karena itu: padding & ukuran huruf diperkecil pada layar sempit,
+        label tidak boleh membungkus, dan bar boleh digeser bila tetap
+        tidak muat (misalnya layar 320px). Batang gesernya dibuat tipis
+        supaya tidak menggeser tata letaknya.
+      */}
+      <div
+        data-testid="bar-tab-anggota"
+        data-kiosk-allow
+        className="scroll-thin mb-4 flex gap-1 overflow-x-auto rounded-lg border border-slate-800 bg-slate-900/50 p-1"
+      >
+        {(['jadwal', 'formasi', 'absensi', 'catatan', 'musik'] as const).map((t) => (
+          <button
+            key={t}
+            data-testid={`tab-${t}`}
+            onClick={() => setTab(t)}
+            className={cx(
+              'flex-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[11px] font-medium capitalize transition sm:px-3 sm:text-xs',
+              tab === t ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-slate-100',
+            )}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'musik' ? (
+        /*
+         * N4 — metronom sengaja bisa dipakai WALAU belum memilih nama.
+         * Berlatih ketukan tidak perlu identitas, dan memaksa anggota
+         * memilih nama dulu hanya untuk berlatih tempo adalah rintangan
+         * yang tidak memberi apa pun.
+         */
+        <Music hanyaPutar />
+      ) : !me ? (
+        <EmptyState title="Pilih nama di atas" desc="Supaya DrillKit tahu formasi dan absensi siapa yang ditampilkan." />
+      ) : tab === 'jadwal' ? (
+        <MemberSchedule sessions={bundle.sessions} />
+      ) : tab === 'formasi' ? (
+        <MemberDrill bundle={bundle} me={me} members={members} />
+      ) : tab === 'absensi' ? (
+        <MemberAttendance bundle={bundle} me={me} />
+      ) : (
+        <MemberNotes bundle={bundle} me={me} />
+      )}
+    </div>
+  )
+}
+
+function MemberSchedule({ sessions }: { sessions: Session[] }) {
+  const sorted = [...sessions].sort((a, b) => a.date.localeCompare(b.date))
+  const upcoming = sorted.filter((s) => daysFromToday(s.date) >= 0)
+  const past = sorted.filter((s) => daysFromToday(s.date) < 0).reverse()
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Mendatang ({upcoming.length})
+        </h2>
+        {!upcoming.length ? (
+          <EmptyState title="Belum ada jadwal" />
+        ) : (
+          <div className="space-y-2">
+            {upcoming.map((s) => (
+              <Card key={s.id}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-100">{s.title}</p>
+                    <p className="text-xs text-slate-400">
+                      {formatDateLong(s.date)} · {s.startTime}–{s.endTime}
+                      {s.place ? ` · ${s.place}` : ''}
+                    </p>
+                  </div>
+                  <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                    {relativeDay(s.date)}
+                  </Badge>
+                </div>
+                {s.checklist.length > 0 && (
+                  <ul className="mt-2 space-y-0.5">
+                    {s.checklist.map((c) => (
+                      <li key={c.id} className="text-xs text-slate-400">
+                        • {c.text}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {past.length > 0 && (
+        <div>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Sudah lewat</h2>
+          <div className="space-y-1.5">
+            {past.slice(0, 10).map((s) => (
+              <div key={s.id} className="flex items-center justify-between rounded-lg border border-slate-800 px-3 py-2">
+                <span className="truncate text-xs text-slate-300">{s.title}</span>
+                <span className="shrink-0 text-[11px] text-slate-500">{s.date}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Tab "Formasi" untuk anggota.
+ *
+ * Isinya: pilihan drill, navigasi set memakai tombol besar (‹ ›), peta posisi
+ * dengan titiknya sendiri ditandai lingkaran emas, koordinat & jumlah langkah,
+ * informasi **asal** (set sebelumnya) dan **tujuan** (set berikutnya), serta
+ * tombol **Putar** untuk melihat perpindahannya beranimasi — supaya anggota
+ * bisa berlatih mandiri tanpa harus menunggu pelatih.
+ */
+function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: Member; members: Member[] }) {
+  const [drillId, setDrillId] = useState(bundle.drills[0]?.id ?? '')
+  const [setId, setSetId] = useState('')
+  const [playing, setPlaying] = useState(false)
+
+  const drill = bundle.drills.find((d) => d.id === drillId) ?? bundle.drills[0]
+  const sets: DrillSet[] = useMemo(
+    () => bundle.sets.filter((s) => s.drillId === drill?.id).sort((a, b) => a.order - b.order),
+    [bundle.sets, drill?.id],
+  )
+  useEffect(() => {
+    if (sets.length && !sets.some((s) => s.id === setId)) setSetId(sets[0].id)
+  }, [sets, setId])
+
+  const f: FieldConfig = drill?.field ?? DEFAULT_FIELD
+  /** Ukuran titik mengikuti luas lapangan — sama seperti di editor. */
+  const uk = (n: number) => ukurTitik(f, n)
+  const sYd = stepYd(f)
+  const halfW = f.widthYd / 2
+  const halfL = (f.lengthYd + f.endZoneYd * 2) / 2
+  const VW = f.lengthYd + f.endZoneYd * 2
+  const VH = f.widthYd
+  const sx = (x: number) => halfL - x
+  const sy = (y: number) => halfW - y
+
+  const idxSet = sets.findIndex((s) => s.id === setId)
+  const set = sets[idxSet] ?? sets[0]
+  const prevSet = idxSet > 0 ? sets[idxSet - 1] : undefined
+  const nextSet = idxSet >= 0 && idxSet < sets.length - 1 ? sets[idxSet + 1] : undefined
+  const myPoint = set?.points?.[me.id]
+  const myPrev = prevSet?.points?.[me.id]
+  const myNext = nextSet?.points?.[me.id]
+
+  /** Elemen <g> tiap titik — dipakai untuk menggerakkan saat animasi. */
+  const dotRefs = useRef(new Map<string, SVGGElement>())
+  const rafRef = useRef(0)
+
+  /**
+   * Animasi perpindahan ke set berikutnya. Sama seperti mode presenter: titik
+   * digerakkan lewat atribut `transform`, tanpa render ulang React per frame,
+   * supaya tetap mulus walau timnya 80 orang. Setelah selesai, set aktif maju.
+   */
+  useEffect(() => {
+    if (!playing || !set || !nextSet || !drill) {
+      setPlaying(false)
+      return
+    }
+    const total = Math.max(1, set.counts ?? 8) * drill.beatsPerCount * (60_000 / Math.max(20, drill.tempo))
+    const t0 = performance.now()
+    const vec: [string, number, number][] = []
+    for (const [id, p] of Object.entries(set.points ?? {})) {
+      const q = nextSet.points[id]
+      if (!q) continue
+      vec.push([id, sx(q.x) - sx(p.x), sy(q.y) - sy(p.y)])
+    }
+    const loop = () => {
+      const p = Math.min(1, (performance.now() - t0) / total)
+      for (const [id, vx, vy] of vec) {
+        dotRefs.current.get(id)?.setAttribute('transform', `translate(${vx * p} ${vy * p})`)
+      }
+      if (p < 1) {
+        rafRef.current = requestAnimationFrame(loop)
+      } else {
+        for (const [id] of vec) dotRefs.current.get(id)?.removeAttribute('transform')
+        setPlaying(false)
+        setSetId(nextSet.id)
+      }
+    }
+    rafRef.current = requestAnimationFrame(loop)
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+      for (const [id] of vec) dotRefs.current.get(id)?.removeAttribute('transform')
+    }
+  }, [playing, set, nextSet, drill])
+
+  const gantiSet = (arah: number) => {
+    setPlaying(false)
+    const i = Math.min(Math.max(0, idxSet + arah), sets.length - 1)
+    if (sets[i]) setSetId(sets[i].id)
+  }
+
+  if (!drill) return <EmptyState title="Paket ini tidak berisi formasi" />
+
+  const jarak = (a?: { x: number; y: number }, b?: { x: number; y: number }) =>
+    a && b ? Math.round(Math.hypot(b.x - a.x, b.y - a.y) / sYd) : null
+
+  return (
+    <div className="space-y-3">
+      <Card>
+        <Select value={drillId} onChange={(e) => setDrillId(e.target.value)} className="mb-2 w-full">
+          {bundle.drills.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </Select>
+
+        {/* Navigasi set — tombol besar supaya mudah dipakai di HP */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => gantiSet(-1)}
+            disabled={idxSet <= 0}
+            className="grid h-12 w-14 place-items-center rounded-xl border border-slate-700 bg-slate-900 text-2xl text-slate-100 active:scale-[.97] disabled:opacity-30"
+            title="Set sebelumnya"
+          >
+            ‹
+          </button>
+          <div className="min-w-0 flex-1 text-center">
+            <p className="truncate text-sm font-medium text-slate-100">{set?.name}</p>
+            <p className="text-[11px] text-slate-500">
+              Set {idxSet + 1} dari {sets.length} · {set?.counts ?? 0} count
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => gantiSet(1)}
+            disabled={idxSet >= sets.length - 1}
+            className="grid h-12 w-14 place-items-center rounded-xl border border-slate-700 bg-slate-900 text-2xl text-slate-100 active:scale-[.97] disabled:opacity-30"
+            title="Set berikutnya"
+          >
+            ›
+          </button>
+        </div>
+
+        {nextSet && (
+          <Button
+            className="mt-2 w-full"
+            variant={playing ? 'danger' : 'primary'}
+            onClick={() => setPlaying((p) => !p)}
+          >
+            {playing ? <IconPause size={16} /> : <IconPlay size={16} />}
+            {playing ? 'Jeda' : `Putar perpindahan ke ${nextSet.name}`}
+          </Button>
+        )}
+      </Card>
+
+      <Card padded={false} className="overflow-hidden">
+        <div className="bg-slate-950 p-2">
+          <svg viewBox={`0 0 ${VW} ${VH}`} className="w-full">
+            <FieldSurface f={f} VW={VW} VH={VH} sx={sx} sy={sy} />
+            {nextSet &&
+              Object.entries(set?.points ?? {}).map(([id, p]) => {
+                const q = nextSet.points[id]
+                if (!q) return null
+                return (
+                  <line
+                    key={`p-${id}`}
+                    x1={sx(p.x)}
+                    y1={sy(p.y)}
+                    x2={sx(q.x)}
+                    y2={sy(q.y)}
+                    stroke="rgba(255,255,255,0.35)"
+                    strokeWidth={id === me.id ? 0.4 : 0.15}
+                    strokeDasharray="1 1"
+                  />
+                )
+              })}
+            {Object.entries(set?.points ?? {}).map(([id, p]) => {
+              const m = members.find((x) => x.id === id)
+              if (!m) return null
+              const mine = id === me.id
+              const deg = facingDeg(p.facing, p.facingDeg)
+              const rad = (deg * Math.PI) / 180
+              return (
+                <g
+                  key={id}
+                  ref={(el) => {
+                    if (el) dotRefs.current.set(id, el)
+                    else dotRefs.current.delete(id)
+                  }}
+                >
+                  <line
+                    x1={sx(p.x)}
+                    y1={sy(p.y)}
+                    x2={sx(p.x) - Math.sin(rad) * 1.6}
+                    y2={sy(p.y) + Math.cos(rad) * 1.6}
+                    stroke={sectionDot(m.section)}
+                    strokeWidth={0.35}
+                  />
+                  <circle
+                    cx={sx(p.x)}
+                    cy={sy(p.y)}
+                    r={uk(mine ? 2.2 : 1.15)}
+                    fill={sectionDot(m.section)}
+                    stroke={mine ? '#fbbf24' : '#0b1120'}
+                    strokeWidth={uk(mine ? 0.6 : 0.18)}
+                  />
+                  {mine && (
+                    <circle
+                      cx={sx(p.x)}
+                      cy={sy(p.y)}
+                      r={uk(3.4)}
+                      fill="none"
+                      stroke="#fbbf24"
+                      strokeWidth={uk(0.3)}
+                      strokeDasharray="1 0.8"
+                    />
+                  )}
+                  <text
+                    x={sx(p.x)}
+                    y={sy(p.y) + 0.45}
+                    textAnchor="middle"
+                    fontSize={mine ? 1.6 : 1.1}
+                    fill="#0b1120"
+                    style={{ fontWeight: 700 }}
+                  >
+                    {m.code}
+                  </text>
+                </g>
+              )
+            })}
+          </svg>
+        </div>
+        <div className="border-t border-slate-800 px-3 py-2 text-[11px] text-slate-500">
+          Titikmu ditandai lingkaran emas · ukuran langkah {Math.round((1 / sYd) * 10) / 10} langkah/yard
+        </div>
+      </Card>
+
+      <Card>
+        <h3 className="mb-2 text-sm font-semibold text-slate-200">Posisiku — {set?.name}</h3>
+        {myPoint ? (
+          <>
+            <p className="rounded-lg bg-slate-950/60 px-3 py-2.5 font-mono text-sm text-emerald-300">
+              {coordText(myPoint.x, myPoint.y, f)}
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <StatTile
+                label="Langkah dari garis 50"
+                value={Math.round((myPoint.x / sYd) * 4) / 4}
+                sub={myPoint.x >= 0 ? 'arah Side 1' : 'arah Side 2'}
+              />
+              <StatTile
+                label="Langkah dari garis depan"
+                value={Math.round(((myPoint.y + f.widthYd / 2) / sYd) * 4) / 4}
+                sub="front sideline = 0"
+              />
+            </div>
+
+            {/* Asal: set sebelumnya */}
+            {prevSet && (
+              <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                <p className="text-xs font-medium text-slate-300">
+                  Dari {prevSet.name}: {prevSet.counts ?? 0} count
+                  {jarak(myPrev, myPoint) !== null && (
+                    <>
+                      {' '}
+                      · jarak <b className="text-sky-400">{jarak(myPrev, myPoint)}</b> langkah
+                    </>
+                  )}
+                </p>
+                {myPrev && (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Asal: {coordText(myPrev.x, myPrev.y, f)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Tujuan: set berikutnya */}
+            {nextSet && (
+              <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                <p className="text-xs font-medium text-slate-300">
+                  Gerakan ke {nextSet.name}: {set?.counts ?? 0} count
+                  {jarak(myPoint, myNext) !== null && (
+                    <>
+                      {' '}
+                      · jarak <b className="text-emerald-400">{jarak(myPoint, myNext)}</b> langkah
+                    </>
+                  )}
+                </p>
+                {myNext && (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Tujuan: {coordText(myNext.x, myNext.y, f)} ·{' '}
+                    {Math.round(((set?.counts ?? 0) * 60) / drill.tempo)} detik pada {drill.tempo} BPM
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-slate-400">Kamu tidak ada di set ini (mungkin istirahat/prop).</p>
+        )}
+      </Card>
+    </div>
+  )
+}
+
+/**
+ * Tab "Catatan" — catatan evaluasi pribadi yang ditulis pelatih.
+ * Hanya catatan untuk anggota yang sedang dipilih yang ditampilkan.
+ */
+function MemberNotes({ bundle, me }: { bundle: ShareBundle; me: Member }) {
+  const notes: MemberNote[] = useMemo(
+    () => (bundle.memberNotes ?? []).filter((n) => n.memberId === me.id).sort((a, b) => b.at - a.at),
+    [bundle.memberNotes, me.id],
+  )
+
+  if (!notes.length) {
+    return (
+      <EmptyState
+        title="Belum ada catatan"
+        desc="Catatan evaluasi dari pelatih akan muncul di sini setelah paket diperbarui."
+      />
+    )
+  }
+
+  return (
+    <Card padded={false}>
+      <ul className="divide-y divide-slate-800/70">
+        {notes.map((n) => (
+          <li key={n.id} className="px-4 py-3">
+            <p className="mb-1 text-[11px] text-slate-500">
+              {formatDateLong(new Date(n.at).toISOString().slice(0, 10))}
+              {n.by ? ` · ${n.by}` : ''}
+            </p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{n.text}</p>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
+/**
+ * Tab "Absensi" milik anggota.
+ *
+ * Persentase kehadiran dihitung dari sesi yang **dicatat pelatih**, bukan
+ * dari seluruh sesi. Dua keadaan yang berbeda bisa menghasilkan angka yang
+ * sama — pelatih mencatat 2 dari 5 sesi (dua-duanya hadir) dan pelatih
+ * mencatat semua 5 sesi (semuanya hadir) keduanya menampilkan **100%**.
+ *
+ * Karena itu penyebutnya ditulis di bawah angkanya, persis seperti yang
+ * sudah dilakukan layar rekap pelatih sendiri, dan sesi yang sudah lewat
+ * tanpa catatan ditampilkan tersendiri sebagai **"Belum dicatat"** —
+ * **bukan** digabung ke "tidak hadir". Pelatih yang belum sempat mengisi
+ * absensi tidak boleh membuat anggotanya tampak mangkir.
+ */
+function MemberAttendance({ bundle, me }: { bundle: ShareBundle; me: Member }) {
+  const mine = bundle.attendance.filter((a) => a.memberId === me.id)
+  const hadir = mine.filter((a) => a.status === 'hadir').length
+  const sessions = [...bundle.sessions].sort((a, b) => b.date.localeCompare(a.date))
+
+  /** Sesi yang sudah lewat dan belum punya catatan apa pun. */
+  const belumDicatat = sessions.filter(
+    (s) => daysFromToday(s.date) < 0 && !mine.some((a) => a.sessionId === s.id),
+  )
+  const baris = sessions
+    .map((s) => ({ s, r: mine.find((a) => a.sessionId === s.id) }))
+    .filter(({ s, r }) => r != null || daysFromToday(s.date) < 0)
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <StatTile label="Hadir" value={hadir} accent="text-emerald-400" />
+        <StatTile label="Izin/Sakit" value={mine.filter((a) => a.status === 'izin' || a.status === 'sakit').length} />
+        <StatTile
+          label="Kehadiran"
+          /*
+           * Bila pelatih belum mencatat apa pun, jangan menampilkan "0%".
+           * Nol persen pada data yang kosong berbunyi sebagai tuduhan
+           * mangkir, padahal yang benar adalah "belum ada datanya".
+           * Angka yang tidak ada dibedakan dari angka nol.
+           */
+          value={mine.length ? `${pct(hadir, mine.length)}%` : '—'}
+          sub={mine.length ? `${hadir} dari ${mine.length} sesi yang dicatat` : 'belum ada yang dicatat'}
+          accent={mine.length ? 'text-emerald-400' : undefined}
+        />
+      </div>
+      {belumDicatat.length > 0 && (
+        <p className="text-[11px] leading-relaxed text-slate-500">
+          {belumDicatat.length} sesi lain yang sudah lewat belum dicatat pelatih — ditandai{' '}
+          <b>Belum dicatat</b> di bawah, bukan berarti tidak hadir.
+        </p>
+      )}
+      <Card padded={false}>
+        <ul className="divide-y divide-slate-800/70">
+          {baris.map(({ s, r }) => (
+            <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-sm text-slate-200">{s.title}</p>
+                <p className="text-[11px] text-slate-500">{s.date}</p>
+              </div>
+              {r ? (
+                <Badge className={STATUS_META[r.status].color}>{STATUS_META[r.status].label}</Badge>
+              ) : (
+                <Badge className="bg-slate-700/40 text-slate-400 border-slate-600/40">Belum dicatat</Badge>
+              )}
+            </li>
+          ))}
+        </ul>
+        {!baris.length && (
+          <div className="p-4">
+            <EmptyState title="Belum ada catatan kehadiran" desc="Paket ini belum memuat data absensi." />
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}
+
+/* --------------------------------- Mode ------------------------------------- */
+
+/*
+ * Simpanan & pembacaan mode kini hidup di `src/lib/modePerangkat`, bersama
+ * aturan-aturannya. Dulu ia di sini, tetapi komponen penjaga rutenya butuh
+ * `useMemberMode` sementara komponen itu sendiri dipakai oleh halaman ini —
+ * impor melingkar. Menyatukan keadaan dan aturannya di satu modul lebih
+ * rapi daripada sekadar memutus lingkaran itu.
+ */
+export { bacaMode, simpanMode } from '../lib/modePerangkat'
+
+/** 'member' kalau perangkat ini memilih mode anggota. */
+export function useMemberMode(): 'coach' | 'member' {
+  const [mode] = useState<'coach' | 'member'>(bacaMode)
+  return mode
+}

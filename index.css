@@ -1,0 +1,348 @@
+@import "tailwindcss";
+
+/*
+ * Palet warna sengaja ditulis sebagai hex, BUKAN oklch bawaan Tailwind v4,
+ * dan ditandai `inline` supaya nilainya langsung tertanam di setiap utility
+ * class (`background-color:#0f172a`, bukan `var(--color-slate-900)`).
+ *
+ * Alasannya: browser yang lebih lama dari Chrome 111 / Safari 15.4 /
+ * Firefox 113 tidak mengerti `oklch()` maupun `color-mix()`, sehingga SELURUH
+ * deklarasi warna dibuang dan aplikasi tampil hanya sebagai teks polos.
+ * Dengan hex, Lightning CSS juga bisa menurunkan
+ * `color-mix(in oklab, #0f172a 60%, transparent)` menjadi `rgba(...)`.
+ *
+ * Daftar warnanya dibuat oleh `scripts/palette-hex.mjs` (npm run palette):
+ * dikonversi presisi dari palet asli Tailwind v4, jadi tampilannya identik.
+ */
+@theme inline {
+  /* === PALETTE START (dibuat oleh scripts/palette-hex.mjs) === */
+/* slate */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cad5e2;
+  --color-slate-400: #90a1b9;
+  --color-slate-500: #62748e;
+  --color-slate-600: #45556c;
+  --color-slate-700: #314158;
+  --color-slate-800: #1d293d;
+  --color-slate-900: #0f172b;
+  --color-slate-950: #020618;
+
+  /* emerald */
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d0fae5;
+  --color-emerald-200: #a4f4cf;
+  --color-emerald-300: #5ee9b5;
+  --color-emerald-400: #00d294;
+  --color-emerald-500: #00bb7f;
+  --color-emerald-600: #009767;
+  --color-emerald-700: #007956;
+  --color-emerald-800: #005f46;
+  --color-emerald-900: #004e3b;
+  --color-emerald-950: #002c22;
+
+  /* amber */
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c6;
+  --color-amber-200: #fee685;
+  --color-amber-300: #ffd236;
+  --color-amber-400: #fcbb00;
+  --color-amber-500: #f99c00;
+  --color-amber-600: #dd7400;
+  --color-amber-700: #b75000;
+  --color-amber-800: #953d00;
+  --color-amber-900: #7b3306;
+  --color-amber-950: #461901;
+
+  /* sky */
+  --color-sky-50: #f0f9ff;
+  --color-sky-100: #dff2fe;
+  --color-sky-200: #b8e6fe;
+  --color-sky-300: #77d4ff;
+  --color-sky-400: #00bcfe;
+  --color-sky-500: #00a5ef;
+  --color-sky-600: #0084cc;
+  --color-sky-700: #0069a4;
+  --color-sky-800: #005986;
+  --color-sky-900: #024a70;
+  --color-sky-950: #052f4a;
+
+  /* rose */
+  --color-rose-50: #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-200: #ffccd3;
+  --color-rose-300: #ffa2ae;
+  --color-rose-400: #ff667f;
+  --color-rose-500: #ff2357;
+  --color-rose-600: #e70044;
+  --color-rose-700: #c20039;
+  --color-rose-800: #a30037;
+  --color-rose-900: #8b0836;
+  --color-rose-950: #4d0218;
+
+  /* violet */
+  --color-violet-50: #f5f3ff;
+  --color-violet-100: #ede9fe;
+  --color-violet-200: #ddd6ff;
+  --color-violet-300: #c4b4ff;
+  --color-violet-400: #a685ff;
+  --color-violet-500: #8d54ff;
+  --color-violet-600: #7f22fe;
+  --color-violet-700: #7008e7;
+  --color-violet-800: #5d0ec0;
+  --color-violet-900: #4d179a;
+  --color-violet-950: #2f0d68;
+
+  /* teal */
+  --color-teal-50: #f0fdfa;
+  --color-teal-100: #cbfbf1;
+  --color-teal-200: #96f7e4;
+  --color-teal-300: #46ecd5;
+  --color-teal-400: #00d3bd;
+  --color-teal-500: #00baa7;
+  --color-teal-600: #009588;
+  --color-teal-700: #00776e;
+  --color-teal-800: #005f5a;
+  --color-teal-900: #0b4f4a;
+  --color-teal-950: #022f2e;
+  /* === PALETTE END === */
+  --color-field-50: #f0fdf4;
+  --color-field-100: #dcfce7;
+  --color-brand-400: #fbbf24;
+  --color-brand-500: #f59e0b;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Menlo", monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0b1120;
+  color: #e2e8f0;
+  -webkit-tap-highlight-color: transparent;
+  font-family: var(--font-sans);
+}
+
+/* Scrollbar halus untuk panel daftar */
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 999px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Mencegah zoom/geser tak sengaja saat drag titik formasi di HP */
+.drill-surface {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+}
+
+/*
+ * Fallback browser lama untuk "ring" (cincin fokus/penanda pilihan).
+ * Tailwind membuat warna `ring-*/50` dengan `lab()`. Browser lama tidak paham
+ * `lab()`, sehingga `var(--tw-ring-color)` menjadi tidak valid saat dipakai
+ * dan cincin fokus hilang sama sekali. Di bawah ini diberi pengganti berupa
+ * heks 8-digit (warna + alpha) untuk semua `ring-*/..` yang dipakai aplikasi.
+ * Browser baru mengabaikan blok ini karena `@supports not (...)` bernilai salah.
+ */
+@supports not (color: lab(50% 0 0)) {
+  .ring-emerald-600\/25 {
+    --tw-ring-color: #00976740;
+  }
+  .ring-emerald-600\/30 {
+    --tw-ring-color: #0097674d;
+  }
+  .ring-emerald-500\/30 {
+    --tw-ring-color: #00bb7f4d;
+  }
+  .ring-emerald-500\/40 {
+    --tw-ring-color: #00bb7f66;
+  }
+  .ring-rose-500\/30 {
+    --tw-ring-color: #ff23574d;
+  }
+  .ring-slate-600\/40 {
+    --tw-ring-color: #45556c66;
+  }
+}
+
+/*
+ * Mode kios: saat data dikunci, semua tombol diredupkan supaya sekilas kelihatan
+ * bahwa aplikasi sedang "hanya bisa dilihat". Tombol di area yang diizinkan
+ * (navigasi, presenter, metronom) tetap terang. Penolakan klik sendiri
+ * diurus oleh penjaga global di src/lib/kiosk.ts.
+ */
+html[data-kiosk="1"] button,
+html[data-kiosk="1"] select,
+html[data-kiosk="1"] textarea {
+  opacity: 0.45;
+}
+
+html[data-kiosk="1"] [data-kiosk-allow] button,
+html[data-kiosk="1"] [data-kiosk-allow] select,
+html[data-kiosk="1"] button[data-kiosk-allow],
+html[data-kiosk="1"] select[data-kiosk-allow] {
+  opacity: 1;
+}
+
+/*
+ * B4 — Kontras tinggi & huruf besar.
+ *
+ * Dua penanda pada <html> yang dipasang oleh src/lib/tampilan.ts:
+ *
+ *   data-kontras="1"     → warna lebih pekat, teks lebih terang, batas lebih tegas
+ *   data-ukuran="besar"  → seluruh antarmuka membesar
+ *
+ * Kenapa di sini, bukan di komponen: ukuran & warna Tailwind memakai satuan
+ * `rem` dan hex yang sudah tertanam di tiap utility class, jadi cukup
+ * mengubah `font-size` di <html> dan menimpa warna lewat CSS — tidak perlu
+ * menyunting satu per satu halaman.
+ *
+ * Semua warna ditulis hex (tanpa oklch/lab/color-mix) supaya aman di browser
+ * lama, sesuai aturan palet di atas.
+ */
+
+/* ------------------------------- Huruf besar ------------------------------ */
+/* Tailwind memakai rem, jadi cukup satu baris untuk membesar semuanya. */
+html[data-ukuran='besar'] {
+  font-size: 19px;
+}
+/*
+ * Pengaman: anak grid/flex dibolehkan menyusut di bawah lebar isinya
+ * (`min-width:auto`), supaya teks yang memanjang karena huruf besar
+ * melipat atau dipotong, bukan membuat halaman bergeser mendatar.
+ * Elemen yang diberi `shrink-0` tetap tidak menyusut.
+ */
+html[data-ukuran='besar'] .grid > *,
+html[data-ukuran='besar'] .flex > * {
+  min-width: 0;
+}
+
+/* ------------------------------ Kontras tinggi ---------------------------- */
+html[data-kontras='1'],
+html[data-kontras='1'] body {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* Teks redup diterangkan — ini yang paling terasa saat kena matahari. */
+html[data-kontras='1'] .text-slate-300,
+html[data-kontras='1'] .text-slate-400,
+html[data-kontras='1'] .text-slate-500,
+html[data-kontras='1'] .text-slate-600 {
+  color: #e7eef7 !important;
+}
+
+/* Panel & kartu: latar rata gelap, tapi tetap beda dari halaman. */
+html[data-kontras='1'] .bg-slate-800,
+html[data-kontras='1'] .bg-slate-800\/50,
+html[data-kontras='1'] .bg-slate-800\/60,
+html[data-kontras='1'] .bg-slate-900,
+html[data-kontras='1'] .bg-slate-900\/40,
+html[data-kontras='1'] .bg-slate-900\/50,
+html[data-kontras='1'] .bg-slate-900\/60,
+html[data-kontras='1'] .bg-slate-900\/70,
+html[data-kontras='1'] .bg-slate-950\/40,
+html[data-kontras='1'] .bg-slate-950\/60,
+html[data-kontras='1'] .bg-slate-950\/80 {
+  background-color: #0b111c !important;
+}
+html[data-kontras='1'] .bg-slate-950 {
+  background-color: #05080e !important;
+}
+
+/* Batas & pembatas dipertegas supaya batas kartu/tabel jelas. */
+html[data-kontras='1'] .border-slate-600,
+html[data-kontras='1'] .border-slate-700,
+html[data-kontras='1'] .border-slate-700\/50,
+html[data-kontras='1'] .border-slate-800 {
+  border-color: #8b98ab !important;
+}
+html[data-kontras='1'] .divide-slate-700 > :not(:last-child),
+html[data-kontras='1'] .divide-slate-800 > :not(:last-child) {
+  border-color: #8b98ab !important;
+}
+
+/* Isian, pilihan, & catatan: latar hampir hitam, teks putih, batas terang. */
+html[data-kontras='1'] input,
+html[data-kontras='1'] select,
+html[data-kontras='1'] textarea {
+  background-color: #04070d !important;
+  color: #fff !important;
+  border-color: #93a1b5 !important;
+}
+html[data-kontras='1'] ::placeholder {
+  color: #a9b6c8 !important;
+}
+
+/* Tombol utama & warna penanda dibuat lebih menyala. */
+html[data-kontras='1'] .bg-emerald-500 {
+  background-color: #00d48f !important;
+}
+html[data-kontras='1'] .bg-emerald-600 {
+  background-color: #00c07f !important;
+}
+html[data-kontras='1'] .text-emerald-300,
+html[data-kontras='1'] .text-emerald-400 {
+  color: #6ff0c0 !important;
+}
+html[data-kontras='1'] .text-amber-300,
+html[data-kontras='1'] .text-amber-400 {
+  color: #ffd93d !important;
+}
+
+/* Unsur yang sengaja diredupkan (riwayat lewat, mode kios) dibuat penuh. */
+html[data-kontras='1'] .opacity-60,
+html[data-kontras='1'] .opacity-70,
+html[data-kontras='1'] .opacity-80,
+html[data-kontras='1'] .opacity-90 {
+  opacity: 1 !important;
+}
+
+/* Fokus kelihatan jelas saat memakai keyboard. */
+html[data-kontras='1'] *:focus-visible {
+  outline: 2px solid #fbbf24 !important;
+  outline-offset: 2px;
+}
+
+/* Lapangan: rumput digelapkan, garis dijadikan putih penuh. */
+html[data-kontras='1'] [data-lap='rumput'] {
+  fill: #04240f;
+}
+html[data-kontras='1'] [data-lap='zona'] {
+  fill: #062f16;
+}
+html[data-kontras='1'] [data-lap='garis'],
+html[data-kontras='1'] [data-lap='hash'],
+html[data-kontras='1'] [data-lap='tepi'] {
+  stroke: #ffffff;
+}
+html[data-kontras='1'] [data-lap='teks'] {
+  fill: #ffffff;
+}
+/* Titik pemain: cincin luarnya mengikuti latar yang sekarang hitam. */
+html[data-kontras='1'] [data-titik] {
+  stroke: #000000;
+}

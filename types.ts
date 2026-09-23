@@ -1,0 +1,782 @@
+/**
+ * DrillKit — Definisi tipe data.
+ *
+ * Semua data tersimpan di browser (IndexedDB lewat Dexie), jadi aplikasi
+ * tetap berjalan tanpa internet dan tanpa biaya server.
+ *
+ * Koordinat formasi disimpan dalam SATUAN YARD, relatif terhadap:
+ *   - x = 0  di garis tengah lapangan (50 yard), positif ke arah SIDE 1
+ *   - y = 0  di garis tengah lapangan, positif ke arah BACK SIDELINE
+ *     (menjauh dari penonton). Front sideline = sisi penonton.
+ * Konversi ke "langkah" (steps) dilakukan saat ditampilkan, karena ukuran
+ * langkah bisa berbeda tiap tim (8-to-5, 6-to-5, dst).
+ */
+
+/**
+ * Section bersifat DINAMIS: pelatih bisa menambah/mengubah nama & warnanya
+ * di Pengaturan. Nilai bawaan mengikuti istilah marching band pada umumnya.
+ */
+export type Section = string
+
+export interface SectionDef {
+  /** id internal, dipakai sebagai nilai `member.section` */
+  id: string
+  label: string
+  /** singkatan pendek untuk chip */
+  short: string
+  /** warna titik di chart (hex) */
+  dot: string
+  /** 1 = tidak ditampilkan di pilihan, tapi data lamanya tetap aman */
+  hidden?: number
+}
+
+export type MemberRole = 'member' | 'sectionLeader' | 'drumMajor' | 'assistant'
+
+export interface Member {
+  id: string
+  /** Nomor/ID singkat yang tampil di chart (mis. "T1", "12") */
+  code: string
+  name: string
+  section: Section
+  /**
+   * Instrumen **sekaligus perlengkapan** yang dibawa pemain. Satu kolom saja
+   * (bukan dua), supaya tidak ada dua tempat untuk hal yang sama — label di
+   * form anggota memang sengaja "Instrumen / perlengkapan".
+   */
+  instrument: string
+  role: MemberRole
+  joinYear: number
+  active: number // 0 | 1 (IndexedDB tidak bisa index boolean)
+  phone?: string
+  notes?: string
+  /** Token acak untuk QR absensi — jadi tidak bisa ditebak */
+  token: string
+  createdAt: number
+}
+
+/**
+ * D3 — Jenis kegiatan. Dipakai untuk membedakan angka kehadiran:
+ * latihan biasa, latihan section, latihan gabungan, penampilan/konser, rapat, dll.
+ * Nilai lama ('latihan', 'penampilan', 'rapat', 'lainnya') tetap berlaku, jadi
+ * data yang sudah ada tidak rusak.
+ */
+export type SessionType = 'latihan' | 'section' | 'gabungan' | 'penampilan' | 'rapat' | 'lainnya'
+
+export interface ChecklistItem {
+  id: string
+  text: string
+  done: number // 0 | 1
+}
+
+export interface Session {
+  id: string
+  title: string
+  type: SessionType
+  /** Tanggal format ISO: YYYY-MM-DD */
+  date: string
+  startTime: string // "15:30"
+  endTime: string
+  place?: string
+  notes?: string
+  checklist: ChecklistItem[]
+  createdAt: number
+  /**
+   * G1 — set list yang dibawakan pada sesi ini.
+   *
+   * Dipakai run sheet hari lomba untuk menjawab pertanyaan yang paling
+   * menentukan: **apakah isi penampilan muat di slot waktunya?** Tanpa
+   * tautan ini, jadwal hanya berisi rentang waktu kosong.
+   */
+  setListId?: string
+
+  /**
+   * H1 — rencana latihan: blok waktu (pemanasan / section / gabungan / …)
+   * beserta durasi yang direncanakan, **dalam menit**.
+   *
+   * Sengaja disimpan sebagai **durasi**, bukan jam absolut. Waktu absolut
+   * tiap blok diturunkan dengan menjumlahkannya dari jam mulai sesi. Dengan
+   * begitu, menggeser jam mulai sesi otomatis menggeser seluruh blok —
+   * pelatih tidak perlu menyusun ulang rencananya satu per satu.
+   */
+  rencanaLatihan?: BlokLatihan[]
+
+  /**
+   * H1 — realisasi: kapan tiap blok benar-benar mulai dan selesai (epoch ms).
+   *
+   * Inilah yang membedakan **rencana** dari **kenyataan**. Tanpa ini,
+   * "latihan melenceng dari rencana" hanya bisa dirasakan, tidak bisa
+   * diukur. Catatan yang sama kelak dipakai G3 untuk sesi hari lomba.
+   */
+  realisasiLatihan?: RealisasiBlok[]
+
+  /**
+   * G3 — kapan **sesinya sendiri** benar-benar dimulai (epoch ms).
+   *
+   * Sengaja **terpisah** dari blok pertama. Sesi dimulai ketika pelatih
+   * memanggil semua orang berkumpul; blok pertama baru mulai ketika
+   * pemanasan benar-benar jalan. Memakai blok pertama sebagai penanda sesi
+   * akan menyembunyikan keterlambatan yang paling umum.
+   */
+  mulaiNyata?: number
+
+  /**
+   * G3 — kapan sesi benar-benar diakhiri (epoch ms). `null`/kosong bila
+   * belum ditandai; sesi yang dimulai tanpa penanda selesai dianggap
+   * **masih berjalan** berapa lama pun, karena menebak waktu berakhirnya
+   * lebih buruk daripada mengaku belum tahu.
+   */
+  selesaiNyata?: number
+}
+
+/**
+ * H2 — aspek yang dinilai pelatih saat mengevaluasi anggota.
+ *
+ * **Kehadiran sengaja tidak ada di sini.** Ia sudah terukur dari data
+ * absensi, jadi menilainya secara manual akan membuat dua tempat untuk hal
+ * yang sama — dan dua angka yang lambat laun tidak cocok. Yang perlu
+ * dinilai pelatih justru yang **tidak** bisa dihitung dari data.
+ */
+export type AspekEvaluasi = 'teknik' | 'musikalitas' | 'kedisiplinan' | 'kerjasama'
+
+/**
+ * H2 — satu kali evaluasi untuk satu anggota.
+ *
+ * Aspek disimpan sebagai peta sederhana (bukan kolom tetap) supaya pelatih
+ * boleh menilai sebagian saja — menilai kerjasama tanpa menilai teknik itu
+ * sah, dan memaksa semua terisi akan membuat evaluasi jadi asal-asalan.
+ */
+export interface Evaluasi {
+  id: string
+  memberId: string
+  /** Tanggal evaluasi, format ISO: YYYY-MM-DD */
+  tanggal: string
+  /** Nilai per aspek, 1–5. Aspek yang tidak dinilai tidak disebut. */
+  nilai: Partial<Record<AspekEvaluasi, number>>
+  catatan?: string
+  /** Siapa yang menilai, mis. "Pelatih". */
+  oleh?: string
+  createdAt: number
+}
+
+/** Jenis blok dalam rencana latihan. Terpisah dari `SessionType` yang ada. */
+export type JenisBlok = 'pemanasan' | 'section' | 'gabungan' | 'pendingin' | 'lainnya'
+
+export interface BlokLatihan {
+  id: string
+  judul: string
+  jenis: JenisBlok
+  /** Durasi yang direncanakan, dalam menit. Nol atau negatif dianggap tidak sah. */
+  menit: number
+  catatan?: string
+}
+
+export interface RealisasiBlok {
+  /** Id blok yang bersesuaian di `rencanaLatihan`. */
+  id: string
+  /** Epoch ms saat blok benar-benar dimulai. */
+  mulai: number
+  /** Epoch ms saat blok benar-benar selesai. `null` = sedang berjalan. */
+  selesai: number | null
+}
+
+export type AttendanceStatus = 'hadir' | 'izin' | 'sakit' | 'alpha'
+
+export interface AttendanceRecord {
+  id: string
+  sessionId: string
+  memberId: string
+  status: AttendanceStatus
+  checkInAt?: number
+  note?: string
+}
+
+/* ------------------------------- Drill ---------------------------------- */
+
+export type StepPreset = '8to5' | '6to5' | '4to5' | 'custom'
+export type HashPreset = 'nfhs' | 'ncaa' | 'nfl' | 'none'
+
+export interface FieldConfig {
+  /** lebar lapangan (yard), default 53.33 */
+  widthYd: number
+  /** panjang area bermain (yard), default 100 */
+  lengthYd: number
+  /** end zone di setiap ujung (yard), default 10 */
+  endZoneYd: number
+  /** jarak antar hash mark */
+  hash: HashPreset
+  /** jarak antar garis yard untuk grid, default 5 yard */
+  gridYd: number
+  /** ukuran langkah */
+  step: StepPreset
+  /** jika step === 'custom', panjang 1 langkah dalam yard */
+  customStepYd: number
+  /** tampilkan label yard line */
+  showLabels: number
+  /**
+   * Satuan yang dipakai saat mengisi panjang/lebar di editor.
+   * Nilai yang tersimpan **tetap yard** — ini hanya memengaruhi tampilan & input,
+   * supaya drill lama tidak perlu diubah.
+   */
+  satuan?: 'yd' | 'm'
+  /**
+   * Sistem patok cara Indonesia (DD1).
+   * Kosong atau `aktif: 0` = koordinat tetap memakai format football lama.
+   */
+  patok?: PatokConfig
+  /** Garis lapangan: 1 = semua, 2 = tanpa garis tepi, 0 = sembunyikan semua. */
+  garis?: number
+  /** Warna latar lapangan — kunci dari `WARNA_LAPANGAN`. Bawaan `'hijau'`. */
+  warna?: string
+  /**
+   * Pengali ukuran titik pemain. `1` = ukuran bawaan (sudah mengikuti luas
+   * lapangan). Bisa diperkecil kalau formasi terasa sesak.
+   */
+  ukuranTitik?: number
+}
+
+/**
+ * Sistem patok lapangan — kebiasaan tim marching band di Indonesia (DD1).
+ *
+ * Dua sumbu patok yang saling tegak lurus:
+ * - **Patok huruf**: `A → # → B → # → C …` — huruf dan tanda # berselang-seling.
+ * - **Patok angka**: `T1 → T2 → T3 …`
+ *
+ * Posisi pemain dibaca sebagai gabungan keduanya, misalnya **A6** (patok A,
+ * patok T6) atau **B#8** (patok B#, patok T8).
+ *
+ * Semua jarak disimpan dalam **langkah**, bukan yard/meter — karena patok di
+ * lapangan dipasang dengan melangkah, dan ukuran langkah bisa berbeda per
+ * drill. Jaraknya ikut menyesuaikan kalau ukuran langkah diubah.
+ */
+export interface PatokConfig {
+  /** 1 = koordinat ditulis memakai patok; 0 = memakai format football */
+  aktif: number
+  /**
+   * Patok huruf dipasang di sumbu yang mana; sumbu lainnya dipakai patok T.
+   * `'y'` = melintang (depan ↔ belakang), `'x'` = membujur (S1 ↔ S2).
+   */
+  sumbuHuruf: 'x' | 'y'
+  /**
+   * Pola patok huruf.
+   * `1` (bawaan, kebiasaan tim) = **A di titik tengah**, lalu keluar ke dua
+   *   sisi: `# C # B # A # B # C #`.
+   * `0` = A di tepi, lalu lurus ke seberang: `A # B # C # …`.
+   */
+  dariTengah: number
+  /** 1 = patok angka ditulis `T1`, `T2`; 0 = cukup `1`, `2` */
+  awalanT: number
+  /**
+   * 1 = sisi yang berlawanan diberi tanda koma atas (`B'`), supaya patok kiri
+   * dan kanan tidak rancu saat dibaca di buku saku. 0 = ditulis sama saja.
+   */
+  penandaSisi: number
+  /** jarak patok huruf ke huruf berikutnya (A→B), dalam langkah */
+  jarakHuruf: number
+  /** jarak patok huruf ke tanda # sesudahnya (A→#), dalam langkah */
+  jarakHash: number
+  /** jarak antar patok angka (T1→T2), dalam langkah */
+  jarakT: number
+  /** 1 = gambar patok & labelnya di lapangan */
+  tampil: number
+}
+
+export type Facing = 'front' | 'back' | 'left' | 'right' | 'custom'
+
+export interface DrillPoint {
+  /** posisi dalam yard, relatif titik tengah lapangan */
+  x: number
+  y: number
+  /** facing: 'front' = menghadap penonton, atau derajat manual (0 = front) */
+  facing: Facing
+  facingDeg?: number
+}
+
+export interface DrillSet {
+  id: string
+  drillId: string
+  order: number
+  name: string
+  /** jumlah count untuk berpindah KE set berikutnya (0 = set terakhir/diam) */
+  counts: number
+  notes?: string
+  /** key = memberId */
+  points: Record<string, DrillPoint>
+  /** DD2 — cara pemain berpindah KE set berikutnya. Kosong = lurus & rata. */
+  gerak?: GerakSet
+  /**
+   * DD10b — cara langkah dihitung **per pemain** untuk perpindahan yang
+   * bermula di set ini. Key = memberId. Yang tidak disebut mengikuti
+   * bawaan drill.
+   */
+  langkah?: Record<string, SetelanLangkah>
+  createdAt: number
+}
+
+/**
+ * 31e — Dasar jarak yang dipakai untuk menghitung langkah.
+ *
+ * Dua kebiasaan yang sama-sama dipakai, dan tidak ada yang benar sendiri:
+ *
+ * - **`jalur`** (bawaan) — jarak **tempuh kaki**, mengikuti kelengkungan
+ *   jalur. Jalur melengkung membuat jarak tempuh lebih panjang dari garis
+ *   lurus walau titik awal & akhirnya sama. Ini yang menentukan berapa
+ *   banyak langkah yang benar-benar diambil pemain.
+ * - **`lurus`** — jarak **perpindahan** dari titik awal ke titik akhir,
+ *   mengabaikan kelengkungan. Ini yang dipakai desainer yang menghitung
+ *   formasi secara geometris: "delapan langkah dari sini ke sana".
+ *
+ * Pilihan ada di tangan desainer drill, bukan ditentukan aplikasi.
+ */
+export type DasarJarak = 'jalur' | 'lurus'
+
+/** Cara menghitung langkah pada satu perpindahan. */
+export type ModeLangkah = 'tetap' | 'menyesuaikan'
+
+/**
+ * DD10b — Cara langkah dihitung.
+ *
+ * Dua kebiasaan yang berbeda, dan keduanya dipakai tim:
+ *
+ * - **`tetap`** — ukuran langkah dikunci (bawaan 8-to-5 = 22,5″). Jumlah
+ *   langkah ditentukan jaraknya; yang berubah adalah
+ *   **kecepatannya** (langkah per hitungan). Jarak dekat dalam hitungan
+ *   panjang = jalan pelan, setengah langkah tiap hitungan.
+ * - **`menyesuaikan`** — jumlah langkah ditentukan **hitungannya**
+ *   (`hitungan × langkahPerCount`), lalu **ukuran langkahnya** yang
+ *   mengecil atau membesar. Ritme tetap satu langkah tiap hitungan, yang
+ *   menyesuaikan panjang langkahnya.
+ */
+export interface SetelanLangkah {
+  mode: ModeLangkah
+  /**
+   * Patokan langkah tiap hitungan. Hanya dipakai bila
+   * `mode === 'menyesuaikan'`. Bawaan 1 (satu langkah tiap hitungan);
+   * 2 untuk jalan cepat, 0,5 untuk setengah langkah.
+   */
+  langkahPerCount?: number
+}
+
+/**
+ * DD2 — Cara pemain berpindah ke set berikutnya.
+ *
+ * Semua nilainya opsional; set yang belum diatur tetap bergerak **lurus dan
+ * rata** seperti sebelumnya, jadi drill lama tidak berubah.
+ */
+export interface GerakSet {
+  /** bentuk jalur yang dilalui pemain */
+  jalur?: 'lurus' | 'lengkung' | 'busur'
+  /**
+   * Derajat kelengkungan, -1 … 1.
+   * `0` = lurus; positif melengkung ke satu sisi, negatif ke sisi lain.
+   * Hanya dipakai kalau `jalur === 'lengkung'`.
+   */
+  lengkung?: number
+  /** pembagian kecepatan sepanjang perpindahan */
+  mudah?: 'rata' | 'halus' | 'mulaiPelan' | 'akhirPelan'
+  /**
+   * Putaran blok yang terjadi pada perpindahan ini — pusat putaran (yard) dan
+   * sudutnya (derajat, boleh negatif).
+   *
+   * Dipakai kalau `jalur === 'busur'`. Pemain yang perpindahannya **cocok**
+   * dengan putaran ini mengikuti busur lingkaran, sehingga jaraknya ke pusat —
+   * dan karena itu jarak antar pemain — tetap terjaga sepanjang jalan.
+   * Pemain yang tidak cocok tetap memakai jalur lurus/melengkung seperti biasa.
+   *
+   * `pusatAkhir` membuat **lingkarannya ikut berjalan**: blok berputar
+   * mengitari sebuah pusat yang pada saat yang sama bergeser lurus dari
+   * `pusat` ke `pusatAkhir`. Tidak diisi (atau sama dengan `pusat`) =
+   * berputar di tempat, persis seperti sediakala.
+   */
+  putar?: {
+    pusat: { x: number; y: number }
+    sudut: number
+    /** Ke mana pusat putaran berpindah selama perpindahan ini (yard). */
+    pusatAkhir?: { x: number; y: number }
+  }
+  /**
+   * Tunda mulai **per section**, dalam count. Misal `{ battery: 2 }` berarti
+   * Battery mulai jalan 2 count lebih lambat, lalu mengejar supaya tetap tiba
+   * bersamaan di akhir.
+   */
+  tunda?: Record<string, number>
+}
+
+/**
+ * A7 — Penanda bebas di lapangan (bukan pemain): properti, bendera, garis
+ * bantu, panah, atau sekadar label area. Disimpan **per drill**, jadi tampil
+ * di semua set layaknya garis lapangan.
+ */
+export type MarkerKind = 'titik' | 'kotak' | 'garis' | 'panah' | 'teks'
+
+export interface FieldMarker {
+  id: string
+  jenis: MarkerKind
+  label: string
+  /** posisi dalam yard, titik tengah lapangan = 0,0 */
+  x: number
+  y: number
+  /** ujung kedua — dipakai kotak, garis, dan panah */
+  x2?: number
+  y2?: number
+  /** warna hex murni (aman untuk browser lama) */
+  warna: string
+  /** jari-jari titik dalam yard (khusus jenis 'titik') */
+  r?: number
+}
+
+export interface Drill {
+  id: string
+  name: string
+  showTitle: string
+  field: FieldConfig
+  /** tempo dasar (BPM) untuk playback */
+  tempo: number
+  /** beats per count (8-to-5 biasanya 1 count = 1 beat, bisa 2 untuk "mark time") */
+  beatsPerCount: number
+  /** urutan section yang dipakai, opsional */
+  rosterIds: string[]
+  /** A7 — penanda bebas di lapangan (properti, bendera, garis bantu) */
+  markers?: FieldMarker[]
+  /** DD10b — bawaan cara langkah dihitung untuk seluruh drill. */
+  setelanLangkah?: SetelanLangkah
+  /**
+   * 31e — dasar jarak untuk drill ini: jarak tempuh mengikuti jalur, atau
+   * garis lurus. Kosong = `jalur`, persis seperti sebelumnya, jadi drill
+   * lama tidak berubah.
+   */
+  setelanJarak?: DasarJarak
+  /**
+   * M1 — tautan ke lagu di repertoar. Kalau diisi, **tempo & segmen lagu
+   * dipakai untuk drill**: tiap set berjalan pada tempo lagu di birama
+   * tempat set itu mulai, dan perubahan sukat lagu ikut menentukan berapa
+   * birama yang terlewati.
+   *
+   * Kosong = perilaku lama (satu tempo datar untuk seluruh drill).
+   */
+  songId?: string
+  createdAt: number
+  updatedAt: number
+}
+
+/* ------------------------------- Musik ---------------------------------- */
+
+export interface TempoSegment {
+  id: string
+  label: string
+  measure: number
+  bpm: number
+  beats: number // pembilang birama, mis. 4
+  note?: string
+  /**
+   * M1 — tanda birama yang berlaku **mulai segmen ini**. Kosong = mewarisi
+   * tanda birama lagu. Jadi lagu bisa berganti meter: 4/4 → 7/8 → 4/4.
+   */
+  birama?: TandaBirama
+  /**
+   * N6 — kalau 1, tempo MENJU segmen berikutnya berangsur, bukan melompat.
+   *
+   * Cara pakainya persis seperti yang diminta pelatih: ketik 172 di
+   * bar 88, ketik 140 di bar 91, lalu nyalakan tanda ini pada segmen
+   * bar 88. Maka bar 89 dan 90 meluncur pelan-pelan dari 172 ke 140.
+   * Kalau tidak dinyalakan, bar 91 tetap melompat seperti sediakala —
+   * sehingga perubahan ini tidak pernah merusak lagu yang sudah ada.
+   *
+   * 0/1 mengikuti kebiasaan tabel lain di aplikasi ini (lihat `getar`).
+   * Opsional karena segmen yang dibuat versi lama tidak memilikinya.
+   */
+  berangsur?: 0 | 1
+}
+
+/* ------------------- M1 — Tanda birama & hitung mundur -------------------- */
+
+import type { HitungMundur, TandaBirama } from '../lib/birama'
+
+/** Diteruskan supaya komponen cukup mengimpor dari `db/types`. */
+export type { HitungMundur, TandaBirama }
+
+/* --------------------- E3 — Pola ritme metronom --------------------------- */
+
+/** Keadaan satu kotak dalam pola: 0 = diam, 1 = ketuk biasa, 2 = aksen. */
+export type TingkatKlik = 0 | 1 | 2
+
+/** Satu birama di dalam pola ritme (bisa beda ketukan & pembagian per birama). */
+export interface BiramaPola {
+  id: string
+  /** jumlah ketukan dalam birama ini (2–12) */
+  beats: number
+  /** pembagian per ketukan: 1 = penuh, 2 = setengah, 3 = triplet, 4 = enam belas */
+  subdiv: number
+  /** panjang = beats × subdiv */
+  cells: TingkatKlik[]
+  label?: string
+}
+
+/** Suara kedua untuk poliritme (mis. 3 lawan 2) — merata sepanjang birama. */
+export interface SuaraKedua {
+  beats: number
+  subdiv: number
+  cells: TingkatKlik[]
+}
+
+/** Pola ritme utuh: rangkaian birama yang diulang + suara kedua opsional. */
+export interface PolaRitme {
+  bars: BiramaPola[]
+  poly: SuaraKedua | null
+}
+
+/** Latih tempo: tempo bergerak bertahap tiap beberapa birama. */
+export interface LatihTempo {
+  on: boolean
+  /** BPM awal */
+  dari: number
+  /** BPM tujuan */
+  ke: number
+  /** perubahan BPM tiap siklus (boleh negatif kalau dari > ke) */
+  langkah: number
+  /** jumlah birama per siklus */
+  tiap: number
+}
+
+/** Jenis bunyi metronom. */
+export type SuaraKlik = 'klik' | 'kayu' | 'bel'
+
+/**
+ * M2 — rentang birama yang diulang terus saat berlatih.
+ *
+ * Inklusif di kedua ujung: `dari = 32, sampai = 48` berarti birama 32
+ * sampai 48 diputar berulang-ulang.
+ */
+export interface UlangBagian {
+  /** birama awal rentang (1-based, inklusif) */
+  dari: number
+  /** birama akhir rentang (1-based, inklusif) */
+  sampai: number
+  /** 1 = nyalakan pengulangan rentang ini. 0 = simpan saja, jangan pakai. */
+  aktif: 0 | 1
+}
+
+export interface Song {
+  id: string
+  title: string
+  composer?: string
+  bpm: number
+  beats: number
+  key?: string
+  notes?: string
+  tempoMap: TempoSegment[]
+  createdAt: number
+  /** E3 — pola ritme per birama + poliritme. Null = metronom detak rata. */
+  pola?: PolaRitme | null
+  /** E3 — latih tempo (naik/turun bertahap). */
+  latih?: LatihTempo | null
+  /** E3 — jenis bunyi. */
+  suara?: SuaraKlik
+  /** E3 — getar tiap ketukan (0/1 seperti kebiasaan tabel lain di aplikasi ini). */
+  getar?: 0 | 1
+  /** E3 — volume 0–1. */
+  volume?: number
+  /**
+   * M1 — tanda birama asli lagu (7/8, 5/4, 12/8, …).
+   * Kosong pada lagu lama → diturunkan dari `beats`, dan bunyinya persis
+   * seperti sebelumnya (lihat `dariBeatsLama`).
+   */
+  tandaBirama?: TandaBirama
+  /** M1 — hitung mundur sebelum lagu mulai (count-off). */
+  hitungMundur?: HitungMundur | null
+  /**
+   * M5 — panjang lagu dalam **birama** (1-based, inklusif): lagu ini
+   * berakhir di akhir birama ke-`panjangBirama`.
+   *
+   * Kosong pada lagu lama → metronom berjalan terus seperti sebelumnya,
+   * jadi tidak ada yang berubah sampai pelatih mengisinya.
+   */
+  panjangBirama?: number
+  /**
+   * M5 — ulang lagu dari awal begitu birama terakhir selesai.
+   * Bawaan (kosong/false) = berhenti di akhir lagu.
+   */
+  ulang?: 0 | 1
+  /**
+   * M2 — ulang satu bagian saja (mis. birama 32–48) alih-alih seluruh lagu.
+   * Kalau `aktif`, rentang ini **menang** atas `ulang` maupun akhir lagu:
+   * lagu tidak akan berhenti sendiri selama pengulangan bagian menyala.
+   */
+  ulangBagian?: UlangBagian
+}
+
+/**
+ * M3 — set list (urutan lagu untuk satu penampilan).
+ *
+ * Isinya hanya **id lagu**, bukan salinan lagu: jadi mengubah judul, tempo,
+ * atau panjang sebuah lagu langsung terlihat di semua set list yang
+ * memakainya, dan tidak ada data yang usang.
+ */
+export interface SetList {
+  id: string
+  /** nama set list, mis. "Show 2026 — Putaran Musik" */
+  name: string
+  /** id lagu, **berurutan** sesuai urutan penampilan */
+  songIds: string[]
+  /** catatan bebas: tempat, waktu, kostum, dll. */
+  catatan?: string
+  createdAt: number
+  updatedAt: number
+}
+
+/**
+ * M4 — paket repertoar untuk ditukar antar perangkat pelatih.
+ *
+ * Sengaja **bukan** `ShareBundle`: paket berbagi itu mengalir satu arah
+ * (pelatih → HP anggota) dan hanya bisa dibaca, tidak pernah masuk ke
+ * pustaka pelatih. Yang ini mengalir antar pelatih dan **ditulis ke
+ * pustaka tujuan**.
+ *
+ * Yang terpenting: **id lagu dipertahankan apa adanya**. `Drill.songId` dan
+ * `SetList.songIds` menyimpan id lagu, bukan salinannya — jadi kalau impor
+ * memberi id baru, tautan drill ke lagu dan urutan set list akan putus.
+ */
+export interface PaketRepertoar {
+  format: 'drillkit-repertoar'
+  version: 1
+  exportedAt: number
+  /** Asal paket, hanya untuk ditampilkan di pratinjau. */
+  team?: { teamName?: string; coachName?: string; city?: string }
+  songs: Song[]
+  setlists: SetList[]
+  /** Drill yang menaut ke lagu terpilih — ikut supaya tautannya tidak putus. */
+  drills: Drill[]
+  /** Set milik drill di atas; tanpa ini drill yang diimpor akan kosong. */
+  sets: DrillSet[]
+}
+
+/* ------------------------------ Settings -------------------------------- */
+
+export interface TeamSettings {
+  key: 'team'
+  teamName: string
+  coachName: string
+  city?: string
+  logo?: string // data URL
+  defaultField: FieldConfig
+  /** Daftar section/kelompok instrumen milik tim ini */
+  sections?: SectionDef[]
+  /** PIN opsional untuk mode "lihat saja" di perangkat bersama */
+  memberMode: number
+  /**
+   * Ingatkan untuk backup tiap N hari (0 = pengingat dimatikan).
+   * Default 7 — lihat `src/lib/backup.ts`.
+   */
+  backupIntervalDays?: number
+  /**
+   * Ambang kesulitan gerak — bisa diubah tim, karena tiap tim berbeda.
+   *
+   * Latar belakangnya: dulu analitik hanya menilai **kecepatan**
+   * (langkah/menit), sedang buku saku menilai kecepatan **dan** ukuran
+   * langkah. Akibatnya analitik bisa berkata "semua nyaman" sementara lembaran
+   * yang dicetak penuh warna merah. Keduanya kini menilai dua dimensi yang
+   * sama dengan ambang yang sama, dan ambangnya bisa diatur di sini.
+   */
+  ambangGerak?: AmbangGerak
+}
+
+/** Ambang satu dimensi kesulitan: di atas `padat` jadi padat, dst. */
+export interface AmbangTingkat {
+  padat: number
+  berat: number
+  mustahil: number
+}
+
+/**
+ * Ambang kesulitan gerak.
+ *
+ * Dua dimensi yang sengaja dipisah: **seberapa cepat** kaki harus bergerak
+ * (`perMenit`) dan **seberapa jauh** satu langkah harus menjangkau (`inci`).
+ * Keduanya bisa berat sendiri-sendiri — gerakan cepat dengan langkah pendek
+ * berbeda masalahnya dengan gerakan pelan bertempo langkah raksasa.
+ */
+export interface AmbangGerak {
+  perMenit?: AmbangTingkat
+  inci?: AmbangTingkat
+}
+
+/**
+ * Catatan evaluasi pribadi untuk satu anggota.
+ * Ditulis pelatih, dibaca anggota yang bersangkutan di mode anggota.
+ */
+/**
+ * K3 — kemajuan latihan untuk satu drill.
+ *
+ * Disimpan di tabel **sendiri**, bukan menempel di `Drill`, dengan dua alasan:
+ *
+ * 1. Kemajuan adalah **keadaan latihan**, bukan data desain. Mencampurnya
+ *    berarti setiap centang menulis ulang rekaman drill — dan karena daftar
+ *    drill diurutkan dengan `orderBy('updatedAt')`, drill itu akan melompat
+ *    ke puncak daftar setiap kali pemain mencentang sesuatu.
+ * 2. Satu drill bisa dilatih oleh banyak seksi secara terpisah, jadi
+ *    kemajuan butuh ruangnya sendiri yang tidak ikut tersalin saat drill
+ *    digandakan.
+ */
+export interface Kemajuan {
+  /** id drill yang kemajuannya dicatat di sini */
+  key: string
+  /**
+   * `setId` → (kunci centang → kapan dicentang, epoch ms).
+   *
+   * Kuncinya `'*'` untuk **seluruh formasi**, atau id seksi bila latihan
+   * sedang dipilah per seksi (mode asisten K2). Waktu dicatat supaya
+   * "terakhir dilatih kapan" bisa dijawab — berguna saat latihan disambung
+   * beberapa minggu kemudian.
+   */
+  centang: Record<string, Record<string, number>>
+  /** Kapan terakhir kali rekaman ini diubah (epoch ms). */
+  diubah: number
+}
+
+export interface MemberNote {
+  id: string
+  memberId: string
+  /** waktu dibuat (epoch ms) */
+  at: number
+  text: string
+  /** siapa yang menulis, mis. "Pelatih" */
+  by?: string
+}
+
+/* --------------------------- Paket berbagi ------------------------------- */
+
+export interface ShareBundle {
+  format: 'drillkit-share'
+  version: 1
+  exportedAt: number
+  team: Omit<TeamSettings, 'key'> | null
+  members: Member[]
+  sessions: Session[]
+  drills: Drill[]
+  sets: DrillSet[]
+  songs: Song[]
+  /**
+   * N4 — urutan lagu untuk satu penampilan.
+   *
+   * Opsional karena paket yang dibuat versi lama tidak memuatnya. Tanpa
+   * ini, anggota menerima lagunya tetapi tidak pernah menerima susunan
+   * penampilannya — padahal metronom bisa memutarnya berurutan.
+   */
+  setlists?: SetList[]
+  attendance: AttendanceRecord[]
+  /** Catatan evaluasi per anggota (opsional — paket lama belum punya) */
+  memberNotes?: MemberNote[]
+  /** Mode yang disarankan saat paket dibuka: 'member' untuk anggota */
+  mode?: 'member' | 'coach'
+  /**
+   * Untuk siapa berkas ini dibuat — **hanya ada pada berkas per anggota**.
+   *
+   * Tanpa penanda ini, anggota yang membuka berkasnya sendiri (yang sudah
+   * difilter hanya untuk dia) malah disuruh memilih namanya dari seluruh
+   * daftar anggota: pertanyaan yang bisa dijawab sendiri oleh aplikasi.
+   *
+   * Opsional karena dua alasan: berkas **grup** memang bukan untuk siapa
+   * pun secara khusus, dan berkas per anggota yang dibuat versi lama tidak
+   * memilikinya — yang membukanya tetap ditanya seperti dulu.
+   */
+  forMember?: string
+}
