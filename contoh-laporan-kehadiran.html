@@ -1,0 +1,1172 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Paket Laporan Semua periode</title>
+    <style>
+      @media print { .no-print { display:none !important } }
+      body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:#000; margin:0; }
+      
+    @page { size: A4 portrait; margin: 14mm; }
+    body { font-size: 11px; color:#000; }
+    .kop { display:flex; align-items:center; gap:10px; border-bottom:2px solid #111; padding-bottom:8px; margin-bottom:10px; }
+    .kop img { height:40px; width:auto; }
+    .kop .nama { font-size:14px; font-weight:700; line-height:1.15; }
+    .kop .sub { font-size:10px; color:#555; }
+    h1.judul { font-size:15px; margin:0 0 2px; }
+    .sub { font-size:10.5px; color:#555; margin:0 0 8px; }
+    h2 { font-size:12px; margin:12px 0 5px; border-left:3px solid #111; padding-left:5px; }
+    .tiles { display:flex; gap:6px; margin:8px 0 10px; }
+    .tile { flex:1; border:1px solid #999; padding:5px 7px; }
+    .tile span { display:block; font-size:9px; text-transform:uppercase; color:#555; }
+    .tile b { font-size:14px; }
+    table { width:100%; border-collapse:collapse; margin:4px 0 10px; }
+    th, td { border:1px solid #999; padding:3px 5px; text-align:left; vertical-align:top; }
+    th { background:#eef2f7; font-size:10px; text-transform:uppercase; }
+    td.r, th.r { text-align:right; }
+    td.c, th.c { text-align:center; }
+    .ringkas { border:1px solid #bbb; background:#fafafa; padding:7px 9px; margin:6px 0 10px; line-height:1.45; }
+    .ttd { display:flex; gap:20px; margin-top:22px; }
+    .ttd > div { flex:1; text-align:center; font-size:10.5px; }
+    .ttd .garis { margin-top:46px; border-top:1px solid #333; padding-top:3px; }
+    .ttd .nama-orang { font-weight:700; }
+    .kartu { border:1px solid #666; padding:8px 10px; margin-bottom:7mm; page-break-inside:avoid; }
+    .kartu .kepala { display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid #999; padding-bottom:5px; margin-bottom:6px; }
+    .kartu .kepala b { font-size:12px; }
+    .identitas { display:flex; flex-wrap:wrap; gap:2px 14px; margin-bottom:6px; }
+    .identitas div { font-size:10.5px; }
+    .identitas i { color:#666; font-style:normal; }
+    .kecil { font-size:9.5px; color:#555; }
+    .pagebreak { page-break-before: always; }
+  
+    </style></head><body>
+    
+    <div class="kop">
+      
+      <div>
+        <div class="nama">Marching Band Saya</div>
+        <div class="sub">Laporan Kehadiran · Semua periode</div>
+      </div>
+    </div>
+    <h1 class="judul">Laporan Kehadiran</h1>
+    <p class="sub">Periode Semua periode · dicetak 16 September 2026</p>
+
+    <div class="tiles"><div class="tile"><span>Kehadiran</span><b>92%</b></div><div class="tile"><span>Sesi</span><b>5</b></div><div class="tile"><span>Anggota</span><b>18</b></div><div class="tile"><span>Hadir</span><b>33</b></div><div class="tile"><span>Izin</span><b>0</b></div><div class="tile"><span>Sakit</span><b>2</b></div><div class="tile"><span>Tanpa keterangan</span><b>1</b></div></div>
+    <div class="ringkas">Kehadiran Semua periode: 92% (33 dari 36 catatan) pada 5 sesi yang diikuti 18 anggota. 2 anggota perlu perhatian (di bawah 60%): Maya Anggraini 0%, Andra Pratama 50%. 16 anggota hadir penuh di semua sesi yang tercatat.</div>
+    <h2>Rekap per section</h2>
+      <table>
+        <thead><tr><th>Section</th><th class="r">Anggota</th><th class="r">Hadir</th><th class="r">Izin</th><th class="r">Sakit</th><th class="r">Tanpa keterangan</th><th class="r">% Hadir</th></tr></thead>
+        <tbody>
+          <tr><td>Battery</td><td class="r">3</td><td class="r">6</td>
+              <td class="r">0</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">100%</td></tr><tr><td>Color Guard</td><td class="r">4</td><td class="r">8</td>
+              <td class="r">0</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">100%</td></tr><tr><td>Woodwind</td><td class="r">4</td><td class="r">8</td>
+              <td class="r">0</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">100%</td></tr><tr><td>Brass</td><td class="r">5</td><td class="r">9</td>
+              <td class="r">0</td><td class="r">0</td><td class="r">1</td>
+              <td class="r">90%</td></tr><tr><td>Pit</td><td class="r">2</td><td class="r">2</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">0</td>
+              <td class="r">50%</td></tr>
+        </tbody>
+      </table>
+    <h2>Kehadiran per jenis kegiatan</h2>
+      <table>
+        <thead><tr><th>Jenis kegiatan</th><th class="r">Sesi</th><th class="r">Hadir</th><th class="r">Terisi</th><th class="r">% Hadir</th></tr></thead>
+        <tbody>
+          <tr><td>Latihan rutin</td><td class="r">2</td><td class="r">33</td><td class="r">36</td><td class="r">92%</td></tr>
+        </tbody>
+      </table>
+    <h2>Rincian per sesi</h2>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="r">Hadir</th><th class="r">Izin</th><th class="r">Sakit</th><th class="r">Tanpa keterangan</th><th class="r">% Hadir</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Latihan rutin</td>
+                <td class="r">16</td><td class="r">0</td><td class="r">1</td><td class="r">1</td>
+                <td class="r">89%</td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Latihan rutin</td>
+                <td class="r">17</td><td class="r">0</td><td class="r">1</td><td class="r">0</td>
+                <td class="r">94%</td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Latihan rutin</td>
+                <td class="r">0</td><td class="r">0</td><td class="r">0</td><td class="r">0</td>
+                <td class="r">0%</td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Latihan rutin</td>
+                <td class="r">0</td><td class="r">0</td><td class="r">0</td><td class="r">0</td>
+                <td class="r">0%</td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Penampilan / konser</td>
+                <td class="r">0</td><td class="r">0</td><td class="r">0</td><td class="r">0</td>
+                <td class="r">0%</td></tr>
+        </tbody>
+      </table>
+    <h2>Perlu perhatian (di bawah 60%)</h2>
+      <table>
+        <thead><tr><th>Kode</th><th>Nama</th><th>Section</th><th class="r">% Hadir</th><th>Hadir / sesi</th></tr></thead>
+        <tbody>
+          <tr><td>PI13</td><td>Maya Anggraini</td><td>Pit</td>
+              <td class="r">0%</td><td>0 dari 2</td></tr><tr><td>BR01</td><td>Andra Pratama</td><td>Brass</td>
+              <td class="r">50%</td><td>1 dari 2</td></tr>
+        </tbody>
+      </table>
+    <h2>Rekap per anggota</h2>
+      <table>
+        <thead><tr><th>Kode</th><th>Nama</th><th>Section</th><th class="r">Hadir</th><th class="r">Izin</th><th class="r">Sakit</th><th class="r">Tanpa keterangan</th><th class="r">Sesi</th><th class="r">% Hadir</th></tr></thead>
+        <tbody>
+          <tr><td>BR02</td><td>Bunga Lestari</td><td>Brass</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>BR03</td><td>Citra Dewi</td><td>Brass</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>BR04</td><td>Dimas Saputra</td><td>Brass</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>BR05</td><td>Eka Wulandari</td><td>Brass</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>WO06</td><td>Fajar Nugroho</td><td>Woodwind</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>WO07</td><td>Gita Permata</td><td>Woodwind</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>WO08</td><td>Hendra Wijaya</td><td>Woodwind</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>WO09</td><td>Indah Kirana</td><td>Woodwind</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>PE10</td><td>Joko Susilo</td><td>Battery</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>PE11</td><td>Kirana Ayu</td><td>Battery</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>PE12</td><td>Lukman Hakim</td><td>Battery</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>PI14</td><td>Naufal Ibrahim</td><td>Pit</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>GU15</td><td>Putri Ramadhani</td><td>Color Guard</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>GU16</td><td>Rendra Kusuma</td><td>Color Guard</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>GU17</td><td>Sari Wahyuni</td><td>Color Guard</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>GU18</td><td>Taufik Hidayat</td><td>Color Guard</td>
+              <td class="r">2</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">100%</td></tr><tr><td>BR01</td><td>Andra Pratama</td><td>Brass</td>
+              <td class="r">1</td><td class="r">0</td><td class="r">0</td>
+              <td class="r">1</td><td class="r">2</td><td class="r">50%</td></tr><tr><td>PI13</td><td>Maya Anggraini</td><td>Pit</td>
+              <td class="r">0</td><td class="r">0</td><td class="r">2</td>
+              <td class="r">0</td><td class="r">2</td><td class="r">0%</td></tr>
+        </tbody>
+      </table>
+
+    <div class="ttd">
+      <div>Mengetahui,<br><span class="kecil">Pembina / Ketua Tim</span>
+        <div class="garis">( ........................................ )</div>
+      </div>
+      <div>16 September 2026<br><span class="kecil">Pelatih</span>
+        <div class="garis"><span class="nama-orang">Pelatih</span></div>
+      </div>
+    </div><div class="pagebreak"></div>
+    
+    <div class="kop">
+      
+      <div>
+        <div class="nama">Marching Band Saya</div>
+        <div class="sub">Kartu Kehadiran Anggota · Semua periode</div>
+      </div>
+    </div>
+    <h1 class="judul">Kartu Kehadiran Anggota</h1>
+    <p class="sub">Periode Semua periode · 18 kartu · dicetak 16 September 2026</p>
+    
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Andra Pratama</b></div>
+        <div><i>Kode</i> &nbsp;BR01</div>
+        <div><i>Section</i> &nbsp;Brass</div>
+        <div><i>Instrumen</i> &nbsp;Trumpet</div>
+        <div><i>Peran</i> &nbsp;Ketua Section</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>1</td><td>0</td><td>0</td><td>1</td>
+            <td>2</td><td><b>50%</b></td><td>Perlu perhatian</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#f43f5e">
+                  <b>A</b> <span class="kecil">Tanpa keterangan</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Bunga Lestari</b></div>
+        <div><i>Kode</i> &nbsp;BR02</div>
+        <div><i>Section</i> &nbsp;Brass</div>
+        <div><i>Instrumen</i> &nbsp;Mellophone</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Citra Dewi</b></div>
+        <div><i>Kode</i> &nbsp;BR03</div>
+        <div><i>Section</i> &nbsp;Brass</div>
+        <div><i>Instrumen</i> &nbsp;Trombone</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Dimas Saputra</b></div>
+        <div><i>Kode</i> &nbsp;BR04</div>
+        <div><i>Section</i> &nbsp;Brass</div>
+        <div><i>Instrumen</i> &nbsp;Baritone</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Eka Wulandari</b></div>
+        <div><i>Kode</i> &nbsp;BR05</div>
+        <div><i>Section</i> &nbsp;Brass</div>
+        <div><i>Instrumen</i> &nbsp;Tuba</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Fajar Nugroho</b></div>
+        <div><i>Kode</i> &nbsp;WO06</div>
+        <div><i>Section</i> &nbsp;Woodwind</div>
+        <div><i>Instrumen</i> &nbsp;Flute</div>
+        <div><i>Peran</i> &nbsp;Ketua Section</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Gita Permata</b></div>
+        <div><i>Kode</i> &nbsp;WO07</div>
+        <div><i>Section</i> &nbsp;Woodwind</div>
+        <div><i>Instrumen</i> &nbsp;Clarinet</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Hendra Wijaya</b></div>
+        <div><i>Kode</i> &nbsp;WO08</div>
+        <div><i>Section</i> &nbsp;Woodwind</div>
+        <div><i>Instrumen</i> &nbsp;Alto Sax</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Indah Kirana</b></div>
+        <div><i>Kode</i> &nbsp;WO09</div>
+        <div><i>Section</i> &nbsp;Woodwind</div>
+        <div><i>Instrumen</i> &nbsp;Tenor Sax</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Joko Susilo</b></div>
+        <div><i>Kode</i> &nbsp;PE10</div>
+        <div><i>Section</i> &nbsp;Battery</div>
+        <div><i>Instrumen</i> &nbsp;Snare</div>
+        <div><i>Peran</i> &nbsp;Ketua Section</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Kirana Ayu</b></div>
+        <div><i>Kode</i> &nbsp;PE11</div>
+        <div><i>Section</i> &nbsp;Battery</div>
+        <div><i>Instrumen</i> &nbsp;Quad</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Lukman Hakim</b></div>
+        <div><i>Kode</i> &nbsp;PE12</div>
+        <div><i>Section</i> &nbsp;Battery</div>
+        <div><i>Instrumen</i> &nbsp;Bass Drum</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Maya Anggraini</b></div>
+        <div><i>Kode</i> &nbsp;PI13</div>
+        <div><i>Section</i> &nbsp;Pit</div>
+        <div><i>Instrumen</i> &nbsp;Marimba</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>0</td><td>0</td><td>2</td><td>0</td>
+            <td>2</td><td><b>0%</b></td><td>Perlu perhatian</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#f59e0b">
+                  <b>S</b> <span class="kecil">Sakit</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#f59e0b">
+                  <b>S</b> <span class="kecil">Sakit</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Naufal Ibrahim</b></div>
+        <div><i>Kode</i> &nbsp;PI14</div>
+        <div><i>Section</i> &nbsp;Pit</div>
+        <div><i>Instrumen</i> &nbsp;Xylophone</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Putri Ramadhani</b></div>
+        <div><i>Kode</i> &nbsp;GU15</div>
+        <div><i>Section</i> &nbsp;Color Guard</div>
+        <div><i>Instrumen</i> &nbsp;Flag</div>
+        <div><i>Peran</i> &nbsp;Ketua Section</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Rendra Kusuma</b></div>
+        <div><i>Kode</i> &nbsp;GU16</div>
+        <div><i>Section</i> &nbsp;Color Guard</div>
+        <div><i>Instrumen</i> &nbsp;Rifle</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Sari Wahyuni</b></div>
+        <div><i>Kode</i> &nbsp;GU17</div>
+        <div><i>Section</i> &nbsp;Color Guard</div>
+        <div><i>Instrumen</i> &nbsp;Flag</div>
+        <div><i>Peran</i> &nbsp;Anggota</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kepala">
+        <b>Kartu Kehadiran</b>
+        <span class="kecil">Marching Band Saya · Semua periode</span>
+      </div>
+      <div class="identitas">
+        <div><i>Nama</i> &nbsp;<b>Taufik Hidayat</b></div>
+        <div><i>Kode</i> &nbsp;GU18</div>
+        <div><i>Section</i> &nbsp;Color Guard</div>
+        <div><i>Instrumen</i> &nbsp;Sabre</div>
+        <div><i>Peran</i> &nbsp;Drum Major</div>
+        <div><i>Gabung</i> &nbsp;2025</div>
+      </div>
+      <table>
+        <thead><tr><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Tanpa keterangan</th><th>Sesi tercatat</th><th>% Kehadiran</th><th>Predikat</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+            <td>2</td><td><b>100%</b></td><td>Baik</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th class="c">Status</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>9 Sep 2026</td><td>Latihan Rutin — Blok Pembuka</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>13 Sep 2026</td><td>Latihan Section</td><td>Rutin</td>
+                <td class="c" style="color:#10b981">
+                  <b>H</b> <span class="kecil">Hadir</span>
+                </td>
+                <td></td></tr><tr><td>16 Sep 2026</td><td>Latihan Rutin — Perapian Formasi</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>19 Sep 2026</td><td>Latihan Gabungan</td><td>Rutin</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr><tr><td>26 Sep 2026</td><td>Penampilan — Hari Ulang Tahun Sekolah</td><td>Konser</td>
+                <td class="c" style="color:#999">
+                  <b>–</b>
+                </td>
+                <td></td></tr>
+        </tbody>
+      </table>
+      
+      <div class="ttd">
+        <div><span class="kecil">Paraf anggota</span><div class="garis">( ........................ )</div></div>
+        <div><span class="kecil">16 September 2026<br>Pelatih</span>
+          <div class="garis"><span class="nama-orang">Pelatih</span></div>
+        </div>
+      </div>
+    </div></body></html>
