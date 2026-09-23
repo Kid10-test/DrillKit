@@ -48,7 +48,7 @@ bash regresi.sh "$BASE" \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
   kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data \
-  uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist \
+  uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui
