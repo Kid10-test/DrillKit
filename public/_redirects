@@ -1,0 +1,17 @@
+# N11 — Pengaman untuk host statis.
+#
+# Aplikasi memakai HashRouter (#/musik), jadi semua rutenya berada
+# setelah tanda '#' dan peladen hanya pernah melihat '/'. Aturan ini
+# bukan untuk routing — ia untuk dua keadaan lain:
+#
+#   1. bila ada yang membuka tautan yang ditulis tanpa '#', dan
+#   2. bila perambah menyimpan index.html lama lalu meminta berkas
+#      ber-hash yang sudah dihapus unggahan baru: ia akan menerima
+#      index.html, bukan halaman 404 "link rusak".
+#
+# Berkas yang BENAR-BENAR ADA tidak pernah tertimpa aturan ini —
+# demikian aturan Netlify: "you can't shadow an existing URL by
+# default". Jadi /paket.json dan /assets/* tetap terlayani seperti
+# biasa; tombol "Perbarui materi" tidak tersentuh oleh baris ini.
+
+/*    /index.html   200

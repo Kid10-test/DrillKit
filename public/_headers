@@ -1,0 +1,30 @@
+# N11 — Aturan cache untuk host statis (Netlify dan sejenisnya).
+#
+# Mengapa ini wajib: setiap unggahan baru adalah PENGGANTIAN, bukan
+# tambahan — berkas ber-hash yang lama ikut TERHAPUS dari situs. Bila
+# perambah menyimpan salinan lama dari `index.html` atau `sw.js`, ia
+# akan meminta berkas ber-hash yang sudah tidak ada, mendapat 404, dan
+# pemakai melihat halaman "link rusak" padahal situsnya baik-baik saja.
+#
+# Berkas ber-hash di /assets/ sengaja TIDAK disentuh: namanya berubah
+# setiap kali isinya berubah, jadi aman disimpan lama.
+
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+/registerSW.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+/manifest.webmanifest
+  Cache-Control: no-cache
+
+# Pengaman kecil untuk semua berkas lainnya.
+/*
+  X-Content-Type-Options: nosniff
