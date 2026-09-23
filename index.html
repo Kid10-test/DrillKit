@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Ikon ditanam langsung (data URI) supaya tidak 404 saat dibuka dari berkas. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f172a'/%3E%3Cg stroke='%2334d399' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 22h20M6 16h20M6 10h20'/%3E%3C/g%3E%3C/svg%3E"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="DrillKit - aplikasi pelatih marching band: formasi/drill, anggota, absensi, jadwal, metronom. Gratis & offline." />
+    <title>DrillKit — Pelatih Marching Band</title>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!--
+      N11 — Panel darurat bila aplikasi GAGAL dimuat.
+
+      Mengapa perlu: unggahan baru ke host statis adalah PENGGANTIAN.
+      Berkas ber-hash yang lama ikut terhapus, sementara perambah bisa
+      saja masih menyimpan `index.html` lama berikut `sw.js` lama.
+      Perambah itu lalu meminta berkas yang sudah tidak ada, menerima
+      404, dan pemakai melihat "link rusak" — padahal situsnya sehat.
+
+      Yang paling menderita justru pemakai awam: mereka tidak tahu apa
+      itu cache, apalagi cara membersihkannya di Safari. Panel ini
+      memberi mereka SATU tombol yang mengerjakan semuanya, tanpa
+      perlu membuka pengaturan perambah.
+
+      Panelnya disembunyikan sampai terbukti aplikasi tidak berjalan.
+      Kalau aplikasinya hidup, panel ini tidak pernah terlihat.
+    -->
+    <div
+      id="darurat"
+      style="display: none; position: fixed; inset: 0; z-index: 9999; overflow: auto; background: #0f172a; color: #e2e8f0; padding: 24px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;"
+    >
+      <div style="max-width: 30rem; margin: 40px auto;">
+        <div style="font-size: 20px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+          DrillKit
+        </div>
+        <h1 style="font-size: 17px; font-weight: 600; margin: 12px 0;">Aplikasi gagal dimuat</h1>
+        <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+          Ini hampir selalu karena peramban menyimpan <b>versi lama</b> DrillKit,
+          padahal versi lamanya sudah diganti. Tidak ada yang rusak pada
+          materinya — perambannya saja yang perlu dibersihkan.
+        </p>
+        <button
+          id="tombol-bersihkan"
+          type="button"
+          style="margin-top: 16px; width: 100%; padding: 12px 16px; font-size: 15px; font-weight: 600; color: #052e22; background: #34d399; border: 0; border-radius: 10px; cursor: pointer;"
+        >
+          Bersihkan &amp; muat ulang
+        </button>
+        <p style="margin-top: 12px; font-size: 12px; line-height: 1.5; color: #94a3b8;">
+          Tombol ini membuang simpanan lama DrillKit di perangkat ini,
+          lalu membuka aplikasinya kembali dari awal. Data yang tersimpan
+          di dalam aplikasi tidak ikut terhapus.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      /*
+       * Sengaja ditulis sebagai JavaScript biasa di dalam berkas HTML,
+       * bukan sebagai modul: kalau berkas modulnya gagal dimuat, kode di
+       * dalamnya tidak akan pernah berjalan — dan justru itulah keadaan
+       * yang harus ditangani oleh skrip ini.
+       */
+      ;(function () {
+        function bersihkanDanMuatUlang() {
+          var tombol = document.getElementById('tombol-bersihkan')
+          if (tombol) {
+            tombol.disabled = true
+            tombol.textContent = 'Membersihkan…'
+          }
+          var janji = Promise.resolve()
+          if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+            janji = janji
+              .then(function () {
+                return navigator.serviceWorker.getRegistrations()
+              })
+              .then(function (daftar) {
+                return Promise.all(
+                  (daftar || []).map(function (r) {
+                    return r.unregister()
+                  }),
+                )
+              })
+              .catch(function () {})
+          }
+          if (window.caches && caches.keys) {
+            janji = janji
+              .then(function () {
+                return caches.keys()
+              })
+              .then(function (kunci) {
+                return Promise.all(
+                  (kunci || []).map(function (k) {
+                    return caches.delete(k)
+                  }),
+                )
+              })
+              .catch(function () {})
+          }
+          /*
+           * Alamatnya diberi penanda waktu supaya perambah dan jaringan
+           * pengirim tidak mengembalikan salinan lama yang sama.
+           */
+          janji.then(function () {
+            window.location.href = window.location.pathname + '?bersih=' + Date.now()
+          })
+        }
+
+        var tombol = document.getElementById('tombol-bersihkan')
+        if (tombol) tombol.addEventListener('click', bersihkanDanMuatUlang)
+
+        /*
+         * Tunggu sebentar, baru nilai. Terlalu cepat akan memunculkan
+         * panel ini pada sambungan yang lambat — keadaan yang paling
+         * tidak perlu ditambah lagi masalahnya.
+         */
+        ;(window.__drillkitPeriksa = function () {
+          setTimeout(function () {
+            if (window.__drillkitJalan) return
+            var panel = document.getElementById('darurat')
+            if (panel) panel.style.display = 'block'
+          }, 8000)
+        })()
+      })()
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

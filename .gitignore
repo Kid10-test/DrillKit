@@ -1,0 +1,17 @@
+# Hasil build — semua bisa dibuat ulang dengan `npm run build` / `npm run build:portable`
+dist/
+dist-standalone/
+release/
+portable/
+*.zip
+
+# Dependensi (dipasang ulang dengan `npm install`)
+node_modules/
+
+# Cache & sampah editor
+.vite/
+*.local
+.DS_Store
+
+# Folder bundel unggahan — dibuat ulang dengan scripts/siapkan-unggah.sh
+unggah/

@@ -1,0 +1,23 @@
+# Konfigurasi untuk deploy gratis ke Netlify (https://netlify.com)
+# Cara paling mudah: drag & drop folder dist/ ke https://app.netlify.com/drop
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Service worker jangan pernah di-cache lama, supaya pembaruan aplikasi langsung terasa.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# Aplikasi memakai HashRouter (#/anggota), jadi tidak butuh rewrite.
+# Baris berikut hanya pengaman kalau nanti pindah ke URL biasa.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
