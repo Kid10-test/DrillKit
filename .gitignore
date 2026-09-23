@@ -4,6 +4,7 @@ dist-standalone/
 release/
 portable/
 *.zip
+*.rar
 
 # Dependensi (dipasang ulang dengan `npm install`)
 node_modules/

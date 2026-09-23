@@ -1,0 +1,17 @@
+import puppeteer from 'puppeteer'
+import fs from 'node:fs'
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+fs.mkdirSync('/home/user/shots', { recursive: true })
+const b = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--mute-audio'] })
+const p = await b.newPage(); await p.setViewport({ width: 1440, height: 900 })
+await p.goto('http://localhost:5173/', { waitUntil: 'networkidle2' }); await wait(1600)
+await p.evaluate(() => { const x=[...document.querySelectorAll('button')].find(y=>y.textContent.includes('Muat data contoh')); x&&x.click() })
+await wait(3400)
+await p.evaluate(() => { location.hash = '#/drill' }); await wait(2800)
+const setSelect = (lab, val) => p.evaluate((l,v)=>{ const f=[...document.querySelectorAll('label')].find(x=>x.textContent.includes(l)); const sel=f&&f.parentElement.querySelector('select'); const set=Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype,'value').set; set.call(sel,String(v)); sel.dispatchEvent(new Event('change',{bubbles:true})) }, lab, val)
+const setRange = (aria, val) => p.evaluate((a,v)=>{ const el=document.querySelector(`input[aria-label="${a}"]`); const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set; set.call(el,String(v)); el.dispatchEvent(new Event('input',{bubbles:true})) }, aria, val)
+await setSelect('Bentuk jalur','lengkung'); await wait(800)
+await setRange('Lengkungan jalur', 75); await wait(900)
+await p.screenshot({ path: '/home/user/shots/dd2-lengkung.png' })
+console.log('selesai')
+await b.close()

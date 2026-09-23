@@ -1,0 +1,20 @@
+import puppeteer from 'puppeteer'
+import { lewatSambutan } from './sambutan.mjs'
+const BASE='http://localhost:4173'
+const wait=(ms)=>new Promise(r=>setTimeout(r,ms))
+const b=await puppeteer.launch({args:['--no-sandbox','--disable-dev-shm-usage'],defaultViewport:{width:1300,height:1000}})
+const h=await b.newPage()
+h.on('pageerror',e=>console.log('PAGEERROR:',String(e).slice(0,300)))
+h.on('console',m=>{if(m.type()==='error')console.log('CONSOLE:',m.text().slice(0,300))})
+await h.goto(BASE,{waitUntil:'networkidle2'}); await wait(2500)
+await h.click('[data-testid="pilih-member"]'); await wait(300)
+await h.click('[data-testid="lanjut-pilih-mode"]'); await wait(1500)
+await h.goto(`${BASE}/#/berbagi`,{waitUntil:'networkidle2'}); await wait(2200)
+const tabs = await h.evaluate(()=>[...document.querySelectorAll('button')].map(y=>JSON.stringify(y.textContent.trim())).join(' '))
+console.log('TOMBOL:', tabs.slice(0,600))
+const ok = await h.evaluate(()=>{const x=[...document.querySelectorAll('button')].find(y=>y.textContent.trim().toLowerCase()==='musik'); if(!x) return 'tidak ada'; x.click(); return 'diklik'})
+console.log('klik musik:', ok)
+await wait(2500)
+console.log('TEKS:', (await h.evaluate(()=>document.body.innerText.replace(/\s+/g,' ').trim())).slice(0,400))
+console.log('tombol-mulai:', await h.evaluate(()=>document.querySelector('[data-testid="tombol-mulai"]')!=null))
+await b.close()

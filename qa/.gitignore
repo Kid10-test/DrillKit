@@ -1,0 +1,9 @@
+# Dependensi uji (dipasang ulang dengan npm install di folder ini)
+node_modules/
+
+# Hasil unduhan & contoh bekas pakai — dibuat ulang oleh uji itu sendiri
+unduhan-uji/
+dlf3/
+dlf3b/
+dlf4/
+dlpratinjau/
