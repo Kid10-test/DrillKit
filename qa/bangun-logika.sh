@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Rakit modul murni aplikasi menjadi .mjs di /tmp, supaya uji *-logika bisa
+# mengimpornya langsung tanpa peramban.
+#
+# Uji logika mengimpor dari '/tmp/<modul>.mjs', bukan dari src — jadi tanpa
+# skrip ini uji tersebut hanya jalan di mesin yang kebetulan pernah merakit
+# berkasnya dengan tangan, dan `/tmp` kosong setiap kali kotak pasir
+# dimulai ulang. Kegagalannya tidak kentara: impor gagal, bukan asersi.
+#
+# Pakai: bash /home/user/drillkit/qa/bangun-logika.sh
+set -eu
+cd /home/user/drillkit
+ESBUILD=./node_modules/.bin/esbuild
+[ -x "$ESBUILD" ] || { echo "esbuild tidak ketemu"; exit 1; }
+
+rakit() {
+  local src="$1" nama="$2"
+  "$ESBUILD" "$src" --bundle --format=esm --platform=neutral \
+    --outfile="/tmp/$nama.mjs" --log-level=warning
+  printf "  %-24s <- %s\n" "$nama.mjs" "$src"
+}
+
+echo "== merakit modul untuk uji logika =="
+rakit src/lib/modePerangkat.ts modePerangkat
+rakit src/lib/bagikan.ts      bagikan
+rakit src/lib/zip.ts          zip
+rakit src/lib/metronome.ts    metronome
+# N7 — birama & ulang ikut dirakit: hitungan waktu lagu kini menerima
+# tempo per birama, dan satu-satunya cara mengujinya tanpa peramban adalah
+# mengimpor modulnya langsung (uji-birama & uji-panjang-lagu juga butuhnya).
+rakit src/lib/birama.ts       birama
+rakit src/lib/ulang.ts        ulang
+# N8 — uji-gabung-musik & uji-setlist mengimpor '/tmp/gabung.mjs' dan
+# '/tmp/setlist.mjs'. Tanpa dua baris ini mereka mogok pada baris impornya
+# (ERR_MODULE_NOT_FOUND) — kegagalan yang tampak seperti "uji ini tidak
+# punya ringkasan", padahal modulnya yang belum dirakit.
+rakit src/lib/gabungMusik.ts  gabung
+rakit src/lib/setlist.ts      setlist
+# N12 — pemeriksa situs: modul murni, diuji tanpa peramban.
+rakit src/lib/situs.ts        situs
+# N13 — pendeteksi rilis baru: modul murni, diuji tanpa peramban.
+rakit src/lib/rilis.ts        rilis
+# N15 — field.ts: modul terbesar aplikasi, baru sekarang punya uji logika.
+rakit src/lib/field.ts        lapangan
+# N14 — dua belas modul berikut punya rangkaian uji sendiri
+# (*-logika) tetapi TIDAK PERNAH dirakit, sehingga uji itu mogok pada
+# baris impornya (ERR_MODULE_NOT_FOUND) dan tidak pernah masuk daftar
+# regresi. Rangkaian yang tidak dijalankan sama dengan tidak ada.
+rakit src/lib/evaluasi.ts     evaluasi
+rakit src/lib/analitik.ts     analitik
+rakit src/lib/kemajuan.ts     kemajuan
+rakit src/lib/kunciLayar.ts   kunciLayar
+rakit src/lib/latihan.ts      latihan
+rakit src/lib/lomba.ts        lomba
+rakit src/lib/runsheet.ts     runsheet
+rakit src/lib/pindah.ts       pindah
+rakit src/lib/repertoar.ts    repertoar
+rakit src/lib/sesi.ts         sesi
+rakit src/lib/gerak.ts        gerak
+# Nama berkasnya `csvk`, bukan `csvKoordinat` — mengikuti impor ujinya.
+rakit src/lib/csvKoordinat.ts csvk
+echo "== selesai =="

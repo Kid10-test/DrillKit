@@ -1,0 +1,17 @@
+import puppeteer from 'puppeteer'
+import fs from 'node:fs'
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+fs.mkdirSync('/home/user/shots', { recursive: true })
+const b = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--mute-audio'] })
+const p = await b.newPage(); await p.setViewport({ width: 1440, height: 900 })
+await p.goto('http://localhost:5173/', { waitUntil: 'networkidle2' }); await wait(1600)
+await p.evaluate(() => { const x=[...document.querySelectorAll('button')].find(y=>y.textContent.includes('Muat data contoh')); x&&x.click() })
+await wait(3400)
+await p.evaluate(() => { location.hash = '#/drill' }); await wait(2800)
+await p.evaluate(() => { const x=[...document.querySelectorAll('button')].find(y=>(y.title||'')==='Pengaturan drill'); x&&x.click() }); await wait(1100)
+await p.evaluate(() => { const x=[...document.querySelectorAll('button')].find(y=>y.textContent.trim()==='Sepak bola (Indonesia)'); x&&x.click() }); await wait(1000)
+await p.screenshot({ path: '/home/user/shots/dd1e-aturan.png' })
+await p.evaluate(() => { const x=[...document.querySelectorAll('button')].find(y=>y.textContent.trim()==='Simpan'); x&&x.click() }); await wait(2600)
+await p.screenshot({ path: '/home/user/shots/dd1e-lapangan.png' })
+console.log('selesai')
+await b.close()

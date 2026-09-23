@@ -1,0 +1,9 @@
+TARUH berkas "paket.json" di folder ini — sejajar dengan index.html.
+
+Berkas itu didapat dari menu Berbagi -> "Unduh berkas grup",
+lalu diganti namanya menjadi:  paket.json
+
+Tanpa berkas ini, tombol "Perbarui" di HP anggota tidak akan bekerja.
+
+Berkas PETUNJUK ini aman dihapus setelah Anda paham alurnya.
+Ia tidak dipakai aplikasi; ia hanya pengingat.

@@ -1,0 +1,16 @@
+import puppeteer from 'puppeteer'
+import fs from 'node:fs'
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+fs.mkdirSync('/home/user/shots', { recursive: true })
+const b = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox','--mute-audio'] })
+const p = await b.newPage(); await p.setViewport({ width: 1500, height: 1000 })
+await p.goto('http://localhost:5173/', { waitUntil: 'networkidle2' }); await wait(1600)
+await p.evaluate(()=>{ const x=[...document.querySelectorAll('button')].find(y=>y.textContent.includes('Muat data contoh')); x&&x.click() })
+await wait(3400); await p.evaluate(()=>{ location.hash='#/drill' }); await wait(2800)
+const ling = await p.$$('circle[data-titik="1"]')
+await ling[0].click(); await wait(800)
+await p.evaluate(()=>{ const el=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Detail'); el&&el.click() })
+await wait(1500)
+await p.screenshot({ path: '/home/user/shots/dd6-detail.png' })
+console.log('selesai')
+await b.close()

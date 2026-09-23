@@ -4,6 +4,7 @@ dist-standalone/
 release/
 portable/
 *.zip
+*.rar
 
 # Dependensi (dipasang ulang dengan `npm install`)
 node_modules/
@@ -12,6 +13,9 @@ node_modules/
 .vite/
 *.local
 .DS_Store
+
+# Berkas sampah sistem (bukan milik proyek)
+.sudo_as_admin_successful
 
 # Folder bundel unggahan — dibuat ulang dengan scripts/siapkan-unggah.sh
 unggah/

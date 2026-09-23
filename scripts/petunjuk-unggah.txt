@@ -1,0 +1,60 @@
+CARA MENGUNGGAH DRILLKIT KE NETLIFY DROP
+========================================
+
+Yang diseret ke Netlify adalah folder "DrillKit" di sebelah berkas ini.
+BUKAN berkas petunjuk ini, dan BUKAN folder induknya.
+
+Netlify Drop:  https://app.netlify.com/drop
+
+
+LIMA LANGKAH
+------------
+
+1. Buka DrillKit, menu Berbagi.
+
+2. Klik "Unduh berkas grup".
+   (JANGAN pakai berkas per anggota - itu berisi data pribadi mereka.)
+
+3. Ganti nama berkas yang terunduh menjadi persis:  paket.json
+   Lalu taruh ke dalam folder "DrillKit" - sejajar dengan index.html.
+
+4. Seret folder "DrillKit" ke kotak Netlify Drop.
+
+5. Buka tautannya, lalu cek di HP.
+
+
+YANG PALING SERING MENGHABISKAN WAKTU
+-------------------------------------
+
+"paket.json" TIDAK ikut di dalam folder DrillKit. Anda yang menaruh
+sendiri pada langkah 3. Sementara sebuah unggahan ke Netlify adalah
+PENGGANTIAN, bukan sinkronisasi: apa yang ada di dalam folder menjadi
+situsnya, dan apa yang TIDAK ada di dalamnya ikut TERHAPUS.
+
+Jadi kalau Anda mengunggah ulang tanpa menyertakan paket.json lagi,
+berkas materi di situs akan hilang - dan tombol "Perbarui" di HP
+seluruh anggota berhenti bekerja, tanpa ada yang rusak di aplikasinya.
+
+BIASAKAN INI:
+Setiap kali mengunggah ulang, pastikan paket.json masih ada di dalam
+folder DrillKit. Biasanya Anda tinggal menimpa paket.json yang lama
+dengan berkas grup yang baru.
+
+Kalau sampai lupa, tidak apa-apa. Aplikasinya akan memberitahu dengan
+pesan yang menyebut kemungkinan ini. Unggah ulang paket.json-nya saja,
+dan semuanya kembali bekerja.
+
+
+MEMPERBARUI APLIKASINYA SAJA (tanpa mengubah materi)
+----------------------------------------------------
+Unggah folder DrillKit seperti biasa, TANPA mengganti paket.json di
+dalamnya. Aplikasinya yang berganti; materinya tetap.
+
+
+CATATAN LAIN
+------------
+- Pengunjung lama mungkin masih melihat versi sebelumnya, karena service
+  worker menyimpan aplikasi di perangkatnya. Tutup lalu buka kembali
+  aplikasinya di HP.
+- Data latihan TIDAK pernah ikut terunggah. Ia tersimpan di perangkat
+  masing-masing. Ekspor backup adalah satu-satunya jaring pengaman.
