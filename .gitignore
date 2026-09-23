@@ -13,5 +13,8 @@ node_modules/
 *.local
 .DS_Store
 
+# Berkas sampah sistem (bukan milik proyek)
+.sudo_as_admin_successful
+
 # Folder bundel unggahan — dibuat ulang dengan scripts/siapkan-unggah.sh
 unggah/
