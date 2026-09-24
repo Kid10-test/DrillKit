@@ -141,6 +141,16 @@ const berkasMasuk = {
     },
   ],
 }
+// 2a — satu evaluasi ikut di berkas masuk. `terapkan` menulis semua jenis
+// dalam SATU transaksi Dexie. Dulu `evaluasi` dipakai di dalamnya tanpa
+// tercantum di cakupannya, sehingga berkas APA PUN yang memuat evaluasi batal
+// seluruhnya ("Gagal menerapkan data"), lagu dan jadwalnya pun tidak masuk.
+// Rujukannya ke anggota yang ada, supaya tidak ikut dikosongkan.
+const anggotaAda = (await bacaDb('members'))[0]?.id
+berkasMasuk.evaluasi = [{
+  id: 'ev_dt_1', memberId: anggotaAda, tanggal: '2026-09-01',
+  nilai: { teknik: 3 }, oleh: 'Pelatih', createdAt: 1,
+}]
 const jalurMasuk = path.join(BERKAS, 'masuk.json')
 fs.writeFileSync(jalurMasuk, JSON.stringify(berkasMasuk))
 
@@ -179,8 +189,24 @@ const j1 = jadwalSesudah.find((s) => s.id === 's_dt_1')
 cek('jadwal tetap masuk walau rujukannya putus', j1 != null)
 cek('rujukan yang putus dikosongkan', j1 && (j1.setListId == null || j1.setListId === ''),
   JSON.stringify(j1?.setListId))
-const laporan = await teks('[data-testid="laporan-impor"]')
-cek('rujukan yang dikosongkan DILAPORKAN', laporan.includes('dikosongkan'), laporan.slice(0, 120))
+// Laporan yang tidak muncul adalah KEGAGALAN yang dilaporkan, bukan mogok
+// tanpa ringkasan (dulu `teks()` melempar di sini bila terapkan gagal).
+const laporan = (await ada('[data-testid="laporan-impor"]')) ? await teks('[data-testid="laporan-impor"]') : ''
+cek('rujukan yang dikosongkan DILAPORKAN', laporan.includes('dikosongkan'), laporan.slice(0, 120) || 'laporan tidak tampil')
+
+const evaluasiSesudah = await bacaDb('evaluasi')
+cek('evaluasi ikut masuk', evaluasiSesudah.some((e) => e.id === 'ev_dt_1'),
+  JSON.stringify(evaluasiSesudah.map((e) => e.id)))
+cek('rujukan evaluasi ke anggota tetap utuh',
+  anggotaAda != null && evaluasiSesudah.find((e) => e.id === 'ev_dt_1')?.memberId === anggotaAda)
+
+// Bila terapkan gagal, dialog konfirmasinya tetap terbuka dan menghalangi
+// alur berikutnya. Tutup (Escape) supaya sisa uji tetap berjalan, dan
+// kegagalan di atas tetap muncul di ringkasan alih-alih berujung mogok.
+if (await ada('[data-testid="konfirmasi-impor"]')) {
+  await p.keyboard.press('Escape')
+  await wait(500)
+}
 
 // ============================================================ ALUR 2: CSV
 await klik('[data-testid="alur-csv"]')

@@ -142,6 +142,10 @@ export default function Settings() {
         toast.push('Format file tidak dikenali', 'err')
         return
       }
+      // Setiap tabel yang ditulis di bawah WAJIB tercantum di cakupan ini.
+      // Dexie menolak tabel di luar cakupan (NotFound) dan seluruh pemulihan
+      // batal. `memberNotes` dulu tertinggal, sehingga backup yang memuat
+      // catatan anggota tidak bisa dipulihkan sama sekali (2a).
       await db.transaction(
         'rw',
         [
@@ -153,6 +157,7 @@ export default function Settings() {
             db.songs,
             db.setlists,
             db.settings,
+            db.memberNotes,
             db.kemajuan,
             db.evaluasi,
           ],

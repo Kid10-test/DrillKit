@@ -237,10 +237,21 @@ for n in nama:
   cek('PER ANGGOTA: nilai evaluasi H2 tidak pernah ikut', adaEvaluasi === false)
 
   // Nama berkas harus memuat nama anggotanya, supaya mudah dikirim.
+  //
+  // 2a — dicocokkan dengan NAMA LENGKAP (spasi → tanda hubung, seperti
+  // `namaBerkasAnggota`), bukan nama depan saja. "Anggota pertama" diambil
+  // dari IndexedDB, yang urutannya mengikuti `id` berakhiran acak; bila yang
+  // terambil Kirana Ayu, kata "kirana" juga cocok dengan Indah-Kirana — dua
+  // berkas, dan uji ini gagal sekali tiap ±18 putaran tanpa ada yang rusak.
   const namaBerkas = baris.map((b) => b.split(' ')[1])
   const pertama = DISEM.anggota[0]
-  const cocok = namaBerkas.filter((n) => n.toLowerCase().includes(
-    pertama.name.split(' ')[0].toLowerCase()))
+  const namaDiBerkas = pertama.name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  const cocok = namaBerkas.filter((n) => n.toLowerCase().includes(namaDiBerkas))
   cek('nama berkas memuat nama anggotanya', cocok.length === 1,
     JSON.stringify(namaBerkas.slice(0, 3)))
   cek('nama berkas berakhiran .json', namaBerkas.every((n) => n.endsWith('.json')))

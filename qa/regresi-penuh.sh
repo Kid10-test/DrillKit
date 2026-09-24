@@ -26,7 +26,16 @@
 # pertamanya — tanpa pernah menghasilkan baris "N lulus, M gagal".
 # Jangan keluarkan lagi tanpa mencatat alasannya.
 #
-# Pakai: bash /home/user/drillkit/qa/regresi-penuh.sh [BASE_URL]
+# 2a — enam rangkaian buku saku (dd8 dd8b dd9-kompas dd10b-kartu dd10b-mode
+# dd10b-override) menyusul dengan kegagalan yang PALING sunyi: mereka tidak
+# mogok, mereka tidak bisa gagal. Isinya skrip pengintai yang mencetak JSON
+# tanpa satu asersi pun — tertutup layar sambutan pun mereka keluar dengan
+# kode 0 dan `regresi.sh` melaporkan `"error": [] | tanda ✗: 0`, yang
+# terbaca bersih. Kini mereka punya asersi (alat bersama: alat-buku-saku.mjs)
+# dan SELALU mencetak "N lulus, M gagal". Jangan keluarkan lagi tanpa
+# mencatat alasannya.
+#
+# Pakai: bash /home/user/DrillKit/qa/regresi-penuh.sh [BASE_URL]
 #   bawaan BASE_URL = http://localhost:4173 (versi jadi).
 #   Jangan arahkan ke server dev Vite (:5173): ia menyajikan ratusan modul
 #   per muat dan kehabisan sumber daya di kotak pasir bermemori 2 GB,
@@ -52,4 +61,5 @@ bash regresi.sh "$BASE" \
   uji-simpan-otomatis \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui \
-  ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui
+  ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \
+  dd8 dd8b dd9-kompas dd10b-kartu dd10b-mode dd10b-override

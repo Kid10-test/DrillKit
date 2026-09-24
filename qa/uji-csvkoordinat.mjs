@@ -1,7 +1,13 @@
 // Uji murni modul DD7 — src/lib/csvKoordinat.ts
-import { execSync } from 'child_process'
-execSync('npx esbuild src/lib/csvKoordinat.ts --format=esm --outfile=/tmp/csvk.mjs --log-level=error', { cwd: '/home/user/drillkit' })
-const K = await import('/tmp/csvk.mjs?' + Date.now())
+//
+// 2a — modulnya dirakit oleh bangun-logika.sh (`/tmp/csvk.mjs`), seperti uji
+// logika lainnya. Dulu rangkaian ini merakitnya sendiri lewat `execSync` di
+// `/home/user/drillkit` — jalur yang tidak ada di checkout lain (huruf besar
+// DrillKit), sehingga ia mogok dengan `spawnSync /bin/sh ENOENT`. Ringkasannya
+// pun berbentuk "36/36 lulus", yang tidak dikenali regresi.sh: ia tercatat
+// "(tanpa ringkasan)" baik saat sehat maupun saat mogok, dan kode keluarnya
+// tidak pernah 1. Kini: "N lulus, M gagal", ✓/✗, dan exit 1 bila ada yang gagal.
+const K = await import('/tmp/csvk.mjs')
 
 const sYd = 0.625          // 8-to-5: 1 langkah = 0,625 yard
 const lebarYd = 53.3333    // lebar lapangan DCI
@@ -15,7 +21,7 @@ function uji(nama, dapat, mau, toleransi = 0.001) {
     ? Math.abs(dapat - mau) <= toleransi
     : JSON.stringify(dapat) === JSON.stringify(mau)
   if (ok) lulus++
-  console.log(`${ok ? 'LULUS' : 'GAGAL '}  ${nama}${ok ? '' : `  dapat ${JSON.stringify(dapat)} mau ${JSON.stringify(mau)}`}`)
+  console.log(`  ${ok ? '✓' : '✗'} ${nama}${ok ? '' : `  dapat ${JSON.stringify(dapat)} mau ${JSON.stringify(mau)}`}`)
 }
 
 /* ---- 1. bentuk LEBAR: round-trip dengan rumus ekspor aplikasi ---- */
@@ -115,4 +121,5 @@ const h10 = K.bacaCsvKoordinat(
 uji('set berangka: nama set', h10.namaSet, ['Set 1', 'Set 2'])
 uji('set berangka: posisi set 2', h10.baris[0].pos[1].x, -4 * sYd)
 
-console.log(`\n${lulus}/${total} lulus`)
+console.log(`\n${lulus} lulus, ${total - lulus} gagal`)
+if (lulus !== total) process.exitCode = 1

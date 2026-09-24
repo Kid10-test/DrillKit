@@ -4586,3 +4586,276 @@ koordinat mana pun**, bukan sekadar bahwa `stepYd` mengembalikan angka),
 dan `lapangan-ui.mjs` 16 butir: end zone **boleh** 0, ukuran langkah
 tidak boleh 0 atau kosong, lebar & panjang dijaga, dan setelah semuanya
 halaman drill tetap terbuka tanpa `NaN`.
+
+## 2a — Enam rangkaian buku saku yang tidak bisa gagal (23 Sep 2026)
+
+**Yang memicu:** agenda *Item #2 — Buku Saku, 2a: pemulihan uji & regresi*.
+Perbaikan buku sakunya sendiri (kompas, panah, tanda ′, −/+) sudah tayang;
+yang tersisa adalah enam rangkaian ujinya — `dd8`, `dd8b`, `dd9-kompas`,
+`dd10b-kartu`, `dd10b-mode`, `dd10b-override` — yang disebut "mati karena
+layar sambutan".
+
+### Yang ditemukan: bukan mati, melainkan tidak bisa gagal
+
+Diagnosis awalnya benar, tetapi tidak lengkap. Keenamnya memang tertutup
+layar sambutan `PilihMode` — klik pertama tidak mengenai apa pun. Yang
+lebih buruk: **mereka tidak pernah gagal karenanya.** Keenamnya skrip
+pengintai yang mencetak JSON tanpa satu asersi pun. Dijalankan apa
+adanya (alamatnya dialihkan ke versi jadi):
+
+```
+dd8          {"buka": false, "adaCentang": false, "denganLpc": null, ...}   exit 0
+dd8b         {"berat": null, "error": []}                                   exit 0
+dd9-kompas   {"patokOn": false, "saatPatok": null, ...}                     exit 0
+dd10b-mode   TETAP TIDAK ADA · MENYESUAIKAN TIDAK ADA                       exit 0
+```
+
+`regresi.sh` melaporkan yang pertama sebagai `"error": [] | tanda ✗: 0` —
+**terbaca bersih**. Ini jenis kegagalan sunyi yang ketiga, setelah
+"mogok sebelum asersi pertama" (N8) dan "tidak pernah dirakit/dijalankan"
+(N14): uji yang ada, berjalan, keluar dengan kode 0, dan tidak
+membuktikan apa pun.
+
+### Dan di balik layar sambutan pun pemeriksaannya sudah rusak
+
+Menambahkan `lewatSambutan()` saja tidak cukup. Versi lamanya dijalankan
+lagi dengan sambutan dilewati, dan tiga pemeriksaan ternyata sudah lama
+berbohong:
+
+1. **`dd8` menyatakan SETIAP baris "tidak cocok".** Sejak DD10 kolom
+   langkah berisi panah (`17 →`); `Number('17 →')` adalah `NaN`, jadi
+   pemeriksaan Lk/cnt-nya tidak mungkin lulus — dan tidak ada yang tahu,
+   karena hasilnya hanya dicetak.
+2. **`dd8` & `dd8b` membaca kolom yang salah.** Warna Lk/cnt dibaca dari
+   "sel terakhir". Sejak DD10b sel terakhir adalah **Ukuran langkah** —
+   `dd8b` membaca `<span class="mono">22.5″</span>` yang memang tidak
+   pernah berwarna, lalu melaporkannya sebagai hasil pemeriksaan warna
+   peringatan.
+3. **"Kartu pertama" adalah pemain yang berbeda di setiap perangkat.**
+   Urutan kartu mengikuti `id` anggota, dan `id` dibuat dengan akhiran
+   acak. Karena itu catatan DD8 menyebut angka Eka dan DD8b angka Andra
+   dari rangkaian yang sama-sama membaca kartu pertama.
+
+Satu hal lagi yang dicatat supaya tidak diulang: komentar `dd10b-override`
+yang lama berbunyi "setel ke hitungan", padahal satu klik dari `drill`
+menghasilkan `tetap`. Dan ia menutup panel Detail dengan Escape, yang —
+tanpa jendela terbuka — juga **membatalkan pilihan titik** di editor.
+Dengan panel terbuka, pilihannya diamati bertahan, tetapi tidak ada yang
+menjanjikannya di kode; rangkaian baru tidak mengandalkannya.
+
+### Perbaikannya: satu alat bersama, enam rangkaian dengan asersi
+
+`qa/alat-buku-saku.mjs` — **bukan rangkaian**, alat bersama keenamnya
+(seperti `sambutan.mjs` dan `db-mentah.mjs`). Ia menjamin:
+
+- **selalu ada baris "N lulus, M gagal"** — juga saat rangkaiannya mogok
+  (dihitung satu kegagalan, lengkap dengan sebabnya) atau macet (batas
+  waktu sendiri 240 detik, jauh di bawah `timeout 600` milik
+  `regresi.sh`, supaya ringkasannya sempat tercetak);
+- **langkah yang gagal berhenti dengan terang** — pratinjau yang tidak
+  muncul atau jendela yang tidak terbuka melempar galat berkalimat
+  jelas, bukan mengembalikan `null` untuk dibaca asersi berikutnya;
+- **kolom dicari lewat judulnya, kartu lewat nama pemainnya**;
+- **yang tersimpan dibaca dari basis data**, bukan dari layar (README);
+- **kolom React diketik**, bukan ditimpa lewat setter prototipe.
+
+Keenam rangkaian ditulis ulang di atasnya. Maksud tiap rangkaian
+dipertahankan, dan angka acuannya diambil dari bagian **Hasil DD8/DD10/
+DD10b** di dokumen ini — jadi yang diuji adalah klaim yang dulu ditulis,
+bukan angka yang dicomot dari layar hari ini.
+
+| Rangkaian | Butir | Yang dibuktikan |
+|---|---:|---|
+| `dd8` | 23 | kolom Lk/cnt di 18 kartu; Eka 29 langkah / 16 = **1,82**; di semua kartu Lk/cnt sejalan dengan Langkah ÷ Cnt; warna hanya untuk berat/mustahil, sama dengan legendanya; centang mati → kolom **dan** legenda hilang |
+| `dd8b` | 15 | count diketik 1 → tersimpan di basis data; Andra **12,92 merah** (mustahil) di semua kartu; ukuran langkah 22,5″ **tidak** ikut merah — yang mustahil kecepatannya |
+| `dd9-kompas` | 35 | kompas BELAKANG · PENONTON · S1 · S2; penjelasan A/−/+ hanya bila patok menyala; Gita `C' · T5 +2.75` → `B' +2.25 · T6 +0.75` `↖`; **koma atas tepat pada pemain di sisi S2**, dicocokkan silang dengan koordinat garis yard (36 koordinat); panah sama dengan atau tanpa patok |
+| `dd10b-mode` | 24 | tetap: Citra 21/16 = **1,32**, 22,5″ di semua kartu; ikut hitungan: **16/16 = 1**, Citra **29,6″**; (ukuran ÷ 22,5″) × 16 = langkah mode tetap untuk tiap pemain; warna ukuran mengikuti 22,5/30/45″ |
+| `dd10b-override` | 24 | siklus drill → tetap → hitungan → drill, tiap langkah **tersimpan di basis data**; kembali ke drill = timpaan dihapus; `hitungan` = **16 · 1 · 120**; bertahan setelah panel ditutup-dibuka **dan setelah halaman dimuat ulang**; pemain lain tidak ikut |
+| `dd10b-kartu` | 15 | Detail Andra `16 · 1 · 120 · 18,2″` = kartu Andra `16 →` · `1` · `18,2″`; **17 kartu lainnya tidak berubah**; dikembalikan → kartu kembali persis |
+
+**Jumlah: 136 butir**, dari enam rangkaian yang sebelumnya membuktikan
+nol.
+
+### Batas "sejalan" yang jujur, bukan 0,02
+
+Rangkaian lama memakai selisih tetap 0,02 antara Lk/cnt dan Langkah ÷ Cnt.
+Itu terlalu ketat untuk angka yang dicetak: langkah dibulatkan ke
+bilangan bulat, sedangkan Lk/cnt dihitung dari jarak yang belum
+dibulatkan. 8,49 langkah tercetak "8" dengan Lk/cnt 0,53, padahal 8 ÷ 16
+= 0,50. Selisih yang jujur bisa mencapai ½ ÷ Cnt + 0,005 (0,036 untuk 16
+hitungan); dengan batas 0,02, **tujuh dari delapan belas kartu** data
+contoh akan "gagal" padahal angkanya benar. Batasnya kini diturunkan
+dari cara angkanya dibulatkan, dan ditulis di `lkCntSejalan()`.
+
+### Uji yang benar-benar bisa gagal
+
+Setiap rangkaian baru dibuktikan bisa gagal dengan menyuntikkan cacat ke
+bundel versi jadi, lalu mengembalikannya:
+
+- Lk/cnt dikali 1,1 → `dd8`: **21 lulus, 2 gagal** (Eka 2 ≠ 1,82; 18
+  kartu tidak sejalan).
+- Koma atas dipasang di sisi yang salah → `dd9-kompas`: **31 lulus, 4
+  gagal**, termasuk pemeriksaan silang dengan garis yard.
+- Buku saku mengabaikan timpaan per pemain → `dd10b-kartu`: **11 lulus,
+  4 gagal** (13 ≠ 16, 22,5″ ≠ 18,2″).
+- Alamat mati, dan layar sambutan yang tidak terlewati → **0 lulus, 1
+  gagal**, exit 1, dengan sebabnya — bukan JSON kosong berkode 0.
+
+### Lain-lain
+
+- Keenamnya didaftarkan ke `regresi-penuh.sh` (kini **77 rangkaian**),
+  dengan catatan di dalam berkasnya supaya tidak dikeluarkan tanpa
+  alasan tertulis. `jalankan-semua.sh` mendapat blok kelima, yang juga
+  menambal dua rangkaian 1a/1b (`uji-riwayat`, `uji-simpan-otomatis`)
+  yang belum tercantum di sana — kedua daftar kini sama persis.
+- Bawaan `regresi.sh` dipindah dari `:5173` ke `:4173`, sama dengan
+  `regresi-penuh.sh`.
+- `qa/README.md`: angka rangkaian yang basi (24 → 77), tiga pelajaran di
+  atas, dan cara menjalankan Chromium bila unduhan Chrome Puppeteer
+  diblokir (`@sparticuz/chromium`).
+- Tangkapan layar kini opsional (`SHOTS=/folder`); dulu dua rangkaian
+  menulis ke `/home/user/shots` yang belum tentu ada.
+- Rangkaian yang sama juga lulus pada berkas portabel
+  (`BASE=file:///…/index.html`).
+- **Catatan lingkungan:** tiga belas rangkaian lain yang terdaftar juga
+  masih menyebut `/home/user/drillkit` (huruf kecil) untuk `dist/` atau
+  folder unduhan. Di kotak pasir ini mereka dijalankan dengan tautan
+  `ln -s /home/user/DrillKit /home/user/drillkit`; merapikannya menjadi
+  jalur relatif sengaja tidak dicampur ke 2a.
+
+### Regresi penuh: empat yang tidak bersih, satu yang sungguhan
+
+Regresi penuh pertama dengan 77 rangkaian (23 Sep 2026, 15.00–15.46,
+lawan versi jadi): **73 bersih**, termasuk keenam rangkaian buku saku.
+Empat sisanya diperiksa satu per satu. Tiga ternyata ujinya sendiri, satu
+cacat sungguhan:
+
+1. **`uji-csvkoordinat` — `(tanpa ringkasan)`.** Ia merakit modulnya
+   sendiri lewat `execSync` di `/home/user/drillkit`, jalur yang tidak ada
+   di checkout ini (huruf besar `DrillKit`), dan mogok dengan
+   `spawnSync /bin/sh ENOENT`. Ringkasannya pun berbentuk `36/36 lulus`,
+   yang tidak dikenali `regresi.sh`: sehat atau mogok, catatannya sama
+   persis, dan kode keluarnya tidak pernah 1. Kini ia memakai modul yang
+   sudah dirakit `bangun-logika.sh`, mencetak `N lulus, M gagal`, dan
+   keluar dengan kode 1 bila ada yang gagal (dibuktikan dengan merusak
+   modulnya sementara: lima ✗, exit 1).
+2. **`berbagi-anggota` — 33 lulus, 1 gagal, karena kebetulan.** "Anggota
+   pertama" diambil dari IndexedDB, yang urutannya mengikuti `id`
+   berakhiran acak, lalu berkasnya dicari lewat nama DEPAN. Kali ini yang
+   terambil Kirana Ayu, dan "kirana" juga cocok dengan
+   `DrillKit-Indah-Kirana-WO09.json`: dua berkas, uji gagal. Peluangnya
+   kira-kira satu dari delapan belas putaran, tanpa ada yang rusak. Kini
+   dicocokkan dengan nama lengkap, persis seperti `namaBerkasAnggota`
+   membentuknya.
+3. **`mode-lomba` — `(tanpa ringkasan)`, bergantung jam.** Data contoh
+   punya sesi hari ini pukul 15.30–18.00, dan regresinya kebetulan sampai
+   di sini pukul 15.30. Sesi itu menjadi "sedang berjalan", kartu set list
+   penampilan yang disiapkan uji tidak muncul, dan uji mogok di
+   `daftar-lagu`. Setiap sore, kira-kira 15.00–18.00 jam perangkat, uji
+   ini mogok tanpa ada yang rusak. Kini sesi data contoh yang jatuh hari
+   ini dibuang sebelum sesi uji ditanam.
+4. **`backup-lengkap` — 20 lulus, 3 gagal: CACAT SUNGGUHAN, sudah ada di
+   `main`.** Uji ini membaca daftar tabel langsung dari IndexedDB dan
+   menuntut setiap tabel ada di berkas backup. Tujuannya persis menangkap
+   tabel baru yang lupa didaftarkan (cacat `setlists` di M3). 1a dan 1b
+   menambah dua tabel, `riwayat` dan `simpanan`, dan tidak satu pun masuk
+   backup. Tidak ketahuan karena PR #2 hanya menjalankan uji logika:
+   Chrome tidak bisa diunduh di kotak pasirnya. **Sengaja belum
+   diperbaiki**, karena ini keputusan produk, bukan urusan 2a:
+   - `simpanan` berisi *pegangan berkas* (File System Access) milik
+     perangkat itu sendiri. Isinya tidak bisa ditulis ke JSON dan tidak
+     berarti apa pun di perangkat lain. Hampir pasti harus
+     **dikecualikan** seperti `packages`, dengan alasannya ditulis di
+     ujinya.
+   - `riwayat` perlu diputuskan. Pilihan pertama: ikut backup, sehingga
+     pulih bersama datanya. Tetapi berkas backup, termasuk yang ditulis 1b
+     tiap ±15 menit, bisa membengkak beberapa MB per drill, dan
+     pemulihannya harus ditambahkan. Pilihan kedua: dikecualikan.
+     Riwayat dianggap milik perangkat, dan backup sudah memuat keadaan
+     terkini.
+
+   **Diputuskan keesokan harinya: keduanya dikecualikan** (lihat
+   *Keputusan backup* di bawah).
+
+Setelah ketiga uji diperbaiki, keempatnya dijalankan ulang lewat
+`regresi.sh`: `uji-csvkoordinat` 36 lulus, `berbagi-anggota` 34 lulus,
+dan `mode-lomba` 23 lulus. `mode-lomba` dijalankan pukul 15.47, di
+dalam jendela yang dulu membuatnya mogok. `backup-lengkap` tetap 20
+lulus, 3 gagal, sampai keputusannya diambil.
+
+### Keputusan backup: `riwayat` dan `simpanan` milik perangkat
+
+Diputuskan 24 Sep 2026: **keduanya dikecualikan dari backup**. Alasannya
+ditulis di kepala `qa/backup-lengkap.mjs`, di samping `packages`:
+
+- `simpanan`: pegangan berkas hanya berlaku di browser yang membuatnya,
+  dan tidak bisa ditulis ke JSON.
+- `riwayat`: backup memuat keadaan terkini, sedangkan riwayat untuk undo
+  tetap milik perangkat. Kalau ikut, setiap berkas backup ikut membengkak,
+  termasuk yang ditulis simpan otomatis tiap ±15 menit.
+
+Sebelum memutuskan, jalur pemulihannya diperiksa dulu. `importBackup`
+hanya menimpa tabel yang ada di berkas lewat `bulkPut`, tanpa
+mengosongkan apa pun. Jadi saat backup dipulihkan, riwayat dan pegangan
+simpan otomatis di perangkat tetap utuh; mengecualikan keduanya tidak
+berarti menghapusnya. Bila kelak riwayat mau ikut backup, ada tiga
+tempat yang harus diubah bersamaan: daftar `DIKECUALIKAN`,
+`buildBackupPayload`, dan transaksi `importBackup`.
+
+Keputusan ini tidak mengubah `src/`. Hasilnya, `backup-lengkap` **21
+lulus, 0 gagal**.
+
+### Temuan saat memutuskan: pemulihan yang batal seluruhnya
+
+Memeriksa jalur pemulihan untuk keputusan di atas membuka cacat yang jauh
+lebih berat. Cacat ini sudah ada sebelum 1a/1b: PR #2 tidak menyentuh
+kedua transaksi yang bermasalah.
+
+`importBackup` (Pengaturan) menulis semua tabel dalam satu transaksi
+Dexie. Di dalamnya ia memanggil `db.memberNotes.bulkPut`, padahal
+`memberNotes` tidak tercantum di cakupan transaksinya. Dexie 4.4.6 menolak
+tabel di luar cakupan (`NotFound: Table memberNotes not part of
+transaction`), sehingga seluruh transaksi batal. Akibatnya, **backup yang
+memuat satu saja catatan anggota tidak bisa dipulihkan sama sekali**.
+Tidak satu tabel pun kembali, dan pengguna hanya melihat "Gagal memulihkan
+backup". Padahal berkas backup adalah satu-satunya jaring pengaman untuk
+data yang hanya tinggal di perangkat.
+
+Pola yang sama ada di `terapkan` (Pusat Data), dengan tabel lain: di sana
+`evaluasi` yang ditulis tanpa tercantum di cakupan. Berkas Data apa pun
+yang memuat evaluasi batal seluruhnya ("Gagal menerapkan data").
+
+Tidak ada uji yang pernah menyentuh kedua jalur ini, karena data contoh
+tidak punya catatan anggota maupun evaluasi. Semua `db.transaction(` di
+`src/` (lima buah) lalu dipindai, dan hanya dua kasus ini yang ditemukan.
+
+Ujinya ditulis lebih dulu, dan dibuktikan gagal pada versi jadi yang
+belum diperbaiki:
+
+- **`backup-lengkap` mendapat langkah 5.** Di setiap tabel wajib ditandai
+  satu baris: baris yang sudah ada, atau baris uji bila tabelnya kosong.
+  Backup diekspor, baris-baris itu dihapus, backup dipulihkan, dan setiap
+  baris harus kembali. Tabel yang kelak ditambahkan ikut teruji tanpa
+  perlu diingat. Sebelum perbaikan hasilnya **25 lulus, 11 gagal**:
+  muncul "Gagal memulihkan backup", dan tidak satu pun dari sepuluh tabel
+  pulih.
+- **Berkas masuk `pusat-data` kini memuat satu evaluasi.** Sebelum
+  perbaikan hasilnya **25 lulus, 10 gagal**: lagu, jadwal, dan evaluasinya
+  tidak ada yang masuk. Dulu rangkaian ini mogok tanpa ringkasan bila
+  terapkan gagal, karena dialog konfirmasinya tetap terbuka. Kini
+  kegagalannya terlapor, lalu dialognya ditutup supaya sisa uji tetap
+  berjalan.
+
+Perbaikannya dua baris, masing-masing dengan komentar: `db.memberNotes`
+masuk cakupan `importBackup`, dan `db.evaluasi` masuk cakupan `terapkan`.
+Sesudahnya `backup-lengkap` **36 lulus**, `pusat-data` **35 lulus**, dan
+`backup-setlist` 14 lulus, semuanya tanpa kegagalan.
+
+**Diuji:** keenam rangkaian buku saku lulus lewat `regresi.sh`, diulang
+tiga putaran lagi tanpa satu pun kegagalan, dan lulus lagi di regresi
+penuh. `tsc --noEmit` bersih, `npm run build` sukses, dan
+`bangun-logika.sh` merakit 26 modul. Regresi penuh pertama (23 Sep)
+berakhir dengan 76 dari 77 rangkaian bersih. Setelah keputusan backup dan
+perbaikan pemulihan, regresi penuh diulang sekali jalan lawan versi jadi
+yang baru (24 Sep 2026, ±46 menit): **77 dari 77 rangkaian bersih, 2.670
+butir lulus, 0 gagal**, dan tidak satu pun berakhir tanpa ringkasan.
