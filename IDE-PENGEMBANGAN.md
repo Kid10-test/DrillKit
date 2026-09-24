@@ -4854,7 +4854,8 @@ Sesudahnya `backup-lengkap` **36 lulus**, `pusat-data` **35 lulus**, dan
 **Diuji:** keenam rangkaian buku saku lulus lewat `regresi.sh`, diulang
 tiga putaran lagi tanpa satu pun kegagalan, dan lulus lagi di regresi
 penuh. `tsc --noEmit` bersih, `npm run build` sukses, dan
-`bangun-logika.sh` merakit 26 modul. Hasil regresi penuh: **76 dari 77
-rangkaian bersih**. Yang tersisa, `backup-lengkap`, lulus setelah
-keputusan di atas (21 lulus, 0 gagal), dan setelah perbaikan pemulihan
-lulus 36 butir.
+`bangun-logika.sh` merakit 26 modul. Regresi penuh pertama (23 Sep)
+berakhir dengan 76 dari 77 rangkaian bersih. Setelah keputusan backup dan
+perbaikan pemulihan, regresi penuh diulang sekali jalan lawan versi jadi
+yang baru (24 Sep 2026, ±46 menit): **77 dari 77 rangkaian bersih, 2.670
+butir lulus, 0 gagal**, dan tidak satu pun berakhir tanpa ringkasan.
