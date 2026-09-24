@@ -233,9 +233,12 @@ function AlurPindah({
     const { berkas, putus } = putusRujukan(menunggu, yangAda)
     const b = berkas
     try {
+      // Setiap tabel yang ditulis di bawah WAJIB tercantum di cakupan ini.
+      // Dexie menolak tabel di luar cakupan (NotFound) dan seluruh berkas
+      // batal. `evaluasi` dulu tertinggal (2a).
       await db.transaction(
         'rw',
-        [db.members, db.sessions, db.attendance, db.drills, db.sets, db.songs, db.setlists, db.kemajuan, db.memberNotes],
+        [db.members, db.sessions, db.attendance, db.drills, db.sets, db.songs, db.setlists, db.kemajuan, db.memberNotes, db.evaluasi],
         async () => {
           if (b.anggota?.length) await db.members.bulkPut(b.anggota)
           if (b.jadwal?.length) await db.sessions.bulkPut(b.jadwal)

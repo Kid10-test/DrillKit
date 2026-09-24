@@ -12,6 +12,9 @@
  * muncul di berkas backup. Menambah tabel baru tanpa mendaftarkannya di
  * backup akan langsung membuat uji ini gagal.
  *
+ * Sejak 2a, setiap tabel itu juga harus PULIH dari berkasnya (langkah 5),
+ * bukan hanya tersimpan: tersimpan-tapi-tidak-pulih sama buruknya.
+ *
  * Dikecualikan, dengan alasan:
  * - `settings` — ditangani terpisah (`db.settings.put`), bukan bulkPut.
  * - `packages` — salinan paket berbagi di perangkat ANGGOTA, bukan data
@@ -188,6 +191,122 @@ if (adaEvaluasi) {
   })
   cek('evaluasi pulih setelah impor', sesudah.some((e) => e.id === 'ev_uji'), JSON.stringify(sesudah.map((e) => e.id)))
   cek('nilai evaluasi pulih utuh', sesudah.find((e) => e.id === 'ev_uji')?.nilai?.teknik === 4)
+}
+
+// 5. SETIAP tabel wajib harus PULIH, bukan hanya tersimpan.
+//
+// Langkah 3 hanya memastikan kuncinya ada di berkas, dan itu belum menjamin
+// pemulihannya. `importBackup` menulis semua tabel dalam SATU transaksi
+// Dexie. Tabel yang dipakai tanpa tercantum di cakupan transaksi melempar
+// NotFound, sehingga seluruh pemulihan batal dan tidak satu tabel pun pulih.
+// Itu yang terjadi pada `memberNotes` (catatan anggota), ditemukan di 2a
+// (24 Sep 2026): data contoh tidak punya catatan, jadi tidak ada uji yang
+// pernah memulihkannya.
+//
+// Karena itu, di setiap tabel wajib ditandai satu baris: baris yang sudah
+// ada, atau baris uji bila tabelnya kosong. Backup diekspor, baris-baris itu
+// dihapus, backup dipulihkan, dan setiap baris harus kembali. Tabel yang
+// kelak ditambahkan ikut teruji tanpa perlu diingat.
+const tanda = await p.evaluate(async (daftar) => {
+  const r = await new Promise((res) => { const q = indexedDB.open('drillkit'); q.onsuccess = () => res(q.result) })
+  const hasil = []
+  for (const t of daftar) {
+    const s0 = r.transaction([t], 'readonly').objectStore(t)
+    const kp = s0.keyPath
+    const ada = await new Promise((res) => { const q = s0.getAllKeys(null, 1); q.onsuccess = () => res(q.result[0]) })
+    if (ada !== undefined) { hasil.push({ t, kp, kunci: ada, ditanam: false }); continue }
+    // Tabel kosong: tanam satu baris uji. IndexedDB hanya mewajibkan
+    // kuncinya; indeks yang kolomnya tidak ada dilewati begitu saja.
+    const k = 'uji_pulih_' + t
+    const baris = { memberId: 'm_uji', at: 1, createdAt: 1, tanggal: '2026-09-01', text: 'uji pulih' }
+    let kunci = k
+    if (typeof kp === 'string') baris[kp] = k
+    else if (Array.isArray(kp)) { for (const x of kp) baris[x] = k; kunci = kp.map(() => k) }
+    const tx = r.transaction([t], 'readwrite')
+    if (kp == null) tx.objectStore(t).put(baris, k)
+    else tx.objectStore(t).put(baris)
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error) })
+    hasil.push({ t, kp, kunci, ditanam: true })
+  }
+  return hasil
+}, wajib)
+console.log('baris yang ditandai:', tanda.map((x) => x.t + (x.ditanam ? ' (ditanam)' : '')).join(', '))
+cek('setiap tabel wajib punya satu baris yang ditandai', tanda.length === wajib.length,
+  `${tanda.length}/${wajib.length}`)
+
+const adaBaris = () => p.evaluate(async (daftar) => {
+  const r = await new Promise((res) => { const q = indexedDB.open('drillkit'); q.onsuccess = () => res(q.result) })
+  const hasil = {}
+  for (const x of daftar) {
+    hasil[x.t] = await new Promise((res) => {
+      const q = r.transaction([x.t], 'readonly').objectStore(x.t).get(x.kunci)
+      q.onsuccess = () => res(q.result !== undefined)
+    })
+  }
+  return hasil
+}, tanda)
+const bukaPengaturan = async () => {
+  await p.reload({ waitUntil: 'networkidle2' })
+  await wait(2200)
+  await p.evaluate(() => { location.hash = '#/pengaturan' })
+  await wait(1800)
+}
+
+await bukaPengaturan()
+for (const f of fs.readdirSync(UNDUH)) fs.rmSync(path.join(UNDUH, f), { force: true })
+await tombol('Ekspor backup')
+let berkas3 = null
+let isi3 = null
+for (let i = 0; i < 60 && !berkas3; i += 1) {
+  await wait(250)
+  for (const f of fs.readdirSync(UNDUH).filter((x) => x.endsWith('.json'))) {
+    try {
+      isi3 = JSON.parse(fs.readFileSync(path.join(UNDUH, f), 'utf8'))
+      berkas3 = path.join(UNDUH, f)
+    } catch {}
+  }
+}
+cek('berkas backup ketiga terunduh', berkas3 != null)
+if (!berkas3) {
+  console.log(`\n${lulus} lulus, ${gagal.length} gagal`)
+  console.log('GAGAL:\n - ' + gagal.join('\n - '))
+  await browser.close()
+  process.exit(1)
+}
+const kunciDari = (b, kp) => (Array.isArray(kp) ? kp.map((x) => b?.[x]) : b?.[kp])
+const takTersimpan = tanda
+  .filter((x) => !(isi3[x.t] ?? []).some((b) => JSON.stringify(kunciDari(b, x.kp)) === JSON.stringify(x.kunci)))
+  .map((x) => x.t)
+cek('setiap baris yang ditandai ada di berkas backup', takTersimpan.length === 0, takTersimpan.join(', '))
+
+await p.evaluate(async (daftar) => {
+  const r = await new Promise((res) => { const q = indexedDB.open('drillkit'); q.onsuccess = () => res(q.result) })
+  for (const x of daftar) {
+    const tx = r.transaction([x.t], 'readwrite')
+    tx.objectStore(x.t).delete(x.kunci)
+    await new Promise((res) => { tx.oncomplete = res })
+  }
+}, tanda)
+await bukaPengaturan()
+const masihAda = Object.entries(await adaBaris()).filter(([, v]) => v).map(([t]) => t)
+cek('baris yang ditandai benar-benar terhapus sebelum dipulihkan', masihAda.length === 0, masihAda.join(', '))
+
+await (await p.$('#restore-input')).uploadFile(berkas3)
+// Toast hanya tampil beberapa detik — tangkap selagi ada.
+let pesan = ''
+for (let i = 0; i < 40 && !pesan; i += 1) {
+  await wait(100)
+  pesan = await p.evaluate(() => {
+    const t = document.body.innerText
+    if (t.includes('Gagal memulihkan backup')) return 'Gagal memulihkan backup'
+    return t.includes('Backup dipulihkan') ? 'Backup dipulihkan' : ''
+  })
+}
+cek('pemulihan melapor "Backup dipulihkan"', pesan === 'Backup dipulihkan', pesan || 'tidak ada pesan')
+await wait(1500)
+const pulih = await adaBaris()
+for (const x of tanda) {
+  cek(`baris "${x.t}" pulih dari backup${x.ditanam ? ' (baris uji)' : ''}`, pulih[x.t] === true)
 }
 
 cek('tidak ada error konsol', errors.length === 0, errors.slice(0, 3).join(' | '))

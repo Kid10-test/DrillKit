@@ -4805,9 +4805,56 @@ tempat yang harus diubah bersamaan: daftar `DIKECUALIKAN`,
 Keputusan ini tidak mengubah `src/`. Hasilnya, `backup-lengkap` **21
 lulus, 0 gagal**.
 
+### Temuan saat memutuskan: pemulihan yang batal seluruhnya
+
+Memeriksa jalur pemulihan untuk keputusan di atas membuka cacat yang jauh
+lebih berat. Cacat ini sudah ada sebelum 1a/1b: PR #2 tidak menyentuh
+kedua transaksi yang bermasalah.
+
+`importBackup` (Pengaturan) menulis semua tabel dalam satu transaksi
+Dexie. Di dalamnya ia memanggil `db.memberNotes.bulkPut`, padahal
+`memberNotes` tidak tercantum di cakupan transaksinya. Dexie 4.4.6 menolak
+tabel di luar cakupan (`NotFound: Table memberNotes not part of
+transaction`), sehingga seluruh transaksi batal. Akibatnya, **backup yang
+memuat satu saja catatan anggota tidak bisa dipulihkan sama sekali**.
+Tidak satu tabel pun kembali, dan pengguna hanya melihat "Gagal memulihkan
+backup". Padahal berkas backup adalah satu-satunya jaring pengaman untuk
+data yang hanya tinggal di perangkat.
+
+Pola yang sama ada di `terapkan` (Pusat Data), dengan tabel lain: di sana
+`evaluasi` yang ditulis tanpa tercantum di cakupan. Berkas Data apa pun
+yang memuat evaluasi batal seluruhnya ("Gagal menerapkan data").
+
+Tidak ada uji yang pernah menyentuh kedua jalur ini, karena data contoh
+tidak punya catatan anggota maupun evaluasi. Semua `db.transaction(` di
+`src/` (lima buah) lalu dipindai, dan hanya dua kasus ini yang ditemukan.
+
+Ujinya ditulis lebih dulu, dan dibuktikan gagal pada versi jadi yang
+belum diperbaiki:
+
+- **`backup-lengkap` mendapat langkah 5.** Di setiap tabel wajib ditandai
+  satu baris: baris yang sudah ada, atau baris uji bila tabelnya kosong.
+  Backup diekspor, baris-baris itu dihapus, backup dipulihkan, dan setiap
+  baris harus kembali. Tabel yang kelak ditambahkan ikut teruji tanpa
+  perlu diingat. Sebelum perbaikan hasilnya **25 lulus, 11 gagal**:
+  muncul "Gagal memulihkan backup", dan tidak satu pun dari sepuluh tabel
+  pulih.
+- **Berkas masuk `pusat-data` kini memuat satu evaluasi.** Sebelum
+  perbaikan hasilnya **25 lulus, 10 gagal**: lagu, jadwal, dan evaluasinya
+  tidak ada yang masuk. Dulu rangkaian ini mogok tanpa ringkasan bila
+  terapkan gagal, karena dialog konfirmasinya tetap terbuka. Kini
+  kegagalannya terlapor, lalu dialognya ditutup supaya sisa uji tetap
+  berjalan.
+
+Perbaikannya dua baris, masing-masing dengan komentar: `db.memberNotes`
+masuk cakupan `importBackup`, dan `db.evaluasi` masuk cakupan `terapkan`.
+Sesudahnya `backup-lengkap` **36 lulus**, `pusat-data` **35 lulus**, dan
+`backup-setlist` 14 lulus, semuanya tanpa kegagalan.
+
 **Diuji:** keenam rangkaian buku saku lulus lewat `regresi.sh`, diulang
 tiga putaran lagi tanpa satu pun kegagalan, dan lulus lagi di regresi
 penuh. `tsc --noEmit` bersih, `npm run build` sukses, dan
 `bangun-logika.sh` merakit 26 modul. Hasil regresi penuh: **76 dari 77
 rangkaian bersih**. Yang tersisa, `backup-lengkap`, lulus setelah
-keputusan di atas (21 lulus, 0 gagal).
+keputusan di atas (21 lulus, 0 gagal), dan setelah perbaikan pemulihan
+lulus 36 butir.
