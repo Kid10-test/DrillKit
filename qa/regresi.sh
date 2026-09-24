@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Menjalankan sekumpulan skrip uji lalu melaporkan ringkasannya saja.
 # Pakai: bash regresi.sh [BASE_URL] [skrip...]
+#
+# 2a — bawaannya versi jadi (:4173), sama dengan regresi-penuh.sh. Dulu :5173,
+# server pengembangan yang tidak sanggup memikul regresi (N14).
 cd "$(dirname "$0")" || exit 1
-BASE="${1:-http://localhost:5173}"
+BASE="${1:-http://localhost:4173}"
 shift || true
 DAFTAR=("$@")
 if [ ${#DAFTAR[@]} -eq 0 ]; then

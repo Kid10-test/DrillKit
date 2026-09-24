@@ -1,123 +1,95 @@
-// DD10b — override per gerakan harus ikut tercetak di buku saku,
-// dibaca pada kartu anggota YANG SAMA dengan titik yang diubah (dev 5173)
-import puppeteer from 'puppeteer'
-const wait = (ms) => new Promise((r) => setTimeout(r, ms))
-const b = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--mute-audio'] })
-const p = await b.newPage()
-await p.setViewport({ width: 1440, height: 1000 })
-const errs = []
-p.on('pageerror', (e) => errs.push(e.message.slice(0, 160)))
-p.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 160)) })
+/**
+ * DD10b — timpaan per gerakan harus ikut TERCETAK di buku saku, pada kartu
+ * pemain YANG SAMA dengan yang diubah di panel Detail.
+ *
+ * Skenario dari "Hasil DD10b" (IDE-PENGEMBANGAN): Andra Pratama, Set 1 →
+ * Set 2, ditimpa ke "hitungan". Panel Detail menampilkan `16 · 1 · 120 ·
+ * 18,2″`, dan kartu Andra harus mencetak `16 →` · `1` · `18,2″` — sama persis.
+ *
+ * Yang diuji:
+ *   1. sebelum ditimpa: kartu Andra mengikuti bawaan drill (13 langkah, 22,5″);
+ *   2. panel Detail Andra → "hitungan": 16 · 1 · 120 · 18,2″;
+ *   3. kartu Andra (dipilih sendiri di buku saku) mencetak angka yang SAMA
+ *      dengan panel Detail — langkah, Lk/cnt, ukuran — plus panah →;
+ *   4. di pratinjau semua pemain, HANYA kartu Andra yang berubah: 17 kartu
+ *      lainnya persis seperti sebelum ditimpa;
+ *   5. timpaan dikembalikan ke "drill" → kartu Andra kembali seperti semula.
+ *
+ * 2a — dihidupkan kembali. Rangkaian lama hanya mencetak JSON tanpa asersi,
+ * mencari tabel Detail lewat rantai
+ * `closest('div[class*="rounded"]').parentElement.parentElement` yang
+ * bergantung pada kedalaman susunan DOM, dan memilih pemain dengan menimpa
+ * `value` lewat setter prototipe. Kini tabel dicari dari judul panelnya,
+ * pemain dipilih lewat `select()` Puppeteer, dan yang dibandingkan bukan
+ * hanya kartu Andra tetapi juga 17 kartu lain yang TIDAK boleh ikut berubah.
+ *
+ * Pakai: BASE=http://localhost:4173 node dd10b-kartu.mjs
+ */
+import { barisDetail, gerakPertama, jalankan, kartuMilik } from './alat-buku-saku.mjs'
 
-const bukaDetail = async () => {
-  const l = await p.$$('circle[data-titik="1"]')
-  if (!l.length) return false
-  await l[0].click()
-  await wait(900)
-  return p.evaluate(() => {
-    const el = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Detail')
-    if (!el) return false
-    el.click()
-    return true
-  })
-}
+const NAMA = 'Andra Pratama'
 
-/** Nama anggota dari judul panel Detail. */
-const namaDetail = () => p.evaluate(() => {
-  const j = [...document.querySelectorAll('h2,h3')].find((h) => (h.textContent || '').startsWith('Detail —'))
-  return j ? j.textContent.replace('Detail —', '').trim() : null
-})
+/** Ringkasan satu kartu untuk dibandingkan: koordinat, langkah+panah, Lk/cnt, ukuran. */
+const sidik = (k) => k.baris.map((b) => b.map((c) => c.teks).join(' | ')).join(' // ')
 
-const bacaMode = (n) => p.evaluate((i) => {
-  const j = [...document.querySelectorAll('h2,h3')].find((h) => (h.textContent || '').startsWith('Detail —'))
-  const k = j?.closest('div[class*="rounded"]')?.parentElement?.parentElement
-  const t = k?.querySelector('table')
-  const tr = t?.querySelectorAll('tbody tr')[i]
-  return tr?.querySelector('td:last-child button')?.textContent.trim() ?? null
-}, n)
+await jalankan('DD10b — timpaan per gerakan tercetak di kartu pemain yang sama', async (t) => {
+  const { cek, sama, catat } = t
+  await t.siapkan()
 
-const klikMode = (n) => p.evaluate((i) => {
-  const j = [...document.querySelectorAll('h2,h3')].find((h) => (h.textContent || '').startsWith('Detail —'))
-  const k = j?.closest('div[class*="rounded"]')?.parentElement?.parentElement
-  const t = k?.querySelector('table')
-  const tr = t?.querySelectorAll('tbody tr')[i]
-  const tombol = tr?.querySelector('td:last-child button')
-  if (!tombol) return null
-  tombol.click()
-  return true
-}, n)
+  /* ---------------------- 1. sebelum ditimpa ---------------------- */
+  const semulaSemua = await t.pratinjau({ pemain: null })
+  sama('1: satu kartu per pemain (18)', semulaSemua.length, 18)
+  const semula = gerakPertama(kartuMilik(semulaSemua, NAMA))
+  sama(`1: kartu ${NAMA} mengikuti bawaan drill — 13 langkah · 22.5″`, [semula.langkah, semula.ukuran], [13, 22.5])
+  const sidikSemula = new Map(semulaSemua.map((k) => [k.nama, sidik(k)]))
+  await t.tutupSemua()
 
-const bacaTabelDetail = () => p.evaluate(() => {
-  const j = [...document.querySelectorAll('h2,h3')].find((h) => (h.textContent || '').startsWith('Detail —'))
-  const k = j?.closest('div[class*="rounded"]')?.parentElement?.parentElement
-  const t = k?.querySelector('table')
-  if (!t) return null
-  return [...t.querySelectorAll('tbody tr')].slice(0, 1).map((tr) =>
-    [...tr.children].map((td) => td.textContent.trim()),
+  /* ---------------------- 2. timpa di panel Detail ---------------------- */
+  await t.pilihAnggota(NAMA)
+  const d0 = await t.bukaDetail()
+  sama(`2: panel Detail milik ${NAMA}`, d0?.nama, NAMA)
+  let d = barisDetail(d0)
+  for (let i = 0; i < 3 && d.mode !== 'hitungan'; i++) d = barisDetail(await t.klikModeDetail(0))
+  sama('2: mode baris Set 1 → Set 2 jadi "hitungan"', d.mode, 'hitungan')
+  sama(
+    '2: Detail menampilkan 16 · 1 · 120 · 18.2″ (IDE-PENGEMBANGAN: "16 · 1 · 120 · 18,2″")',
+    [d.langkah, d.lpc, d.lpm, d.ukuran],
+    [16, 1, 120, 18.2],
   )
+  catat(`Detail: ${d.angka.join(' · ')}`)
+  await t.tutupDetail()
+
+  /* -------------------- 3. kartu pemain yang sama -------------------- */
+  const sendiri = await t.pratinjau({ pemain: NAMA })
+  sama(`3: buku saku berisi satu kartu, milik ${NAMA}`, sendiri.map((k) => k.nama), [NAMA])
+  const k = gerakPertama(sendiri[0])
+  sama('3: kartu mencetak langkah yang sama dengan Detail (16)', k.langkah, d.langkah)
+  sama('3: kartu mencetak Lk/cnt yang sama dengan Detail (1)', k.lpc, d.lpc)
+  sama('3: kartu mencetak ukuran yang sama dengan Detail (18.2″)', k.ukuranTeks, d.ukuranTeks)
+  sama('3: kartu mencetak panah → ("16 →")', k.panah, ['→'])
+  await t.simpanGambar('dd10b-kartu.png')
+
+  /* ------------------ 4. hanya kartu Andra yang berubah ------------------ */
+  const semua = await t.pratinjau({ pemain: null })
+  sama('4: kartu Andra di pratinjau semua pemain juga 16 · 1 · 18.2″', (() => {
+    const g = gerakPertama(kartuMilik(semua, NAMA))
+    return [g.langkah, g.lpc, g.ukuran]
+  })(), [16, 1, 18.2])
+  const ikutBerubah = semua.filter((x) => x.nama !== NAMA && sidik(x) !== sidikSemula.get(x.nama))
+  cek(
+    '4: 17 kartu lainnya persis seperti sebelum ditimpa',
+    ikutBerubah.length === 0 && semua.length === 18,
+    ikutBerubah.map((x) => x.nama).join(', '),
+  )
+  await t.tutupSemua()
+
+  /* ---------------- 5. kembalikan ke drill → kartu kembali ---------------- */
+  await t.pilihAnggota(NAMA)
+  let e = barisDetail(await t.bukaDetail())
+  for (let i = 0; i < 3 && e.mode !== 'drill'; i++) e = barisDetail(await t.klikModeDetail(0))
+  sama('5: timpaan dikembalikan ke "drill"', e.mode, 'drill')
+  await t.tutupDetail()
+  const kembali = await t.pratinjau({ pemain: NAMA })
+  sama(`5: kartu ${NAMA} kembali persis seperti semula`, sidik(kembali[0]), sidikSemula.get(NAMA))
+  await t.tutupSemua()
 })
-
-/** Buka buku saku, pilih anggota tertentu, lalu baca tabelnya. */
-const pratinjauAnggota = async (nama) => {
-  await p.evaluate(() => { const el = document.querySelector('[title="Kartu/dot sheet per pemain"]'); el && el.click() })
-  await wait(1300)
-  await p.evaluate((n) => {
-    const sel = [...document.querySelectorAll('select')].find((s) =>
-      [...s.options].some((o) => o.textContent.includes(n)),
-    )
-    if (!sel) return false
-    const opt = [...sel.options].find((o) => o.textContent.includes(n))
-    const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set
-    set.call(sel, opt.value)
-    sel.dispatchEvent(new Event('change', { bubbles: true }))
-    return true
-  }, nama)
-  await wait(900)
-  await p.evaluate(() => {
-    const el = [...document.querySelectorAll('button')].find((x) => x.textContent.trim().includes('Pratinjau'))
-    el && el.click()
-  })
-  await wait(1700)
-  let data = null
-  for (const f of p.frames()) {
-    const h = await f.evaluate(() => (document.body ? document.body.innerHTML : '')).catch(() => '')
-    if (h.includes('<table')) {
-      data = await f.evaluate(() => {
-        const t = document.querySelector('table')
-        return [...t.querySelectorAll('tbody tr')].slice(0, 2).map((tr) =>
-          [...tr.children].map((td) => td.textContent.trim()),
-        )
-      })
-      break
-    }
-  }
-  await p.keyboard.press('Escape')
-  await wait(1200)
-  return data
-}
-
-await p.goto('http://localhost:5173/', { waitUntil: 'networkidle2' }); await wait(1600)
-await p.evaluate(() => { const x = [...document.querySelectorAll('button')].find((y) => y.textContent.includes('Muat data contoh')); x && x.click() })
-await wait(3400)
-await p.evaluate(() => { location.hash = '#/drill' }); await wait(2800)
-
-const R = {}
-R.buka1 = await bukaDetail(); await wait(1500)
-R.nama = await namaDetail()
-
-// putar mode sampai benar-benar "hitungan" (maks 4 kali)
-R.siklus = []
-for (let i = 0; i < 4; i++) {
-  const m = await bacaMode(0)
-  R.siklus.push(m)
-  if (m === 'hitungan') break
-  await klikMode(0); await wait(1200)
-}
-R.modeAkhir = await bacaMode(0)
-R.tabelDetail = await bacaTabelDetail()
-await p.keyboard.press('Escape'); await wait(1000)
-
-R.kartu = await pratinjauAnggota(R.nama)
-
-console.log(JSON.stringify({ ...R, error: errs }, null, 2))
-await b.close()

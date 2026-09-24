@@ -4586,3 +4586,139 @@ koordinat mana pun**, bukan sekadar bahwa `stepYd` mengembalikan angka),
 dan `lapangan-ui.mjs` 16 butir: end zone **boleh** 0, ukuran langkah
 tidak boleh 0 atau kosong, lebar & panjang dijaga, dan setelah semuanya
 halaman drill tetap terbuka tanpa `NaN`.
+
+## 2a — Enam rangkaian buku saku yang tidak bisa gagal (23 Sep 2026)
+
+**Yang memicu:** agenda *Item #2 — Buku Saku, 2a: pemulihan uji & regresi*.
+Perbaikan buku sakunya sendiri (kompas, panah, tanda ′, −/+) sudah tayang;
+yang tersisa adalah enam rangkaian ujinya — `dd8`, `dd8b`, `dd9-kompas`,
+`dd10b-kartu`, `dd10b-mode`, `dd10b-override` — yang disebut "mati karena
+layar sambutan".
+
+### Yang ditemukan: bukan mati, melainkan tidak bisa gagal
+
+Diagnosis awalnya benar, tetapi tidak lengkap. Keenamnya memang tertutup
+layar sambutan `PilihMode` — klik pertama tidak mengenai apa pun. Yang
+lebih buruk: **mereka tidak pernah gagal karenanya.** Keenamnya skrip
+pengintai yang mencetak JSON tanpa satu asersi pun. Dijalankan apa
+adanya (alamatnya dialihkan ke versi jadi):
+
+```
+dd8          {"buka": false, "adaCentang": false, "denganLpc": null, ...}   exit 0
+dd8b         {"berat": null, "error": []}                                   exit 0
+dd9-kompas   {"patokOn": false, "saatPatok": null, ...}                     exit 0
+dd10b-mode   TETAP TIDAK ADA · MENYESUAIKAN TIDAK ADA                       exit 0
+```
+
+`regresi.sh` melaporkan yang pertama sebagai `"error": [] | tanda ✗: 0` —
+**terbaca bersih**. Ini jenis kegagalan sunyi yang ketiga, setelah
+"mogok sebelum asersi pertama" (N8) dan "tidak pernah dirakit/dijalankan"
+(N14): uji yang ada, berjalan, keluar dengan kode 0, dan tidak
+membuktikan apa pun.
+
+### Dan di balik layar sambutan pun pemeriksaannya sudah rusak
+
+Menambahkan `lewatSambutan()` saja tidak cukup. Versi lamanya dijalankan
+lagi dengan sambutan dilewati, dan tiga pemeriksaan ternyata sudah lama
+berbohong:
+
+1. **`dd8` menyatakan SETIAP baris "tidak cocok".** Sejak DD10 kolom
+   langkah berisi panah (`17 →`); `Number('17 →')` adalah `NaN`, jadi
+   pemeriksaan Lk/cnt-nya tidak mungkin lulus — dan tidak ada yang tahu,
+   karena hasilnya hanya dicetak.
+2. **`dd8` & `dd8b` membaca kolom yang salah.** Warna Lk/cnt dibaca dari
+   "sel terakhir". Sejak DD10b sel terakhir adalah **Ukuran langkah** —
+   `dd8b` membaca `<span class="mono">22.5″</span>` yang memang tidak
+   pernah berwarna, lalu melaporkannya sebagai hasil pemeriksaan warna
+   peringatan.
+3. **"Kartu pertama" adalah pemain yang berbeda di setiap perangkat.**
+   Urutan kartu mengikuti `id` anggota, dan `id` dibuat dengan akhiran
+   acak. Karena itu catatan DD8 menyebut angka Eka dan DD8b angka Andra
+   dari rangkaian yang sama-sama membaca kartu pertama.
+
+Satu hal lagi yang dicatat supaya tidak diulang: komentar `dd10b-override`
+yang lama berbunyi "setel ke hitungan", padahal satu klik dari `drill`
+menghasilkan `tetap`. Dan ia menutup panel Detail dengan Escape, yang —
+tanpa jendela terbuka — juga **membatalkan pilihan titik** di editor.
+Dengan panel terbuka, pilihannya diamati bertahan, tetapi tidak ada yang
+menjanjikannya di kode; rangkaian baru tidak mengandalkannya.
+
+### Perbaikannya: satu alat bersama, enam rangkaian dengan asersi
+
+`qa/alat-buku-saku.mjs` — **bukan rangkaian**, alat bersama keenamnya
+(seperti `sambutan.mjs` dan `db-mentah.mjs`). Ia menjamin:
+
+- **selalu ada baris "N lulus, M gagal"** — juga saat rangkaiannya mogok
+  (dihitung satu kegagalan, lengkap dengan sebabnya) atau macet (batas
+  waktu sendiri 240 detik, jauh di bawah `timeout 600` milik
+  `regresi.sh`, supaya ringkasannya sempat tercetak);
+- **langkah yang gagal berhenti dengan terang** — pratinjau yang tidak
+  muncul atau jendela yang tidak terbuka melempar galat berkalimat
+  jelas, bukan mengembalikan `null` untuk dibaca asersi berikutnya;
+- **kolom dicari lewat judulnya, kartu lewat nama pemainnya**;
+- **yang tersimpan dibaca dari basis data**, bukan dari layar (README);
+- **kolom React diketik**, bukan ditimpa lewat setter prototipe.
+
+Keenam rangkaian ditulis ulang di atasnya. Maksud tiap rangkaian
+dipertahankan, dan angka acuannya diambil dari bagian **Hasil DD8/DD10/
+DD10b** di dokumen ini — jadi yang diuji adalah klaim yang dulu ditulis,
+bukan angka yang dicomot dari layar hari ini.
+
+| Rangkaian | Butir | Yang dibuktikan |
+|---|---:|---|
+| `dd8` | 23 | kolom Lk/cnt di 18 kartu; Eka 29 langkah / 16 = **1,82**; di semua kartu Lk/cnt sejalan dengan Langkah ÷ Cnt; warna hanya untuk berat/mustahil, sama dengan legendanya; centang mati → kolom **dan** legenda hilang |
+| `dd8b` | 15 | count diketik 1 → tersimpan di basis data; Andra **12,92 merah** (mustahil) di semua kartu; ukuran langkah 22,5″ **tidak** ikut merah — yang mustahil kecepatannya |
+| `dd9-kompas` | 35 | kompas BELAKANG · PENONTON · S1 · S2; penjelasan A/−/+ hanya bila patok menyala; Gita `C' · T5 +2.75` → `B' +2.25 · T6 +0.75` `↖`; **koma atas tepat pada pemain di sisi S2**, dicocokkan silang dengan koordinat garis yard (36 koordinat); panah sama dengan atau tanpa patok |
+| `dd10b-mode` | 24 | tetap: Citra 21/16 = **1,32**, 22,5″ di semua kartu; ikut hitungan: **16/16 = 1**, Citra **29,6″**; (ukuran ÷ 22,5″) × 16 = langkah mode tetap untuk tiap pemain; warna ukuran mengikuti 22,5/30/45″ |
+| `dd10b-override` | 24 | siklus drill → tetap → hitungan → drill, tiap langkah **tersimpan di basis data**; kembali ke drill = timpaan dihapus; `hitungan` = **16 · 1 · 120**; bertahan setelah panel ditutup-dibuka **dan setelah halaman dimuat ulang**; pemain lain tidak ikut |
+| `dd10b-kartu` | 15 | Detail Andra `16 · 1 · 120 · 18,2″` = kartu Andra `16 →` · `1` · `18,2″`; **17 kartu lainnya tidak berubah**; dikembalikan → kartu kembali persis |
+
+**Jumlah: 136 butir**, dari enam rangkaian yang sebelumnya membuktikan
+nol.
+
+### Batas "sejalan" yang jujur, bukan 0,02
+
+Rangkaian lama memakai selisih tetap 0,02 antara Lk/cnt dan Langkah ÷ Cnt.
+Itu terlalu ketat untuk angka yang dicetak: langkah dibulatkan ke
+bilangan bulat, sedangkan Lk/cnt dihitung dari jarak yang belum
+dibulatkan. 8,49 langkah tercetak "8" dengan Lk/cnt 0,53, padahal 8 ÷ 16
+= 0,50. Selisih yang jujur bisa mencapai ½ ÷ Cnt + 0,005 (0,036 untuk 16
+hitungan); dengan batas 0,02, **tujuh dari delapan belas kartu** data
+contoh akan "gagal" padahal angkanya benar. Batasnya kini diturunkan
+dari cara angkanya dibulatkan, dan ditulis di `lkCntSejalan()`.
+
+### Uji yang benar-benar bisa gagal
+
+Setiap rangkaian baru dibuktikan bisa gagal dengan menyuntikkan cacat ke
+bundel versi jadi, lalu mengembalikannya:
+
+- Lk/cnt dikali 1,1 → `dd8`: **21 lulus, 2 gagal** (Eka 2 ≠ 1,82; 18
+  kartu tidak sejalan).
+- Koma atas dipasang di sisi yang salah → `dd9-kompas`: **31 lulus, 4
+  gagal**, termasuk pemeriksaan silang dengan garis yard.
+- Buku saku mengabaikan timpaan per pemain → `dd10b-kartu`: **11 lulus,
+  4 gagal** (13 ≠ 16, 22,5″ ≠ 18,2″).
+- Alamat mati, dan layar sambutan yang tidak terlewati → **0 lulus, 1
+  gagal**, exit 1, dengan sebabnya — bukan JSON kosong berkode 0.
+
+### Lain-lain
+
+- Keenamnya didaftarkan ke `regresi-penuh.sh` (kini **77 rangkaian**),
+  dengan catatan di dalam berkasnya supaya tidak dikeluarkan tanpa
+  alasan tertulis. `jalankan-semua.sh` mendapat blok kelima, yang juga
+  menambal dua rangkaian 1a/1b (`uji-riwayat`, `uji-simpan-otomatis`)
+  yang belum tercantum di sana — kedua daftar kini sama persis.
+- Bawaan `regresi.sh` dipindah dari `:5173` ke `:4173`, sama dengan
+  `regresi-penuh.sh`.
+- `qa/README.md`: angka rangkaian yang basi (24 → 77), tiga pelajaran di
+  atas, dan cara menjalankan Chromium bila unduhan Chrome Puppeteer
+  diblokir (`@sparticuz/chromium`).
+- Tangkapan layar kini opsional (`SHOTS=/folder`); dulu dua rangkaian
+  menulis ke `/home/user/shots` yang belum tentu ada.
+- Rangkaian yang sama juga lulus pada berkas portabel
+  (`BASE=file:///…/index.html`).
+- **Catatan lingkungan:** tiga belas rangkaian lain yang terdaftar juga
+  masih menyebut `/home/user/drillkit` (huruf kecil) untuk `dist/` atau
+  folder unduhan. Di kotak pasir ini mereka dijalankan dengan tautan
+  `ln -s /home/user/DrillKit /home/user/drillkit`; merapikannya menjadi
+  jalur relatif sengaja tidak dicampur ke 2a.

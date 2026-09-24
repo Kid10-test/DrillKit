@@ -1,93 +1,102 @@
-// DD10b — timpa mode langkah per pemain per perpindahan (panel Detail, dev 5173)
-import puppeteer from 'puppeteer'
-const wait = (ms) => new Promise((r) => setTimeout(r, ms))
-const b = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--mute-audio'] })
-const p = await b.newPage()
-await p.setViewport({ width: 1440, height: 1000 })
-const errs = []
-p.on('pageerror', (e) => errs.push(e.message.slice(0, 160)))
-p.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 160)) })
-const R = {}
+/**
+ * DD10b — timpa mode langkah per pemain per perpindahan (panel Detail).
+ *
+ * Yang diuji:
+ *   1. titik dipilih dengan tetikus → tombol Detail → panel "Detail — <nama>";
+ *   2. tombol mode bersiklus `drill` → `tetap` → `hitungan` → `drill`, dan
+ *      tiap langkahnya TERSIMPAN di basis data (`set.langkah[idPemain]`) —
+ *      dicocokkan dengan pemain yang namanya tertulis di judul panel;
+ *   3. yang ditimpa ditandai biru; kembali ke `drill` = tanda hilang DAN
+ *      timpaannya dihapus dari basis data (bukan disimpan sebagai "drill");
+ *   4. angkanya ikut berubah: `hitungan` → 16 langkah · Lk/cnt 1 · 120 lk/mnt
+ *      (IDE-PENGEMBANGAN: "16 · 1 · 120"); `tetap` = sama dengan bawaan drill
+ *      (karena bawaan drill contoh memang tetap); `drill` = persis angka awal;
+ *   5. timpaan bertahan setelah panel ditutup lalu dibuka lagi, DAN setelah
+ *      halaman dimuat ulang;
+ *   6. timpaan hanya untuk SATU pemain: pemain lain tetap "drill".
+ *
+ * 2a — dihidupkan kembali. Rangkaian lama hanya mencetak JSON tanpa asersi,
+ * jadi ia tidak pernah bisa gagal — dan komentarnya ("setel ke hitungan")
+ * tidak sesuai dengan yang dilakukannya: satu klik dari `drill` menghasilkan
+ * `tetap` (diperiksa, 23 Sep 2026). Ia juga menutup panel dengan Escape dan
+ * mengandalkan pilihan titik yang kebetulan masih bertahan sesudahnya. Kini
+ * panel ditutup dengan tombol Tutup seperti pemakai, timpaannya dicocokkan
+ * dengan basis data, dan persistensinya diperiksa juga sesudah halaman
+ * dimuat ulang.
+ *
+ * Pakai: BASE=http://localhost:4173 node dd10b-override.mjs
+ */
+import { barisDetail, jalankan } from './alat-buku-saku.mjs'
 
-/** Baris tabel gerak di dalam panel Detail. */
-const bacaTabel = () => p.evaluate(() => {
-  const j = [...document.querySelectorAll('h2,h3')].find((h) => (h.textContent || '').startsWith('Detail —'))
-  if (!j) return null
-  const k = j.closest('div[class*="rounded"]')?.parentElement?.parentElement
-  if (!k) return null
-  const t = k.querySelector('table')
-  if (!t) return null
-  return {
-    kepala: [...t.querySelectorAll('thead th')].map((x) => x.textContent.trim()),
-    baris: [...t.querySelectorAll('tbody tr')].slice(0, 3).map((tr) =>
-      [...tr.children].map((td) => td.textContent.trim()),
-    ),
-  }
+await jalankan('DD10b — timpa mode langkah per pemain (Detail)', async (t) => {
+  const { cek, sama, catat } = t
+  await t.siapkan()
+
+  /** Timpaan yang TERSIMPAN untuk pemain ini di Set 1 (`null` = ikut drill). */
+  const timpaanDb = async (idPemain) => (await t.setDiDb())[0]?.langkah?.[idPemain] ?? null
+
+  /* ----------------------- 1. pilih titik → Detail ----------------------- */
+  await t.pilihTitikPertama()
+  const awal = await t.bukaDetail()
+  cek('1: panel Detail terbuka dengan nama pemain di judulnya', !!awal?.nama, JSON.stringify(awal?.nama))
+  const nama = awal.nama
+  const anggota = (await t.anggotaDiDb()).find((m) => m.name === nama)
+  cek(`1: "${nama}" adalah anggota yang ada di basis data`, !!anggota)
+  sama(
+    '1: kolom tabel gerak: Perpindahan · Cnt · Langkah · Lk/cnt · Lk/mnt · Ukuran · Mode langkah',
+    awal.kepala,
+    ['Perpindahan', 'Cnt', 'Langkah', 'Lk/cnt', 'Lk/mnt', 'Ukuran', 'Mode langkah'],
+  )
+  const b0 = barisDetail(awal)
+  sama('1: satu perpindahan, Set 1 → Set 2', b0.perpindahan, 'Set 1 — Blok → Set 2 — Busur')
+  sama('1: mode awal "drill", tidak ditandai', [b0.mode, b0.ditandai], ['drill', false])
+  sama('1: belum ada timpaan tersimpan', await timpaanDb(anggota.id), null)
+  catat(`pemain: ${nama} · awal ${b0.angka.join(' · ')}`)
+
+  /* ------------------------------ 2. siklus ------------------------------ */
+  const d1 = barisDetail(await t.klikModeDetail(0))
+  sama('2: klik 1 → "tetap", ditandai biru', [d1.mode, d1.ditandai], ['tetap', true])
+  sama('2: tersimpan: { mode: tetap, langkahPerCount: 1 }', await timpaanDb(anggota.id), { mode: 'tetap', langkahPerCount: 1 })
+  sama('2: "tetap" = angka bawaan drill (bawaannya memang tetap)', d1.angka, b0.angka)
+
+  const d2 = barisDetail(await t.klikModeDetail(0))
+  sama('2: klik 2 → "hitungan", ditandai biru', [d2.mode, d2.ditandai], ['hitungan', true])
+  sama('2: tersimpan: { mode: menyesuaikan, langkahPerCount: 1 }', await timpaanDb(anggota.id), {
+    mode: 'menyesuaikan',
+    langkahPerCount: 1,
+  })
+  sama('2: "hitungan" → 16 langkah · Lk/cnt 1 · 120 lk/mnt', [d2.langkah, d2.lpc, d2.lpm], [16, 1, 120])
+
+  const d3 = barisDetail(await t.klikModeDetail(0))
+  sama('2: klik 3 → kembali "drill", tanda biru hilang', [d3.mode, d3.ditandai], ['drill', false])
+  sama('3: kembali ke drill = timpaan DIHAPUS dari basis data', await timpaanDb(anggota.id), null)
+  sama('3: angkanya persis seperti awal', d3.angka, b0.angka)
+
+  /* -------------------- 4–5. hitungan, lalu tutup-buka -------------------- */
+  await t.klikModeDetail(0) // tetap
+  const d5 = barisDetail(await t.klikModeDetail(0)) // hitungan
+  sama('4: disetel ke "hitungan" untuk uji simpan', d5.mode, 'hitungan')
+  await t.tutupDetail()
+  const buka = barisDetail(await t.bukaDetail())
+  sama('5: ditutup lalu dibuka lagi → masih "hitungan", masih ditandai', [buka.mode, buka.ditandai], ['hitungan', true])
+  sama('5: …dengan angka yang sama', buka.angka, d5.angka)
+  await t.tutupDetail()
+
+  await t.muatUlangEditor()
+  await t.pilihAnggota(nama)
+  const ulang = await t.bukaDetail()
+  sama('5: setelah halaman dimuat ulang → panel pemain yang sama', ulang.nama, nama)
+  const bu = barisDetail(ulang)
+  sama('5: …masih "hitungan", masih ditandai', [bu.mode, bu.ditandai], ['hitungan', true])
+  sama('5: …dengan angka yang sama', bu.angka, d5.angka)
+  await t.tutupDetail()
+
+  /* --------------------- 6. pemain lain tidak ikut --------------------- */
+  const lain = (await t.anggotaDiDb()).find((m) => m.name !== nama)
+  await t.pilihAnggota(lain.name)
+  const dl = await t.bukaDetail()
+  sama(`6: pemain lain (${lain.name}) tetap "drill"`, barisDetail(dl)?.mode, 'drill')
+  const langkahSet = (await t.setDiDb())[0]?.langkah ?? {}
+  sama('6: basis data hanya berisi timpaan untuk satu pemain', Object.keys(langkahSet), [anggota.id])
+  await t.tutupDetail()
 })
-
-/** Klik tombol mode pada baris ke-n (0 = baris pertama). */
-const klikMode = (n) => p.evaluate((i) => {
-  const j = [...document.querySelectorAll('h2,h3')].find((h) => (h.textContent || '').startsWith('Detail —'))
-  const k = j?.closest('div[class*="rounded"]')?.parentElement?.parentElement
-  const t = k?.querySelector('table')
-  const tr = t?.querySelectorAll('tbody tr')[i]
-  const tombol = tr?.querySelector('td:last-child button')
-  if (!tombol) return null
-  const sebelum = tombol.textContent.trim()
-  tombol.click()
-  return sebelum
-}, n)
-
-await p.goto('http://localhost:5173/', { waitUntil: 'networkidle2' }); await wait(1600)
-await p.evaluate(() => { const x = [...document.querySelectorAll('button')].find((y) => y.textContent.includes('Muat data contoh')); x && x.click() })
-await wait(3400)
-await p.evaluate(() => { location.hash = '#/drill' }); await wait(2800)
-
-// pilih satu titik lalu buka Detail
-const ling = await p.$$('circle[data-titik="1"]')
-R.titik = ling.length
-await ling[0].click(); await wait(900)
-R.buka = await p.evaluate(() => {
-  const el = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Detail')
-  if (!el) return false
-  el.click(); return true
-})
-await wait(1500)
-R.awal = await bacaTabel()
-
-// siklus: drill -> tetap -> hitungan -> drill
-R.langkah1 = await klikMode(0); await wait(1300)
-R.setelahTetap = await bacaTabel()
-R.langkah2 = await klikMode(0); await wait(1300)
-R.setelahHitungan = await bacaTabel()
-R.langkah3 = await klikMode(0); await wait(1300)
-R.setelahKembali = await bacaTabel()
-
-// tutup lalu buka lagi — harus tetap tersimpan
-await p.keyboard.press('Escape'); await wait(1200)
-await p.evaluate(() => { const el = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Detail'); el && el.click() })
-await wait(1400)
-
-// setel ke "hitungan" lalu tutup-buka untukuji simpan
-R.langkah4 = await klikMode(0); await wait(1200)
-R.setelahSimpan = await bacaTabel()
-await p.keyboard.press('Escape'); await wait(1200)
-const ling2 = await p.$$('circle[data-titik="1"]')
-await ling2[0].click(); await wait(800)
-await p.evaluate(() => { const el = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Detail'); el && el.click() })
-await wait(1500)
-R.setelahBukaLagi = await bacaTabel()
-
-const ringkas = (d) => d && { kepala: d.kepala.join(' | '), baris: d.baris.slice(0, 2) }
-console.log(JSON.stringify({
-  titik: R.titik,
-  buka: R.buka,
-  awal: ringkas(R.awal),
-  siklus: [R.langkah1, R.langkah2, R.langkah3, R.langkah4],
-  setelahTetap: ringkas(R.setelahTetap),
-  setelahHitungan: ringkas(R.setelahHitungan),
-  setelahKembali: ringkas(R.setelahKembali),
-  setelahBukaLagi: ringkas(R.setelahBukaLagi),
-  error: errs,
-}, null, 2))
-await b.close()

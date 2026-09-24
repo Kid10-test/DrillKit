@@ -1,99 +1,123 @@
-// DD8 — langkah per hitungan di buku saku (dev 5173)
-import puppeteer from 'puppeteer'
-const wait = (ms) => new Promise((r) => setTimeout(r, ms))
-const b = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--mute-audio'] })
-const p = await b.newPage()
-await p.setViewport({ width: 1440, height: 1000 })
-const errs = []
-p.on('pageerror', (e) => errs.push(e.message.slice(0, 160)))
-p.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 160)) })
-const R = {}
+/**
+ * DD8 — kolom "langkah per hitungan" (Lk/cnt) di buku saku.
+ *
+ * Yang diuji, dari kertas yang benar-benar dicetak (bingkai pratinjau):
+ *   1. kotak centang "Sertakan langkah per hitungan" ada dan menyala bawaan;
+ *   2. kolom Lk/cnt tercetak di kartu SETIAP pemain, dengan legendanya;
+ *   3. angkanya benar: Eka 29 langkah dalam 16 count = 1,82 (IDE-PENGEMBANGAN
+ *      "Hasil DD8"), dan di SEMUA kartu Lk/cnt sejalan dengan Langkah ÷ Cnt;
+ *   4. warna hanya untuk yang berat/mustahil, dan warnanya sama dengan
+ *      legenda di bawah tabel — gerakan nyaman tetap hitam (hemat tinta);
+ *   5. mematikan centang menghilangkan kolom DAN legendanya, tanpa
+ *      mengganggu kolom lainnya.
+ *
+ * 2a — dihidupkan kembali. Rangkaian ini dulu skrip pengintai tanpa asersi:
+ * sejak layar sambutan ada, ia mencetak `"buka": false` dengan kode keluar 0,
+ * dan `regresi.sh` melaporkannya `"error": [] | tanda ✗: 0` — tampak bersih.
+ * Setelah sambutan dilewati pun pemeriksaannya sendiri sudah rusak (diperiksa
+ * dengan menjalankan versi lamanya, 23 Sep 2026):
+ *   - sejak DD10 kolom langkah berisi panah (`17 →`), jadi `Number()`-nya NaN
+ *     dan SETIAP baris dinyatakan "tidak cocok";
+ *   - warnanya dibaca dari sel terakhir, yang sejak DD10b adalah kolom
+ *     Ukuran langkah, bukan Lk/cnt;
+ *   - yang diperiksa hanya kartu pertama — pemain yang berbeda di setiap
+ *     perangkat baru (lihat `kartuMilik`).
+ * Lihat `alat-buku-saku.mjs`.
+ *
+ * Pakai: BASE=http://localhost:4173 node dd8.mjs
+ */
+import {
+  gerakPertama,
+  jalankan,
+  kartuMilik,
+  lkCntSejalan,
+  tempoKartu,
+  warnaLegenda,
+  warnaSel,
+} from './alat-buku-saku.mjs'
 
-const tombol = (t) => p.evaluate((x) => {
-  const el = [...document.querySelectorAll('button')].find((y) => y.textContent.trim().includes(x))
-  if (!el) return false
-  el.click(); return true
-}, t)
-const centang = (teks, nilai) => p.evaluate((t, v) => {
-  const el = [...document.querySelectorAll('label')].find((l) => l.textContent.includes(t))
-  const cb = el && el.querySelector('input[type="checkbox"]')
-  if (!cb) return false
-  if (cb.checked !== v) cb.click()
-  return true
-}, teks, nilai)
-/** Ambil tabel dari iframe pratinjau. */
-const bacaPratinjau = async () => {
-  await wait(1400)
-  for (const f of p.frames()) {
-    const html = await f.evaluate(() => (document.body ? document.body.innerHTML : '')).catch(() => '')
-    if (html.includes('<table')) {
-      return f.evaluate(() => {
-        const t = document.querySelector('table')
-        if (!t) return null
-        const kepala = [...t.querySelectorAll('thead th')].map((th) => th.textContent.trim())
-        const baris = [...t.querySelectorAll('tbody tr')]
-          .slice(0, 5)
-          .map((tr) => [...tr.children].map((td) => td.textContent.trim()))
-        const warnaLpc = [...t.querySelectorAll('tbody tr')]
-          .slice(0, 5)
-          .map((tr) => {
-            const td = tr.children[tr.children.length - 1]
-            return td ? td.innerHTML : ''
-          })
-        const legenda = (document.querySelector('.legend') || {}).textContent || null
-        return { kepala, baris, warnaLpc, legenda }
-      })
-    }
-  }
-  return null
-}
+const CENTANG = 'Sertakan langkah per hitungan'
 
-await p.goto('http://localhost:5173/', { waitUntil: 'networkidle2' }); await wait(1600)
-await p.evaluate(() => { const x = [...document.querySelectorAll('button')].find((y) => y.textContent.includes('Muat data contoh')); x && x.click() })
-await wait(3400)
-await p.evaluate(() => { location.hash = '#/drill' }); await wait(2800)
+await jalankan('DD8 — Lk/cnt di buku saku', async (t) => {
+  const { cek, sama, catat } = t
+  await t.siapkan()
 
-R.buka = await p.evaluate(() => {
-  const el = document.querySelector('[title="Kartu/dot sheet per pemain"]')
-  if (!el) return false
-  el.click(); return true
+  /* ------------------------------ 1. centang ------------------------------ */
+  await t.bukaBukuSaku()
+  sama(`1: centang "${CENTANG}" ada dan menyala bawaan`, await t.statusCentang(CENTANG), true)
+
+  /* ----------------------- 2. kolom & legenda tercetak ---------------------- */
+  const kartu = await t.pratinjau({ pemain: null })
+  sama('2: satu kartu per pemain (18)', kartu.length, 18)
+  cek(
+    '2: kolom Lk/cnt ada di SEMUA kartu',
+    kartu.every((k) => k.kepala.includes('Lk/cnt')),
+    kartu.filter((k) => !k.kepala.includes('Lk/cnt')).map((k) => k.nama).join(', '),
+  )
+  cek(
+    '2: legenda Lk/cnt tercetak di bawah tabel',
+    kartu.every((k) => k.legenda.some((l) => l.startsWith('Lk/cnt = langkah per hitungan'))),
+  )
+  const tk = tempoKartu(kartu[0])
+  sama('2: kepala kartu menyebut tempo drill (120 BPM · 1 ketuk/count)', tk, { tempo: 120, ketuk: 1 })
+
+  /* --------------------------- 3. angkanya benar --------------------------- */
+  const eka = kartuMilik(kartu, 'Eka Wulandari')
+  cek('3: kartu Eka Wulandari ada', !!eka)
+  const g = gerakPertama(eka)
+  sama('3: Eka — Set 1 → Set 2 dalam 16 count', g.cnt, 16)
+  sama('3: Eka — 29 langkah (IDE-PENGEMBANGAN: "29 langkah")', g.langkah, 29)
+  sama('3: Eka — Lk/cnt 1.82 (IDE-PENGEMBANGAN: "1,82")', g.lpc, 1.82)
+
+  const tidakSejalan = kartu
+    .map((k) => ({ nama: k.nama, ...gerakPertama(k) }))
+    .filter((x) => !lkCntSejalan(x.langkah, x.cnt, x.lpc))
+  cek(
+    '3: di semua kartu Lk/cnt sejalan dengan Langkah ÷ Cnt (batas pembulatan ½ ÷ Cnt)',
+    tidakSejalan.length === 0,
+    tidakSejalan.map((x) => `${x.nama}: ${x.langkah}/${x.cnt} vs ${x.lpc}`).join('; '),
+  )
+  cek(
+    '3: set terakhir tidak punya perpindahan — Lk/cnt "-"',
+    kartu.every((k) => {
+      const i = k.kepala.indexOf('Lk/cnt')
+      return k.baris[1]?.[i]?.teks === '-'
+    }),
+  )
+
+  /* -------------------- 4. warna: hemat tinta, sesuai legenda --------------- */
+  const leg = warnaLegenda(eka)
+  cek('4: legenda punya warna "berat" dan "mustahil"', !!leg.berat && !!leg.mustahil, JSON.stringify(leg))
+  // Pada 120 BPM: 1,82 lk/cnt = 218 lk/mnt (> 180, mustahil).
+  sama('4: Eka (218 lk/mnt) diwarnai "mustahil", sama dengan legenda', warnaSel(g.lpcHtml), leg.mustahil)
+  // 1,32 lk/cnt = 158 lk/mnt (150–180, berat).
+  const citra = gerakPertama(kartuMilik(kartu, 'Citra Dewi'))
+  sama('4: Citra (158 lk/mnt) diwarnai "berat", sama dengan legenda', warnaSel(citra.lpcHtml), leg.berat)
+  // 0,81 lk/cnt = 97 lk/mnt — nyaman, tidak berwarna.
+  const andra = gerakPertama(kartuMilik(kartu, 'Andra Pratama'))
+  sama('4: Andra (97 lk/mnt, nyaman) hitam biasa — tanpa warna', warnaSel(andra.lpcHtml), null)
+  catat(`Eka ${g.lpc} · Citra ${citra.lpc} · Andra ${andra.lpc}`)
+  await t.simpanGambar('dd8-dengan-lpc.png')
+  await t.tutupPratinjau()
+
+  /* --------------------- 5. centang dimatikan → hilang --------------------- */
+  sama('5: centang bisa dimatikan', await t.centang(CENTANG, false), false)
+  const tanpa = await t.pratinjau()
+  cek('5: kolom Lk/cnt hilang dari semua kartu', tanpa.every((k) => !k.kepala.includes('Lk/cnt')))
+  cek(
+    '5: legenda Lk/cnt ikut hilang',
+    tanpa.every((k) => !k.legenda.some((l) => l.startsWith('Lk/cnt'))),
+  )
+  sama(
+    '5: kolom lain tetap: # · Set · Cnt · Koordinat · Langkah & arah · Ukuran langkah',
+    tanpa[0]?.kepala,
+    ['#', 'Set', 'Cnt', 'Koordinat', 'Langkah & arah', 'Ukuran langkah'],
+  )
+  sama('5: angka langkah Eka tidak berubah (29)', gerakPertama(kartuMilik(tanpa, 'Eka Wulandari')).langkah, 29)
+  await t.tutupPratinjau()
+
+  sama('5: centang dinyalakan kembali → kolomnya kembali', await t.centang(CENTANG, true), true)
+  const lagi = await t.pratinjau()
+  cek('5: Lk/cnt tercetak lagi', lagi.every((k) => k.kepala.includes('Lk/cnt')))
+  await t.tutupSemua()
 })
-await wait(1400)
-R.adaCentang = await p.evaluate(() =>
-  [...document.querySelectorAll('label')].some((l) => l.textContent.includes('Sertakan langkah per hitungan')),
-)
-// centang menyala bawaan
-await tombol('Pratinjau')
-R.denganLpc = await bacaPratinjau()
-
-// tutup pratinjau, buka ulang bila perlu, matikan centang
-await p.keyboard.press('Escape'); await wait(1200)
-if (!(await p.evaluate(() => [...document.querySelectorAll('label')].some((l) => l.textContent.includes('Sertakan langkah per hitungan'))))) {
-  await p.evaluate(() => { const el = document.querySelector('[title="Kartu/dot sheet per pemain"]'); el && el.click() })
-  await wait(1400)
-}
-R.setMatikan = await centang('Sertakan langkah per hitungan', false); await wait(700)
-await tombol('Pratinjau')
-R.tanpaLpc = await bacaPratinjau()
-
-// periksa kebenaran angka: Lk/cnt harus = jarak (langkah) / count
-if (R.denganLpc) {
-  const k = R.denganLpc.kepala
-  const iSet = k.findIndex((x) => x === 'Set')
-  const iCnt = k.findIndex((x) => x.toLowerCase() === 'cnt')
-  const iLk = k.findIndex((x) => /langkah|→/i.test(x))
-  const iLpc = k.findIndex((x) => x.toLowerCase().includes('lk/cnt'))
-  R.indeks = { iSet, iCnt, iLk, iLpc }
-  R.periksa = R.denganLpc.baris
-    .filter((r) => r.length === k.length && r[iLk] && r[iLk] !== '-')
-    .map((r) => {
-      const langkah = Number(r[iLk])
-      const cnt = Number(r[iCnt])
-      const lpc = Number(r[iLpc])
-      const harap = Math.round((langkah / cnt) * 100) / 100
-      return { set: r[iSet], langkah, cnt, lpc, harap, cocok: Math.abs(lpc - harap) < 0.02 }
-    })
-}
-R.error = errs
-console.log(JSON.stringify(R, null, 2))
-await b.close()
