@@ -21,6 +21,7 @@ import {
   IconUsers,
 } from '../components/Icons'
 import { BackupReminder } from '../components/BackupReminder'
+import { PengingatJadwal } from '../components/PengingatJadwal'
 import { TombolPanduan } from '../components/Panduan'
 import {
   sectionDot,
@@ -134,6 +135,11 @@ export default function Dashboard() {
       {/* Pengingat backup — muncul hanya kalau sudah waktunya */}
       <div className="mb-4">
         <BackupReminder />
+      </div>
+
+      {/* C3 — pengingat jadwal terdekat, muncul hanya kalau ada yang dekat */}
+      <div className="mb-4">
+        <PengingatJadwal sessions={sessions} prefix="ingat-coach" />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

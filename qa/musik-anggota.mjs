@@ -33,9 +33,9 @@ import { lewatSambutan } from './sambutan.mjs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { DIST } from './lokasi.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:4173'
-const DIST = '/home/user/drillkit/dist'
 const PAKET = path.join(DIST, 'paket.json')
 const UNDUH = path.join(os.tmpdir(), `unduh-musik-${Date.now()}`)
 fs.mkdirSync(UNDUH, { recursive: true })
@@ -280,12 +280,16 @@ try {
     cek('8: setelah memilih nama, jadwalnya tampil', !/Pilih nama di atas/.test(t2), t2.slice(0, 200))
   }
 
-  /* ===== 9. Bar tab harus muat di HP — cacat ini lahir dari tab ke-5 =====
+  /* ===== 9. Enam tab harus tetap terjangkau di HP =====
    *
-   * Menambahkan tab Musik membuat bar tab anggota meluber 12px pada layar
-   * 360px: tombol terakhir sebagian keluar dari layar. Seluruh rangkaian
-   * uji berjalan di lebar 1300px, jadi cacatnya tidak pernah terlihat —
-   * padahal mode anggota justru dipakai di HP. Baris ini menjaganya.
+   * Menambahkan tab Musik (ke-5) membuat bar tab anggota meluber 12px pada
+   * layar 360px: tombol terakhir sebagian keluar dari layar. Seluruh
+   * rangkaian uji berjalan di lebar 1300px, jadi cacatnya tidak pernah
+   * terlihat — padahal mode anggota justru dipakai di HP.
+   *
+   * Tab Kuis (ke-6, C2) tidak muat lagi tanpa mengecilkan huruf sampai tak
+   * terbaca, jadi aturannya berubah: bar tab BOLEH digeser (overflow-x),
+   * tetapi DOKUMEN tidak boleh melebar. Baris-baris ini menjaganya.
    */
   {
     await B.setViewport({ width: 360, height: 740 })
@@ -301,9 +305,13 @@ try {
       }
     })
     cek('9: bar tab anggota ada', bar != null)
-    cek('9: kelima tab semuanya ada', bar?.tombol === 5, String(bar?.tombol))
-    cek('9: bar tab TIDAK meluber di HP 360px', bar != null && bar.isi <= bar.lebar + 1,
-      `isi ${bar?.isi} lawan lebar ${bar?.lebar}`)
+    cek('9: keenam tab semuanya ada', bar?.tombol === 6, String(bar?.tombol))
+    const dok9 = await B.evaluate(() => ({
+      dok: document.documentElement.scrollWidth,
+      layar: window.innerWidth,
+    }))
+    cek('9: bar tab TIDAK melebarkan dokumen di HP 360px', dok9.dok <= dok9.layar + 1,
+      `dok ${dok9.dok} lawan layar ${dok9.layar}`)
 
     // Tab Musik anggota: dulu meluber 30px. Sumbernya bukan tabnya,
     // melainkan kartu metronom — item grid dengan `min-width: auto` tidak

@@ -15,10 +15,11 @@ import puppeteer from 'puppeteer'
 import { lewatSambutan } from './sambutan.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
+import { QA } from './lokasi.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:5173'
-const UNDUH = '/home/user/drillkit/qa/unduhan-data'
-const BERKAS = '/home/user/drillkit/qa/berkas-data'
+const UNDUH = path.join(QA, 'unduhan-data')
+const BERKAS = path.join(QA, 'berkas-data')
 for (const d of [UNDUH, BERKAS]) {
   fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(d, { recursive: true })

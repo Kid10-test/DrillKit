@@ -1,5 +1,7 @@
 # DrillKit — Aplikasi Pelatih Marching Band
 
+![CI](https://github.com/Kid10-test/DrillKit/actions/workflows/ci/badge.svg)
+
 Aplikasi **all-in-one, gratis, dan offline-first** untuk pelatih marching band:
 editor formasi/drill, data anggota, absensi QR, jadwal latihan, metronom + tempo map,
 serta mode berbagi ke anggota.
@@ -84,11 +86,11 @@ drillkit/
 │     ├─ Attendance.tsx     # absensi cepat (H/I/S/A), buka pemindai QR, riwayat
 │     ├─ KioskLock.tsx      # tombol kunci data, kartu PIN (mode kios)
 │     ├─ Schedule.tsx       # jadwal + checklist materi + catatan evaluasi
-│     ├─ Drill.tsx          # ⭐ editor formasi (drag, multi-set, animasi, ekspor)
+│     ├─ Drill.tsx          # halaman drill (pilih drill; editornya di components/DrillEditor.tsx)
 │     ├─ Music.tsx          # metronom, tap tempo, tempo map, repertoar (`hanyaPutar` = mode anggota)
 │     ├─ Share.tsx          # ekspor paket tim + tampilan khusus anggota
 │     └─ Settings.tsx       # profil tim, standar lapangan, backup/restore
-├─ qa/                     # ⭐ 24 rangkaian uji regresi (Puppeteer) — lihat qa/README.md
+├─ qa/                     # ⭐ 82 rangkaian uji regresi (Puppeteer) — lihat qa/README.md
 │  ├─ regresi-penuh.sh     # menjalankan semuanya lawan versi yang sudah dibangun
 │  ├─ pulihkan.sh          # pasang ulang node_modules & pustaka Chrome
 │  └─ *.mjs                # satu berkas per rangkaian uji

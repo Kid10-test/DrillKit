@@ -23,9 +23,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
+import { AKAR, DIST } from './lokasi.mjs'
 
-const DIST = '/home/user/drillkit/dist'
-const SKRIP = '/home/user/drillkit/scripts/periksa-situs.sh'
+const SKRIP = path.join(AKAR, 'scripts/periksa-situs.sh')
 
 let lulus = 0
 const gagal = []

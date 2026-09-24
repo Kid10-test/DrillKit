@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { db } from './db/db'
 import Layout from './components/Layout'
@@ -8,16 +8,23 @@ import { ErrorBoundary, ToastProvider } from './components/ui'
 import { KioskProvider } from './hooks/useKiosk'
 import { useBootstrap } from './hooks/useSettings'
 import Dashboard from './pages/Dashboard'
-import Members from './pages/Members'
-import Attendance from './pages/Attendance'
-import Schedule from './pages/Schedule'
-import Drill from './pages/Drill'
-import Music from './pages/Music'
-import Lomba from './pages/Lomba'
-import Data from './pages/Data'
-import Evaluasi from './pages/Evaluasi'
-import Share from './pages/Share'
-import Settings from './pages/Settings'
+/**
+ * #5 — halaman dimuat malas (code splitting) per rute. Sebelumnya seluruh
+ * aplikasi — termasuk editor drill yang besar — dibundel jadi satu berkas
+ * ±870 KB yang harus diunduh sebelum halaman pertama tampil. Kini muatan
+ * awal hanya cangkang + Dashboard; halaman lain diunduh saat dibuka.
+ * Dashboard sengaja TIDAK malas: ia halaman pertama yang dilihat.
+ */
+const Members = lazy(() => import('./pages/Members'))
+const Attendance = lazy(() => import('./pages/Attendance'))
+const Schedule = lazy(() => import('./pages/Schedule'))
+const Drill = lazy(() => import('./pages/Drill'))
+const Music = lazy(() => import('./pages/Music'))
+const Lomba = lazy(() => import('./pages/Lomba'))
+const Data = lazy(() => import('./pages/Data'))
+const Evaluasi = lazy(() => import('./pages/Evaluasi'))
+const Share = lazy(() => import('./pages/Share'))
+const Settings = lazy(() => import('./pages/Settings'))
 
 /**
  * DrillKit menyimpan semua data di IndexedDB. Ada situasi where penyimpanan
@@ -83,6 +90,16 @@ export default function App() {
       <PenjagaSimpanOtomatis />
       <Layout>
         <ErrorBoundary>
+        <Suspense
+          fallback={
+            <div
+              data-testid="memuat-halaman"
+              className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500"
+            >
+              Memuat halaman…
+            </div>
+          }
+        >
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/anggota" element={<Members />} />
@@ -97,6 +114,7 @@ export default function App() {
           <Route path="/pengaturan" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
         </ErrorBoundary>
       </Layout>
       </KioskProvider>

@@ -5,7 +5,7 @@ import { applySectionConfig } from '../lib/utils'
 import { cx } from '../lib/utils'
 import { useSettings } from '../hooks/useSettings'
 import { KioskBanner, KioskButton } from './KioskLock'
-import { useMemberMode } from '../pages/Share'
+import { useMemberMode } from '../hooks/useMemberMode'
 import { RUTE_ANGGOTA, bolehBuka, pernahMemilih } from '../lib/modePerangkat'
 import { PilihMode } from './PilihMode'
 import {

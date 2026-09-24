@@ -3,9 +3,9 @@
 Dokumen ini **bukan** rencana yang harus dikerjakan semua. Ini kandidat perbaikan,
 diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
 
-**Terakhir diperbarui: 19 Sep 2026 — seri hari lomba (G1 & G2) rampung.**
-· **23 dari 27** ide kelompok A–F selesai · 2 dicoret · **C2 & C3** menunggu anggota
-  rutin memakai aplikasi sendiri (sasaran tahun depan, bersama rencana komersial).
+**Terakhir diperbarui: 24 Sep 2026 — C2 (kuis) & C3 (pengingat jadwal) rampung.**
+· **25 dari 29** ide kelompok A–F selesai · 2 dicoret · tidak ada lagi ide yang
+  menunggu — kelompok A–F tuntas (yang tersisa hanya J1 & I1 yang ditunda).
 · **Seri musik rampung: M1–M5** — tanda birama & hitung mundur, panjang lagu,
   ulang bagian, set list latihan, dan tukar repertoar antar perangkat.
   Kelompok E tidak ada yang tersisa. Rinciannya di bagian **E**.
@@ -122,9 +122,9 @@ Dikerjakan satu per satu, dan setiap ide yang selesai dicatat hasilnya di bawah 
 
 | Status | Ide |
 | --- | --- |
-| ✅ Sudah selesai | **A1–A7** (editor formasi) · **B1–B5** (lapangan) · **C1** (sisi anggota) · **D1–D4** (absensi) · **E3, E4** (musik) · **F1–F4** (keandalan data) · **DD1–DD10 + DD10b** (Drill Display) · **M1–M5** (musik, rampung 19 Sep) · **K1–K3** (mode asisten presenter) · **31e** (dasar jarak) · **G1** (run sheet hari lomba) · **G2** (layar hari H) · **H1** (rencana & pacu latihan) · **Pusat Data** (impor/ekspor lintas fitur) · **H2** (evaluasi & kemajuan anggota, rampung 20 Sep) · **G3** (penanda mulai/selesai sesi, rampung 20 Sep) · **G2b** (kunci layar presenter, rampung 20 Sep) · **Berbagi aman** (berkas grup vs per anggota, rampung 20 Sep) · **Kunci mode anggota** (21 Sep) · **Pilihan mode pertama** (layar sambutan, 21 Sep) · **Berkas anggota mengenali pemiliknya** (21 Sep) · **Angka kehadiran anggota jujur** (21 Sep) |
-| ⬜ Belum dikerjakan | C2, C3 |
-| 🔜 Kandidat berikutnya | **C2** (sisi anggota: pengingat) · **C3** (sisi anggota: umpan balik) · **J1** (polesan) |
+| ✅ Sudah selesai | **A1–A7** (editor formasi) · **B1–B5** (lapangan) · **C1** (sisi anggota) · **D1–D4** (absensi) · **E3, E4** (musik) · **F1–F4** (keandalan data) · **DD1–DD10 + DD10b** (Drill Display) · **M1–M5** (musik, rampung 19 Sep) · **K1–K3** (mode asisten presenter) · **31e** (dasar jarak) · **G1** (run sheet hari lomba) · **G2** (layar hari H) · **H1** (rencana & pacu latihan) · **Pusat Data** (impor/ekspor lintas fitur) · **H2** (evaluasi & kemajuan anggota, rampung 20 Sep) · **G3** (penanda mulai/selesai sesi, rampung 20 Sep) · **G2b** (kunci layar presenter, rampung 20 Sep) · **Berbagi aman** (berkas grup vs per anggota, rampung 20 Sep) · **Kunci mode anggota** (21 Sep) · **Pilihan mode pertama** (layar sambutan, 21 Sep) · **Berkas anggota mengenali pemiliknya** (21 Sep) · **Angka kehadiran anggota jujur** (21 Sep) · **C2** (mode kuis/hafalan, rampung 24 Sep) · **C3** (pengingat jadwal, rampung 24 Sep) |
+| ⬜ Belum dikerjakan | — |
+| 🔜 Kandidat berikutnya | **J1** (polesan) |
 | 💤 Ditunda | J1 (polesan: transposisi penala, ambang predikat laporan, panduan versi anggota) · I1 (log perubahan show — belum pernah jadi masalah) |
 | 🚫 Dicoret | E2 (sudah ada di aplikasi inti) · E1 (sisanya sudah masuk E3) |
 
@@ -471,8 +471,8 @@ Bilah **kontrol animasi** sekarang ada tepat di bawah lapangan:
 | # | Ide | Masalah yang dipecahkan | Dampak | Usaha |
 | --- | --- | --- | --- | --- |
 | C1 | **✅ SELESAI — Halaman anggota lebih kaya**: posisiku + set sebelumnya & berikutnya + catatan evaluasi pribadi + animasi perpindahan | Sekarang "Posisiku" masih sederhana | ⭐⭐⭐⭐ | Sedang |
-| C2 | **Mode kuis/hafalan** — *ditunda sampai anggota rutin buka sendiri*: tebak posisi sendiri di set berikutnya | Anggota bisa berlatih mandiri | ⭐⭐⭐ | Sedang |
-| C3 | **Pengingat jadwal latihan** — *ditunda, alasan sama dengan C2* (notifikasi lokal dari perangkat) | Anggota lupa jadwal | ⭐⭐⭐ | Sedang |
+| C2 | **✅ SELESAI — Mode kuis/hafalan**: tebak posisi sendiri di set berikutnya dengan mengetuk peta | Anggota bisa berlatih mandiri | ⭐⭐⭐ | Sedang |
+| C3 | **✅ SELESAI — Pengingat jadwal latihan**: spanduk saat dibuka + notifikasi sistem + berkas kalender (.ics) | Anggota lupa jadwal | ⭐⭐⭐ | Sedang |
 
 **Hasil C1 (diuji 16 Sep 2026):**
 
@@ -492,6 +492,33 @@ Bilah **kontrol animasi** sekarang ada tepat di bawah lapangan:
 - **Uji alur penuh** di *versi produksi* maupun *versi portabel* (`DrillKit.html`),
   murni lewat antarmuka (tanpa menyentuh database langsung): tulis catatan → ekspor
   paket → buka sebagai anggota → catatan terbaca. Keduanya **0 error**.
+
+**Hasil C2 (diuji 24 Sep 2026):**
+
+- **Tab Kuis** di halaman anggota: satu soal per perpindahan set — peta
+  menampilkan set asal (titik sendiri berlingkaran emas) *tanpa* garis
+  perpindahan, anggota mengetuk tebakannya lalu mengunci jawaban.
+- **Benar bila dalam 2 langkah** dari kunci; sesudah dikunci tampil jarak
+  tebakan, koordinat kunci, dan skor sesi. Urutan soal mengikuti set, bisa
+  diacak. Baca-saja: tidak menulis ke database, aman untuk kios.
+- **Dua rangkaian uji baru**: `uji-kuis` (25 uji logika murni) dan
+  `kuis-anggota` (31 uji end-to-end: ketukan tepat → Tepat, sudut terjauh →
+  Belum tepat, geser penanda, skor akhir, ulangi, acak, dan lebar 360px).
+
+**Hasil C3 (diuji 24 Sep 2026):**
+
+- **Spanduk "jadwal terdekat"** di Dashboard pelatih dan tab Jadwal anggota:
+  sesi hari ini & besok, bisa ditutup per sesi sampai besok. Tanpa server
+  tidak ada alarm sungguhan — dan dokumen kodenya berkata begitu.
+- **Notifikasi sistem** sekali per sesi per hari, bila aplikasinya dibuka,
+  sesinya dalam 3 jam ke depan, dan izinnya diberikan (tombolnya di
+  spanduk, tidak otomatis meminta).
+- **Tombol Kalender (.ics)** di tiap sesi (pelatih & anggota): berkasnya
+  memuat dua alarm (H-1 dan sejam sebelumnya) — dialah pengingat yang
+  berjalan saat aplikasi tutup, dipegang kalender HP.
+- **Dua rangkaian uji baru**: `uji-pengingat` (50 uji logika murni) dan
+  `pengingat-jadwal` (25 uji end-to-end: spanduk, tutup-ingatkan,
+  notifikasi tercatat sekali, .ics valid, dan lebar 360px).
 
 ---
 
@@ -1883,8 +1910,8 @@ masih tersimpan sebagai kandidat.
    untuk sesi hari H.
 3. **G2b — Kunci layar presenter** (Kecil) — murah dan langsung terasa di
    lapangan; bisa diselipkan kapan saja tanpa mengganggu pekerjaan lain.
-4. **C2 & C3** (Sedang) — bagian dari rencana komersial; jalan setelah anggota
-   mulai rutin membuka aplikasi (sasaran: tahun depan).
+4. **C2 & C3** (Sedang) — **keduanya rampung 24 Sep 2026**; sisi anggota
+   untuk rencana komersial sudah terisi (kuis/hafalan + pengingat jadwal).
 5. **J1 — polesan kecil** (Kecil) — transposisi penala, ambang predikat
    laporan bisa diatur, panduan 1 halaman versi anggota.
 
@@ -1911,8 +1938,8 @@ saat orangnya tegang dan hanya punya waktu satu ketukan tombol, sedangkan
 H1 dipakai di **latihan biasa**, saat pelatih sempat mengoreksi. Jangan
 sampai antarmuka hari H diwarisi dari latihan tanpa dipikir ulang.
 
-**Ditunda:** C2 & C3 (sampai anggota rutin membuka aplikasi — sasaran: tahun
-depan, setelah program baru berjalan).
+**Ditunda:** tidak ada lagi di daftar ini (C2 & C3 rampung 24 Sep 2026;
+J1 & I1 tetap ditunda sesuai tabel status).
 **Dicoret:** E2 (sudah ada di aplikasi inti) dan E1 (sisanya — getar — sudah
 masuk E3).
 
@@ -4859,3 +4886,67 @@ berakhir dengan 76 dari 77 rangkaian bersih. Setelah keputusan backup dan
 perbaikan pemulihan, regresi penuh diulang sekali jalan lawan versi jadi
 yang baru (24 Sep 2026, ±46 menit): **77 dari 77 rangkaian bersih, 2.670
 butir lulus, 0 gagal**, dan tidak satu pun berakhir tanpa ringkasan.
+
+## 2b — Kartu lipat buku saku (24 Sep 2026)
+
+**Yang memicu:** sisa agenda *Item #2 — Buku Saku*: "kartu lipat (menunggu
+keputusan user)". Panduan dan teks bantuan menyuruh kartu 9,5 × 13,5 cm itu
+"dilipat", padahal desain lipatnya belum pernah ada — yang dicetak aplikasi
+adalah kartu satu muka per pemain, satu halaman per kartu, di kertas
+berukuran 95 × 135 mm yang hampir tidak ada printer rumahan mendukungnya.
+
+**Keputusannya** (disetujui user, "ikut preferensimu"): kartu **dilipat dua**.
+Lembaran 190 × 135 mm dicetak satu sisi, lalu panel kanan dilipat ke
+belakang menjadi kartu 9,5 × 13,5 cm bermuka dua — tidak perlu printer
+bolak-balik. Dua kartu muat satu lembar A4, lengkap dengan garis potong
+(✂) dan garis lipat. Muka depan memuat kepala kartu + kompas + set awal;
+muka belakang memuat sambungan set + keterangan + catatan. Contoh cetaknya
+dibuat dulu di luar aplikasi (`contoh-kartu-lipat.html`, disetujui), baru
+dipasang ke tombol "Buku saku". Format kartu tunggal yang lama dihapus;
+"Lembar A4" (dot sheet) tidak berubah.
+
+### Baris yang tingginya harus tetap
+
+Muka kartu tingginya tetap (135 mm), jadi pagination-nya memakai kapasitas
+baris per muka — dan kapasitas hanya jujur kalau tinggi barisnya tetap.
+Awalnya nama set boleh melipat (seperti format lama), tetapi uji multikartu
+langsung menangkapnya: 17 baris nama panjang ("Set 1 — Blok (salinan)")
+meluap 125 px. Karena itu tabel lipat memakai `table-layout: fixed` dengan
+sel satu baris: kolom Set berelipsis bila kepanjangan (teks selnya utuh di
+HTML, hanya tampilan cetaknya yang dipotong; kolom "#" tetap mengancarkan
+identitas). Kapasitas final, diukur dari render Chromium lalu dikurangi
+±10% sebagai ruang font lain: depan 27 (30 tanpa kompas), belakang-tengah
+32, belakang-terakhir 24 (ditambah 2/3 bila keterangan dimatikan, dikurangi
+panjang catatan). Satu kartu memuat ±51 set; show yang lebih panjang
+otomatis menjadi kartu 1/2, 2/2, … — diuji dengan 64 set: baris 1–27,
+28–59, 60–64, tidak satu pun hilang atau ganda.
+
+### Lebar kolom: koordinat tak boleh terpotong
+
+Kolom Koordinat hampir menjadi korban: format DCI ("S2 · YL50 −3.25 · FH
+−5.25", 27 karakter) terpotong pada lebar 30%. Bobot final: # 6, Set 16,
+Cnt 7, Koordinat 38, Langkah 12, Lk/cnt 9, Ukuran 13 (dinormalisasi ulang
+bila kolom dimatikan). Judul kolom yang panjang ("Langkah & arah")
+dipenggal paksa dua baris dengan `<br>` — dengan spasi yang disengaja di
+sekitarnya, supaya `textContent`-nya tetap "Langkah & arah" sesuai kontrak
+dengan uji. Rangkaian `kartu-lipat` mengunci semua ini: 48 butir, termasuk
+"tak ada sel terpotong selain nama set" dan "judul kolom tak terpotong"
+(diukur lewat `scrollWidth` lawan `clientWidth`), serta "tak ada muka yang
+meluap" di setiap konfigurasi.
+
+### Uji lama tidak diubah, pembacanya yang diperbarui
+
+Keenam rangkaian dd membaca pratinjau lewat `section.page` — struktur yang
+tidak ada lagi di format lipat. Tetapi yang diubah hanya pembacanya
+(`qa/alat-buku-saku.mjs`): `.kartu` bermuka dua (digabung menjadi satu
+kartu per pemain, kompas dari depan, keterangan dari belakang kartu
+terakhir), dengan `section.page` sebagai jalan kembali untuk format A4.
+Hasilnya: **136 dari 136 butir dd lulus tanpa satu asersi pun diubah** —
+bukti kontrak "kolom dicari lewat judul, kartu lewat nama" menahan
+perubahan struktur total.
+
+**Diuji:** `kartu-lipat` 48 lulus; dd8 23, dd8b 15, dd9-kompas 35,
+dd10b-kartu 15, dd10b-mode 24, dd10b-override 24; ambang-gerak 20 dan
+dasar-jarak 17 (keduanya membaca pratinjau) tetap lulus. `tsc --noEmit`
+bersih, `npm run build` sukses. Contoh cetak diverifikasi satu halaman A4,
+nol luapan, di render maupun PDF.

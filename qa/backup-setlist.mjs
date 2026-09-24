@@ -15,9 +15,10 @@ import puppeteer from 'puppeteer'
 import fs from 'node:fs'
 import path from 'node:path'
 import { lewatSambutan } from './sambutan.mjs'
+import { QA } from './lokasi.mjs'
 
 const BASE = process.env.BASE || BASE
-const UNDUH = '/home/user/drillkit/qa/unduhan-uji'
+const UNDUH = path.join(QA, 'unduhan-uji')
 fs.rmSync(UNDUH, { recursive: true, force: true })
 fs.mkdirSync(UNDUH, { recursive: true })
 

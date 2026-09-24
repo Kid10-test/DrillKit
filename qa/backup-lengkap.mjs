@@ -36,9 +36,10 @@ import puppeteer from 'puppeteer'
 import { lewatSambutan } from './sambutan.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
+import { QA } from './lokasi.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:5173'
-const UNDUH = '/home/user/drillkit/qa/unduhan-lengkap'
+const UNDUH = path.join(QA, 'unduhan-lengkap')
 fs.rmSync(UNDUH, { recursive: true, force: true })
 fs.mkdirSync(UNDUH, { recursive: true })
 

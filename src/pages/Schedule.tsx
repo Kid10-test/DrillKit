@@ -17,6 +17,7 @@ import {
   useToast,
 } from '../components/ui'
 import { IconCalendar, IconPlus, IconDownload, IconPlay } from '../components/Icons'
+import { unduhICS } from '../components/PengingatJadwal'
 import { PacuLatihan } from '../components/PacuLatihan'
 import { PenandaSesi, RekapPenanda } from '../components/PenandaSesi'
 import { lamaSlot, menitDariJam } from '../lib/runsheet'
@@ -259,6 +260,14 @@ function Section({
                       <IconPlay size={14} /> Pacu
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    data-testid={`ics-${s.id}`}
+                    onClick={() => unduhICS(s)}
+                  >
+                    Kalender
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => onEdit(s)}>
                     Edit
                   </Button>

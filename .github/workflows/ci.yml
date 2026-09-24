@@ -1,0 +1,78 @@
+# CI DrillKit — typecheck + build + regresi penuh (82 rangkaian).
+#
+# Tiap push & pull request menjalankan seluruh rangkaian uji ke versinya
+# yang sudah di-build (`vite preview`), sama persis dengan yang dijalankan
+# lokal via `bash qa/regresi-penuh.sh`. Tidak ada server, tidak ada rahasia:
+# yang dibutuhkan hanya Node, Chrome (diambil puppeteer), dan pustaka
+# sistem Chrome dari apt.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  uji:
+    # Ubuntu 24.04 (noble): nama paketnya sudah generasi `t64`, dan daftar
+    # apt di bawah ditulis untuknya. Jangan ganti versi tanpa menyesuaikan.
+    runs-on: ubuntu-24.04
+    # Regresi penuh ±40 menit (ada jeda 10 detik antar-rangkaian, lihat
+    # qa/regresi.sh) + instalasi. Batas 90 menit memberi ruang lega tanpa
+    # menggantung selamanya bila ada yang macet.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            qa/package-lock.json
+
+      - name: Dependensi aplikasi
+        run: npm ci
+
+      - name: Dependensi uji (puppeteer + Chrome)
+        run: npm --prefix qa ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Pustaka sistem Chrome
+        run: |
+          sudo apt-get update
+          # Daftar per paket dengan `|| true`: nama paket berbeda antar
+          # generasi Ubuntu (*-t64 di noble), dan satu nama yang tidak ada
+          # tidak boleh menggugurkan seluruh instalasi.
+          for p in libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+            libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 \
+            libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libasound2t64; do
+            sudo apt-get install -y "$p" >/dev/null 2>&1 || echo "  (lewati $p)"
+          done
+
+      - name: Chrome bisa jalan (gagal cepat bila pustaka kurang)
+        run: |
+          cd qa
+          node -e "import('puppeteer').then(async ({default: p}) => {
+            const b = await p.launch({ args: ['--no-sandbox'] })
+            console.log(await b.version())
+            await b.close()
+          })"
+
+      - name: Pratinjau build
+        run: |
+          (npm run preview -- --port 4173 --strictPort >/tmp/preview.log 2>&1 &)
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:4173/ >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:4173/ >/dev/null
+
+      - name: Regresi penuh
+        run: bash qa/regresi-penuh.sh http://localhost:4173

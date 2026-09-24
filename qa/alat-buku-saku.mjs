@@ -1,7 +1,10 @@
 /**
- * Alat bersama untuk enam rangkaian uji buku saku:
+ * Alat bersama untuk tujuh rangkaian uji buku saku:
  *
- *     dd8 · dd8b · dd9-kompas · dd10b-kartu · dd10b-mode · dd10b-override
+ *     dd8 · dd8b · dd9-kompas · dd10b-kartu · dd10b-mode · dd10b-override · kartu-lipat
+ *
+ * 2b — pembaca pratinjaunya mengenal kartu lipat (`.kartu` bermuka dua,
+ * digabung menjadi satu kartu per pemain) dan lembar A4 (`section.page`).
  *
  * **Ini bukan rangkaian uji.** Jangan didaftarkan ke `regresi-penuh.sh` —
  * sama seperti `sambutan.mjs` dan `db-mentah.mjs`, berkas ini tidak menguji
@@ -183,28 +186,72 @@ export function tempoKartu(kartu) {
  */
 function bacaKartuDiBingkai() {
   const bersih = (s) => (s || '').replace(/\s+/g, ' ').trim()
+  const bacaBaris = (akar) =>
+    akar
+      ? [...akar.querySelectorAll('tbody tr')].map((tr) =>
+          [...tr.children].map((td) => ({ teks: bersih(td.textContent), html: td.innerHTML.trim() })),
+        )
+      : []
+  const bacaKepala = (akar) => {
+    const t = akar && akar.querySelector('table')
+    return t ? [...t.querySelectorAll('thead th')].map((th) => bersih(th.textContent)) : []
+  }
+  const bacaKompas = (akar) => {
+    const kompas = akar && akar.querySelector('.kompas')
+    // Label mata angin (teks SVG) dan keterangannya, dibaca terpisah.
+    return kompas
+      ? {
+          label: [...kompas.querySelectorAll('svg text')].map((x) => bersih(x.textContent)),
+          teks: bersih(kompas.querySelector(':scope > div') ? kompas.querySelector(':scope > div').textContent : ''),
+        }
+      : null
+  }
+  /*
+   * 2b — kartu lipat: tiap pemain punya satu `.kartu` bermuka dua (atau
+   * lebih bila show-nya panjang). Baris digabung sesuai urutan cetak —
+   * muka depan dulu, lalu muka belakang, kartu demi kartu — supaya
+   * pemeriksaannya tetap "satu kartu per pemain". Kompas dibaca dari muka
+   * depan kartu pertama, keterangan dari muka belakang kartu terakhir.
+   */
+  const lipat = [...document.querySelectorAll('.kartu')]
+  if (lipat.length) {
+    const perPemain = new Map()
+    for (const sec of lipat) {
+      const depan = sec.querySelector('.muka.depan')
+      const belakang = sec.querySelector('.muka:not(.depan)')
+      const h2 = depan && depan.querySelector('h2')
+      const nama = h2 && h2.firstChild ? bersih(h2.firstChild.textContent) : ''
+      const satu = {
+        nama,
+        kode: bersih(h2 && h2.querySelector('.code') ? h2.querySelector('.code').textContent : ''),
+        sub: depan ? [...depan.querySelectorAll('header .sub')].map((x) => bersih(x.textContent)) : [],
+        kepala: bacaKepala(depan),
+        baris: [...bacaBaris(depan), ...bacaBaris(belakang)],
+        kompas: bacaKompas(depan),
+        legenda: belakang ? [...belakang.querySelectorAll('.legend')].map((e) => bersih(e.textContent)) : [],
+        legendaHtml: belakang ? [...belakang.querySelectorAll('.legend')].map((e) => e.innerHTML) : [],
+      }
+      const ada = perPemain.get(nama)
+      if (ada) {
+        ada.baris.push(...satu.baris)
+        ada.legenda = satu.legenda
+        ada.legendaHtml = satu.legendaHtml
+      } else {
+        perPemain.set(nama, satu)
+      }
+    }
+    return [...perPemain.values()]
+  }
   return [...document.querySelectorAll('section.page')].map((sec) => {
     const h2 = sec.querySelector('h2')
-    const t = sec.querySelector('table')
-    const kompas = sec.querySelector('.kompas')
     const legenda = [...sec.querySelectorAll('.legend')]
     return {
       nama: h2 && h2.firstChild ? bersih(h2.firstChild.textContent) : '',
       kode: bersih(h2 && h2.querySelector('.code') ? h2.querySelector('.code').textContent : ''),
       sub: [...sec.querySelectorAll('header .sub')].map((x) => bersih(x.textContent)),
-      kepala: t ? [...t.querySelectorAll('thead th')].map((th) => bersih(th.textContent)) : [],
-      baris: t
-        ? [...t.querySelectorAll('tbody tr')].map((tr) =>
-            [...tr.children].map((td) => ({ teks: bersih(td.textContent), html: td.innerHTML.trim() })),
-          )
-        : [],
-      // Kompas: label mata angin (teks SVG) dan keterangannya, dibaca terpisah.
-      kompas: kompas
-        ? {
-            label: [...kompas.querySelectorAll('svg text')].map((x) => bersih(x.textContent)),
-            teks: bersih(kompas.querySelector(':scope > div') ? kompas.querySelector(':scope > div').textContent : ''),
-          }
-        : null,
+      kepala: bacaKepala(sec),
+      baris: bacaBaris(sec),
+      kompas: bacaKompas(sec),
       legenda: legenda.map((e) => bersih(e.textContent)),
       legendaHtml: legenda.map((e) => e.innerHTML),
     }
@@ -472,7 +519,7 @@ function alatHalaman(p) {
     langkah(el, 'pratinjau cetak tidak muncul setelah tombol Pratinjau diklik')
     const bingkai = await el.contentFrame()
     langkah(bingkai, 'bingkai pratinjau tidak bisa dibaca')
-    const ada = await bingkai.waitForSelector('section.page table', { timeout: 8000 }).then(
+    const ada = await bingkai.waitForSelector('section.page table, .kartu table', { timeout: 8000 }).then(
       () => true,
       () => false,
     )

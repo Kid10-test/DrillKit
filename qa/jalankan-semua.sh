@@ -43,7 +43,7 @@ bash regresi.sh "$BASE" \
 echo "== BLOK 5: 1a/1b & rangkaian buku saku yang dihidupkan kembali (2a) ==" >> "$LOG"
 bash regresi.sh "$BASE" \
   uji-riwayat uji-simpan-otomatis \
-  dd8 dd8b dd9-kompas dd10b-kartu dd10b-mode dd10b-override \
+  dd8 dd8b dd9-kompas dd10b-kartu dd10b-mode dd10b-override kartu-lipat \
   >> "$LOG" 2>&1
 
 echo "== SELESAI ==" >> "$LOG"

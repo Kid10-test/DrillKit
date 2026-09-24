@@ -62,7 +62,7 @@ const LANGKAH: [string, string][] = [
   ],
   [
     'Bawa ke lapangan',
-    'Di editor: <b>Dot sheet &amp; buku saku</b> → <b>Pratinjau</b> → <b>Cetak</b>. Buku saku 9,5 × 13,5 cm, tinggal dilipat dan masuk saku pemain.',
+    'Di editor: <b>Dot sheet &amp; buku saku</b> → <b>Pratinjau</b> → <b>Cetak</b> di kertas A4. Potong tiap kartu mengikuti garis tepi, lipat garis putus-putusnya ke belakang menjadi kartu 9,5 × 13,5 cm, dan masuk saku pemain.',
   ],
   [
     'Jadwal &amp; absensi',

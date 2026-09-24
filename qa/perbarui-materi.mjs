@@ -24,10 +24,10 @@ import { lewatSambutan } from './sambutan.mjs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { DIST } from './lokasi.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:4173'
 /** Berkas materi yang disajikan sejajar dengan aplikasinya (satu asal). */
-const DIST = '/home/user/drillkit/dist'
 const PAKET = path.join(DIST, 'paket.json')
 const UNDUH = path.join(os.tmpdir(), `unduh-perbarui-${Date.now()}`)
 fs.mkdirSync(UNDUH, { recursive: true })
