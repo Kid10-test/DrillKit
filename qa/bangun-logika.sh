@@ -71,4 +71,8 @@ rakit src/db/db.ts          dbk
 # 1b — simpan otomatis ke berkas. Modulnya mengimpor `backup.ts`,
 # jadi ikut terbawa ke dalam bundelnya.
 rakit src/lib/simpanOtomatis.ts simpanOtomatis
+# C2 — kuis/hafalan anggota: penyusunan soal, penilaian, acakan berbenih.
+rakit src/lib/kuis.ts kuis
+# C3 — pengingat jadwal: jendela sesi, ingatan harian, berkas .ics.
+rakit src/lib/pengingat.ts pengingat
 echo "== selesai =="

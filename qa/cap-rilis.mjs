@@ -17,6 +17,8 @@
 import puppeteer from 'puppeteer'
 import { lewatSambutan } from './sambutan.mjs'
 import fs from 'node:fs'
+import path from 'node:path'
+import { DIST } from './lokasi.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:4173'
 
@@ -61,9 +63,17 @@ try {
      Hasil buildnya baru saja dibuat, jadi capnya tidak boleh lebih tua
      dari satu hari. Cap yang lebih tua berarti ia diketik atau disuntikkan
      sekali lalu beku — dan cap yang beku memberi keyakinan palsu. */
-  const berkas = fs.readdirSync('/home/user/drillkit/dist/assets').filter((f) => f.endsWith('.js'))
-  const js = fs.readFileSync(`/home/user/drillkit/dist/assets/${berkas[0]}`, 'utf8')
-  const cocok = js.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/)
+  const berkas = fs.readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js'))
+  // #5 — build terbelah per rute (bukan satu gajah 870 KB), jadi capnya
+  // dicari di SEMUA chunk, bukan hanya berkas pertama. Jumlah chunknya
+  // sendiri dijaga: kalau kembali jadi satu, pemisahan bundelnya rusak.
+  cek('3: build terbelah per rute', berkas.length >= 6, `${berkas.length} chunk: ${berkas.join(', ')}`)
+  let cocok = null
+  for (const b of berkas) {
+    const js = fs.readFileSync(path.join(DIST, 'assets', b), 'utf8')
+    cocok = js.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/)
+    if (cocok) break
+  }
   cek('3: cap waktu build tersemat di dalam berkas rilisnya', cocok != null,
     cocok ? cocok[0] : 'tidak ketemu')
 

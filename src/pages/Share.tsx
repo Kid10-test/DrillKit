@@ -20,7 +20,7 @@ import { IconDownload, IconLoop, IconPause, IconPlay, IconShare, IconUpload } fr
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
 import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
 import Music from './Music'
-import { bacaMode } from '../lib/modePerangkat'
+import { useMemberMode } from '../hooks/useMemberMode'
 import { TombolKeluarModeAnggota, TombolMasukModeAnggota } from '../components/ModePerangkat'
 import { bikinZip } from '../lib/zip'
 import {
@@ -38,6 +38,9 @@ import {
   slugify,
 } from '../lib/utils'
 import { coordText, facingDeg, stepYd, ukurTitik } from '../lib/field'
+import { acakUrutan, bangunSoal, nilaiTebakan, TOLERANSI_LANGKAH } from '../lib/kuis'
+import { PengingatJadwal, unduhICS } from '../components/PengingatJadwal'
+import type { NilaiTebakan } from '../lib/kuis'
 
 /**
  * Halaman berbagi punya dua mode:
@@ -348,7 +351,7 @@ const BISA_AMBIL = /^https?:$/.test(location.protocol)
 function MemberView() {
   const toast = useToast()
   const pkg = useLiveQuery(() => db.packages.get('current'), [], undefined)
-  const [tab, setTab] = useState<'jadwal' | 'formasi' | 'absensi' | 'catatan' | 'musik'>('jadwal')
+  const [tab, setTab] = useState<'jadwal' | 'formasi' | 'kuis' | 'absensi' | 'catatan' | 'musik'>('jadwal')
   const [meId, setMeId] = useState(() => localStorage.getItem('drillkit.meId') ?? '')
   const [q, setQ] = useState('')
   const [sedangMuat, setSedangMuat] = useState(false)
@@ -651,7 +654,7 @@ function MemberView() {
       )}
 
       {/*
-        Tab — lima buah, dan ukurannya harus Muat di HP.
+        Tab — enam buah, dan ukurannya harus Muat di HP.
 
         Penambahan tab Musik membuat bar ini meluber 12px pada layar 360px:
         tombol terakhir sebagian keluar dari layar. Seluruh rangkaian uji
@@ -660,7 +663,7 @@ function MemberView() {
 
         Karena itu: padding & ukuran huruf diperkecil pada layar sempit,
         label tidak boleh membungkus, dan bar boleh digeser bila tetap
-        tidak muat (misalnya layar 320px). Batang gesernya dibuat tipis
+        tidak muat (misalnya layar 320px — atau tab Kuis di 360px). Batang gesernya dibuat tipis
         supaya tidak menggeser tata letaknya.
       */}
       <div
@@ -668,7 +671,7 @@ function MemberView() {
         data-kiosk-allow
         className="scroll-thin mb-4 flex gap-1 overflow-x-auto rounded-lg border border-slate-800 bg-slate-900/50 p-1"
       >
-        {(['jadwal', 'formasi', 'absensi', 'catatan', 'musik'] as const).map((t) => (
+        {(['jadwal', 'formasi', 'kuis', 'absensi', 'catatan', 'musik'] as const).map((t) => (
           <button
             key={t}
             data-testid={`tab-${t}`}
@@ -697,6 +700,8 @@ function MemberView() {
         <MemberSchedule sessions={bundle.sessions} />
       ) : tab === 'formasi' ? (
         <MemberDrill bundle={bundle} me={me} members={members} />
+      ) : tab === 'kuis' ? (
+        <MemberKuis bundle={bundle} me={me} members={members} />
       ) : tab === 'absensi' ? (
         <MemberAttendance bundle={bundle} me={me} />
       ) : (
@@ -712,7 +717,9 @@ function MemberSchedule({ sessions }: { sessions: Session[] }) {
   const past = sorted.filter((s) => daysFromToday(s.date) < 0).reverse()
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-kiosk-allow>
+      {/* C3 — spanduk jadwal terdekat, sama seperti Dashboard pelatih. */}
+      <PengingatJadwal sessions={sessions} prefix="ingat-anggota" />
       <div>
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
           Mendatang ({upcoming.length})
@@ -734,6 +741,16 @@ function MemberSchedule({ sessions }: { sessions: Session[] }) {
                   <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
                     {relativeDay(s.date)}
                   </Badge>
+                </div>
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    data-testid={`ics-anggota-${s.id}`}
+                    onClick={() => unduhICS(s)}
+                  >
+                    Kalender (.ics)
+                  </Button>
                 </div>
                 {s.checklist.length > 0 && (
                   <ul className="mt-2 space-y-0.5">
@@ -1065,6 +1082,297 @@ function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: Member;
 }
 
 /**
+ * C2 — tab "Kuis" untuk anggota: tebak posisi sendiri di set berikutnya.
+ *
+ * Satu soal per perpindahan set (berurutan, atau acak bila diminta). Peta
+ * menampilkan set ASAL — titik sendiri berlingkaran emas, seperti tab
+ * Formasi — tetapi TANPA garis perpindahan: di situlah soalnya. Anggota
+ * mengetuk peta untuk meletakkan tebakan (bisa digeser dengan mengetuk
+ * lagi), lalu mengunci jawaban. Benar bila dalam toleransi langkah dari
+ * kunci. Baca-saja: tidak menulis apa pun ke basis data.
+ */
+function MemberKuis({ bundle, me, members }: { bundle: ShareBundle; me: Member; members: Member[] }) {
+  const [drillId, setDrillId] = useState(bundle.drills[0]?.id ?? '')
+  /** 0 = urutan set; selain itu benih acakan (lihat `acakUrutan`). */
+  const [benih, setBenih] = useState(0)
+  const [idx, setIdx] = useState(0)
+  const [tebakan, setTebakan] = useState<{ x: number; y: number } | null>(null)
+  const [terkunci, setTerkunci] = useState<NilaiTebakan | null>(null)
+  const [benar, setBenar] = useState(0)
+
+  const drill = bundle.drills.find((d) => d.id === drillId) ?? bundle.drills[0]
+  const sets: DrillSet[] = useMemo(
+    () => bundle.sets.filter((s) => s.drillId === drill?.id).sort((a, b) => a.order - b.order),
+    [bundle.sets, drill?.id],
+  )
+  const soal = useMemo(() => acakUrutan(bangunSoal(sets, me.id), benih), [sets, me.id, benih])
+  const selesai = idx >= soal.length
+  const kini = selesai ? undefined : soal[idx]
+
+  const f: FieldConfig = drill?.field ?? DEFAULT_FIELD
+  const uk = (n: number) => ukurTitik(f, n)
+  const sYd = stepYd(f)
+  const halfW = f.widthYd / 2
+  const halfL = (f.lengthYd + f.endZoneYd * 2) / 2
+  const VW = f.lengthYd + f.endZoneYd * 2
+  const VH = f.widthYd
+  const sx = (x: number) => halfL - x
+  const sy = (y: number) => halfW - y
+
+  const petaAsal = kini ? sets.find((s) => s.id === kini.dariSetId) : undefined
+  const dijawab = Math.min(idx + (terkunci ? 1 : 0), soal.length)
+
+  function ulang(acak: boolean) {
+    setIdx(0)
+    setTebakan(null)
+    setTerkunci(null)
+    setBenar(0)
+    setBenih(acak ? Date.now() : 0)
+  }
+
+  function ketukPeta(e: { clientX: number; clientY: number; currentTarget: SVGSVGElement }) {
+    if (terkunci || !kini) return
+    const r = e.currentTarget.getBoundingClientRect()
+    if (r.width <= 0 || r.height <= 0) return
+    // Balik proyeksi peta: sx = halfL − x, jadi x = halfL − vx.
+    setTebakan({
+      x: halfL - ((e.clientX - r.left) / r.width) * VW,
+      y: halfW - ((e.clientY - r.top) / r.height) * VH,
+    })
+  }
+
+  function kunci() {
+    if (!kini || !tebakan || terkunci) return
+    const nilai = nilaiTebakan(tebakan, kini.kunci, sYd)
+    setTerkunci(nilai)
+    if (nilai.benar) setBenar((b) => b + 1)
+  }
+
+  function lanjut() {
+    setIdx((i) => i + 1)
+    setTebakan(null)
+    setTerkunci(null)
+  }
+
+  if (!drill) return <EmptyState title="Paket ini tidak berisi formasi" />
+
+  return (
+    <div className="space-y-3" data-kiosk-allow>
+      <Card>
+        <Select
+          value={drill.id}
+          onChange={(e) => {
+            setDrillId(e.target.value)
+            ulang(false)
+          }}
+          className="mb-2 w-full"
+        >
+          {bundle.drills.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </Select>
+        <div className="flex items-center justify-between gap-2">
+          <p data-testid="soal-ke" className="text-xs text-slate-400">
+            {soal.length ? (selesai ? `Selesai — ${soal.length} soal` : `Soal ${idx + 1} dari ${soal.length}`) : 'Belum ada soal'}
+            {benih !== 0 && soal.length ? ' · acak' : ''}
+          </p>
+          <p data-testid="skor-kuis" className="text-xs font-medium text-slate-300">
+            Benar {benar} dari {dijawab}
+          </p>
+        </div>
+        {soal.length > 1 && !selesai && (
+          <Button size="sm" variant="ghost" data-testid="acak-kuis" onClick={() => ulang(true)} className="mt-2 w-full">
+            <IconLoop size={14} /> Acak urutan
+          </Button>
+        )}
+      </Card>
+
+      {!soal.length ? (
+        <EmptyState
+          title="Belum bisa kuis"
+          desc="Kamu harus ada di dua set berurutan supaya ada yang ditebak. Minta pelatih menambah set."
+        />
+      ) : selesai ? (
+        <Card data-testid="selesai-kuis">
+          <h3 className="mb-1 text-sm font-semibold text-slate-200">Kuis selesai</h3>
+          <p className="mb-3 text-sm text-slate-400">
+            Skor: <b className="text-emerald-400">{benar}</b> benar dari {soal.length} soal
+            {benar === soal.length && soal.length > 0 ? ' — hafal semua!' : '.'}
+          </p>
+          <div className="flex gap-2">
+            <Button data-testid="ulang-kuis" onClick={() => ulang(false)} className="flex-1">
+              Main lagi
+            </Button>
+            <Button variant="ghost" onClick={() => ulang(true)} className="flex-1">
+              Acak & main lagi
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        kini && (
+          <>
+            <Card>
+              <p className="text-sm text-slate-200">
+                Dari <b>{kini.dariNama}</b> ke <b>{kini.keNama}</b> · {kini.counts} count
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Ketuk posisimu di {kini.keNama} — kunci jawaban bila sudah yakin.
+              </p>
+            </Card>
+
+            <Card padded={false} className="overflow-hidden">
+              <div className="bg-slate-950 p-2">
+                <svg
+                  data-testid="peta-kuis"
+                  viewBox={`0 0 ${VW} ${VH}`}
+                  className="w-full cursor-crosshair touch-manipulation"
+                  onClick={ketukPeta}
+                >
+                  <FieldSurface f={f} VW={VW} VH={VH} sx={sx} sy={sy} />
+                  {Object.entries(petaAsal?.points ?? {}).map(([id, p]) => {
+                    const m = members.find((x) => x.id === id)
+                    if (!m) return null
+                    const mine = id === me.id
+                    const deg = facingDeg(p.facing, p.facingDeg)
+                    const rad = (deg * Math.PI) / 180
+                    return (
+                      <g key={id}>
+                        <line
+                          x1={sx(p.x)}
+                          y1={sy(p.y)}
+                          x2={sx(p.x) - Math.sin(rad) * 1.6}
+                          y2={sy(p.y) + Math.cos(rad) * 1.6}
+                          stroke={sectionDot(m.section)}
+                          strokeWidth={0.35}
+                        />
+                        <circle
+                          cx={sx(p.x)}
+                          cy={sy(p.y)}
+                          r={uk(mine ? 2.2 : 1.15)}
+                          fill={sectionDot(m.section)}
+                          stroke={mine ? '#fbbf24' : '#0b1120'}
+                          strokeWidth={uk(mine ? 0.6 : 0.18)}
+                        />
+                        {mine && (
+                          <circle
+                            cx={sx(p.x)}
+                            cy={sy(p.y)}
+                            r={uk(3.4)}
+                            fill="none"
+                            stroke="#fbbf24"
+                            strokeWidth={uk(0.3)}
+                            strokeDasharray="1 0.8"
+                          />
+                        )}
+                        <text
+                          x={sx(p.x)}
+                          y={sy(p.y) + 0.45}
+                          textAnchor="middle"
+                          fontSize={mine ? 1.6 : 1.1}
+                          fill="#0b1120"
+                          style={{ fontWeight: 700 }}
+                        >
+                          {m.code}
+                        </text>
+                      </g>
+                    )
+                  })}
+                  {tebakan && (
+                    <g data-testid="penanda-tebakan">
+                      <circle
+                        cx={sx(tebakan.x)}
+                        cy={sy(tebakan.y)}
+                        r={uk(2.6)}
+                        fill="rgba(56,189,248,.35)"
+                        stroke="#38bdf8"
+                        strokeWidth={uk(0.5)}
+                      />
+                      <line
+                        x1={sx(tebakan.x) - uk(1.2)}
+                        y1={sy(tebakan.y)}
+                        x2={sx(tebakan.x) + uk(1.2)}
+                        y2={sy(tebakan.y)}
+                        stroke="#38bdf8"
+                        strokeWidth={uk(0.4)}
+                      />
+                      <line
+                        x1={sx(tebakan.x)}
+                        y1={sy(tebakan.y) - uk(1.2)}
+                        x2={sx(tebakan.x)}
+                        y2={sy(tebakan.y) + uk(1.2)}
+                        stroke="#38bdf8"
+                        strokeWidth={uk(0.4)}
+                      />
+                    </g>
+                  )}
+                  {terkunci && tebakan && (
+                    <g data-testid="penanda-kunci">
+                      <line
+                        x1={sx(tebakan.x)}
+                        y1={sy(tebakan.y)}
+                        x2={sx(kini.kunci.x)}
+                        y2={sy(kini.kunci.y)}
+                        stroke="rgba(52,211,153,.7)"
+                        strokeWidth={uk(0.35)}
+                        strokeDasharray="1 1"
+                      />
+                      <circle
+                        cx={sx(kini.kunci.x)}
+                        cy={sy(kini.kunci.y)}
+                        r={uk(2.2)}
+                        fill="none"
+                        stroke="#34d399"
+                        strokeWidth={uk(0.6)}
+                      />
+                    </g>
+                  )}
+                </svg>
+              </div>
+              <div className="border-t border-slate-800 px-3 py-2 text-[11px] text-slate-500">
+                {terkunci
+                  ? 'Biru = tebakanmu · hijau = kunci'
+                  : tebakan
+                    ? 'Ketuk lagi untuk menggeser, lalu kunci jawaban.'
+                    : 'Ketuk peta untuk meletakkan tebakanmu.'}
+              </div>
+            </Card>
+
+            {!terkunci ? (
+              <Button
+                data-testid="kunci-jawaban"
+                variant="primary"
+                disabled={!tebakan}
+                onClick={kunci}
+                className="w-full"
+              >
+                Kunci jawaban
+              </Button>
+            ) : (
+              <Card data-testid="hasil-kuis">
+                <p className={`text-sm font-semibold ${terkunci.benar ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {terkunci.benar ? 'Tepat!' : 'Belum tepat.'}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Jarak tebakanmu {terkunci.jarakLangkah} langkah (toleransi {TOLERANSI_LANGKAH}).
+                </p>
+                <p data-testid="kunci-koor" className="mt-2 rounded-lg bg-slate-950/60 px-3 py-2 font-mono text-sm text-emerald-300">
+                  {coordText(kini.kunci.x, kini.kunci.y, f)}
+                </p>
+                <Button data-testid="lanjut-kuis" onClick={lanjut} className="mt-3 w-full">
+                  {idx + 1 >= soal.length ? 'Lihat skor' : 'Lanjut'}
+                </Button>
+              </Card>
+            )}
+          </>
+        )
+      )}
+    </div>
+  )
+}
+
+/**
  * Tab "Catatan" — catatan evaluasi pribadi yang ditulis pelatih.
  * Hanya catatan untuk anggota yang sedang dipilih yang ditampilkan.
  */
@@ -1188,8 +1496,6 @@ function MemberAttendance({ bundle, me }: { bundle: ShareBundle; me: Member }) {
  */
 export { bacaMode, simpanMode } from '../lib/modePerangkat'
 
-/** 'member' kalau perangkat ini memilih mode anggota. */
-export function useMemberMode(): 'coach' | 'member' {
-  const [mode] = useState<'coach' | 'member'>(bacaMode)
-  return mode
-}
+// #5 — hooknya pindah ke `src/hooks/useMemberMode.ts` supaya `Layout` tidak
+// menarik halaman ini ke bundel awal. Diteruskan di sini untuk kompatibilitas.
+export { useMemberMode } from '../hooks/useMemberMode'

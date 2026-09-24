@@ -18,9 +18,10 @@ import { lewatSambutan } from './sambutan.mjs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { DIST } from './lokasi.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:4173'
-const PAKET = '/home/user/drillkit/dist/paket.json'
+const PAKET = path.join(DIST, 'paket.json')
 const UNDUH = path.join(os.tmpdir(), 'unduh-mik')
 fs.mkdirSync(UNDUH, { recursive: true })
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))

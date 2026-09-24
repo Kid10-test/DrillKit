@@ -19,3 +19,10 @@ node_modules/
 
 # Folder bundel unggahan — dibuat ulang dengan scripts/siapkan-unggah.sh
 unggah/
+
+# Folder sementara rangkaian uji (dibuat & dibersihkan tiap jalan; kalau
+# rangkaiannya mati di tengah jalan, sisanya tidak boleh ikut terkomit)
+qa/unduhan-*/
+qa/berkas-*/
+qa/berkas-shot/
+qa/dl*/

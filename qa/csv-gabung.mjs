@@ -19,9 +19,10 @@ import puppeteer from 'puppeteer'
 import { lewatSambutan } from './sambutan.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
+import { QA } from './lokasi.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:5173'
-const BERKAS = '/home/user/drillkit/qa/berkas-gabung'
+const BERKAS = path.join(QA, 'berkas-gabung')
 fs.rmSync(BERKAS, { recursive: true, force: true })
 fs.mkdirSync(BERKAS, { recursive: true })
 

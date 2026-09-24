@@ -22,9 +22,9 @@
 import puppeteer from 'puppeteer'
 import fs from 'node:fs'
 import { lewatSambutan } from './sambutan.mjs'
+import { DIST } from './lokasi.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:4173'
-const DIST = '/home/user/drillkit/dist'
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
 let lulus = 0
