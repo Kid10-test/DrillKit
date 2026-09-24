@@ -63,6 +63,21 @@ const info = await p.evaluate(async () => {
     id, title, bpm: 120, beats: 4, tempoMap: [], createdAt: Date.now(), panjangBirama: 32,
   })
   const tx = r.transaction(['songs', 'setlists', 'sessions'], 'readwrite')
+  /*
+   * 2a — sesi data contoh yang jatuh HARI INI dibuang dulu. Data contoh
+   * punya "Latihan Rutin" hari ini pukul 15:30–18:00; bila uji berjalan
+   * kira-kira pukul 15:00–18:00 (jam perangkat), sesi itu menjadi "sedang
+   * berjalan" atau "berikutnya" menggantikan sesi yang disiapkan di bawah,
+   * kartu set list tidak muncul, dan uji MOGOK di `daftar-lagu` tanpa
+   * ringkasan — setiap sore, tanpa ada yang rusak (terjadi pada regresi
+   * penuh 23 Sep 2026, 15:30). Yang diuji hanya tiga sesi milik uji ini.
+   */
+  const lama = tx.objectStore('sessions').getAll()
+  lama.onsuccess = () => {
+    for (const s of lama.result) {
+      if (s.date === iso && !String(s.id).startsWith('s_ml_')) tx.objectStore('sessions').delete(s.id)
+    }
+  }
   tx.objectStore('songs').put(bersih('song_ml_a', 'Pembuka'))
   tx.objectStore('songs').put(bersih('song_ml_b', 'Balada'))
   tx.objectStore('setlists').put({
@@ -109,8 +124,8 @@ await p.evaluate((t) => {
 }, info.iso)
 await wait(1600)
 
-// Data contoh sudah punya satu sesi di hari ini, jadi jangan menghitung
-// jumlah baris — periksa bahwa ketiga sesi yang disiapkan uji ada.
+// Periksa bahwa ketiga sesi yang disiapkan uji ada (sesi data contoh yang
+// jatuh hari ini sudah dibuang di atas).
 for (const id of ['s_ml_lewat', 's_ml_kini', 's_ml_nanti']) {
   cek(`sesi ${id} tampil di run sheet`, await ada(`[data-testid="baris-run-${id}"]`))
 }

@@ -4722,3 +4722,67 @@ bundel versi jadi, lalu mengembalikannya:
   folder unduhan. Di kotak pasir ini mereka dijalankan dengan tautan
   `ln -s /home/user/DrillKit /home/user/drillkit`; merapikannya menjadi
   jalur relatif sengaja tidak dicampur ke 2a.
+
+### Regresi penuh: empat yang tidak bersih, satu yang sungguhan
+
+Regresi penuh pertama dengan 77 rangkaian (23 Sep 2026, 15.00–15.46,
+lawan versi jadi): **73 bersih**, termasuk keenam rangkaian buku saku.
+Empat sisanya diperiksa satu per satu. Tiga ternyata ujinya sendiri, satu
+cacat sungguhan:
+
+1. **`uji-csvkoordinat` — `(tanpa ringkasan)`.** Ia merakit modulnya
+   sendiri lewat `execSync` di `/home/user/drillkit`, jalur yang tidak ada
+   di checkout ini (huruf besar `DrillKit`), dan mogok dengan
+   `spawnSync /bin/sh ENOENT`. Ringkasannya pun berbentuk `36/36 lulus`,
+   yang tidak dikenali `regresi.sh`: sehat atau mogok, catatannya sama
+   persis, dan kode keluarnya tidak pernah 1. Kini ia memakai modul yang
+   sudah dirakit `bangun-logika.sh`, mencetak `N lulus, M gagal`, dan
+   keluar dengan kode 1 bila ada yang gagal (dibuktikan dengan merusak
+   modulnya sementara: lima ✗, exit 1).
+2. **`berbagi-anggota` — 33 lulus, 1 gagal, karena kebetulan.** "Anggota
+   pertama" diambil dari IndexedDB, yang urutannya mengikuti `id`
+   berakhiran acak, lalu berkasnya dicari lewat nama DEPAN. Kali ini yang
+   terambil Kirana Ayu, dan "kirana" juga cocok dengan
+   `DrillKit-Indah-Kirana-WO09.json`: dua berkas, uji gagal. Peluangnya
+   kira-kira satu dari delapan belas putaran, tanpa ada yang rusak. Kini
+   dicocokkan dengan nama lengkap, persis seperti `namaBerkasAnggota`
+   membentuknya.
+3. **`mode-lomba` — `(tanpa ringkasan)`, bergantung jam.** Data contoh
+   punya sesi hari ini pukul 15.30–18.00, dan regresinya kebetulan sampai
+   di sini pukul 15.30. Sesi itu menjadi "sedang berjalan", kartu set list
+   penampilan yang disiapkan uji tidak muncul, dan uji mogok di
+   `daftar-lagu`. Setiap sore, kira-kira 15.00–18.00 jam perangkat, uji
+   ini mogok tanpa ada yang rusak. Kini sesi data contoh yang jatuh hari
+   ini dibuang sebelum sesi uji ditanam.
+4. **`backup-lengkap` — 20 lulus, 3 gagal: CACAT SUNGGUHAN, sudah ada di
+   `main`.** Uji ini membaca daftar tabel langsung dari IndexedDB dan
+   menuntut setiap tabel ada di berkas backup. Tujuannya persis menangkap
+   tabel baru yang lupa didaftarkan (cacat `setlists` di M3). 1a dan 1b
+   menambah dua tabel, `riwayat` dan `simpanan`, dan tidak satu pun masuk
+   backup. Tidak ketahuan karena PR #2 hanya menjalankan uji logika:
+   Chrome tidak bisa diunduh di kotak pasirnya. **Sengaja belum
+   diperbaiki**, karena ini keputusan produk, bukan urusan 2a:
+   - `simpanan` berisi *pegangan berkas* (File System Access) milik
+     perangkat itu sendiri. Isinya tidak bisa ditulis ke JSON dan tidak
+     berarti apa pun di perangkat lain. Hampir pasti harus
+     **dikecualikan** seperti `packages`, dengan alasannya ditulis di
+     ujinya.
+   - `riwayat` perlu diputuskan. Pilihan pertama: ikut backup, sehingga
+     pulih bersama datanya. Tetapi berkas backup, termasuk yang ditulis 1b
+     tiap ±15 menit, bisa membengkak beberapa MB per drill, dan
+     pemulihannya harus ditambahkan. Pilihan kedua: dikecualikan.
+     Riwayat dianggap milik perangkat, dan backup sudah memuat keadaan
+     terkini.
+
+Setelah ketiga uji diperbaiki, keempatnya dijalankan ulang lewat
+`regresi.sh`: `uji-csvkoordinat` 36 lulus, `berbagi-anggota` 34 lulus,
+dan `mode-lomba` 23 lulus. `mode-lomba` dijalankan pukul 15.47, di
+dalam jendela yang dulu membuatnya mogok. `backup-lengkap` tetap 20
+lulus, 3 gagal.
+
+**Diuji:** keenam rangkaian buku saku lulus lewat `regresi.sh`, diulang
+tiga putaran lagi tanpa satu pun kegagalan, dan lulus lagi di regresi
+penuh. `tsc --noEmit` bersih, `npm run build` sukses, dan
+`bangun-logika.sh` merakit 26 modul. Hasil regresi penuh: **76 dari 77
+rangkaian bersih**. Yang tersisa, `backup-lengkap`, menunggu keputusan
+di atas.
