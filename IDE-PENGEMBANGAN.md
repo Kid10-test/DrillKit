@@ -4774,15 +4774,40 @@ cacat sungguhan:
      Riwayat dianggap milik perangkat, dan backup sudah memuat keadaan
      terkini.
 
+   **Diputuskan keesokan harinya: keduanya dikecualikan** (lihat
+   *Keputusan backup* di bawah).
+
 Setelah ketiga uji diperbaiki, keempatnya dijalankan ulang lewat
 `regresi.sh`: `uji-csvkoordinat` 36 lulus, `berbagi-anggota` 34 lulus,
 dan `mode-lomba` 23 lulus. `mode-lomba` dijalankan pukul 15.47, di
 dalam jendela yang dulu membuatnya mogok. `backup-lengkap` tetap 20
-lulus, 3 gagal.
+lulus, 3 gagal, sampai keputusannya diambil.
+
+### Keputusan backup: `riwayat` dan `simpanan` milik perangkat
+
+Diputuskan 24 Sep 2026: **keduanya dikecualikan dari backup**. Alasannya
+ditulis di kepala `qa/backup-lengkap.mjs`, di samping `packages`:
+
+- `simpanan`: pegangan berkas hanya berlaku di browser yang membuatnya,
+  dan tidak bisa ditulis ke JSON.
+- `riwayat`: backup memuat keadaan terkini, sedangkan riwayat untuk undo
+  tetap milik perangkat. Kalau ikut, setiap berkas backup ikut membengkak,
+  termasuk yang ditulis simpan otomatis tiap ±15 menit.
+
+Sebelum memutuskan, jalur pemulihannya diperiksa dulu. `importBackup`
+hanya menimpa tabel yang ada di berkas lewat `bulkPut`, tanpa
+mengosongkan apa pun. Jadi saat backup dipulihkan, riwayat dan pegangan
+simpan otomatis di perangkat tetap utuh; mengecualikan keduanya tidak
+berarti menghapusnya. Bila kelak riwayat mau ikut backup, ada tiga
+tempat yang harus diubah bersamaan: daftar `DIKECUALIKAN`,
+`buildBackupPayload`, dan transaksi `importBackup`.
+
+Keputusan ini tidak mengubah `src/`. Hasilnya, `backup-lengkap` **21
+lulus, 0 gagal**.
 
 **Diuji:** keenam rangkaian buku saku lulus lewat `regresi.sh`, diulang
 tiga putaran lagi tanpa satu pun kegagalan, dan lulus lagi di regresi
 penuh. `tsc --noEmit` bersih, `npm run build` sukses, dan
 `bangun-logika.sh` merakit 26 modul. Hasil regresi penuh: **76 dari 77
-rangkaian bersih**. Yang tersisa, `backup-lengkap`, menunggu keputusan
-di atas.
+rangkaian bersih**. Yang tersisa, `backup-lengkap`, lulus setelah
+keputusan di atas (21 lulus, 0 gagal).

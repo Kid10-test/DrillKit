@@ -17,6 +17,17 @@
  * - `packages` — salinan paket berbagi di perangkat ANGGOTA, bukan data
  *   pelatih; menyertakannya akan membuat backup perangkat anggota berisi
  *   data yang bukan miliknya.
+ * - `simpanan` (1b) — pegangan berkas/folder File System Access untuk simpan
+ *   otomatis. Pegangan hanya berlaku di browser yang membuatnya dan tidak
+ *   bisa ditulis ke JSON; di perangkat lain isinya tidak berarti apa pun.
+ * - `riwayat` (1a) — foto keadaan untuk undo, milik perangkat. Diputuskan
+ *   di 2a (24 Sep 2026) untuk TIDAK ikut backup: berkas backup memuat
+ *   keadaan terkini, sedangkan riwayat bisa beberapa MB per drill dan akan
+ *   ikut tertulis di setiap simpan otomatis (±15 menit). Pemulihan backup
+ *   hanya menimpa tabel yang ada di berkas (bulkPut, tanpa clear), jadi
+ *   riwayat dan simpanan di perangkat tetap utuh setelah backup dipulihkan.
+ *   Bila kelak riwayat mau ikut backup, hapus dari daftar ini SEKALIGUS
+ *   tambahkan ke `buildBackupPayload` dan ke transaksi `importBackup`.
  */
 import puppeteer from 'puppeteer'
 import { lewatSambutan } from './sambutan.mjs'
@@ -28,7 +39,7 @@ const UNDUH = '/home/user/drillkit/qa/unduhan-lengkap'
 fs.rmSync(UNDUH, { recursive: true, force: true })
 fs.mkdirSync(UNDUH, { recursive: true })
 
-const DIKECUALIKAN = new Set(['settings', 'packages'])
+const DIKECUALIKAN = new Set(['settings', 'packages', 'simpanan', 'riwayat'])
 
 const browser = await puppeteer.launch({
   args: ['--no-sandbox', '--disable-dev-shm-usage'],
