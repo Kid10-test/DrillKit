@@ -3,9 +3,13 @@
 Dokumen ini **bukan** rencana yang harus dikerjakan semua. Ini kandidat perbaikan,
 diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
 
-**Terakhir diperbarui: 24 Sep 2026 — C2 (kuis) & C3 (pengingat jadwal) rampung.**
+**Terakhir diperbarui: 24 Sep 2026 — J1 (polesan) rampung.**
+· **J1 rampung (24 Sep 2026)** — transposisi penala (nada sesuai partitur
+  instrumen), ambang predikat laporan bisa diatur, dan panduan 1 halaman
+  versi anggota. Rinciannya di bagian **J1** paling bawah. Yang masih
+  ditunda tinggal **I1** (log perubahan show).
 · **25 dari 29** ide kelompok A–F selesai · 2 dicoret · tidak ada lagi ide yang
-  menunggu — kelompok A–F tuntas (yang tersisa hanya J1 & I1 yang ditunda).
+  menunggu — kelompok A–F tuntas.
 · **Seri musik rampung: M1–M5** — tanda birama & hitung mundur, panjang lagu,
   ulang bagian, set list latihan, dan tukar repertoar antar perangkat.
   Kelompok E tidak ada yang tersisa. Rinciannya di bagian **E**.
@@ -122,10 +126,10 @@ Dikerjakan satu per satu, dan setiap ide yang selesai dicatat hasilnya di bawah 
 
 | Status | Ide |
 | --- | --- |
-| ✅ Sudah selesai | **A1–A7** (editor formasi) · **B1–B5** (lapangan) · **C1** (sisi anggota) · **D1–D4** (absensi) · **E3, E4** (musik) · **F1–F4** (keandalan data) · **DD1–DD10 + DD10b** (Drill Display) · **M1–M5** (musik, rampung 19 Sep) · **K1–K3** (mode asisten presenter) · **31e** (dasar jarak) · **G1** (run sheet hari lomba) · **G2** (layar hari H) · **H1** (rencana & pacu latihan) · **Pusat Data** (impor/ekspor lintas fitur) · **H2** (evaluasi & kemajuan anggota, rampung 20 Sep) · **G3** (penanda mulai/selesai sesi, rampung 20 Sep) · **G2b** (kunci layar presenter, rampung 20 Sep) · **Berbagi aman** (berkas grup vs per anggota, rampung 20 Sep) · **Kunci mode anggota** (21 Sep) · **Pilihan mode pertama** (layar sambutan, 21 Sep) · **Berkas anggota mengenali pemiliknya** (21 Sep) · **Angka kehadiran anggota jujur** (21 Sep) · **C2** (mode kuis/hafalan, rampung 24 Sep) · **C3** (pengingat jadwal, rampung 24 Sep) |
+| ✅ Sudah selesai | **A1–A7** (editor formasi) · **B1–B5** (lapangan) · **C1** (sisi anggota) · **D1–D4** (absensi) · **E3, E4** (musik) · **F1–F4** (keandalan data) · **DD1–DD10 + DD10b** (Drill Display) · **M1–M5** (musik, rampung 19 Sep) · **K1–K3** (mode asisten presenter) · **31e** (dasar jarak) · **G1** (run sheet hari lomba) · **G2** (layar hari H) · **H1** (rencana & pacu latihan) · **Pusat Data** (impor/ekspor lintas fitur) · **H2** (evaluasi & kemajuan anggota, rampung 20 Sep) · **G3** (penanda mulai/selesai sesi, rampung 20 Sep) · **G2b** (kunci layar presenter, rampung 20 Sep) · **Berbagi aman** (berkas grup vs per anggota, rampung 20 Sep) · **Kunci mode anggota** (21 Sep) · **Pilihan mode pertama** (layar sambutan, 21 Sep) · **Berkas anggota mengenali pemiliknya** (21 Sep) · **Angka kehadiran anggota jujur** (21 Sep) · **C2** (mode kuis/hafalan, rampung 24 Sep) · **C3** (pengingat jadwal, rampung 24 Sep) · **J1** (polesan: transposisi penala, ambang predikat, panduan anggota — rampung 24 Sep) |
 | ⬜ Belum dikerjakan | — |
-| 🔜 Kandidat berikutnya | **J1** (polesan) |
-| 💤 Ditunda | J1 (polesan: transposisi penala, ambang predikat laporan, panduan versi anggota) · I1 (log perubahan show — belum pernah jadi masalah) |
+| 🔜 Kandidat berikutnya | — (menunggu arahanmu; I1 satu-satunya kandidat tersisa) |
+| 💤 Ditunda | I1 (log perubahan show — belum pernah jadi masalah) |
 | 🚫 Dicoret | E2 (sudah ada di aplikasi inti) · E1 (sisanya sudah masuk E3) |
 
 Daftar ini hanya berisi **tambahan & perbaikan**. Fitur inti yang sudah ada sejak awal
@@ -1815,7 +1819,7 @@ show yang sama, **masa lomba**, dan kebiasaan memakai **berkas portabel**.
 | H1 | ✅ **Rencana latihan per sesi** — *selesai 19 Sep 2026*, bersama layar **pacu latihan** | Latihan sering melenceng dari rencana, bagian akhir kehabisan waktu | ⭐⭐⭐⭐ | Sedang |
 | ~~H2~~ ✅ | **Evaluasi & kemajuan anggota**: catatan evaluasi terstruktur + rekap perkembangannya untuk pembinaan | Catatan evaluasi sekarang hanya teks bebas, perkembangannya sulit dilihat | ⭐⭐⭐ | Sedang |
 | I1 | **Log perubahan show**: jejak siapa mengubah set apa & kapan — penting karena sekarang dua pelatih menyunting | Set tiba-tiba berubah tanpa tahu siapa yang mengubah | ⭐⭐⭐ | Kecil |
-| J1 | **Polesan kecil yang sengaja ditunda**: transposisi penala (nada sesuai instrumen), ambang predikat laporan bisa diatur, panduan 1 halaman versi anggota | Beberapa kebiasaan tim belum bisa diatur sendiri | ⭐⭐ | Kecil |
+| ~~J1~~ ✅ | **Polesan kecil yang sengaja ditunda**: transposisi penala (nada sesuai instrumen), ambang predikat laporan bisa diatur, panduan 1 halaman versi anggota — *selesai 24 Sep 2026* | Beberapa kebiasaan tim belum bisa diatur sendiri | ⭐⭐ | Kecil |
 
 Catatan 17 Sep 2026: **I1 (log perubahan show) belum pernah jadi masalah** —
 pelatih tidak pernah kehilangan jejak siapa mengubah apa. Jadi statusnya sekadar
@@ -1887,8 +1891,7 @@ git sehingga bisa dibatalkan satu per satu tanpa mengganggu yang lain.
 | DD10 | 17 Sep 2026 | Koordinat buku saku tidak rancu |
 | DD10b | 17 Sep 2026 | Dua cara menghitung langkah |
 
-**J1 (polesan) tetap ditunda** — transposisi penala & ambang predikat laporan
-masih tersimpan sebagai kandidat.
+**J1 (polesan) selesai 24 Sep 2026** — lihat bagian **J1** paling bawah.
 
 **Kandidat musik — semuanya sudah selesai, tidak ada yang tersisa.**
 
@@ -1912,8 +1915,8 @@ masih tersimpan sebagai kandidat.
    lapangan; bisa diselipkan kapan saja tanpa mengganggu pekerjaan lain.
 4. **C2 & C3** (Sedang) — **keduanya rampung 24 Sep 2026**; sisi anggota
    untuk rencana komersial sudah terisi (kuis/hafalan + pengingat jadwal).
-5. **J1 — polesan kecil** (Kecil) — transposisi penala, ambang predikat
-   laporan bisa diatur, panduan 1 halaman versi anggota.
+5. **J1 — polesan kecil** (Kecil) — **rampung 24 Sep 2026**: transposisi
+   penala, ambang predikat laporan bisa diatur, panduan 1 halaman versi anggota.
 
 **Catatan: G3 & H1 beririsan, jadi urutannya tidak netral (19 Sep 2026).**
 H1 hendak menyimpan blok waktu latihan (pemanasan / section / gabungan)
@@ -1938,8 +1941,8 @@ saat orangnya tegang dan hanya punya waktu satu ketukan tombol, sedangkan
 H1 dipakai di **latihan biasa**, saat pelatih sempat mengoreksi. Jangan
 sampai antarmuka hari H diwarisi dari latihan tanpa dipikir ulang.
 
-**Ditunda:** tidak ada lagi di daftar ini (C2 & C3 rampung 24 Sep 2026;
-J1 & I1 tetap ditunda sesuai tabel status).
+**Ditunda:** tidak ada lagi di daftar ini (C2 & C3 & J1 rampung 24 Sep 2026;
+I1 tetap ditunda sesuai tabel status).
 **Dicoret:** E2 (sudah ada di aplikasi inti) dan E1 (sisanya — getar — sudah
 masuk E3).
 
@@ -4950,3 +4953,155 @@ dd10b-kartu 15, dd10b-mode 24, dd10b-override 24; ambang-gerak 20 dan
 dasar-jarak 17 (keduanya membaca pratinjau) tetap lulus. `tsc --noEmit`
 bersih, `npm run build` sukses. Contoh cetak diverifikasi satu halaman A4,
 nol luapan, di render maupun PDF.
+
+## J1 — Polesan: transposisi penala, ambang predikat, panduan anggota (24 Sep 2026)
+
+**Yang memicu:** *"Kerjakan J1: transposisi penala, ambang predikat laporan,
+dan panduan satu halaman anggota."* Tiga polesan yang sengaja ditunda sejak
+17 Sep 2026, disatukan karena temanya sama: **kebiasaan tim yang belum bisa
+diatur sendiri**.
+
+### 1. Transposisi penala
+
+Mikrofon mendengar nada **konser**. Pemain trumpet yang meniup C di
+partiturnya membunyikan Bb konser — dan penala lama menulis "Bb4", jadi ia
+harus menghitung ulang di kepala, atau mengira dirinya salah nada.
+
+- Kotak **Instrumen** di kartu penala: *Konser (C)*, *Bb*, *Bb oktaf bawah*,
+  *Eb*, *Eb oktaf bawah*, *F* — tiap pilihan menyebut contoh instrumennya
+  (trumpet, sax tenor, sax alto, sax bariton, mellophone, …), karena pemain
+  tidak perlu tahu teori transposisi untuk memilih.
+- Nada besar menjadi **nada tertulis** (Bb4 konser → **C5** di trumpet),
+  nada konsernya tetap disebut kecil di bawahnya supaya pelatih di
+  sebelahnya bisa tetap bicara dalam nada konser. Nada dengung ikut
+  diterjemahkan: *"A#3 · = C4 di partitur Bb"*.
+- **Oktafnya ikut benar**, bukan hanya nama nadanya: sax tenor berbunyi M9
+  di bawah tulisan, jadi gesernya 14, bukan 2. Tanpa itu, penala menulis
+  "C4" untuk nada yang di partitur sax tenor tertulis C5.
+- **Sen tidak ikut bergeser** — meleset 12 sen tetap 12 sen, apa pun nama
+  nadanya. Nama tertulis diambil dari nada **terdekat** (bukan frekuensi
+  mentah), jadi nama dan angka sen selalu sepasang.
+- Disimpan **per perangkat** (setelan penala di `localStorage`), bukan per
+  tim: HP pemain trumpet dan HP pemain mellophone memang harus berbeda.
+  Setelan lama tanpa kolom ini, atau id yang tidak dikenal, jatuh ke
+  **konser** — tidak pernah menggeser nada diam-diam.
+- Penala juga ada di tab Musik **mode anggota**, jadi transposisi paling
+  terasa justru di HP pemain.
+- Sengaja **tidak** dimasukkan: bugle G (DCI lama). Belum pernah disebut
+  tim, dan pilihan yang salah lebih berbahaya daripada pilihan yang tidak ada.
+
+### 2. Ambang predikat laporan
+
+Angka 85/70 dulu tertanam di **dua** tempat terpisah (kartu kehadiran & CSV
+ringkas). Kini satu sumber: `predikatKehadiran()` di `lib/laporan.ts`.
+
+- Kartu **Predikat kartu kehadiran** di Pengaturan: *Baik mulai dari …%*,
+  *Cukup mulai dari …%*, pratinjau teks yang akan tercetak, dan
+  **Kembalikan ke bawaan**. Disimpan di **pengaturan tim** (`ambangPredikat`)
+  — ikut backup, dan laporan dari laptop & HP pelatih kedua memberi
+  predikat yang sama untuk angka yang sama.
+- **Ambangnya ikut tercetak di setiap kartu** (*"Predikat: Baik ≥ 90% ·
+  Cukup 75–89% · Perlu perhatian < 75%"*). Begitu ambang bisa diatur, kata
+  "Cukup" sendiri tidak lagi menjelaskan apa pun bagi pembina yang
+  membacanya.
+- Kartu Paket laporan admin di Rekap menyebut ambang yang berlaku plus
+  tautan **Ubah di Pengaturan** — di sanalah pelatih melihat kata "Cukup"
+  dan bertanya artinya.
+- **Tahan salah ketik** (`rapikanPredikat`): dijepit 0–100, dibulatkan,
+  bukan-angka → bawaan, dan **urutan terbalik ditukar**. Tanpa penukaran,
+  `Baik 70 / Cukup 85` membuat predikat Cukup mustahil diraih. Dirapikan
+  saat disimpan, jadi yang tersimpan sama dengan pratinjaunya.
+- **Mengosongkan kolom bukan nol** (pelajaran 22 Sep 2026 terulang): di sini
+  nol itu sah (Cukup 0% = tak ada yang "Perlu perhatian"), jadi kolom kosong
+  yang diam-diam menjadi 0 akan mengubah laporan. Kolom memegang teksnya
+  sendiri dan hanya meneruskan angka yang benar-benar terbaca.
+- Tanpa pengaturan, predikatnya **identik** dengan sebelum J1 — diuji
+  untuk setiap persen 0–100.
+
+**Ambang "Perlu perhatian" di Rekap kini mengikuti Cukup (J1a, diputuskan
+24 Sep 2026).** Saat J1 selesai, ambang di tab Rekap (pilihan <50/60/70/80%,
+bawaan 60, tidak diingat) masih **terpisah**: anggota 65% berpredikat
+"Perlu perhatian" di kartunya, tetapi tidak masuk daftar "Perlu perhatian
+(di bawah 60%)" di laporan yang sama. Dari dua pilihan — (a) ambang Rekap
+mengikuti Cukup, atau (b) predikat terendah diganti nama — kamu memilih (a):
+
+- Bawaan ambang Rekap = **ambang Cukup** dari Pengaturan (bawaan 70, jadi
+  angka bawaannya naik dari 60 ke 70 — itu memang maksudnya). Pilihannya
+  ditandai *"(Cukup)"*, dan ambang Cukup yang bukan kelipatan 10 (mis. 75)
+  ikut masuk daftar pilihan.
+- Angka lain **tetap boleh** dipilih untuk melihat sekilas, tetapi hanya
+  untuk kunjungan itu dan disertai peringatan kuning *"Berbeda dari ambang
+  predikat Cukup … kartu kehadiran tetap memakai 70%"* plus tombol
+  **Kembali ke 70%**. Ketidaksepakatan tidak dilarang — tetapi tidak lagi
+  terjadi diam-diam, dan tidak lagi jadi keadaan bawaan.
+- Ambang yang dipilih tetap menentukan daftar "Perlu perhatian" di layar,
+  kalimat ringkasan & daftar di laporan, serta CSV — kini semuanya satu
+  angka dengan predikat kartu.
+- Diuji di `j1-polesan` (8 butir tambahan): bawaan 70 bertanda (Cukup),
+  memilih 60 → peringatan + laporan memakai 60, "Kembali" → 70, dan setelah
+  Cukup diubah di Pengaturan ambang Rekap ikut berubah.
+
+### 3. Panduan 1 halaman versi anggota
+
+Panduan F4 ditulis untuk pelatih: shortcut editor, backup, absensi — menu
+yang tidak pernah dilihat anggota. Versi anggota **bukan salinan yang
+dipangkas**, melainkan lembar dengan urutan yang dialami anggota:
+
+1. **Buka DrillKit** — alamat situs + **kode QR** (pustaka `qrcode` yang
+   sama dengan kartu QR absensi, tetap offline), pilih *Saya anggota*,
+   pasang ke layar utama (Android & iPhone).
+2. **Masukkan materi tim** — *Ambil materi dari situs* / *Buka paket tim*;
+   berkas atas nama langsung mengenali pemiliknya, berkas grup lewat *Pilih
+   namamu dulu*; Absensi & Catatan hanya terisi dari berkas atas nama.
+3. **Isi tiap tab** — enam tab, urut seperti bar tab di HP.
+4. **Menala sesuai instrumenmu** — tabel pilihan transposisi (sumbernya
+   `DAFTAR_TRANSPOSISI` yang sama dengan penala, jadi tidak bisa berbeda).
+5. **Kalau materi berubah** — *Perbarui* / *Ganti paket*.
+6. **Kalau macet** — lima gejala, termasuk halaman "link rusak" (panel
+   *Bersihkan & muat ulang*, 22 Sep 2026) dan berkas .json dari WhatsApp.
+
+- **Dua keadaan yang tidak boleh tertukar.** Dari situs: alamat, QR,
+  *Ambil materi dari situs*, *Perbarui*, panel darurat. Dari berkas
+  portabel: tidak satu pun — aplikasinya memang menyembunyikan tombol
+  itu, dan panduan yang menyuruh menekan tombol yang tidak ada lebih buruk
+  daripada tanpa panduan. Kartu Pengaturan memberi tahu bila lembarnya
+  sedang disusun versi berkas.
+- **Alamat lokal diperingatkan.** Dicetak dari `localhost`/jaringan rumah,
+  QR-nya tidak akan terbuka di HP anggota — pelatih diberi tahu sebelum
+  mencetak 60 lembar yang tidak berguna. Bagian `#/…` dibuang dari alamat,
+  supaya anggota mendarat di layar awal, bukan di Pengaturan.
+- **Dua pintu masuk:** kartu Panduan di Pengaturan (bagian *Versi anggota*)
+  dan kotak *Panduan untuk anggota* di menu **Berbagi** — tempat pelatih
+  sedang menyiapkan kiriman. Unduhannya bernama sendiri
+  (`panduan-anggota-drillkit.html`), tidak menimpa panduan pelatih.
+- Panduan pelatih ikut disentuh sedikit: langkah *Kirim ke anggota*
+  menunjuk ke panduan anggota, dan langkah tuning menyebut kotak Instrumen.
+  Keduanya tetap **satu halaman**.
+
+### Uji yang bisa gagal
+
+**Setiap tombol yang disebut panduan dicari di kode sumber**
+(`uji-panduan-anggota`, 20 label: *Ambil materi dari situs*, *Kunci
+jawaban*, *Bersihkan & muat ulang*, …). Panduan yang menyebut tombol yang
+sudah berganti nama tidak pernah terasa rusak — sampai seorang anggota
+tersesat. Sekarang ia menggagalkan uji.
+
+Satu asersi e2e sempat **lulus padahal tidak membuktikan apa-apa**:
+absensi data contoh acak dan hampir semuanya 100%/50%/0%, sehingga ambang
+90/60 tidak mengubah satu predikat pun — kartu "cocok dengan ambang tim"
+sekaligus cocok dengan ambang bawaan. Kini uji menulis satu anggota tepat
+50% dan menuntut **sedikitnya satu predikat berbeda dari bawaan**. Begitu
+pula penghitung halaman PDF diuji dulu bisa berkata "2", sebelum
+dipercaya berkata "1".
+
+**Diuji:** `uji-transposisi` 41 · `uji-predikat` 31 · `uji-panduan-anggota`
+58 · `j1-polesan` 76 (J1a ikut di dalamnya; mikrofon palsu Bb4 → C5/G5/F5/C6/G6 dengan sen tetap;
+pengaturan diketik lewat antarmuka → tersimpan rapi → kartu & CSV; panduan
+anggota dari Berbagi & Pengaturan, satu halaman A4 termasuk kasus terberat;
+lebar 360px). Rangkaian di sekitarnya tetap bersih: musik-anggota 43,
+mikrofon-ditolak 9, lebar-hp 13, berbagi-anggota 34, backup-lengkap 36,
+pusat-data 35, sambutan-mode 32, buka-paket 28. Keempat rangkaian baru
+masuk `regresi-penuh.sh` (kini 86). **Regresi penuh: 86 dari 86 rangkaian
+bersih, 3.048 butir lulus, 0 gagal.** `tsc --noEmit` bersih, `vite build` dan
+`build:portable` sukses.
+

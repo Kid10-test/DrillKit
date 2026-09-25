@@ -19,7 +19,7 @@ bash qa/pulihkan.sh
 ./node_modules/.bin/vite preview --port 4173 --host 0.0.0.0
 cd qa && BASE=http://localhost:4173 node <nama-uji>.mjs
 
-# Atau jalankan semuanya sekaligus (82 rangkaian, hampir satu jam).
+# Atau jalankan semuanya sekaligus (86 rangkaian, hampir satu jam).
 bash qa/regresi-penuh.sh http://localhost:4173
 ```
 
@@ -99,7 +99,7 @@ sini supaya tidak perlu ditemukan ulang.
 |---|---|
 | `pulihkan.sh` | Memasang ulang `node_modules` di kedua folder dan pustaka Chrome. Tanpa yang terakhir, Puppeteer gagal dengan `Code: 127` tentang `libnspr4`. |
 | `bangun-logika.sh` | Merakit `src/lib/*.ts` murni menjadi `/tmp/*.mjs` untuk uji logika. Impor gagal, bukan asersi. |
-| `regresi-penuh.sh` | Menjalankan ke-82 rangkaian lawan satu `BASE`. |
+| `regresi-penuh.sh` | Menjalankan ke-86 rangkaian lawan satu `BASE`. |
 | `jalankan-semua.sh` | Daftar yang sama, dipecah per blok, hasilnya ke `hasil-regresi.txt` — untuk dipantau selagi berjalan. |
 | `sambutan.mjs` | `lewatSambutan(halaman)` — melewati layar sambutan seperti pemakai sungguhan. |
 | `db-mentah.mjs` | Menanam & membaca IndexedDB langsung, tanpa modul aplikasinya. |

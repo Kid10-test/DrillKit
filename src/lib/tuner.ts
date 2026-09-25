@@ -56,24 +56,81 @@ export interface HasilNada {
   target: number
 }
 
+/** Nomor MIDI → nama, oktaf, dan label siap tampil ("A#4 / Bb4"). */
+export function namaMidi(midi: number): { nama: string; oktaf: number; label: string } {
+  const oktaf = Math.floor(midi / 12) - 1
+  const idx = ((midi % 12) + 12) % 12
+  const nama = NAMA[idx]
+  const flat = NAMA_FLAT[idx]
+  return { nama, oktaf, label: `${nama}${oktaf}${flat !== nama ? ` / ${flat}${oktaf}` : ''}` }
+}
+
 /** Frekuensi → nada terdekat + selisih sen. */
 export function hzKeNada(hz: number, a4 = 440): HasilNada | null {
   if (!isFinite(hz) || hz <= 0) return null
   const midi = Math.round(69 + 12 * Math.log2(hz / a4))
-  const oktaf = Math.floor(midi / 12) - 1
-  const idx = ((midi % 12) + 12) % 12
   const target = a4 * Math.pow(2, (midi - 69) / 12)
   const sen = Math.round(1200 * Math.log2(hz / target))
-  const nama = NAMA[idx]
-  const flat = NAMA_FLAT[idx]
-  return {
-    hz,
-    nama,
-    oktaf,
-    label: `${nama}${oktaf}${flat !== nama ? ` / ${flat}${oktaf}` : ''}`,
-    sen,
-    target,
-  }
+  const { nama, oktaf, label } = namaMidi(midi)
+  return { hz, nama, oktaf, label, sen, target }
+}
+
+/* ------------------------------ Transposisi -------------------------------- */
+
+/**
+ * J1 — transposisi penala: nada yang tampil mengikuti **partitur** pemain.
+ *
+ * Mikrofon selalu mendengar nada **konser** (nada yang benar-benar berbunyi).
+ * Tetapi pemain trumpet yang memainkan C di partiturnya membunyikan Bb konser,
+ * jadi penala yang menulis "Bb" membuatnya menghitung ulang di kepala setiap
+ * kali — atau lebih buruk, mengira ia salah nada. Dengan transposisi, penala
+ * menulis **nada tertulis** ("C5") dan nada konsernya tetap disebut di bawahnya.
+ *
+ * `geser` = jarak (semitone) dari nada konser ke nada tertulis:
+ * **tertulis = konser + geser**. Oktafnya ikut benar — sax tenor berbunyi
+ * satu oktaf + satu nada (M9) di bawah tulisannya, jadi geser 14, bukan 2.
+ *
+ * Selisih **sen tidak berubah** oleh transposisi: meleset 12 sen ya tetap
+ * 12 sen, apa pun nama nadanya.
+ */
+export interface Transposisi {
+  id: string
+  /** label singkat di pilihan, mis. "Bb" */
+  label: string
+  /** contoh instrumen — supaya pemain tidak perlu tahu teori transposisi */
+  contoh: string
+  /** semitone dari konser ke tertulis (tertulis = konser + geser) */
+  geser: number
+}
+
+export const DAFTAR_TRANSPOSISI: Transposisi[] = [
+  { id: 'c', label: 'Konser (C)', contoh: 'trombone, tuba/sousaphone, baritone kunci F, flute, pit', geser: 0 },
+  { id: 'bb', label: 'Bb', contoh: 'trumpet, cornet, flugelhorn, klarinet, sax sopran', geser: 2 },
+  { id: 'bb8', label: 'Bb oktaf bawah', contoh: 'sax tenor, baritone/euphonium kunci G, klarinet bas', geser: 14 },
+  { id: 'eb', label: 'Eb', contoh: 'sax alto, alto horn', geser: 9 },
+  { id: 'eb8', label: 'Eb oktaf bawah', contoh: 'sax bariton', geser: 21 },
+  { id: 'f', label: 'F', contoh: 'mellophone, french horn', geser: 7 },
+]
+
+/** Cari transposisi menurut id; id tak dikenal → konser (aman: tidak menggeser apa pun). */
+export function cariTransposisi(id: string | undefined): Transposisi {
+  return DAFTAR_TRANSPOSISI.find((t) => t.id === id) ?? DAFTAR_TRANSPOSISI[0]
+}
+
+/**
+ * Nada konser (hasil penala) → nada tertulis untuk instrumen bertransposisi.
+ * Memakai nada terdekat (`target`), bukan frekuensi mentah, supaya nama nada
+ * tertulis selalu sepasang dengan angka sen yang tampil.
+ */
+export function keTertulis(h: HasilNada, geser: number, a4 = 440): { nama: string; oktaf: number; label: string } {
+  const midi = Math.round(69 + 12 * Math.log2(h.target / a4))
+  return namaMidi(midi + geser)
+}
+
+/** Nada dengung (konser) → bunyinya di partitur instrumen, mis. Bb3 konser → "C4" untuk trumpet. */
+export function dengungTertulis(nama: string, oktaf: number, geser: number): string {
+  const midi = 12 * (oktaf + 1) + indeksNada(nama)
+  return namaMidi(midi + geser).label
 }
 
 /* ------------------------------ Deteksi nada ------------------------------- */
@@ -414,6 +471,12 @@ export interface SetelanPenala {
   volume: number
   /** 1 = sertakan nada kelima */
   kelima: number
+  /**
+   * J1 — id transposisi instrumen pemakai perangkat ini (lihat
+   * `DAFTAR_TRANSPOSISI`). Disimpan per perangkat, bukan per tim: HP pemain
+   * trumpet dan HP pemain mellophone memang harus berbeda.
+   */
+  transposisi: string
 }
 
 const KUNCI_SETELAN = 'drillkit.penala'
@@ -425,6 +488,7 @@ export const SETELAN_BAKU: SetelanPenala = {
   bentuk: 'triangle',
   volume: 0.35,
   kelima: 1,
+  transposisi: 'c',
 }
 
 /** Baca setelan tersimpan; kalau gagal (mode penyamaran/penyimpanan penuh) pakai bawaan. */
@@ -440,6 +504,9 @@ export function bacaSetelan(): SetelanPenala {
       bentuk: (d.bentuk ?? SETELAN_BAKU.bentuk) as OscillatorType,
       volume: typeof d.volume === 'number' ? d.volume : SETELAN_BAKU.volume,
       kelima: d.kelima ? 1 : 0,
+      // Setelan dari versi sebelum J1 tidak punya kolom ini → konser, persis
+      // perilaku lama. Id yang tidak dikenal juga jatuh ke konser.
+      transposisi: cariTransposisi(typeof d.transposisi === 'string' ? d.transposisi : undefined).id,
     }
   } catch {
     return { ...SETELAN_BAKU }

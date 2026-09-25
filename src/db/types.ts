@@ -744,6 +744,22 @@ export interface TeamSettings {
    * sama dengan ambang yang sama, dan ambangnya bisa diatur di sini.
    */
   ambangGerak?: AmbangGerak
+  /**
+   * J1 — ambang predikat di kartu kehadiran & CSV ringkas (persen hadir).
+   * Kosong = bawaan 85/70 (`PREDIKAT_BAKU` di `lib/laporan.ts`). Disimpan di
+   * pengaturan tim — bukan per perangkat — supaya laporan dari laptop dan
+   * dari HP pelatih kedua memberi predikat yang sama untuk angka yang sama.
+   */
+  ambangPredikat?: AmbangPredikat
+}
+
+/**
+ * Batas bawah tiap predikat kehadiran, dalam persen (0–100).
+ * `rate >= baik` → Baik; `rate >= cukup` → Cukup; di bawahnya → Perlu perhatian.
+ */
+export interface AmbangPredikat {
+  baik: number
+  cukup: number
 }
 
 /** Ambang satu dimensi kesulitan: di atas `padat` jadi padat, dst. */

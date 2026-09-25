@@ -18,6 +18,7 @@ import {
 } from '../components/ui'
 import { IconDownload, IconLoop, IconPause, IconPlay, IconShare, IconUpload } from '../components/Icons'
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
+import { TombolPanduanAnggota } from '../components/Panduan'
 import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
 import Music from './Music'
 import { useMemberMode } from '../hooks/useMemberMode'
@@ -272,6 +273,18 @@ function CoachExport() {
             pribadi semua anak harus ada di dalamnya. Menyaring tampilan tidak mengatasinya — yang
             bocor adalah berkasnya, bukan layarnya.
           </p>
+
+          {/* J1 — panduan anggota: disiapkan di tempat yang sama dengan berkasnya. */}
+          <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/40 p-3" data-testid="kotak-panduan-anggota">
+            <p className="text-xs font-semibold text-slate-200">Panduan untuk anggota</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+              Satu lembar A4: cara membuka berkas ini di HP, isi tiap tab, menala sesuai instrumen,
+              dan kalau macet. Cetak, atau unduh HTML-nya lalu kirim bersama berkasnya.
+            </p>
+            <div className="mt-2">
+              <TombolPanduanAnggota label="Pratinjau panduan anggota" />
+            </div>
+          </div>
         </Card>
 
         <Card className="lg:col-span-3">
