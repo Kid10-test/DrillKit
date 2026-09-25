@@ -16,7 +16,7 @@
  * murni — aman untuk browser lama di laptop portabel.
  */
 
-import type { AttendanceRecord, AttendanceStatus, Member, Session } from '../db/types'
+import type { AmbangPredikat, AttendanceRecord, AttendanceStatus, Member, Session } from '../db/types'
 import { ROLE_LABEL, formatDateShort, pct, sectionLabel, sesiMeta, toCSV, downloadFile } from './utils'
 import { URUTAN_JENIS } from './utils'
 import { downloadHtmlFile, esc, printHtml, printShell } from './print'
@@ -50,6 +50,57 @@ const BULAN = [
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
 ]
 
+/* -------------------------------- Predikat --------------------------------- */
+
+/** Ambang bawaan — sama persis dengan angka yang dulu tertanam di kode (D4). */
+export const PREDIKAT_BAKU: AmbangPredikat = { baik: 85, cukup: 70 }
+
+/**
+ * J1 — rapikan ambang predikat dari pengaturan.
+ *
+ * Nilainya diketik tangan, jadi harus tahan salah ketik: di luar 0–100
+ * dijepit, pecahan dibulatkan (persen kehadiran selalu bilangan bulat, lihat
+ * `pct`), yang bukan angka kembali ke bawaan, dan urutan terbalik
+ * (Cukup > Baik) ditukar. Tanpa penukaran itu, `baik 70 / cukup 85`
+ * membuat predikat "Cukup" mustahil diraih — anggota 80% langsung jatuh ke
+ * "Perlu perhatian" tanpa ada yang mengerti mengapa.
+ */
+export function rapikanPredikat(a?: Partial<AmbangPredikat> | null): AmbangPredikat {
+  const angka = (v: unknown, bawaan: number) => {
+    const n = typeof v === 'number' ? v : Number.NaN
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : bawaan
+  }
+  const baik = angka(a?.baik, PREDIKAT_BAKU.baik)
+  const cukup = angka(a?.cukup, PREDIKAT_BAKU.cukup)
+  return baik >= cukup ? { baik, cukup } : { baik: cukup, cukup: baik }
+}
+
+/** Predikat satu anggota. `terisi` 0 → "Belum ada catatan", bukan "Perlu perhatian". */
+export function predikatKehadiran(
+  b: { terisi: number; rate: number },
+  ambang?: Partial<AmbangPredikat> | null,
+): string {
+  if (b.terisi === 0) return 'Belum ada catatan'
+  const a = rapikanPredikat(ambang)
+  return b.rate >= a.baik ? 'Baik' : b.rate >= a.cukup ? 'Cukup' : 'Perlu perhatian'
+}
+
+/**
+ * Keterangan ambang yang ikut tercetak, mis. "Baik ≥ 85% · Cukup 70–84% ·
+ * Perlu perhatian < 70%". Pembina yang membaca kartu perlu tahu arti
+ * "Cukup" di tim ini — begitu ambangnya bisa diatur, kata itu sendiri tidak
+ * lagi menjelaskan apa pun.
+ */
+export function teksAmbangPredikat(ambang?: Partial<AmbangPredikat> | null): string {
+  const a = rapikanPredikat(ambang)
+  const bagian = [`Baik ≥ ${a.baik}%`]
+  if (a.cukup < a.baik) {
+    bagian.push(a.baik - 1 === a.cukup ? `Cukup ${a.cukup}%` : `Cukup ${a.cukup}–${a.baik - 1}%`)
+  }
+  if (a.cukup > 0) bagian.push(`Perlu perhatian < ${a.cukup}%`)
+  return bagian.join(' · ')
+}
+
 /* ------------------------------- Data masuk -------------------------------- */
 
 /** Semua yang dibutuhkan untuk menyusun laporan — sudah disaring periode/section/jenis. */
@@ -73,6 +124,8 @@ export interface DataLaporan {
   batas: number
   /** Bulan pembanding dari tren D2 (opsional) — untuk kalimat ringkasan. */
   banding?: { label: string; rate: number } | null
+  /** J1 — ambang predikat dari pengaturan tim; kosong = `PREDIKAT_BAKU`. */
+  predikat?: AmbangPredikat
 }
 
 export interface BarisAnggota {
@@ -234,6 +287,7 @@ function cssCetak(): string {
     .identitas div { font-size:10.5px; }
     .identitas i { color:#666; font-style:normal; }
     .kecil { font-size:9.5px; color:#555; }
+    .ambang-predikat { margin:-6px 0 6px; }
     .pagebreak { page-break-before: always; }
   `
 }
@@ -415,8 +469,7 @@ function satuKartu(d: DataLaporan, b: BarisAnggota): string {
       </table>`
     : `<p class="kecil">Belum ada sesi pada periode ini.</p>`
 
-  const predikat =
-    b.terisi === 0 ? 'Belum ada catatan' : b.rate >= 85 ? 'Baik' : b.rate >= 70 ? 'Cukup' : 'Perlu perhatian'
+  const predikat = predikatKehadiran(b, d.predikat)
 
   return `
     <div class="kartu">
@@ -441,6 +494,7 @@ function satuKartu(d: DataLaporan, b: BarisAnggota): string {
           </tr>
         </tbody>
       </table>
+      <p class="kecil ambang-predikat">Predikat: ${esc(teksAmbangPredikat(d.predikat))}</p>
       ${rincian}
       ${b.keterangan.length ? `<p class="kecil"><b>Catatan pelatih:</b> ${b.keterangan.map((k) => esc(`${formatDateShort(k.tanggal)} — ${k.teks}`)).join('; ')}</p>` : ''}
       <div class="ttd">
@@ -533,7 +587,7 @@ export function csvRingkas(d: DataLaporan): string {
         b.counts.alpha,
         b.terisi,
         `${b.rate}%`,
-        b.terisi === 0 ? 'Belum ada catatan' : b.rate >= 85 ? 'Baik' : b.rate >= 70 ? 'Cukup' : 'Perlu perhatian',
+        predikatKehadiran(b, d.predikat),
       ]),
   ]
   return toCSV(rows)

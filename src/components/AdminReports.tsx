@@ -13,6 +13,7 @@ import {
   namaBerkas,
   susunBaris,
   susunRingkasan,
+  teksAmbangPredikat,
   unduhCsv,
 } from '../lib/laporan'
 
@@ -134,6 +135,24 @@ export default function AdminReports({ data }: { data: DataLaporan }) {
           <IconDownload size={16} /> CSV ringkas
         </Button>
       </div>
+
+      {/* J1 — ambang predikat tampil di sini, bukan hanya di Pengaturan:
+          di sinilah pelatih melihat kata "Cukup" dan bertanya artinya. */}
+      <p className="mt-3 text-[11px] leading-relaxed text-slate-500" data-testid="info-predikat">
+        <b className="text-slate-400">Predikat di kartu & CSV ringkas:</b>{' '}
+        <span data-testid="teks-predikat">{teksAmbangPredikat(data.predikat)}</span>
+        {data.predikat ? '' : ' (bawaan)'}.{' '}
+        <button
+          type="button"
+          data-testid="ubah-predikat"
+          onClick={() => {
+            location.hash = '#/pengaturan'
+          }}
+          className="text-emerald-400 underline decoration-dotted hover:text-emerald-300"
+        >
+          Ubah di Pengaturan
+        </button>
+      </p>
 
       <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
         <b className="text-slate-400">CSV matriks</b> — satu baris per anggota, satu kolom per sesi

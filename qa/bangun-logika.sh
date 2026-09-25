@@ -75,4 +75,8 @@ rakit src/lib/simpanOtomatis.ts simpanOtomatis
 rakit src/lib/kuis.ts kuis
 # C3 — pengingat jadwal: jendela sesi, ingatan harian, berkas .ics.
 rakit src/lib/pengingat.ts pengingat
+# J1 — polesan: transposisi penala, ambang predikat laporan, panduan anggota.
+rakit src/lib/tuner.ts tuner
+rakit src/lib/laporan.ts laporan
+rakit src/lib/panduan.ts panduan
 echo "== selesai =="

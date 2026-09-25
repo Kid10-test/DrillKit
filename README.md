@@ -69,7 +69,7 @@ drillkit/
 │  │  ├─ field.ts           # ⭐ geometri lapangan & konversi yard ⇄ langkah
 │  │  ├─ laporan.ts         # D4 — laporan bulanan, kartu kehadiran, CSV matriks/ringkas
 │  │  ├─ tuner.ts           # E4 — deteksi nada dari mikrofon + nada dengung (drone)
-│  │  ├─ panduan.ts         # F4 — penyusun panduan 1 halaman (dari data tim)
+│  │  ├─ panduan.ts         # F4 — penyusun panduan 1 halaman (pelatih & anggota, J1)
 │  │  └─ shortcut.ts        # daftar shortcut editor (dipakai dialog ? & panduan)
 │  ├─ hooks/useSettings.ts  # pembacaan data reaktif
 │  ├─ components/
@@ -90,7 +90,7 @@ drillkit/
 │     ├─ Music.tsx          # metronom, tap tempo, tempo map, repertoar (`hanyaPutar` = mode anggota)
 │     ├─ Share.tsx          # ekspor paket tim + tampilan khusus anggota
 │     └─ Settings.tsx       # profil tim, standar lapangan, backup/restore
-├─ qa/                     # ⭐ 82 rangkaian uji regresi (Puppeteer) — lihat qa/README.md
+├─ qa/                     # ⭐ 86 rangkaian uji regresi (Puppeteer) — lihat qa/README.md
 │  ├─ regresi-penuh.sh     # menjalankan semuanya lawan versi yang sudah dibangun
 │  ├─ pulihkan.sh          # pasang ulang node_modules & pustaka Chrome
 │  └─ *.mjs                # satu berkas per rangkaian uji
@@ -413,7 +413,7 @@ Bawaan mengikuti istilah marching band: `Brass`, `Battery`, `Pit`, `Color Guard`
   ke bulan itu (klik lagi untuk kembali ke semua).
 - **Perbandingan antar bulan**: bulan terakhir dibanding bulan sebelumnya, lengkap dengan
   selisih poin dan jumlah sesinya.
-- **Perlu perhatian**: ambang kehadiran rendah bisa diatur (<50/60/70/80%) dan anggota yang
+- **Perlu perhatian**: ambang kehadiran rendah bisa diatur (bawaan = ambang predikat Cukup, atau <50/60/70/80%) dan anggota yang
   **mulai menurun** (turun ≥10 poin dibanding bulan sebelumnya) ditandai ⚠ — bisa disaring
   supaya cuma mereka yang tampil di tabel, dan diurutkan paling atas.
 - **Grafik batang bertumpuk** kehadiran per sesi (hadir/izin/sakit/tanpa keterangan).
@@ -431,6 +431,14 @@ Bawaan mengikuti istilah marching band: `Brass`, `Battery`, `Pit`, `Color Guard`
 - **Kartu kehadiran per anggota**: identitas, H/I/S/A + % kehadiran + predikat
   (Baik · Cukup · Perlu perhatian), rincian tiap sesi, keterangan pelatih, serta
   garis paraf. Bisa satu anggota atau semua anggota sekaligus.
+- **Ambang predikat bisa diatur (J1)** di **Pengaturan → Predikat kartu
+  kehadiran** (bawaan Baik ≥ 85%, Cukup ≥ 70%). Dipakai kartu kehadiran dan
+  CSV ringkas, ikut backup, dan **tercetak di setiap kartu** supaya pembina
+  tahu arti predikatnya. Salah ketik dirapikan (0–100, urutan terbalik
+  ditukar); kolom yang dikosongkan tidak dianggap nol.
+  Ambang **Cukup** juga menjadi bawaan ambang **"Perlu perhatian"** di tab
+  Rekap, jadi predikat di kartu dan daftar perlu perhatian di laporan selalu
+  sepakat; memilih angka lain di Rekap diberi peringatan dan tombol kembali.
 - **Paket lengkap**: laporan + semua kartu dalam satu berkas HTML — tinggal
   kirim lewat WhatsApp, bisa dibuka & dicetak dari HP.
 - **CSV matriks** (baris = anggota, kolom = sesi) dan **CSV ringkas** (satu
@@ -443,6 +451,13 @@ Bawaan mengikuti istilah marching band: `Brass`, `Battery`, `Pit`, `Color Guard`
   selisih dalam **sen**, dan jarum −50…+50 (zona hijau ±5 sen). Acuan A4 bisa
   diubah 438–445 Hz. Teruji dengan nada sintetis: **440 Hz → 0…+1 sen**,
   **Bb4 → 0…−1 sen**, **442 Hz pada acuan 440 → +8 sen**, **E2 82 Hz → ±4 sen**.
+- **Transposisi (J1)**: kotak **Instrumen** — Konser, Bb, Bb oktaf bawah, Eb,
+  Eb oktaf bawah, F (masing-masing dengan contoh instrumennya). Nada besar
+  menjadi **nada tertulis** di partitur (Bb4 konser → **C5** trumpet, **G5**
+  sax alto, **F5** mellophone), nada konsernya tetap disebut di bawahnya, dan
+  nada dengung ikut diterjemahkan ("= C4 di partitur Bb"). Oktaf ikut benar
+  (sax tenor M9, sax bariton oktaf + M6); angka sen tidak bergeser. Diingat
+  per perangkat, juga di mode anggota.
 - **Nada dengung (drone)**: pilih nada & oktaf, bentuk bunyi, volume, plus
   tombol cepat **Bb / F / Eb / A konser**. Bisa ditambah **nada kelima** agar
   terdengar seperti harmoni band. Nada & volume bisa diubah sambil bunyi.
@@ -695,6 +710,15 @@ Bawaan mengikuti istilah marching band: `Brass`, `Battery`, `Pit`, `Color Guard`
   dan catatan bahwa data tersimpan di perangkat.
 - Teruji **benar-benar 1 halaman A4** — juga pada kasus terberat (nama tim
   panjang, 8 section, 80 anggota, 42 sesi).
+- **Versi anggota (J1)** — kartu yang sama di Pengaturan (bagian *Versi
+  anggota*) dan kotak **Panduan untuk anggota** di menu **Berbagi**. Isinya
+  untuk HP anggota, tanpa menu pelatih: buka DrillKit (alamat situs + **kode
+  QR**), masukkan materi tim, isi keenam tab, menala sesuai instrumen, kalau
+  materi berubah, dan kalau macet. Dari berkas portabel, lembarnya otomatis
+  memakai petunjuk versi berkas (tanpa alamat, QR, dan tombol Perbarui);
+  dicetak dari `localhost`/jaringan rumah, pelatih diperingatkan bahwa QR-nya
+  tidak akan terbuka di HP anggota. Setiap tombol yang disebut lembarnya
+  diperiksa ada di aplikasi oleh `qa/uji-panduan-anggota.mjs`.
 
 **Berbagi**
 - Pelatih membuat paket `.json` (jadwal, formasi, repertoar, absensi, evaluasi

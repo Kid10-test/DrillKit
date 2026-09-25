@@ -18,6 +18,7 @@ import { downloadHtmlFile, esc, printHtml, printShell } from '../lib/print'
 import { useSettings } from '../hooks/useSettings'
 import AdminReports from '../components/AdminReports'
 import type { DataLaporan } from '../lib/laporan'
+import { rapikanPredikat } from '../lib/laporan'
 
 const ORDER: AttendanceStatus[] = ['hadir', 'izin', 'sakit', 'alpha']
 const BAR: Record<AttendanceStatus, string> = {
@@ -53,8 +54,23 @@ export default function AttendanceRecap({
   /** D3 — saring rekap menurut jenis kegiatan (latihan section / gabungan / konser…). */
   const [jenis, setJenis] = useState<string>('all')
   const [sort, setSort] = useState<'pct' | 'name' | 'perhatian'>('pct')
-  /** Ambang kehadiran rendah (%) — dipakai penanda "perlu perhatian" (D2). */
-  const [batas, setBatas] = useState(60)
+  /**
+   * Ambang kehadiran rendah (%) — dipakai penanda "perlu perhatian" (D2),
+   * daftar "Perlu perhatian" di laporan, dan CSV.
+   *
+   * J1a — bawaannya **mengikuti ambang predikat Cukup** dari Pengaturan.
+   * Dulu bawaannya 60 dan tidak terhubung ke apa pun, sehingga anggota 65%
+   * berpredikat "Perlu perhatian" di kartu kehadirannya tetapi tidak masuk
+   * daftar "Perlu perhatian (di bawah 60%)" di laporan yang sama.
+   *
+   * `null` = ikut Cukup. Memilih angka lain di tab Rekap tetap boleh (untuk
+   * melihat sekilas), tetapi hanya untuk kunjungan ini dan diberi tanda
+   * bahwa kartu kehadiran tetap memakai ambang Cukup.
+   */
+  const [batasManual, setBatasManual] = useState<number | null>(null)
+  const batasCukup = rapikanPredikat(settings.ambangPredikat).cukup
+  const batas = batasManual ?? batasCukup
+  const pilihanBatas = [...new Set([50, 60, 70, 80, batasCukup])].sort((a, b) => a - b)
   /** Hanya tampilkan anggota yang perlu perhatian di tabel. */
   const [hanyaPerhatian, setHanyaPerhatian] = useState(false)
 
@@ -297,6 +313,8 @@ export default function AttendanceRecap({
       catatan: recs,
       batas,
       banding: banding ? { label: banding.sebelum.panjang, rate: banding.sebelum.rate } : null,
+      // J1 — ambang predikat milik tim (Pengaturan). Kosong → bawaan 85/70.
+      predikat: settings.ambangPredikat,
     }),
     [settings, month, filteredMembers, filteredSessions, recs, batas, banding],
   )
@@ -649,18 +667,40 @@ export default function AttendanceRecap({
                 <label className="text-[11px] text-slate-500">Ambang rendah</label>
                 <Select
                   data-kiosk-allow
+                  data-testid="pilih-batas-rendah"
                   value={String(batas)}
-                  onChange={(e) => setBatas(Number(e.target.value))}
-                  className="w-24"
+                  onChange={(e) => {
+                    const v = Number(e.target.value)
+                    // Memilih angka Cukup = kembali mengikuti Pengaturan.
+                    setBatasManual(v === batasCukup ? null : v)
+                  }}
+                  className="w-36"
                 >
-                  {[50, 60, 70, 80].map((v) => (
+                  {pilihanBatas.map((v) => (
                     <option key={v} value={v}>
-                      &lt; {v}%
+                      &lt; {v}%{v === batasCukup ? ' (Cukup)' : ''}
                     </option>
                   ))}
                 </Select>
               </div>
             </div>
+            {batas !== batasCukup && (
+              <p
+                className="mb-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-relaxed text-amber-200"
+                data-testid="batas-beda-cukup"
+              >
+                Berbeda dari ambang predikat <b>Cukup ({batasCukup}%)</b> di Pengaturan — kartu kehadiran
+                tetap memakai {batasCukup}%, jadi predikat di kartu dan daftar ini bisa tidak sepakat.{' '}
+                <button
+                  type="button"
+                  data-testid="batas-ikut-cukup"
+                  onClick={() => setBatasManual(null)}
+                  className="text-amber-100 underline decoration-dotted"
+                >
+                  Kembali ke {batasCukup}%
+                </button>
+              </p>
+            )}
 
             {!perhatianIds.size ? (
               <p className="text-xs text-slate-500">

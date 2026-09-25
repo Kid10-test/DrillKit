@@ -29,6 +29,7 @@ import { backupNotes, daysSince, downloadBackup, formatBytes, lastBackup } from 
 import { KartuSimpanOtomatis } from '../components/SimpanOtomatis'
 import { AMBANG, AMBANG_LANGKAH } from '../lib/analitik'
 import type { AmbangTingkat } from '../db/types'
+import { PREDIKAT_BAKU, rapikanPredikat, teksAmbangPredikat } from '../lib/laporan'
 import { KioskPinCard } from '../components/KioskLock'
 import KartuPanduan from '../components/Panduan'
 import { bacaTampilan, langgananTampilan, ubahTampilan } from '../lib/tampilan'
@@ -109,7 +110,13 @@ export default function Settings() {
   const patch = (p: Partial<TeamSettings>) => setForm({ ...form, ...p })
 
   async function save() {
-    await db.settings.put(form!)
+    // J1 — ambang predikat dirapikan saat disimpan (jepit 0–100, urutan
+    // terbalik ditukar), jadi yang tersimpan selalu sama dengan pratinjaunya.
+    const simpan: TeamSettings = form!.ambangPredikat
+      ? { ...form!, ambangPredikat: rapikanPredikat(form!.ambangPredikat) }
+      : form!
+    await db.settings.put(simpan)
+    setForm(simpan)
     applySectionConfig(form!.sections)
     toast.push('Pengaturan disimpan')
   }
@@ -298,6 +305,51 @@ export default function Settings() {
               Kembalikan ke bawaan
             </Button>
           </div>
+        </Card>
+
+        {/* J1 — Ambang predikat laporan */}
+        <Card className="lg:col-span-2" data-testid="kartu-ambang-predikat">
+          <h2 className="mb-1 text-sm font-semibold text-slate-200">Predikat kartu kehadiran</h2>
+          <p className="mb-3 text-[11px] leading-snug text-slate-500">
+            Menentukan kata di kolom <b>Predikat</b> pada <b>kartu kehadiran</b> dan <b>CSV ringkas</b>{' '}
+            (menu Absensi → Rekap → Paket laporan admin). Isi persen hadir <b>minimum</b> untuk tiap
+            predikat; di bawah ambang <i>Cukup</i> tertulis <i>Perlu perhatian</i>. Ambangnya ikut
+            tercetak di setiap kartu, jadi pembina tahu arti kata itu di tim ini.
+          </p>
+          <div className="grid max-w-md grid-cols-2 gap-3">
+            <KolomPersen
+              label="Baik — mulai dari"
+              testId="predikat-baik"
+              nilai={(form.ambangPredikat ?? PREDIKAT_BAKU).baik}
+              onChange={(v) => patch({ ambangPredikat: { ...(form.ambangPredikat ?? PREDIKAT_BAKU), baik: v } })}
+            />
+            <KolomPersen
+              label="Cukup — mulai dari"
+              testId="predikat-cukup"
+              nilai={(form.ambangPredikat ?? PREDIKAT_BAKU).cukup}
+              onChange={(v) => patch({ ambangPredikat: { ...(form.ambangPredikat ?? PREDIKAT_BAKU), cukup: v } })}
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] leading-snug text-slate-400">
+              Tercetak: <b className="text-slate-200" data-testid="pratinjau-predikat">{teksAmbangPredikat(form.ambangPredikat)}</b>
+              {!form.ambangPredikat && <span className="text-slate-500"> (bawaan)</span>}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              className="shrink-0 px-2 py-1 text-[11px]"
+              onClick={() => patch({ ambangPredikat: undefined })}
+              data-testid="predikat-kembali-bawaan"
+            >
+              Kembalikan ke bawaan
+            </Button>
+          </div>
+          <p className="mt-2 text-[10px] leading-snug text-slate-500">
+            Ambang <b>Cukup</b> juga menjadi ambang <b>“Perlu perhatian”</b> di tab Rekap — daftar
+            anggota yang disorot di layar dan di laporan — jadi kartu dan daftar itu selalu sepakat.
+            Tekan <b>Simpan</b> di atas setelah mengubah angka.
+          </p>
         </Card>
 
         {/* Section */}
@@ -686,6 +738,61 @@ function AmbangBaris({
             <div className="mt-0.5 text-[10px] text-slate-500">{label}</div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+/* ========================================================================== */
+/*  J1 — kolom persen untuk ambang predikat                                   */
+/* ========================================================================== */
+
+/**
+ * Kolom persen 0–100.
+ *
+ * Mengosongkan kolom **tidak** menyimpan nol: `Number('')` adalah `0`, dan
+ * nol di sini sah (Cukup 0% = tidak ada yang "Perlu perhatian"), jadi kolom
+ * kosong yang diam-diam menjadi nol akan mengubah laporan tanpa disadari.
+ * Teks yang sedang diketik dipegang sendiri; yang diteruskan hanya angka
+ * yang benar-benar terbaca.
+ */
+function KolomPersen({
+  label,
+  testId,
+  nilai,
+  onChange,
+}: {
+  label: string
+  testId: string
+  nilai: number
+  onChange: (v: number) => void
+}) {
+  const [teks, setTeks] = useState(String(nilai))
+  // Ikut berubah bila nilainya diganti dari luar (mis. "Kembalikan ke bawaan").
+  useEffect(() => {
+    setTeks((t) => (t.trim() !== '' && Number(t) === nilai ? t : String(nilai)))
+  }, [nilai])
+  return (
+    <div>
+      <label className="mb-1 block text-[11px] font-medium text-slate-400">{label}</label>
+      <div className="flex items-center gap-1.5">
+        <Input
+          type="number"
+          min={0}
+          max={100}
+          step={1}
+          value={teks}
+          onChange={(e) => {
+            const t = e.target.value
+            setTeks(t)
+            if (t.trim() === '') return
+            const n = Number(t)
+            if (Number.isFinite(n)) onChange(n)
+          }}
+          aria-label={label}
+          data-testid={testId}
+        />
+        <span className="text-xs text-slate-500">%</span>
       </div>
     </div>
   )

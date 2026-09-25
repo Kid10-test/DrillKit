@@ -2,11 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, Card, Select, useToast } from './ui'
 import { IconMic, IconMusic, IconPause, IconPlay } from './Icons'
 import {
+  DAFTAR_TRANSPOSISI,
   Dengung,
   Penala,
   PILIHAN_NADA,
   PILIHAN_OKTAF,
   bacaSetelan,
+  cariTransposisi,
+  dengungTertulis,
+  keTertulis,
   nadaKeHz,
   pesanMikrofon,
   simpanSetelan,
@@ -22,6 +26,11 @@ import {
  * 2. Tekan **Dengarkan**, lalu mainkan nada yang sama.
  * 3. Jarum di tengah = tepat. Angka **sen** menunjukkan selisihnya:
  *    ±5 sen masih wajar, di atas itu perlu dibetulkan.
+ *
+ * J1 — **Instrumen** (transposisi): pemain trumpet memilih "Bb", lalu penala
+ * menulis nada sesuai partiturnya (C5), bukan nada konser (Bb4). Nada konser
+ * tetap disebut kecil di bawahnya, supaya pelatih yang berdiri di sebelahnya
+ * tetap bisa bicara dalam nada konser.
  *
  * Mikrofon hanya dibuka setelah tombol ditekan (aturan browser), dan langsung
  * dilepas saat dimatikan atau saat komponen dibongkar — jadi tidak ada
@@ -129,6 +138,9 @@ export default function TunerDrone() {
   const pos = 50 + Math.max(-50, Math.min(50, sen))
   const warna = !hasil ? '#64748b' : Math.abs(sen) <= 5 ? '#10b981' : Math.abs(sen) <= 15 ? '#f59e0b' : '#f43f5e'
   const hzDengung = nadaKeHz(st.nada, st.oktaf, st.a4)
+  const tr = cariTransposisi(st.transposisi)
+  /** Label besar: nada tertulis untuk instrumen bertransposisi, konser bila tidak. */
+  const labelUtama = !hasil ? '—' : tr.geser ? keTertulis(hasil, tr.geser, st.a4).label : hasil.label
 
   return (
     <Card data-testid="kartu-penala" className="min-w-0 lg:col-span-3">
@@ -148,8 +160,19 @@ export default function TunerDrone() {
               style={{ color: warna }}
               data-testid="nada-terdeteksi"
             >
-              {hasil ? hasil.label : '—'}
+              {labelUtama}
             </div>
+            {tr.geser !== 0 && (
+              <div className="mt-0.5 text-[11px] text-slate-400" data-testid="nada-konser">
+                {hasil ? (
+                  <>
+                    konser <b className="tabular-nums text-slate-300">{hasil.label}</b> · nada tertulis {tr.label}
+                  </>
+                ) : (
+                  <>nada tertulis untuk instrumen {tr.label}</>
+                )}
+              </div>
+            )}
             <div className="mt-1 text-xs text-slate-400">
               <span data-testid="sen-terdeteksi" className="tabular-nums">
                 {hasil ? `${sen > 0 ? '+' : ''}${sen} sen` : 'menunggu nada…'}
@@ -194,6 +217,25 @@ export default function TunerDrone() {
                     ? `${Math.abs(sen)} sen terlalu rendah.`
                     : `${sen} sen terlalu tinggi.`}
           </p>
+
+          <div className="mt-3">
+            <label className="mb-1 block text-[11px] text-slate-500" htmlFor="pilih-transposisi">
+              Instrumen (nada yang tampil mengikuti partitur)
+            </label>
+            <Select
+              id="pilih-transposisi"
+              data-testid="pilih-transposisi"
+              data-kiosk-allow
+              value={tr.id}
+              onChange={(e) => patch({ transposisi: e.target.value })}
+            >
+              {DAFTAR_TRANSPOSISI.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label} — {t.contoh}
+                </option>
+              ))}
+            </Select>
+          </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             <Button
@@ -240,6 +282,12 @@ export default function TunerDrone() {
                 {st.oktaf}
               </div>
               <div className="text-[11px] tabular-nums text-slate-500">{hzDengung.toFixed(1)} Hz</div>
+              {tr.geser !== 0 && (
+                <div className="text-[11px] text-slate-400" data-testid="dengung-tertulis">
+                  = <b className="tabular-nums text-slate-300">{dengungTertulis(st.nada, st.oktaf, tr.geser)}</b> di
+                  partitur {tr.label}
+                </div>
+              )}
             </div>
             <Button data-testid="tombol-dengung" variant={bunyi ? 'soft' : 'primary'} onClick={toggleDengung}>
               {bunyi ? <IconPause size={16} /> : <IconPlay size={16} />} {bunyi ? 'Hentikan' : 'Putar dengung'}
