@@ -60,7 +60,7 @@ bash regresi.sh "$BASE" \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika \
+  nama-anggota-logika terbit-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \

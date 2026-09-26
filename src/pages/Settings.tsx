@@ -35,6 +35,7 @@ import KartuPanduan from '../components/Panduan'
 import { bacaTampilan, langgananTampilan, ubahTampilan } from '../lib/tampilan'
 import type { Tampilan } from '../lib/tampilan'
 import { PilihModeNama } from '../components/PilihModeNama'
+import { KartuTerbit } from '../components/KartuTerbit'
 import { PanelCocok } from '../components/PanelCocok'
 import {
   keputusanAwal,
@@ -241,6 +242,7 @@ export default function Settings() {
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <KartuTerbit />
         {/* Profil */}
         <Card>
           <h2 className="mb-3 text-sm font-semibold text-slate-200">Profil tim</h2>

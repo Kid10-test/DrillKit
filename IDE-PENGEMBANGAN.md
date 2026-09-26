@@ -3,9 +3,13 @@
 Dokumen ini **bukan** rencana yang harus dikerjakan semua. Ini kandidat perbaikan,
 diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
 
-**Terakhir diperbarui: 26 Sep 2026 — #1 (satu anggota, dua nama) rampung.**
+**Terakhir diperbarui: 26 Sep 2026 — #2 bagian pertama (terbitkan ke anggota) rampung.**
 · **Rancangan lanjutan (26 Sep 2026)** — delapan rancangan hasil diskusi pelatih
-  disimpan di bagian paling bawah (**Rancangan lanjutan**). #2–#8 belum dikerjakan.
+  disimpan di bagian paling bawah (**Rancangan lanjutan**). #3–#8 belum dikerjakan.
+  Kunci pribadi (#2 bagian kedua) juga belum.
+· **#2 bagian pertama rampung (26 Sep 2026)** — satu tombol menerbitkan materi
+  grup ke repo GitHub. HP anggota memberitahu bila ada materi baru. Rinciannya
+  di **Hasil #2** pada bagian yang sama.
 · **#1 rampung (26 Sep 2026)** — satu anggota bisa punya nama panggilan, anggota
   ganda bisa digabung, dan impor tidak lagi diam-diam menambah orang baru.
   Rinciannya di **Hasil #1** pada bagian yang sama.
@@ -5326,6 +5330,40 @@ dengan id sama; serta paket yang memuat jadwal sekaligus posisi drill.
 terkunci identik dengan berkas per anggota; kunci baru menolak kunci
 lama; token ditolak memberi pesan jelas; pemberitahuan materi baru
 muncul.
+
+### Hasil #2, bagian pertama (26 Sep 2026)
+
+Rancangan ini dibagi dua. Yang selesai sekarang: tombol terbit,
+pemberitahuan di HP anggota, dan materi grup. **Kunci pribadi dan data
+pribadi terkunci belum dikerjakan.**
+
+**Pengaturan sekali.** Pengaturan → Terbitkan ke anggota. Empat langkah:
+buat repo publik `drillkit-materi`, buat token fine-grained yang hanya
+berhak Contents pada repo itu, tempel, uji sambungan. Token ditolak,
+kedaluwarsa, atau repo privat diberi pesan yang jelas. Token hanya di
+localStorage perangkat pelatih — tidak masuk backup dan tidak masuk
+paket. Cuplikan rewrite Vercel bisa disalin: `/paket.json` mengarah ke
+berkas mentah di repo, alamat bagi anggota tidak berubah.
+
+**Tombol Terbitkan ke anggota** di menu Berbagi. Pratinjau menghitung
+jadwal, show, lagu, dan menyebut bahwa belum ada anggota yang terkunci.
+Yang ditulis adalah berkas grup, sama dengan unduhan manual: tanpa
+absensi, catatan, telepon, dan token QR. Menulis lewat GitHub Contents
+API, dengan sidik berkas lama bila sudah ada. Riwayat terbitan bisa
+dikembalikan sebagai terbitan baru — riwayat GitHub tidak dihapus.
+Saat luring, tombol ditolak dan unduh manual tetap ada.
+
+**Di HP anggota.** Saat online, aplikasi memeriksa `paket.json`. Kalau
+lebih baru, muncul "Ada materi baru dari pelatih (tanggal)" dan anggota
+yang menekan Perbarui. Tidak diterapkan sendiri. Absensi, catatan,
+penanda pemilik, dan setelan latihan yang anggota ubah sendiri tidak
+ditimpa. Panduan anggota (situs) menyebut pemberitahuan itu. Versi
+berkas portabel tidak menyebutnya, karena tombolnya memang tidak ada.
+
+**Uji yang lulus:** `qa/terbit-logika.mjs`. Terdaftar di
+`qa/regresi-penuh.sh`. Uji yang masih menunggu bagian kedua: kunci salah
+gagal membuka, isi terkunci identik dengan berkas per anggota, dan kunci
+baru menolak kunci lama.
 
 ---
 
