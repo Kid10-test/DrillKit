@@ -3,10 +3,11 @@
 Dokumen ini **bukan** rencana yang harus dikerjakan semua. Ini kandidat perbaikan,
 diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
 
-**Terakhir diperbarui: 26 Sep 2026 — #2 bagian pertama (terbitkan ke anggota) rampung.**
+**Terakhir diperbarui: 26 Sep 2026 — #2 bagian kedua (kunci pribadi & data terkunci) rampung.**
 · **Rancangan lanjutan (26 Sep 2026)** — delapan rancangan hasil diskusi pelatih
   disimpan di bagian paling bawah (**Rancangan lanjutan**). #3–#8 belum dikerjakan.
-  Kunci pribadi (#2 bagian kedua) juga belum.
+· **#2 bagian kedua rampung (26 Sep 2026)** — kunci pribadi AES-256-GCM per anggota,
+  data pribadi terkunci di berkas terbit, QR kunci, dan tombol Buat kunci baru.
 · **#2 bagian pertama rampung (26 Sep 2026)** — satu tombol menerbitkan materi
   grup ke repo GitHub. HP anggota memberitahu bila ada materi baru. Rinciannya
   di **Hasil #2** pada bagian yang sama.
@@ -5364,6 +5365,69 @@ berkas portabel tidak menyebutnya, karena tombolnya memang tidak ada.
 `qa/regresi-penuh.sh`. Uji yang masih menunggu bagian kedua: kunci salah
 gagal membuka, isi terkunci identik dengan berkas per anggota, dan kunci
 baru menolak kunci lama.
+
+### Hasil #2, bagian kedua — kunci pribadi & data terkunci (26 Sep 2026)
+
+Bagian kedua selesai: kunci pribadi AES-256-GCM per anggota, data
+pribadi terkunci di dalam berkas terbit, dan QR kunci.
+
+**Modul kunci (`src/lib/kunci.ts`).** AES-256-GCM lewat WebCrypto.
+Kunci acak 256 bit per anggota, IV 12 byte acak per terbitan. Kunci
+dalam format base64url (aman untuk URL fragment). Tersimpan di
+localStorage perangkat pelatih (`drillkit.kunciPribadi`), tidak pernah
+masuk backup atau paket.
+
+- `buatKunci()` — kunci acak baru
+- `enkripsi(teks, kunci)` — menghasilkan `base64url(IV ‖ ciphertext)`
+- `dekripsi(data, kunci)` — kunci salah mengembalikan `null`, bukan melempar
+- `cryptoTersedia()` — memeriksa `crypto.subtle` (tidak tersedia di `file://`)
+
+**Berkas terbit sekarang punya dua bagian.** Bagian terbuka = materi
+grup, persis seperti bagian pertama. Bagian terkunci =
+`locked: { "<id>": { d: "<base64url>" } }` — data pribadi per anggota
+yang dienkripsi. Tanpa kunci, bagian `locked` kosong — perilaku persis
+seperti bagian pertama.
+
+**Isi bagian terkunci per anggota** identik dengan berkas per anggota
+yang sudah ada (`paketAnggota`): absensi, evaluasi, kemajuan, catatan
+pribadi. Mengikuti aturan berbagi aman — kolom rahasia (token QR, phone,
+notes pelatih) tidak ikut. Nilai evaluasi terstruktur tidak ikut
+(keputusan yang sudah ditetapkan sebelumnya).
+
+**Kunci diberikan lewat QR** yang berisi alamat situs dan kunci di
+bagian `#` — fragment tidak terkirim ke server. Bisa juga lewat berkas
+per anggota yang kini membawa kuncinya. Tombol **Buat kunci baru** bila
+kunci bocor — catatan jujur di aplikasi: terbitan lama di riwayat repo
+tetap terbuka dengan kunci lama.
+
+**Di HP anggota.** Kunci dibaca dari URL fragment (`location.hash`),
+disimpan di localStorage (`drillkit.kunciAnggota`). Setelah Perbarui,
+aplikasi mencoba dekripsi bagian terkunci. Bila berhasil, data pribadi
+(kehadiran, catatan) ditampilkan di tab Absensi dan Catatan. Tanpa
+kunci, materi grup tetap terbuka dengan catatan untuk meminta QR kunci
+ke pelatih. Data yang dicatat anggota sendiri tidak pernah ditimpa.
+
+**Terbitan lama tetap terbuka dengan kunci lama** — catatan ini
+tertulis di UI (modal QR kunci dan tombol Buat kunci baru). Mengganti
+kunci hanya berlaku untuk terbitan berikutnya.
+
+**Panduan anggota (J1) belum diperbarui** — sengaja, karena belum tahu
+apakah QR kunci akan benar-benar dipakai lewat panduan atau langsung
+dikirim pelatih.
+
+**Uji yang lulus:** `qa/terbit-kunci-logika.mjs` — 69 lulus, 0 gagal.
+Mencakup:
+- kunci salah gagal membuka
+- anggota A tidak bisa membuka data B
+- isi terkunci identik dengan berkas per anggota (`paketAnggota`)
+- kunci baru menolak kunci lama
+- terbitan tanpa kunci = bagian pertama (perilaku lama)
+- `crypto.subtle` tersedia di Node.js
+- evaluasi terstruktur tidak ikut berkas terbit
+
+Terdaftar di `qa/regresi-penuh.sh` bersama `terbit-logika` (58 lulus).
+`qa/bagikan-logika.mjs` tetap 58 lulus.
+`tsc --noEmit` bersih, `npm run build` sukses.
 
 ---
 

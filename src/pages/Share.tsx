@@ -20,7 +20,8 @@ import { IconDownload, IconLoop, IconPause, IconPlay, IconShare, IconUpload } fr
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
 import { TombolPanduanAnggota } from '../components/Panduan'
 import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
-import { gabungPembaruan, materiLebihBaru, tanggalIndonesia } from '../lib/terbit'
+import { gabungPembaruan, materiLebihBaru, muatBerkasTerbit, bukaDataPribadi, tanggalIndonesia } from '../lib/terbit'
+import { kunciDariUrl, simpanKunciAnggota, bacaKunciAnggota } from '../lib/kunci'
 import { TerbitkanAnggota } from '../components/TerbitkanAnggota'
 import { cocokCari, namaDenganPanggilan } from '../lib/namaAnggota'
 import { NamaTampil } from '../components/NamaTampil'
@@ -374,6 +375,24 @@ function MemberView() {
   const [sedangMuat, setSedangMuat] = useState(false)
   const [pemberitahuan, setPemberitahuan] = useState<string | null>(null)
   /**
+   * Kunci pribadi anggota. Dibaca dari URL fragment (#) sekali, lalu
+   * disimpan di localStorage supaya tidak perlu memindai QR lagi.
+   */
+  const [kunciPribadi] = useState(() => {
+    const dariUrl = kunciDariUrl()
+    if (dariUrl) {
+      simpanKunciAnggota(dariUrl)
+      // Hapus fragment dari URL supaya kunci tidak terlihat terus
+      try { history.replaceState(null, '', location.pathname + location.search) } catch { /* */ }
+      return dariUrl
+    }
+    return bacaKunciAnggota()
+  })
+  /** Data pribadi yang sudah didekripsi dari berkas terbit. */
+  const [dataTerkunci, setDataTerkunci] = useState<ShareBundle | null>(null)
+  /** Apakah pernah mencoba dekripsi (untuk menampilkan catatan yang tepat). */
+  const [sudahCobaDekripsi, setSudahCobaDekripsi] = useState(false)
+  /**
    * Alamat berkas materi. Bawaan **`paket.json`** — sebelah aplikasi ini —
    * sehingga pelatih cukup menaruh berkasnya di situ dan anggota tidak
    * perlu menyetel apa pun.
@@ -419,11 +438,19 @@ function MemberView() {
       if (jenis.includes('text/html')) {
         throw new Error('bukan-berkas')
       }
-      const data = (await res.json()) as ShareBundle
-      if (data?.format !== 'drillkit-share') {
+      const teksMentah = await res.text()
+      /*
+       * Muat berkas terbit: ekstrak bagian terbuka (grup) dan terkunci.
+       * `muatBerkasTerbit` memisahkan keduanya — bagian terkunci tidak
+       * ikut tersimpan ke `packages` supaya data pribadi orang lain
+       * tidak bercampur ke IndexedDB anggota ini.
+       */
+      const hasilMuat = muatBerkasTerbit(teksMentah)
+      if (!hasilMuat) {
         toast.push('Berkas di alamat itu bukan paket DrillKit', 'err')
         return
       }
+      const data = hasilMuat.grup
       const lama = pkg?.data
       const laguLokal = await db.songs.toArray()
       const digabung = gabungPembaruan(data, lama, laguLokal)
@@ -444,6 +471,20 @@ function MemberView() {
        */
       if (digabung.songs?.length) await db.songs.bulkPut(digabung.songs)
       if (digabung.setlists?.length) await db.setlists.bulkPut(digabung.setlists)
+      /*
+       * Coba dekripsi data pribadi dari bagian terkunci bila kunci tersedia.
+       * Data yang sudah didekripsi disimpan di state, bukan di IndexedDB —
+       * data orang lain tidak boleh masuk ke perangkat anggota ini.
+       */
+      const locked = hasilMuat.locked
+      if (Object.keys(locked).length > 0 && kunciPribadi && meId) {
+        const terbuka = await bukaDataPribadi(locked, meId, kunciPribadi)
+        if (terbuka) {
+          setDataTerkunci(terbuka)
+          toast.push(`Data pribadi berhasil dibuka — ${terbuka.attendance?.length ?? 0} catatan kehadiran.`)
+        }
+      }
+      setSudahCobaDekripsi(true)
       toast.push(`Materi diperbarui — ${data.team?.teamName ?? 'tim'}`)
     } catch (e) {
       const bukanBerkas = e instanceof Error && e.message === 'bukan-berkas'
@@ -474,10 +515,11 @@ function MemberView() {
         if (!res.ok) return
         const jenis = res.headers.get('content-type') ?? ''
         if (jenis.includes('text/html')) return
-        const data = (await res.json()) as ShareBundle
-        if (batal || data?.format !== 'drillkit-share') return
-        if (materiLebihBaru(pkg?.data?.exportedAt, data.exportedAt)) {
-          setPemberitahuan(tanggalIndonesia(data.exportedAt))
+        const teks = await res.text()
+        const hasil = muatBerkasTerbit(teks)
+        if (batal || !hasil) return
+        if (materiLebihBaru(pkg?.data?.exportedAt, hasil.grup.exportedAt)) {
+          setPemberitahuan(tanggalIndonesia(hasil.grup.exportedAt))
         } else setPemberitahuan(null)
       } catch {
         /* luring — jangan mengganggu */
@@ -708,6 +750,25 @@ function MemberView() {
         </Card>
       )}
 
+      {/* Status kunci pribadi */}
+      {me && !dataTerkunci && sudahCobaDekripsi && (
+        <div className="mb-3 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2" data-testid="status-kunci">
+          <p className="text-[11px] leading-relaxed text-slate-400">
+            Data pribadi (kehadiran, catatan) belum terbuka.{' '}
+            {!kunciPribadi
+              ? 'Mintalah QR kunci ke pelatih untuk membuka data pribadimu.'
+              : 'Kunci tersimpan, tapi data pribadi tidak ditemukan di berkas ini — mungkin belum diterbitkan dengan kunci.'}
+          </p>
+        </div>
+      )}
+      {me && dataTerkunci && (
+        <div className="mb-3 rounded-lg border border-emerald-800/40 bg-emerald-950/20 px-3 py-2" data-testid="status-kunci">
+          <p className="text-[11px] leading-relaxed text-emerald-300">
+            ✓ Data pribadi terbuka — kehadiran dan catatan dari pelatih.
+          </p>
+        </div>
+      )}
+
       {/*
         Tab — enam buah, dan ukurannya harus Muat di HP.
 
@@ -758,9 +819,9 @@ function MemberView() {
       ) : tab === 'kuis' ? (
         <MemberKuis bundle={bundle} me={me} members={members} />
       ) : tab === 'absensi' ? (
-        <MemberAttendance bundle={bundle} me={me} />
+        <MemberAttendance bundle={dataTerkunci ?? bundle} me={me} locked={!!dataTerkunci} />
       ) : (
-        <MemberNotes bundle={bundle} me={me} />
+        <MemberNotes bundle={dataTerkunci ?? bundle} me={me} locked={!!dataTerkunci} />
       )}
     </div>
   )
@@ -1431,7 +1492,7 @@ function MemberKuis({ bundle, me, members }: { bundle: ShareBundle; me: Member; 
  * Tab "Catatan" — catatan evaluasi pribadi yang ditulis pelatih.
  * Hanya catatan untuk anggota yang sedang dipilih yang ditampilkan.
  */
-function MemberNotes({ bundle, me }: { bundle: ShareBundle; me: Member }) {
+function MemberNotes({ bundle, me, locked }: { bundle: ShareBundle; me: Member; locked?: boolean }) {
   const notes: MemberNote[] = useMemo(
     () => (bundle.memberNotes ?? []).filter((n) => n.memberId === me.id).sort((a, b) => b.at - a.at),
     [bundle.memberNotes, me.id],
@@ -1439,10 +1500,14 @@ function MemberNotes({ bundle, me }: { bundle: ShareBundle; me: Member }) {
 
   if (!notes.length) {
     return (
-      <EmptyState
-        title="Belum ada catatan"
-        desc="Catatan evaluasi dari pelatih akan muncul di sini setelah paket diperbarui."
-      />
+      <div>
+        <EmptyState
+          title="Belum ada catatan"
+          desc={locked
+            ? 'Catatan evaluasi dari pelatih akan muncul di sini setelah paket diperbarui.'
+            : 'Mintalah QR kunci ke pelatih untuk membuka catatan pribadi, atau tunggu materi diperbarui.'}
+        />
+      </div>
     )
   }
 
@@ -1477,7 +1542,7 @@ function MemberNotes({ bundle, me }: { bundle: ShareBundle; me: Member }) {
  * **bukan** digabung ke "tidak hadir". Pelatih yang belum sempat mengisi
  * absensi tidak boleh membuat anggotanya tampak mangkir.
  */
-function MemberAttendance({ bundle, me }: { bundle: ShareBundle; me: Member }) {
+function MemberAttendance({ bundle, me, locked }: { bundle: ShareBundle; me: Member; locked?: boolean }) {
   const mine = bundle.attendance.filter((a) => a.memberId === me.id)
   const hadir = mine.filter((a) => a.status === 'hadir').length
   const sessions = [...bundle.sessions].sort((a, b) => b.date.localeCompare(a.date))
@@ -1532,7 +1597,12 @@ function MemberAttendance({ bundle, me }: { bundle: ShareBundle; me: Member }) {
         </ul>
         {!baris.length && (
           <div className="p-4">
-            <EmptyState title="Belum ada catatan kehadiran" desc="Paket ini belum memuat data absensi." />
+            <EmptyState
+              title="Belum ada catatan kehadiran"
+              desc={locked
+                ? 'Paket ini belum memuat data absensi.'
+                : 'Mintalah QR kunci ke pelatih untuk membuka data kehadiran pribadi.'}
+            />
           </div>
         )}
       </Card>
