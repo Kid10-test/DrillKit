@@ -34,6 +34,20 @@ import { KioskPinCard } from '../components/KioskLock'
 import KartuPanduan from '../components/Panduan'
 import { bacaTampilan, langgananTampilan, ubahTampilan } from '../lib/tampilan'
 import type { Tampilan } from '../lib/tampilan'
+import { PilihModeNama } from '../components/PilihModeNama'
+import { KartuTerbit } from '../components/KartuTerbit'
+import { PanelCocok } from '../components/PanelCocok'
+import {
+  keputusanAwal,
+  perluDitanya,
+  saringBentrokLokal,
+  susunSaran,
+  terapkanCocok,
+  tulisUlangMuatan,
+  type KeputusanCocok,
+  type SaranBaris,
+} from '../lib/namaAnggota'
+import type { Member } from '../db/types'
 import {
   BUILTIN_SECTIONS,
   applySectionConfig,
@@ -94,6 +108,12 @@ export default function Settings() {
   /** B4 — pengaturan kontras tinggi & huruf besar. */
   const [tampilan, setTampilan] = useState<Tampilan>(bacaTampilan)
   useEffect(() => langgananTampilan(setTampilan), [])
+  const [cocokBackup, setCocokBackup] = useState<{
+    data: Record<string, unknown>
+    lokal: Member[]
+    saran: SaranBaris[]
+    keputusan: Record<string, KeputusanCocok>
+  } | null>(null)
 
   /** Riwayat backup — diisi saat halaman dibuka & setelah mengunduh backup. */
   const [catatanBackup, setCatatanBackup] = useState(() => backupNotes())
@@ -131,6 +151,62 @@ export default function Settings() {
     toast.push('Backup diunduh — simpan di tempat aman')
   }
 
+  async function tulisBackup(
+    data: Record<string, any>,
+    anggotaLokal: Member[],
+    kep: Record<string, KeputusanCocok>,
+  ) {
+    const masuk = Array.isArray(data.members) ? (data.members as Member[]) : []
+    const hasil = terapkanCocok({
+      masuk,
+      lokal: anggotaLokal,
+      keputusan: kep,
+      arah: 'lokal',
+      timpaSamaId: true,
+    })
+    const { data: diubah, bentrok } = tulisUlangMuatan(data, hasil.peta)
+    if (masuk.length) diubah.members = hasil.anggotaTulis
+    if (Array.isArray(diubah.attendance)) {
+      const saring = saringBentrokLokal(diubah.attendance, await db.attendance.toArray())
+      diubah.attendance = saring.tulis
+      bentrok.push(...saring.bentrok)
+    }
+    // Setiap tabel yang ditulis di bawah WAJIB tercantum di cakupan ini.
+    // Dexie menolak tabel di luar cakupan (NotFound) dan seluruh pemulihan
+    // batal. `memberNotes` dulu tertinggal, sehingga backup yang memuat
+    // catatan anggota tidak bisa dipulihkan sama sekali (2a).
+    await db.transaction(
+      'rw',
+      [
+        db.members,
+        db.sessions,
+        db.attendance,
+        db.drills,
+        db.sets,
+        db.songs,
+        db.setlists,
+        db.settings,
+        db.memberNotes,
+        db.kemajuan,
+        db.evaluasi,
+      ],
+      async () => {
+        if (diubah.members?.length) await db.members.bulkPut(diubah.members)
+        if (diubah.sessions?.length) await db.sessions.bulkPut(diubah.sessions)
+        if (diubah.attendance?.length) await db.attendance.bulkPut(diubah.attendance)
+        if (diubah.drills?.length) await db.drills.bulkPut(diubah.drills)
+        if (diubah.sets?.length) await db.sets.bulkPut(diubah.sets)
+        if (diubah.songs?.length) await db.songs.bulkPut(diubah.songs)
+        if (diubah.setlists?.length) await db.setlists.bulkPut(diubah.setlists)
+        if (diubah.memberNotes?.length) await db.memberNotes.bulkPut(diubah.memberNotes)
+        if (diubah.kemajuan?.length) await db.kemajuan.bulkPut(diubah.kemajuan)
+        if (diubah.evaluasi?.length) await db.evaluasi.bulkPut(diubah.evaluasi)
+      },
+    )
+    if (diubah.settings) await db.settings.put({ ...diubah.settings, key: 'team' })
+    toast.push(bentrok.length ? `Backup dipulihkan · ${bentrok.length} bentrok dilaporkan` : 'Backup dipulihkan')
+  }
+
   async function importBackup(file: File) {
     try {
       const text = await readFileAsText(file)
@@ -139,40 +215,15 @@ export default function Settings() {
         toast.push('Format file tidak dikenali', 'err')
         return
       }
-      // Setiap tabel yang ditulis di bawah WAJIB tercantum di cakupan ini.
-      // Dexie menolak tabel di luar cakupan (NotFound) dan seluruh pemulihan
-      // batal. `memberNotes` dulu tertinggal, sehingga backup yang memuat
-      // catatan anggota tidak bisa dipulihkan sama sekali (2a).
-      await db.transaction(
-        'rw',
-        [
-            db.members,
-            db.sessions,
-            db.attendance,
-            db.drills,
-            db.sets,
-            db.songs,
-            db.setlists,
-            db.settings,
-            db.memberNotes,
-            db.kemajuan,
-            db.evaluasi,
-          ],
-        async () => {
-          if (data.members?.length) await db.members.bulkPut(data.members)
-          if (data.sessions?.length) await db.sessions.bulkPut(data.sessions)
-          if (data.attendance?.length) await db.attendance.bulkPut(data.attendance)
-          if (data.drills?.length) await db.drills.bulkPut(data.drills)
-          if (data.sets?.length) await db.sets.bulkPut(data.sets)
-          if (data.songs?.length) await db.songs.bulkPut(data.songs)
-          if (data.setlists?.length) await db.setlists.bulkPut(data.setlists)
-          if (data.memberNotes?.length) await db.memberNotes.bulkPut(data.memberNotes)
-          if (data.kemajuan?.length) await db.kemajuan.bulkPut(data.kemajuan)
-          if (data.evaluasi?.length) await db.evaluasi.bulkPut(data.evaluasi)
-        },
-      )
-      if (data.settings) await db.settings.put({ ...data.settings, key: 'team' })
-      toast.push('Backup dipulihkan')
+      const lokal = await db.members.toArray()
+      const masuk = Array.isArray(data.members) ? (data.members as Member[]) : []
+      const saran = susunSaran(masuk, lokal)
+      const kep = keputusanAwal(saran)
+      if (perluDitanya(saran, lokal.length)) {
+        setCocokBackup({ data, lokal, saran, keputusan: kep })
+        return
+      }
+      await tulisBackup(data, lokal, kep)
     } catch (e) {
       toast.push('Gagal memulihkan backup', 'err')
     }
@@ -191,6 +242,7 @@ export default function Settings() {
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <KartuTerbit />
         {/* Profil */}
         <Card>
           <h2 className="mb-3 text-sm font-semibold text-slate-200">Profil tim</h2>
@@ -256,6 +308,10 @@ export default function Settings() {
             ditutup, dan bisa dinyalakan cepat lewat chip <b>Kontras</b> dan
             <b> Huruf</b> di presenter.
           </p>
+          <div className="mt-3 border-t border-slate-800 pt-3">
+            <p className="mb-1 text-xs font-medium text-slate-300">Nama anggota</p>
+            <PilihModeNama />
+          </div>
         </Card>
 
         <Card>
@@ -678,6 +734,44 @@ export default function Settings() {
 
       <Modal open={confirmWipe} onClose={() => setConfirmWipe(false)} title="Konfirmasi">
         <p className="text-sm text-slate-300">Tindakan ini tidak bisa dibatalkan.</p>
+      </Modal>
+      <Modal
+        open={!!cocokBackup}
+        onClose={() => setCocokBackup(null)}
+        title="Cocokkan anggota"
+        wide
+        testId="cocok-backup"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCocokBackup(null)}>
+              Batal
+            </Button>
+            <Button
+              variant="primary"
+              data-testid="pulihkan-setelah-cocok"
+              onClick={() => {
+                if (!cocokBackup) return
+                void tulisBackup(cocokBackup.data, cocokBackup.lokal, cocokBackup.keputusan)
+                  .then(() => setCocokBackup(null))
+                  .catch(() => toast.push('Gagal memulihkan backup', 'err'))
+              }}
+            >
+              Pulihkan
+            </Button>
+          </>
+        }
+      >
+        {cocokBackup && (
+          <PanelCocok
+            saran={cocokBackup.saran}
+            lokal={cocokBackup.lokal}
+            keputusan={cocokBackup.keputusan}
+            onUbah={(id, kep) =>
+              setCocokBackup((s) => (s ? { ...s, keputusan: { ...s.keputusan, [id]: kep } } : s))
+            }
+            pengantar="Backup ini memuat anggota yang belum ada di perangkat ini. Cocokkan dulu, atau biarkan sebagai anggota baru."
+          />
+        )}
       </Modal>
     </div>
   )

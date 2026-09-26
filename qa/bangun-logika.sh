@@ -79,4 +79,8 @@ rakit src/lib/pengingat.ts pengingat
 rakit src/lib/tuner.ts tuner
 rakit src/lib/laporan.ts laporan
 rakit src/lib/panduan.ts panduan
+# Satu anggota, dua nama — pencocokan, penggabungan, panggilan.
+rakit src/lib/namaAnggota.ts namaAnggota
+# Terbitkan ke anggota — GitHub Contents, pemberitahuan, berkas grup.
+rakit src/lib/terbit.ts terbit
 echo "== selesai =="

@@ -20,6 +20,10 @@ import { IconDownload, IconLoop, IconPause, IconPlay, IconShare, IconUpload } fr
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
 import { TombolPanduanAnggota } from '../components/Panduan'
 import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
+import { gabungPembaruan, materiLebihBaru, tanggalIndonesia } from '../lib/terbit'
+import { TerbitkanAnggota } from '../components/TerbitkanAnggota'
+import { cocokCari, namaDenganPanggilan } from '../lib/namaAnggota'
+import { NamaTampil } from '../components/NamaTampil'
 import Music from './Music'
 import { useMemberMode } from '../hooks/useMemberMode'
 import { TombolKeluarModeAnggota, TombolMasukModeAnggota } from '../components/ModePerangkat'
@@ -173,6 +177,7 @@ function CoachExport() {
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
+        <TerbitkanAnggota susun={build} />
         <Card className="lg:col-span-2">
           <h2 className="mb-3 text-sm font-semibold text-slate-200">Isi bersama</h2>
           <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
@@ -228,11 +233,10 @@ function CoachExport() {
             </Button>
             {BISA_AMBIL && (
               <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-                <b>Untuk tombol Perbarui anggota:</b> unggah berkas ini ke situs Anda dengan
-                nama <code className="text-slate-400">paket.json</code>, sejajar dengan
-                aplikasinya. Anggota lalu tinggal satu ketuk — tidak perlu dikirimi berkas
-                lagi. Jangan unggah berkas <b>per anggota</b> ke sini: itu memuat absensi
-                dan catatan pribadi.
+                <b>Untuk tombol Perbarui anggota:</b> tekan <b>Terbitkan ke anggota</b> di atas,
+                atau unggah berkas ini secara manual dengan nama{' '}
+                <code className="text-slate-400">paket.json</code>. Jangan unggah berkas{' '}
+                <b>per anggota</b> ke situs: itu memuat absensi dan catatan pribadi.
               </p>
             )}
           </div>
@@ -333,7 +337,7 @@ function CoachExport() {
               {
                 format: preview.format,
                 teamName: preview.team?.teamName,
-                members: preview.members.slice(0, 3).map((m) => `${m.code} — ${m.name} (${m.section})`),
+                members: preview.members.slice(0, 3).map((m) => `${m.code} — ${namaDenganPanggilan(m)} (${m.section})`),
                 sessions: preview.sessions.slice(0, 5).map((s: Session) => `${s.date} ${s.title}`),
                 drills: preview.drills.map((d) => d.name),
                 songs: preview.songs.map((s) => `${s.title} @ ${s.bpm}BPM`),
@@ -368,6 +372,7 @@ function MemberView() {
   const [meId, setMeId] = useState(() => localStorage.getItem('drillkit.meId') ?? '')
   const [q, setQ] = useState('')
   const [sedangMuat, setSedangMuat] = useState(false)
+  const [pemberitahuan, setPemberitahuan] = useState<string | null>(null)
   /**
    * Alamat berkas materi. Bawaan **`paket.json`** — sebelah aplikasi ini —
    * sehingga pelatih cukup menaruh berkasnya di situ dan anggota tidak
@@ -420,15 +425,12 @@ function MemberView() {
         return
       }
       const lama = pkg?.data
+      const laguLokal = await db.songs.toArray()
+      const digabung = gabungPembaruan(data, lama, laguLokal)
       await db.packages.put({
         key: 'current',
         importedAt: Date.now(),
-        data: {
-          ...data,
-          attendance: lama?.attendance ?? [],
-          memberNotes: lama?.memberNotes ?? [],
-          forMember: lama?.forMember,
-        },
+        data: digabung,
       })
       /*
        * Lagu dan set list harus sampai ke **tabelnya**, bukan sekadar ikut
@@ -440,8 +442,8 @@ function MemberView() {
        * ditimpa (itulah maksud pembaruan), dan apa pun yang sudah ada di
        * perangkat ini tetap ada.
        */
-      if (data.songs?.length) await db.songs.bulkPut(data.songs)
-      if (data.setlists?.length) await db.setlists.bulkPut(data.setlists)
+      if (digabung.songs?.length) await db.songs.bulkPut(digabung.songs)
+      if (digabung.setlists?.length) await db.setlists.bulkPut(digabung.setlists)
       toast.push(`Materi diperbarui — ${data.team?.teamName ?? 'tim'}`)
     } catch (e) {
       const bukanBerkas = e instanceof Error && e.message === 'bukan-berkas'
@@ -462,6 +464,29 @@ function MemberView() {
   useEffect(() => {
     if (meId) localStorage.setItem('drillkit.meId', meId)
   }, [meId])
+
+  useEffect(() => {
+    if (!BISA_AMBIL || !urlPaket) return
+    let batal = false
+    ;(async () => {
+      try {
+        const res = await fetch(urlPaket, { cache: 'no-store' })
+        if (!res.ok) return
+        const jenis = res.headers.get('content-type') ?? ''
+        if (jenis.includes('text/html')) return
+        const data = (await res.json()) as ShareBundle
+        if (batal || data?.format !== 'drillkit-share') return
+        if (materiLebihBaru(pkg?.data?.exportedAt, data.exportedAt)) {
+          setPemberitahuan(tanggalIndonesia(data.exportedAt))
+        } else setPemberitahuan(null)
+      } catch {
+        /* luring — jangan mengganggu */
+      }
+    })()
+    return () => {
+      batal = true
+    }
+  }, [urlPaket, pkg?.data?.exportedAt])
 
   /**
    * Buka berkas paket yang dipilih anggota.
@@ -516,6 +541,11 @@ function MemberView() {
           }
           action={
             <>
+              {pemberitahuan && (
+                <p data-testid="pemberitahuan-materi" className="mb-2 text-xs text-emerald-300">
+                  Ada materi baru dari pelatih ({pemberitahuan}).
+                </p>
+              )}
               <input
                 id="pkg-input"
                 type="file"
@@ -552,7 +582,7 @@ function MemberView() {
 
   const filtered = members.filter((m) => {
     const s = q.trim().toLowerCase()
-    return !s || m.name.toLowerCase().includes(s) || m.code.toLowerCase().includes(s)
+    return cocokCari(m, s)
   })
   const me = members.find((m) => m.id === meId)
 
@@ -587,6 +617,18 @@ function MemberView() {
         }}
       />
 
+      {pemberitahuan && (
+        <div
+          data-testid="pemberitahuan-materi"
+          className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-800/60 bg-emerald-950/30 px-3 py-2"
+        >
+          <p className="text-xs text-emerald-200">Ada materi baru dari pelatih ({pemberitahuan}).</p>
+          <Button size="sm" data-testid="perbarui-pemberitahuan" disabled={sedangMuat} onClick={perbarui}>
+            <IconLoop size={14} /> Perbarui
+          </Button>
+        </div>
+      )}
+
       {/* Pilih nama — cukup sekali, diingat di HP ini */}
       <Card className="mb-4">
         {me ? (
@@ -599,7 +641,7 @@ function MemberView() {
                 {me.code}
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-100">{me.name}</p>
+                <p className="text-sm font-semibold text-slate-100">{namaDenganPanggilan(me)}</p>
                 <p className="text-xs text-slate-500">
                   {sectionLabel(me.section)} · {me.instrument}
                 </p>
@@ -626,7 +668,7 @@ function MemberView() {
                   className="flex w-full items-center gap-2 rounded-lg border border-slate-800 px-3 py-2 text-left hover:bg-slate-800/60"
                 >
                   <span className="h-2 w-2 rounded-full" style={{ background: sectionDot(m.section) }} />
-                  <span className="text-sm text-slate-200">{m.name}</span>
+                  <span className="text-sm text-slate-200"><NamaTampil anggota={m} /></span>
                   <Badge className="ml-auto">{m.code}</Badge>
                 </button>
               ))}

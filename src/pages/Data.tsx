@@ -43,6 +43,19 @@ import {
   totalBerkas,
 } from '../lib/pindah'
 import type { BerkasPindah, JenisData, RingkasanJenis, YangAda } from '../lib/pindah'
+import type { AttendanceRecord, Member } from '../db/types'
+import {
+  keputusanAwal,
+  perluDitanya,
+  saringBentrokLokal,
+  susunSaran,
+  terapkanCocok,
+  tulisUlangMuatan,
+  type KeputusanCocok,
+  type SaranBaris,
+} from '../lib/namaAnggota'
+import { PanelCocok } from '../components/PanelCocok'
+import { KartuDaftarInduk } from '../components/DaftarInduk'
 
 /** Tulis daftar entitas sebuah jenis ke berkas. */
 function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void {
@@ -105,6 +118,8 @@ export default function Data() {
         title="Data"
         subtitle="Impor & ekspor seluruh fitur — pindahkan data antar perangkat, atau sunting massal di Excel"
       />
+
+      <KartuDaftarInduk />
 
       <Card className="mb-4">
         <div className="flex flex-wrap gap-2">
@@ -170,6 +185,8 @@ function AlurPindah({
   const [menunggu, setMenunggu] = useState<BerkasPindah | null>(null)
   const [ringkasan, setRingkasan] = useState<RingkasanJenis[]>([])
   const [laporan, setLaporan] = useState<string[] | null>(null)
+  const [saran, setSaran] = useState<SaranBaris[]>([])
+  const [keputusan, setKeputusan] = useState<Record<string, KeputusanCocok>>({})
 
   const jumlah = (j: JenisData) => sumber[j]?.length ?? 0
 
@@ -223,6 +240,11 @@ function AlurPindah({
       toast.push(hasil.alasan, 'err')
       return
     }
+    const anggotaLokal = (sumber.anggota ?? []) as Member[]
+    const masuk = hasil.berkas.anggota ?? []
+    const baris = susunSaran(masuk, anggotaLokal)
+    setSaran(baris)
+    setKeputusan(keputusanAwal(baris))
     setMenunggu(hasil.berkas)
     setRingkasan(hitungBentrok(hasil.berkas, yangAda))
     setLaporan(null)
@@ -230,7 +252,22 @@ function AlurPindah({
 
   async function terapkan() {
     if (!menunggu) return
-    const { berkas, putus } = putusRujukan(menunggu, yangAda)
+    const anggotaLokal = (sumber.anggota ?? []) as Member[]
+    const hasilCocok = terapkanCocok({
+      masuk: menunggu.anggota ?? [],
+      lokal: anggotaLokal,
+      keputusan,
+      arah: 'lokal',
+      timpaSamaId: true,
+    })
+    const { data: dipetakan, bentrok } = tulisUlangMuatan(menunggu, hasilCocok.peta)
+    if (menunggu.anggota) dipetakan.anggota = hasilCocok.anggotaTulis
+    if (dipetakan.absensi) {
+      const saring = saringBentrokLokal(dipetakan.absensi, (sumber.absensi ?? []) as AttendanceRecord[])
+      dipetakan.absensi = saring.tulis
+      bentrok.push(...saring.bentrok)
+    }
+    const { berkas, putus } = putusRujukan(dipetakan, yangAda)
     const b = berkas
     try {
       // Setiap tabel yang ditulis di bawah WAJIB tercantum di cakupan ini.
@@ -253,7 +290,7 @@ function AlurPindah({
         },
       )
       setMenunggu(null)
-      setLaporan(ringkasPutus(putus))
+      setLaporan([...ringkasPutus(putus), ...bentrok, ...hasilCocok.laporan])
       toast.push(putus.length ? `Data masuk, ${putus.length} rujukan dikosongkan` : 'Data masuk')
     } catch {
       toast.push('Gagal menerapkan data', 'err')
@@ -371,6 +408,7 @@ function AlurPindah({
         open={menunggu != null}
         onClose={() => setMenunggu(null)}
         title="Terapkan data ini?"
+        wide={perluDitanya(saran, (sumber.anggota ?? []).length)}
         footer={
           <>
             <Button variant="ghost" onClick={() => setMenunggu(null)}>
@@ -411,6 +449,16 @@ function AlurPindah({
               Rujukan yang tidak ketemu (mis. jadwal menunjuk set list yang tidak ikut) akan
               dikosongkan, bukan ditolak — dan dilaporkan setelahnya.
             </p>
+            {perluDitanya(saran, (sumber.anggota ?? []).length) && (
+              <div className="mt-3">
+                <PanelCocok
+                  saran={saran}
+                  lokal={(sumber.anggota ?? []) as Member[]}
+                  keputusan={keputusan}
+                  onUbah={(id, kep) => setKeputusan((s) => ({ ...s, [id]: kep }))}
+                />
+              </div>
+            )}
           </div>
         )}
       </Modal>

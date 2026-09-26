@@ -94,6 +94,7 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
   ].map(baca).join('\n').replace(/&amp;/g, '&')
   const LABEL = [
     'Saya anggota', 'Ambil materi dari situs', 'Buka paket tim', 'Ganti paket', 'Ganti nama',
+    'Ada materi baru dari pelatih',
     'Pilih namamu dulu', 'Perbarui', 'Kalender', 'Kunci jawaban', 'Putar perpindahan', 'Belum dicatat',
     'Penala & nada dengung', 'Putar dengung', 'Dengarkan', 'Bb konser', 'Instrumen',
     'Lihat mode anggota', 'Bersihkan & muat ulang', 'Aplikasi gagal dimuat',

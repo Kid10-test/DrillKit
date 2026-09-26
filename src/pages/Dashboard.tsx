@@ -23,6 +23,8 @@ import {
 import { BackupReminder } from '../components/BackupReminder'
 import { PengingatJadwal } from '../components/PengingatJadwal'
 import { TombolPanduan } from '../components/Panduan'
+import { NamaTampil, useModeNama } from '../components/NamaTampil'
+import { namaTampil } from '../lib/namaAnggota'
 import {
   sectionDot,
   sesiMeta,
@@ -275,7 +277,7 @@ export default function Dashboard() {
                     <Avatar m={m} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-xs font-medium text-slate-200">{m.name}</p>
+                        <p className="truncate text-xs font-medium text-slate-200"><NamaTampil anggota={m} /></p>
                         <span className="shrink-0 text-[11px] tabular-nums text-slate-500">
                           {h}/{t} · {p}%
                         </span>
@@ -339,7 +341,8 @@ function SummaryRow({ label, value, to }: { label: string; value: string; to: st
 }
 
 export function Avatar({ m, size = 30 }: { m: Member; size?: number }) {
-  const initials = m.name
+  const tampil = namaTampil(m, useModeNama())
+  const initials = tampil
     .split(' ')
     .slice(0, 2)
     .map((w) => w[0])
@@ -349,7 +352,7 @@ export function Avatar({ m, size = 30 }: { m: Member; size?: number }) {
     <div
       className="grid shrink-0 place-items-center rounded-full text-[10px] font-bold text-slate-950"
       style={{ width: size, height: size, background: sectionDot(m.section) }}
-      title={m.name}
+      title={tampil}
     >
       {initials}
     </div>

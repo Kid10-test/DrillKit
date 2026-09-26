@@ -24,6 +24,7 @@
  * berkeliaran di dalam berkas yang bisa diteruskan siapa saja.
  */
 import type { Member, ShareBundle } from '../db/types'
+import { namaDenganPanggilan } from './namaAnggota'
 
 /**
  * Kolom yang **tidak pernah** meninggalkan perangkat pelatih.
@@ -38,9 +39,10 @@ export type KolomRahasia = 'token' | 'phone' | 'notes'
 /**
  * Anggota tanpa kolom rahasianya.
  *
- * Yang **tetap** dipertahankan: `id`, `code`, `name`, `section`,
- * `instrument`, `role`, `joinYear`, `active`. Semua itu diperlukan supaya
- * anggota bisa memilih namanya dan melihat formasinya di antara rekan-rekannya.
+ * Yang **tetap** dipertahankan: `id`, `code`, `name`, `panggilan`, `alias`,
+ * `section`, `instrument`, `role`, `joinYear`, `active`. Semua itu diperlukan
+ * supaya anggota bisa memilih namanya — lengkap maupun panggilan — dan melihat
+ * formasinya di antara rekan-rekannya.
  */
 export function bersihkanAnggota(m: Member): Member {
   const { token: _token, phone: _phone, notes: _notes, ...sisa } = m
@@ -69,6 +71,7 @@ export function paketGrup(b: ShareBundle): ShareBundle {
      * yang sama.
      */
     forMember: undefined,
+    namaPenerima: undefined,
   }
 }
 
@@ -80,7 +83,8 @@ export function paketGrup(b: ShareBundle): ShareBundle {
  * kegagalan yang paling berbahaya karena ia tampak "berhasil".
  */
 export function paketAnggota(b: ShareBundle, memberId: string): ShareBundle {
-  const dikenal = b.members.some((m) => m.id === memberId)
+  const penerima = b.members.find((m) => m.id === memberId)
+  const dikenal = !!penerima
   return {
     ...b,
     members: b.members.map(bersihkanAnggota),
@@ -95,8 +99,12 @@ export function paketAnggota(b: ShareBundle, memberId: string): ShareBundle {
      * Tetap `undefined` bila `memberId` tidak dikenal: menyebut seorang
      * anggota sebagai penerima padahal datanya tidak disertakan akan
      * mengidentifikasi orang yang salah.
+     *
+     * `namaPenerima` menulis kedua namanya ("Andra Pratama (Dede)") supaya
+     * berkasnya tetap dikenali, apa pun nama yang dipakai di lapangan.
      */
     forMember: dikenal ? memberId : undefined,
+    namaPenerima: penerima ? namaDenganPanggilan(penerima) : undefined,
   }
 }
 
@@ -115,7 +123,8 @@ export function namaBerkasAnggota(m: Member): string {
       .replace(/[\u0300-\u036f]/g, '') // buang tanda aksen (é -> e)
       .replace(/[^A-Za-z0-9]+/g, '-')  // sisakan alfanumerik saja
       .replace(/^-+|-+$/g, '')
-  const nama = bersih(m.name ?? '') || 'Anggota'
+  const panggil = bersih(m.panggilan ?? '')
+  const nama = [bersih(m.name ?? ''), panggil].filter(Boolean).join('-') || 'Anggota'
   const kode = bersih(m.code ?? '') || m.id.replace(/[^A-Za-z0-9]/g, '') || 'tanpa-kode'
   return `DrillKit-${nama}-${kode}.json`
 }

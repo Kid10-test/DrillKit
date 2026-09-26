@@ -10,6 +10,7 @@ import type {
   FieldConfig,
   Member,
 } from '../db/types'
+import { NamaTampil } from './NamaTampil'
 import {
   Badge,
   Button,
@@ -45,7 +46,7 @@ export function PointInspector({
   return (
     <Card>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="truncate text-sm font-semibold text-slate-200">{member.name}</h2>
+        <h2 className="truncate text-sm font-semibold text-slate-200"><NamaTampil anggota={member} /></h2>
         <div className="flex shrink-0 items-center gap-1.5">
           {onDetail && (
             <Button size="sm" onClick={onDetail} title="Riwayat gerak & perlengkapan pemain ini">

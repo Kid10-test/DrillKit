@@ -38,6 +38,7 @@ import {
   IconCopy,
 } from './Icons'
 import { FieldSurface } from './FieldSurface'
+import { NamaTampil } from './NamaTampil'
 import { MarkerLayer, PenandaPanel, butuhDuaTitik } from './FieldMarkers'
 import { DrillPresenter } from './DrillPresenter'
 
@@ -3125,7 +3126,9 @@ export function Editor({
                     <ul className="space-y-0.5" data-testid="analitik-peringatan">
                       {analisis.peringatan.slice(0, 8).map((d) => (
                         <li key={d.id} className="flex items-center justify-between gap-2 text-[11px]">
-                          <span className="truncate text-slate-300">{d.nama}</span>
+                          <span className="truncate text-slate-300">
+                            {rosterById.get(d.id) ? <NamaTampil anggota={rosterById.get(d.id)!} /> : d.nama}
+                          </span>
                           <span className="shrink-0" style={{ color: TINGKAT_WARNA[d.tingkatAkhir] }}>
                             {/* Sebut yang bermasalah: kecepatan, ukuran
                                 langkah, atau keduanya. Tanpa ini pembaca tidak
@@ -3215,7 +3218,7 @@ export function Editor({
                   )}
                 >
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: sectionDot(m.section) }} />
-                  <span className={cx('truncate', has ? 'text-slate-200' : 'text-slate-500')}>{m.name}</span>
+                  <NamaTampil anggota={m} className={cx('truncate', has ? 'text-slate-200' : 'text-slate-500')} />
                   <span className="ml-auto shrink-0 text-[10px] text-slate-500">{m.code}</span>
                   {has && set && (
                     <span

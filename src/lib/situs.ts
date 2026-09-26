@@ -243,7 +243,7 @@ export async function periksaSitus(ambil: Ambil): Promise<HasilPeriksa[]> {
             ? 'Alamatnya menjawab halaman aplikasi, bukan berkas materi — berarti berkasnya tidak ada di situs.'
             : `Tidak ada di situs (menjawab ${r.status}).`,
         saran:
-          'Tombol "Perbarui" di HP anggota belum akan jalan. Salin paket.json ke sebelah index.html di folder unggahan, lalu unggah ulang — berkas ini ikut terhapus setiap kali aplikasi diperbarui.',
+          'Tombol "Perbarui" di HP anggota belum akan jalan. Terbitkan dari menu Berbagi, atau salin paket.json ke sebelah index.html. Kalau situs memakai Vercel, rewrite /paket.json ke berkas mentah di repo materi supaya berkas ini tidak ikut terhapus setiap kali aplikasi diperbarui.',
       })
     }
   } catch (e) {

@@ -19,6 +19,8 @@ import { useSettings } from '../hooks/useSettings'
 import AdminReports from '../components/AdminReports'
 import type { DataLaporan } from '../lib/laporan'
 import { rapikanPredikat } from '../lib/laporan'
+import { NamaTampil, useModeNama } from '../components/NamaTampil'
+import { namaTampil } from '../lib/namaAnggota'
 
 const ORDER: AttendanceStatus[] = ['hadir', 'izin', 'sakit', 'alpha']
 const BAR: Record<AttendanceStatus, string> = {
@@ -47,6 +49,7 @@ export default function AttendanceRecap({
   records: AttendanceRecord[]
 }) {
   const toast = useToast()
+  const modeNama = useModeNama()
   /** Identitas tim untuk kepala laporan (D4). */
   const settings = useSettings()
   const [month, setMonth] = useState<string>('all')
@@ -224,7 +227,7 @@ export default function AttendanceRecap({
   const perMember = semuaAnggota
     .filter((x) => (hanyaPerhatian ? perhatianIds.has(x.member.id) : true))
     .sort((a, b) => {
-      if (sort === 'name') return a.member.name.localeCompare(b.member.name)
+      if (sort === 'name') return namaTampil(a.member, modeNama).localeCompare(namaTampil(b.member, modeNama), 'id')
       if (sort === 'perhatian') return (a.tren ?? 0) - (b.tren ?? 0) || a.rate - b.rate
       return b.rate - a.rate
     })
@@ -717,7 +720,7 @@ export default function AttendanceRecap({
                     <div className="flex flex-wrap gap-1.5">
                       {rendah.map((x) => (
                         <Badge key={x.member.id} className="border-amber-500/40 bg-amber-500/10 text-amber-200">
-                          {x.member.name} · {x.rate}%
+                          <NamaTampil anggota={x.member} /> · {x.rate}%
                         </Badge>
                       ))}
                     </div>
@@ -731,7 +734,7 @@ export default function AttendanceRecap({
                     <div className="flex flex-wrap gap-1.5">
                       {menurun.map((x) => (
                         <Badge key={x.member.id} className="border-rose-500/40 bg-rose-500/10 text-rose-200">
-                          {x.member.name} · {x.tren} poin
+                          <NamaTampil anggota={x.member} /> · {x.tren} poin
                         </Badge>
                       ))}
                     </div>
@@ -817,7 +820,7 @@ export default function AttendanceRecap({
                             className="h-2 w-2 shrink-0 rounded-full"
                             style={{ background: BAR.hadir, opacity: 0.5 }}
                           />
-                          <span className="truncate text-slate-200">{x.member.name}</span>
+                          <NamaTampil anggota={x.member} className="truncate text-slate-200" />
                           <Badge className="shrink-0">{x.member.code}</Badge>
                           {perhatianIds.has(x.member.id) && (
                             <span

@@ -365,7 +365,7 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
     <ul>
       ${
         disajikan
-          ? '<li>Tekan <b>Perbarui</b> di bagian atas. Absensi dan catatanmu <b>tidak</b> ikut tertimpa.</li>'
+          ? '<li>Kalau muncul tulisan <b>Ada materi baru dari pelatih</b>, tekan <b>Perbarui</b>. Absensi, catatan, dan setelan latihan yang kamu ubah sendiri <b>tidak</b> ikut tertimpa.</li>'
           : ''
       }
       <li>Pelatih mengirim berkas baru? Tekan <b>Ganti paket</b> dan pilih berkas terbarunya.</li>

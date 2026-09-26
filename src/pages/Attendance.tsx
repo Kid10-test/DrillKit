@@ -16,6 +16,8 @@ import {
 } from '../components/ui'
 import { IconCheck, IconDownload, IconQr, IconSearch } from '../components/Icons'
 import AttendanceRecap from './AttendanceRecap'
+import { bacaModeNama, cocokCari, namaTampil } from '../lib/namaAnggota'
+import { NamaTampil } from '../components/NamaTampil'
 import ScanQrModal from '../components/QrScanner'
 import {
   sectionLabel,
@@ -94,7 +96,7 @@ export default function Attendance() {
   const list = active.filter((m) => {
     const s = q.trim().toLowerCase()
     if (!s) return true
-    return m.name.toLowerCase().includes(s) || m.code.toLowerCase().includes(s)
+    return cocokCari(m, s)
   })
 
   async function setStatus(memberId: string, status: AttendanceStatus) {
@@ -318,7 +320,7 @@ export default function Attendance() {
                     <Avatar m={m} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className="truncate text-sm font-medium text-slate-100">{m.name}</p>
+                        <p className="truncate text-sm font-medium text-slate-100"><NamaTampil anggota={m} /></p>
                         <span className="shrink-0 text-[10px] text-slate-500">{m.code}</span>
                       </div>
                       <p className="truncate text-xs text-slate-500">
@@ -401,7 +403,7 @@ function HistoryModal({
   const hadir = records.filter((r) => r.status === 'hadir').length
 
   return (
-    <Modal open={!!member} onClose={onClose} title={`Riwayat — ${member.name}`}>
+    <Modal open={!!member} onClose={onClose} title={`Riwayat — ${namaTampil(member, bacaModeNama())}`}>
       <p className="text-sm text-slate-400">
         Kehadiran: <span className="font-semibold text-emerald-400">{pct(hadir, total)}%</span> ({hadir} dari{' '}
         {total} sesi)

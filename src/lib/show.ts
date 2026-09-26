@@ -13,8 +13,10 @@
  * - **members** — anggota aktif; **token QR dibuang** saat ekspor dan dibuatkan
  *   baru saat impor, jadi kartu absensi tidak pernah ikut berpindah.
  *
- * Saat mengimpor, datanya **tidak pernah menimpa** anggota yang sudah ada di
- * perangkat penerima — hanya menambah yang belum ada.
+ * Saat mengimpor, anggota yang id-nya sudah ada **tidak pernah ditimpa**.
+ * Yang belum dikenal tidak lagi langsung ditambahkan: layar "Cocokkan
+ * anggota" (`PanelCocok`) memetakan id berkas ke id lokal lebih dulu, lalu
+ * fungsi ini hanya menambah yang memang dipilih sebagai anggota baru.
  */
 
 import { db } from '../db/db'
