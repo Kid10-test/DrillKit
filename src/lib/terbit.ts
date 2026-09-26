@@ -1,19 +1,24 @@
 /**
- * Terbitkan materi ke anggota — bagian pertama.
+ * Terbitkan materi ke anggota — bagian pertama + bagian kedua (kunci pribadi).
  *
- * Pelatih menekan satu tombol. Berkas grup (sama dengan yang diunduh
- * manual) ditulis ke repo GitHub lewat Contents API. Anggota tetap
+ * Pelatih menekan satu tombol. Berkas grup + data pribadi terkunci per
+ * anggota ditulis ke repo GitHub lewat Contents API. Anggota tetap
  * mengambil `paket.json` di situs yang sama; rewrite Vercel yang
  * mengarah ke berkas mentah dipasang sekali.
  *
- * Token hanya hidup di localStorage perangkat pelatih. Modul ini tidak
- * menulisnya ke IndexedDB, backup, atau paket. Kunci pribadi per anggota
- * belum ada — itu bagian berikutnya. Terbitan ini sengaja hanya materi
- * grup, tanpa absensi dan tanpa catatan.
+ * Bagian terbuka: materi grup, persis seperti paket grup sekarang.
+ * Bagian terkunci per anggota: isi yang identik dengan berkas per anggota
+ * yang sudah ada (absensi, evaluasi, kemajuan, catatan pribadi),
+ * mengikuti aturan berbagi aman. Nilai evaluasi terstruktur tidak ikut.
+ *
+ * Kunci AES-256-GCM lewat WebCrypto. IV acak per anggota per terbitan.
+ * Bagian terkunci dikunci dengan id anggota, tanpa nama.
  */
 
 import type { ShareBundle, Song } from '../db/types'
-import { paketGrup } from './bagikan'
+import { paketGrup, paketAnggota } from './bagikan'
+import type { PetaKunci } from './kunci'
+import { enkripsi, dekripsi, imporKunci } from './kunci'
 
 export const NAMA_BERKAS = 'paket.json'
 export const KUNCI_TERBIT = 'drillkit.terbit'
@@ -470,4 +475,156 @@ export function bacaIsiBerkas(json: unknown): string | null {
   } catch {
     return null
   }
+}
+
+/* ======================= Bagian kedua: kunci pribadi ======================== */
+
+/**
+ * Satu entri data terkunci per anggota.
+ *
+ * `d` = ciphertext AES-256-GCM yang di-encode base64url, mengandung IV
+ * 12 byte di awal. Kunci id anggota, tanpa nama.
+ */
+export interface EntriTerkunci {
+  d: string
+}
+
+/** Peta id anggota → data terkunci. */
+export type DataTerkunci = Record<string, EntriTerkunci>
+
+/**
+ * Susun data terkunci untuk semua anggota yang punya kunci.
+ *
+ * Bagian terkunci per anggota identik dengan berkas per anggota
+ * (absensi, evaluasi, kemajuan, catatan pribadi). Mengikuti aturan
+ * berbagi aman — kolom rahasia (token, phone, notes pelatih) tidak ikut.
+ * Nilai evaluasi terstruktur tidak ikut.
+ */
+export async function susunTerkunci(
+  b: ShareBundle,
+  petaKunci: PetaKunci,
+): Promise<{ terkunci: DataTerkunci; tanpaKunci: string[] }> {
+  const terkunci: DataTerkunci = {}
+  const tanpaKunci: string[] = []
+
+  for (const m of b.members) {
+    const kunciBase64 = petaKunci[m.id]
+    if (!kunciBase64) {
+      tanpaKunci.push(m.name)
+      continue
+    }
+    const kunci = await imporKunci(kunciBase64)
+    const isi = JSON.stringify(paketAnggota(b, m.id))
+    terkunci[m.id] = { d: await enkripsi(isi, kunci) }
+  }
+
+  return { terkunci, tanpaKunci }
+}
+
+/**
+ * Dekripsi data terkunci milik seorang anggota.
+ *
+ * Mengembalikan ShareBundle yang sudah didekripsi, atau `null` bila
+ * kunci salah atau data rusak. Kunci salah menghasilkan operasi yang
+ * gagal tanpa melempar galat.
+ */
+export async function bukaTerkunci(
+  entri: EntriTerkunci,
+  kunciBase64: string,
+): Promise<ShareBundle | null> {
+  try {
+    const kunci = await imporKunci(kunciBase64)
+    const teks = await dekripsi(entri.d, kunci)
+    if (!teks) return null
+    const data = JSON.parse(teks) as ShareBundle
+    if (data?.format !== 'drillkit-share') return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Susun isi berkas yang terbit: bagian terbuka + bagian terkunci.
+ *
+ * Format JSON:
+ * ```
+ * {
+ *   ...paketGrup,           // bagian terbuka
+ *   locked: {               // bagian terkunci
+ *     "<memberId>": { d: "<base64url>" },
+ *     ...
+ *   }
+ * }
+ * ```
+ *
+ * Tanpa kunci pribadi, bagian `locked` kosong — perilaku persis seperti
+ * bagian pertama.
+ */
+export async function siapTerbitLengkap(
+  b: ShareBundle,
+  petaKunci: PetaKunci = {},
+): Promise<{ json: string; ringkas: RingkasTerbit }> {
+  const grup = paketGrup(b)
+  const { terkunci, tanpaKunci } = Object.keys(petaKunci).length > 0
+    ? await susunTerkunci(b, petaKunci)
+    : { terkunci: {} as DataTerkunci, tanpaKunci: b.members.map((m) => m.name) }
+
+  const berkas = {
+    ...grup,
+    locked: terkunci,
+  }
+
+  return {
+    json: JSON.stringify(berkas),
+    ringkas: {
+      jadwal: grup.sessions?.length ?? 0,
+      show: grup.drills?.length ?? 0,
+      lagu: grup.songs?.length ?? 0,
+      anggota: grup.members?.length ?? 0,
+      terkunci: Object.keys(terkunci).length,
+      tanpaKunci,
+    },
+  }
+}
+
+/**
+ * Muat berkas yang diambil anggota dan ekstrak bagian terbuka + terkunci.
+ *
+ * Anggota yang punya kunci bisa mendekripsi bagian terkuncinya sendiri.
+ * Tanpa kunci, materi grup tetap terbuka, dengan catatan untuk meminta
+ * QR kunci ke pelatih.
+ */
+export function muatBerkasTerbit(teks: string): {
+  grup: ShareBundle
+  locked: DataTerkunci
+} | null {
+  try {
+    const data = JSON.parse(teks)
+    if (data?.format !== 'drillkit-share') return null
+    const locked: DataTerkunci =
+      data.locked && typeof data.locked === 'object' && !Array.isArray(data.locked)
+        ? data.locked as DataTerkunci
+        : {}
+    const { locked: _l, ...grup } = data as ShareBundle & { locked?: DataTerkunci }
+    return { grup: grup as ShareBundle, locked }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Coba dekripsi data pribadi anggota dari berkas yang sudah dimuat.
+ *
+ * Mengembalikan ShareBundle yang sudah didekripsi (berisi absensi,
+ * catatan, dll milik anggota), atau `null` bila kunci salah/tidak ada.
+ */
+export async function bukaDataPribadi(
+  locked: DataTerkunci,
+  memberId: string,
+  kunciBase64: string,
+): Promise<ShareBundle | null> {
+  const entri = locked[memberId]
+  if (!entri) return null
+  return bukaTerkunci(entri, kunciBase64)
 }

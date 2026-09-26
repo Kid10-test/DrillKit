@@ -83,4 +83,6 @@ rakit src/lib/panduan.ts panduan
 rakit src/lib/namaAnggota.ts namaAnggota
 # Terbitkan ke anggota — GitHub Contents, pemberitahuan, berkas grup.
 rakit src/lib/terbit.ts terbit
+# Bagian kedua #2 — kunci pribadi AES-256-GCM & data terkunci.
+rakit src/lib/kunci.ts kunci
 echo "== selesai =="
