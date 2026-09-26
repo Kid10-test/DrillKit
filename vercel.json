@@ -4,7 +4,12 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "PUPPETEER_SKIP_DOWNLOAD=1 npm install",
-  rewrites
+  "rewrites" : [
+     {
+    "source": "/paket.json",
+    "destination": "https://raw.githubusercontent.com/NAMA-ANDA/drillkit-materi/main/paket.json"
+  }
+],
   "headers": [
     {
       "source": "/sw.js",
