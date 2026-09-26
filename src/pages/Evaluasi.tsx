@@ -15,6 +15,8 @@
  * ini hanya menyajikan.
  */
 import { useMemo, useState } from 'react'
+import { NamaTampil, useModeNama } from '../components/NamaTampil'
+import { namaTampil, bacaModeNama } from '../lib/namaAnggota'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import type { AspekEvaluasi, Evaluasi } from '../db/types'
@@ -79,7 +81,7 @@ export default function Evaluasi() {
         const r = ringkasan(l)
         return { member: m, ...r, terakhir: terbaru(l) }
       })
-    if (urut === 'nama') out.sort((a, b) => a.member.name.localeCompare(b.member.name))
+    if (urut === 'nama') out.sort((a, b) => namaTampil(a.member, bacaModeNama()).localeCompare(namaTampil(b.member, bacaModeNama()), 'id'))
     else if (urut === 'nilai') out.sort((a, b) => (b.rata ?? -1) - (a.rata ?? -1))
     else out.sort((a, b) => (b.tren ?? -99) - (a.tren ?? -99))
     return out
@@ -108,7 +110,7 @@ export default function Evaluasi() {
           <Button
             variant="primary"
             data-testid="tambah-evaluasi"
-            onClick={() => setSunting({ memberId: baris[0]?.member.id ?? '', nama: baris[0]?.member.name ?? '' })}
+            onClick={() => setSunting({ memberId: baris[0]?.member.id ?? '', nama: baris[0] ? namaTampil(baris[0].member, bacaModeNama()) : '' })}
             disabled={baris.length === 0}
           >
             <IconPlus size={16} /> Nilai anggota
@@ -191,7 +193,7 @@ export default function Evaluasi() {
                     className="border-b border-slate-800/60 last:border-0"
                   >
                     <td className="py-2 pr-3">
-                      <span className="text-slate-100">{b.member.name}</span>
+                      <span className="text-slate-100"><NamaTampil anggota={b.member} /></span>
                       {perluPerhatianId.has(b.member.id) && (
                         <span
                           data-testid={`perhatian-${b.member.id}`}
@@ -215,7 +217,7 @@ export default function Evaluasi() {
                       {b.jumlah > 0 && (
                         <button
                           data-testid={`riwayat-${b.member.id}`}
-                          onClick={() => setRiwayat({ memberId: b.member.id, nama: b.member.name })}
+                          onClick={() => setRiwayat({ memberId: b.member.id, nama: namaTampil(b.member, bacaModeNama()) })}
                           className="ml-2 text-[11px] text-slate-500 underline hover:text-slate-300"
                         >
                           {b.jumlah} kali
@@ -227,7 +229,7 @@ export default function Evaluasi() {
                         size="sm"
                         variant="ghost"
                         data-testid={`nilai-${b.member.id}`}
-                        onClick={() => setSunting({ memberId: b.member.id, nama: b.member.name })}
+                        onClick={() => setSunting({ memberId: b.member.id, nama: namaTampil(b.member, bacaModeNama()) })}
                       >
                         Nilai
                       </Button>
@@ -306,16 +308,18 @@ function ModalEvaluasi({
 }: {
   memberId: string
   nama: string
-  daftarAnggota: { id: string; name: string }[]
+  daftarAnggota: { id: string; name: string; panggilan?: string }[]
   onClose: () => void
 }) {
   const toast = useToast()
+  const modeNama = useModeNama()
   const [pilih, setPilih] = useState(memberId)
   const [tanggal, setTanggal] = useState(todayISO())
   const [nilai, setNilai] = useState<Partial<Record<AspekEvaluasi, number>>>({})
   const [catatan, setCatatan] = useState('')
 
-  const terpilih = daftarAnggota.find((m) => m.id === pilih)?.name ?? nama
+  const ketemu = daftarAnggota.find((m) => m.id === pilih)
+  const terpilih = ketemu ? namaTampil(ketemu, modeNama) : nama
 
   async function simpan() {
     if (!pilih) {
@@ -360,7 +364,7 @@ function ModalEvaluasi({
           <Select data-testid="pilih-anggota" value={pilih} onChange={(e) => setPilih(e.target.value)}>
             {daftarAnggota.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.name}
+                <NamaTampil anggota={m} />
               </option>
             ))}
           </Select>

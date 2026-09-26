@@ -31,12 +31,22 @@ import {
   uid,
   visibleSections,
 } from '../lib/utils'
+import {
+  bacaBarisCsvAnggota,
+  barisCsvAnggota,
+  cocokCari,
+  JUDUL_CSV_ANGGOTA,
+  pecahCsv,
+} from '../lib/namaAnggota'
+import { NamaTampil, useModeNama } from '../components/NamaTampil'
+import { GabungAnggota } from '../components/GabungAnggota'
+import { PilihModeNama } from '../components/PilihModeNama'
 
-const SECTIONS: Section[] = ['brass', 'woodwind', 'percussion', 'pit', 'guard', 'other']
 const ROLES: MemberRole[] = ['member', 'sectionLeader', 'drumMajor', 'assistant']
 
 export default function Members() {
   const toast = useToast()
+  const modeNama = useModeNama()
   const members = useLiveQuery(() => db.members.orderBy('name').toArray(), [], [])
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Section | 'all'>('all')
@@ -44,21 +54,14 @@ export default function Members() {
   const [editing, setEditing] = useState<Member | null>(null)
   const [open, setOpen] = useState(false)
   const [qrFor, setQrFor] = useState<Member | null>(null)
+  const [gabung, setGabung] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const list = useMemo(() => {
     return members
       .filter((m) => (showInactive ? true : m.active === 1))
       .filter((m) => (filter === 'all' ? true : m.section === filter))
-      .filter((m) => {
-        const s = q.trim().toLowerCase()
-        if (!s) return true
-        return (
-          m.name.toLowerCase().includes(s) ||
-          m.code.toLowerCase().includes(s) ||
-          m.instrument.toLowerCase().includes(s)
-        )
-      })
+      .filter((m) => cocokCari(m, q, true))
   }, [members, q, filter, showInactive])
 
   const grouped = useMemo(() => {
@@ -91,7 +94,11 @@ export default function Members() {
       toast.push('Nama anggota wajib diisi', 'err')
       return
     }
-    await db.members.put(m)
+    await db.members.put({
+      ...m,
+      name: m.name.trim(),
+      panggilan: m.panggilan?.trim() || undefined,
+    })
     setOpen(false)
     toast.push(members.some((x) => x.id === m.id) ? 'Perubahan disimpan' : 'Anggota ditambahkan')
   }
@@ -109,10 +116,10 @@ export default function Members() {
   /** Unduh contoh berkas CSV supaya mudah diisi di Excel lalu diimpor. */
   function downloadTemplate() {
     const rows: unknown[][] = [
-      ['Kode', 'Nama', 'Section', 'Instrumen', 'Peran', 'Tahun Masuk', 'No. HP', 'Status', 'Catatan'],
-      ['C01', 'Contoh Nama Satu', 'Brass', 'Trumpet', 'Anggota', new Date().getFullYear(), '0812xxxxxxx1', 'Aktif', ''],
-      ['C02', 'Contoh Nama Dua', 'Battery', 'Snare', 'Ketua Section', new Date().getFullYear(), '', 'Aktif', ''],
-      ['C03', 'Contoh Nama Tiga', 'Color Guard', 'Flag', 'Anggota', new Date().getFullYear(), '', 'Aktif', 'Perlu pendampingan langkah'],
+      JUDUL_CSV_ANGGOTA,
+      ['C01', 'Contoh Nama Satu', 'Dede', 'Brass', 'Trumpet', 'Anggota', new Date().getFullYear(), '0812xxxxxxx1', 'Aktif', ''],
+      ['C02', 'Contoh Nama Dua', '', 'Battery', 'Snare', 'Ketua Section', new Date().getFullYear(), '', 'Aktif', ''],
+      ['C03', 'Contoh Nama Tiga', '', 'Color Guard', 'Flag', 'Anggota', new Date().getFullYear(), '', 'Aktif', 'Perlu pendampingan langkah'],
     ]
     downloadFile('template-anggota.csv', toCSV(rows), 'text/csv')
     toast.push('Template diunduh — isi di Excel, lalu Impor')
@@ -120,18 +127,8 @@ export default function Members() {
 
   function exportCSV() {
     const rows: unknown[][] = [
-      ['Kode', 'Nama', 'Section', 'Instrumen', 'Peran', 'Tahun Masuk', 'No. HP', 'Status', 'Catatan'],
-      ...members.map((m) => [
-        m.code,
-        m.name,
-        sectionLabel(m.section),
-        m.instrument,
-        ROLE_LABEL[m.role],
-        m.joinYear,
-        m.phone ?? '',
-        m.active ? 'Aktif' : 'Nonaktif',
-        m.notes ?? '',
-      ]),
+      JUDUL_CSV_ANGGOTA,
+      ...members.map((m) => barisCsvAnggota(m, sectionLabel, (role) => ROLE_LABEL[role] ?? role)),
     ]
     downloadFile('drillkit-anggota.csv', toCSV(rows), 'text/csv')
     toast.push('CSV diunduh')
@@ -141,24 +138,25 @@ export default function Members() {
     try {
       const text = await readFileAsText(file)
       const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(Boolean)
-      const [, ...rows] = lines
+      const [judulMentah, ...rows] = lines
+      const judul = judulMentah ? pecahCsv(judulMentah) : null
+      const sections = visibleSections()
       let added = 0
       for (const line of rows) {
-        const cells = parseCSVLine(line)
-        const [code, name, section, instrument, role, joinYear, phone, status, notes] = cells
-        if (!name) continue
-        const secKey = visibleSections().find((s) => s.label.toLowerCase() === (section ?? '').toLowerCase())?.id
+        const baris = bacaBarisCsvAnggota(pecahCsv(line), judul, sections)
+        if (!baris) continue
         await db.members.put({
           id: uid('m_'),
-          code: code || autoCode(members, added),
-          name,
-          section: secKey ?? (SECTIONS.includes(section as Section) ? (section as Section) : 'other'),
-          instrument: instrument ?? '',
-          role: (ROLES.includes(role as MemberRole) ? (role as MemberRole) : 'member'),
-          joinYear: Number(joinYear) || new Date().getFullYear(),
-          phone: phone ?? '',
-          notes: notes ?? '',
-          active: status === 'Nonaktif' ? 0 : 1,
+          code: baris.code || autoCode(members, added),
+          name: baris.name,
+          panggilan: baris.panggilan,
+          section: baris.section,
+          instrument: baris.instrument,
+          role: baris.role,
+          joinYear: baris.joinYear,
+          phone: baris.phone,
+          notes: baris.notes,
+          active: baris.active,
           token: uid('t_'),
           createdAt: Date.now(),
         })
@@ -185,6 +183,9 @@ export default function Members() {
             </Button>
             <Button onClick={downloadTemplate} title="Unduh contoh berkas CSV">
               Template
+            </Button>
+            <Button data-testid="tombol-gabung" onClick={() => setGabung(true)} title="Satukan dua kartu yang ternyata orang yang sama">
+              Gabungkan
             </Button>
             <Button
               variant="primary"
@@ -218,7 +219,7 @@ export default function Members() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari nama, kode, atau instrumen…"
+              placeholder="Cari nama, panggilan, kode, atau instrumen…"
               className="pl-9"
             />
           </div>
@@ -233,8 +234,9 @@ export default function Members() {
             </Select>
           </div>
         </div>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <Toggle checked={showInactive} onChange={setShowInactive} label="Tampilkan anggota nonaktif" />
+          <PilihModeNama />
         </div>
       </Card>
 
@@ -262,8 +264,14 @@ export default function Members() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <p className={`truncate text-sm font-medium ${m.active ? 'text-slate-100' : 'text-slate-500 line-through'}`}>
-                          {m.name}
+                          <NamaTampil anggota={m} />
                         </p>
+                        {m.panggilan?.trim() && m.panggilan.trim() !== m.name && modeNama === 'lengkap' && (
+                          <span className="text-[10px] text-slate-500">{m.panggilan.trim()}</span>
+                        )}
+                        {m.panggilan?.trim() && modeNama === 'panggilan' && (
+                          <span className="text-[10px] text-slate-500">{m.name}</span>
+                        )}
                         <Badge>{m.code}</Badge>
                         {m.role !== 'member' && <Badge className="border-violet-500/30 bg-violet-500/10 text-violet-300">{ROLE_LABEL[m.role]}</Badge>}
                       </div>
@@ -319,6 +327,7 @@ export default function Members() {
         existingCodes={members.map((m) => m.code)}
       />
       <QrModal member={qrFor} onClose={() => setQrFor(null)} />
+      <GabungAnggota open={gabung} anggota={members} onClose={() => setGabung(false)} />
     </div>
   )
 }
@@ -361,8 +370,16 @@ function MemberModal({
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Nama lengkap">
+        <Field label="Nama lengkap" hint="dipakai laporan & kartu kehadiran">
           <Input autoFocus value={m.name} onChange={(e) => setM({ ...m, name: e.target.value })} placeholder="Nama anggota" />
+        </Field>
+        <Field label="Nama panggilan" hint="opsional, mis. Dede">
+          <Input
+            data-testid="kolom-panggilan"
+            value={m.panggilan ?? ''}
+            onChange={(e) => setM({ ...m, panggilan: e.target.value })}
+            placeholder="Nama di lapangan"
+          />
         </Field>
         <Field label="Kode / nomor" hint="muncul di chart">
           <Input
@@ -539,7 +556,7 @@ function QrModal({ member, onClose }: { member: Member | null; onClose: () => vo
         ) : (
           <p className="text-sm text-slate-400">Membuat kode QR…</p>
         )}
-        <p className="mt-3 text-sm font-medium text-slate-100">{member.name}</p>
+        <p className="mt-3 text-sm font-medium text-slate-100"><NamaTampil anggota={member} /></p>
         <p className="text-xs text-slate-500">
           {member.code} · {sectionLabel(member.section)} · {member.instrument}
         </p>

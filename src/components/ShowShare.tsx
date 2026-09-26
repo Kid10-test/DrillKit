@@ -11,13 +11,13 @@
  * 2. Kalau show dengan id yang sama sudah ada di perangkat ini, aplikasi
  *    **bertanya** lebih dulu mau ditimpa, digabung, atau disalin sebagai show
  *    baru — tidak ada data yang ditimpa tanpa pilihanmu.
- * 3. Anggota yang sudah ada **tidak pernah** ditimpa; yang belum ada ditambahkan
- *    dengan token QR baru.
+ * 3. Anggota yang sudah ada **tidak pernah** ditimpa. Yang belum dikenal
+ *    dicocokkan dulu; yang dipilih sebagai anggota baru mendapat token QR baru.
  */
 
 import { useRef, useState } from 'react'
 import { db } from '../db/db'
-import type { Drill } from '../db/types'
+import type { Drill, Member } from '../db/types'
 import { Button, Field, Modal, Select, useToast } from './ui'
 import { IconDownload, IconUpload } from './Icons'
 import { downloadFile, readFileAsText } from '../lib/utils'
@@ -31,6 +31,17 @@ import {
   susunBerkasShow,
 } from '../lib/show'
 import type { BerkasShow, ModeImpor } from '../lib/show'
+import {
+  keputusanAwal,
+  perluDitanya,
+  susunSaran,
+  terapkanCocok,
+  tulisUlangMuatan,
+  type KeputusanCocok,
+  type SaranBaris,
+} from '../lib/namaAnggota'
+import { simpanAnggota } from '../lib/simpanAnggota'
+import { PanelCocok } from './PanelCocok'
 
 export function KartuBerbagiShow({
   drill,
@@ -45,6 +56,10 @@ export function KartuBerbagiShow({
   const toast = useToast()
   const [mode, setMode] = useState<ModeImpor>('gabung')
   const [berkas, setBerkas] = useState<BerkasShow | null>(null)
+  const [showAda, setShowAda] = useState(false)
+  const [lokal, setLokal] = useState<Member[]>([])
+  const [saran, setSaran] = useState<SaranBaris[]>([])
+  const [keputusan, setKeputusan] = useState<Record<string, KeputusanCocok>>({})
   const [sedang, setSedang] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -73,25 +88,56 @@ export function KartuBerbagiShow({
       return
     }
     const sah = data as BerkasShow
+    const ada = await db.members.toArray()
+    const baris = susunSaran(sah.members ?? [], ada)
     const sudahAda = await db.drills.get(sah.drill.id)
-    if (!sudahAda) {
-      // Show belum ada di sini → langsung masuk tanpa bertanya.
-      await jalankan(sah, 'gabung')
+    const tanya = perluDitanya(baris, ada.length)
+    if (!sudahAda && !tanya) {
+      await jalankan(sah, 'gabung', ada, keputusanAwal(baris))
       return
     }
+    setLokal(ada)
+    setSaran(baris)
+    setKeputusan(keputusanAwal(baris))
+    setShowAda(!!sudahAda)
     setBerkas(sah)
     setMode('gabung')
   }
 
-  async function jalankan(data: BerkasShow, modeDipakai: ModeImpor) {
+  async function jalankan(
+    data: BerkasShow,
+    modeDipakai: ModeImpor,
+    anggotaLokal: Member[] = lokal,
+    kep: Record<string, KeputusanCocok> = keputusan,
+  ) {
     setSedang(true)
     try {
-      const h = await imporShow(data, modeDipakai)
+      const hasil = terapkanCocok({
+        masuk: data.members ?? [],
+        lokal: anggotaLokal,
+        keputusan: kep,
+        arah: 'lokal',
+      })
+      const { data: diubah, bentrok } = tulisUlangMuatan(data, hasil.peta)
+      const idCocok = new Set(hasil.idSudahCocok)
+      const idLokal = new Set(anggotaLokal.map((m) => m.id))
+      // Anggota baru tetap di berkas: imporShow yang memberi token QR baru.
+      const siap: BerkasShow = {
+        ...diubah,
+        members: (diubah.members ?? []).filter((m) => !idCocok.has(m.id)),
+      }
+      await simpanAnggota(
+        hasil.anggotaTulis.filter((m) => idLokal.has(m.id)),
+        [],
+      )
+      const h = await imporShow(siap, modeDipakai)
       setBerkas(null)
+      const catatan = hasil.laporan.length + bentrok.length
       toast.push(
         `Show "${h.nama}" masuk · ${h.setDitulis} set` +
           (h.setDihapus ? ` · ${h.setDihapus} set lama diganti` : '') +
           (h.anggotaBaru ? ` · ${h.anggotaBaru} anggota baru` : '') +
+          (catatan ? ` · ${catatan} catatan pencocokan` : '') +
           (h.laguBaru ? ` · ${h.laguBaru} lagu baru` : ''),
       )
       onSelesai?.(h.drillId)
@@ -110,7 +156,8 @@ export function KartuBerbagiShow({
       <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
         Ekspor show ini jadi berkas <b>.json</b>, kirim ke pelatih lain, lalu ia bisa membukanya,
         menyusun set-nya sendiri, dan mengirim balik berkasnya untuk digabung ke sini. Anggota &
-        lagu yang sudah ada di perangkat tujuan <b>tidak akan ditimpa</b>. Token QR absensi tidak
+        lagu yang sudah ada di perangkat tujuan <b>tidak akan ditimpa</b>. Anggota yang belum
+        dikenal dicocokkan dulu, tidak langsung ditambahkan. Token QR absensi tidak
         ikut dalam berkas.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -139,6 +186,7 @@ export function KartuBerbagiShow({
         open={!!berkas}
         onClose={() => setBerkas(null)}
         title="Impor show"
+        wide={perluDitanya(saran, lokal.length)}
         footer={
           <>
             <Button variant="ghost" onClick={() => setBerkas(null)}>
@@ -173,27 +221,41 @@ export function KartuBerbagiShow({
                 })}
               </p>
             </div>
-            <p className="mt-3 text-[11px] text-amber-200">
-              Show dengan id yang sama sudah ada di perangkat ini. Pilih caranya:
-            </p>
-            <div className="mt-2">
-              <Field label="Cara mengimpor">
-                <Select
-                  data-testid="pilih-mode-impor"
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value as ModeImpor)}
-                >
-                  {(['ganti', 'gabung', 'salinan'] as ModeImpor[]).map((m) => (
-                    <option key={m} value={m}>
-                      {LABEL_MODE[m]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
-                {KETERANGAN_MODE[mode]}
-              </p>
-            </div>
+            {showAda && (
+              <>
+                <p className="mt-3 text-[11px] text-amber-200">
+                  Show dengan id yang sama sudah ada di perangkat ini. Pilih caranya:
+                </p>
+                <div className="mt-2">
+                  <Field label="Cara mengimpor">
+                    <Select
+                      data-testid="pilih-mode-impor"
+                      value={mode}
+                      onChange={(e) => setMode(e.target.value as ModeImpor)}
+                    >
+                      {(['ganti', 'gabung', 'salinan'] as ModeImpor[]).map((m) => (
+                        <option key={m} value={m}>
+                          {LABEL_MODE[m]}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
+                    {KETERANGAN_MODE[mode]}
+                  </p>
+                </div>
+              </>
+            )}
+            {perluDitanya(saran, lokal.length) && (
+              <div className="mt-3">
+                <PanelCocok
+                  saran={saran}
+                  lokal={lokal}
+                  keputusan={keputusan}
+                  onUbah={(id, kep) => setKeputusan((s) => ({ ...s, [id]: kep }))}
+                />
+              </div>
+            )}
           </>
         )}
       </Modal>

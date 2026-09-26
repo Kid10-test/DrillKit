@@ -5,6 +5,8 @@
 
 /** Dot sheet A4 & buku saku lipat per pemain (pratinjau + unduh + cetak). */
 import { useState } from 'react'
+import { namaTampil } from '../lib/namaAnggota'
+import { useModeNama } from './NamaTampil'
 import type {
   Drill,
   DrillSet,
@@ -154,6 +156,7 @@ export function DotSheetModal({
   roster: Member[]
 }) {
   const toast = useToast()
+  const modeNama = useModeNama()
   /** Ambang kesulitan punya tim — supaya kertas & panel DD3 berkata sama. */
   const settings = useSettings()
   const [memberId, setMemberId] = useState<string>('all')
@@ -558,7 +561,7 @@ export function DotSheetModal({
           <option value="all">Semua pemain (satu kartu per orang)</option>
           {roster.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.code} — {m.name}
+              {m.code} — {namaTampil(m, modeNama)}
             </option>
           ))}
         </Select>

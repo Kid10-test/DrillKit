@@ -5,6 +5,8 @@
 
 /** DD6 — Detail gerak per pemain di semua set. */
 import { useEffect, useMemo, useState } from 'react'
+import { namaTampil } from '../lib/namaAnggota'
+import { useModeNama } from './NamaTampil'
 import { db } from '../db/db'
 import type {
   Drill,
@@ -67,6 +69,8 @@ export function PerformerDetailModal({
   onKeSet?: (urutan: number) => void
 }) {
   const toast = useToast()
+  const modeNama = useModeNama()
+  const nama = member ? namaTampil(member, modeNama) : ''
   /** Ambang kesulitan punya tim — supaya angkanya sama dengan panel DD3. */
   const settings = useSettings()
   /**
@@ -123,7 +127,7 @@ export function PerformerDetailModal({
   function simpanInstrumen() {
     if (!member) return
     db.members.update(member.id, { instrument: instrumen.trim() })
-    toast.push(`Instrumen/perlengkapan ${member.name} disimpan`, 'info')
+    toast.push(`Instrumen/perlengkapan ${nama} disimpan`, 'info')
   }
 
   /**
@@ -151,8 +155,8 @@ export function PerformerDetailModal({
     await db.sets.put({ ...s, langkah })
     toast.push(
       berikut
-        ? `${s.name} — langkah ${member.name}: ${berikut === 'tetap' ? 'ukuran tetap' : 'ikut hitungan'}`
-        : `${s.name} — langkah ${member.name} dikembalikan ke bawaan drill`,
+        ? `${s.name} — langkah ${nama}: ${berikut === 'tetap' ? 'ukuran tetap' : 'ikut hitungan'}`
+        : `${s.name} — langkah ${nama} dikembalikan ke bawaan drill`,
       'info',
     )
   }
@@ -161,7 +165,7 @@ export function PerformerDetailModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={`Detail — ${member?.name ?? ''}`}
+      title={`Detail — ${nama}`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

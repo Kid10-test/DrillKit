@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { namaDenganPanggilan } from '../lib/namaAnggota'
 import { Badge, Button, Card, Modal, Select, useToast } from './ui'
 import { IconDownload, IconEye, IconPrinter } from './Icons'
 import { downloadHtmlFile } from '../lib/print'
@@ -110,10 +111,10 @@ export default function AdminReports({ data }: { data: DataLaporan }) {
           >
             <option value="">Semua anggota</option>
             {[...data.anggota]
-              .sort((a, b) => a.name.localeCompare(b.name))
+              .sort((a, b) => namaDenganPanggilan(a).localeCompare(namaDenganPanggilan(b), 'id'))
               .map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name}
+                  {namaDenganPanggilan(m)}
                 </option>
               ))}
           </Select>

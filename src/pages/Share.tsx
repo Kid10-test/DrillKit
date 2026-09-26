@@ -20,6 +20,8 @@ import { IconDownload, IconLoop, IconPause, IconPlay, IconShare, IconUpload } fr
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
 import { TombolPanduanAnggota } from '../components/Panduan'
 import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
+import { cocokCari, namaDenganPanggilan } from '../lib/namaAnggota'
+import { NamaTampil } from '../components/NamaTampil'
 import Music from './Music'
 import { useMemberMode } from '../hooks/useMemberMode'
 import { TombolKeluarModeAnggota, TombolMasukModeAnggota } from '../components/ModePerangkat'
@@ -333,7 +335,7 @@ function CoachExport() {
               {
                 format: preview.format,
                 teamName: preview.team?.teamName,
-                members: preview.members.slice(0, 3).map((m) => `${m.code} — ${m.name} (${m.section})`),
+                members: preview.members.slice(0, 3).map((m) => `${m.code} — ${namaDenganPanggilan(m)} (${m.section})`),
                 sessions: preview.sessions.slice(0, 5).map((s: Session) => `${s.date} ${s.title}`),
                 drills: preview.drills.map((d) => d.name),
                 songs: preview.songs.map((s) => `${s.title} @ ${s.bpm}BPM`),
@@ -552,7 +554,7 @@ function MemberView() {
 
   const filtered = members.filter((m) => {
     const s = q.trim().toLowerCase()
-    return !s || m.name.toLowerCase().includes(s) || m.code.toLowerCase().includes(s)
+    return cocokCari(m, s)
   })
   const me = members.find((m) => m.id === meId)
 
@@ -599,7 +601,7 @@ function MemberView() {
                 {me.code}
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-100">{me.name}</p>
+                <p className="text-sm font-semibold text-slate-100">{namaDenganPanggilan(me)}</p>
                 <p className="text-xs text-slate-500">
                   {sectionLabel(me.section)} · {me.instrument}
                 </p>
@@ -626,7 +628,7 @@ function MemberView() {
                   className="flex w-full items-center gap-2 rounded-lg border border-slate-800 px-3 py-2 text-left hover:bg-slate-800/60"
                 >
                   <span className="h-2 w-2 rounded-full" style={{ background: sectionDot(m.section) }} />
-                  <span className="text-sm text-slate-200">{m.name}</span>
+                  <span className="text-sm text-slate-200"><NamaTampil anggota={m} /></span>
                   <Badge className="ml-auto">{m.code}</Badge>
                 </button>
               ))}

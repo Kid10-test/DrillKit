@@ -3,6 +3,8 @@ import type { AttendanceRecord, Member } from '../db/types'
 import { Badge, Button, Modal, useToast } from './ui'
 import { beep, buzz } from '../lib/feedback'
 import { cx, formatTime } from '../lib/utils'
+import { bacaModeNama, cocokCari, namaTampil } from '../lib/namaAnggota'
+import { NamaTampil } from './NamaTampil'
 import { IconCheck, IconQr, IconSearch } from './Icons'
 
 /**
@@ -148,7 +150,7 @@ export default function ScanQrModal({
       if (sudah) {
         if (soundRef.current) beep('dupe')
         if (vibRef.current) buzz('dupe')
-        setFlash({ kind: 'dupe', text: `${m.name} sudah tercatat`, sub: m.code, at: now })
+        setFlash({ kind: 'dupe', text: `${namaTampil(m, bacaModeNama())} sudah tercatat`, sub: m.code, at: now })
         return
       }
 
@@ -157,7 +159,7 @@ export default function ScanQrModal({
       })
       if (soundRef.current) beep('ok')
       if (vibRef.current) buzz('ok')
-      setFlash({ kind: 'ok', text: m.name, sub: m.code, at: now })
+      setFlash({ kind: 'ok', text: namaTampil(m, bacaModeNama()), sub: m.code, at: now })
       setCamError('')
     }
 
@@ -235,7 +237,7 @@ export default function ScanQrModal({
       (r) => r.sessionId === sessionIdRef.current && r.memberId === m.id && r.status === 'hadir',
     )
     if (sudah) {
-      toastRef.current.push(`${m.name} sudah tercatat hadir`, 'info')
+      toastRef.current.push(`${namaTampil(m, bacaModeNama())} sudah tercatat hadir`, 'info')
       return
     }
     void onMarkRef.current(m.id).then((recordId) => {
@@ -244,7 +246,7 @@ export default function ScanQrModal({
     })
     if (soundRef.current) beep('ok')
     if (vibRef.current) buzz('ok')
-    setFlash({ kind: 'ok', text: m.name, sub: m.code, at: Date.now() })
+    setFlash({ kind: 'ok', text: namaTampil(m, bacaModeNama()), sub: m.code, at: Date.now() })
   }
 
   /** Hasil ketikan manual (kode atau nama), paling banyak 5. */
@@ -252,7 +254,7 @@ export default function ScanQrModal({
     const s = manual.trim().toLowerCase()
     if (!s) return []
     return members
-      .filter((m) => m.code.toLowerCase().includes(s) || m.name.toLowerCase().includes(s))
+      .filter((m) => cocokCari(m, s))
       .slice(0, 5)
   }, [manual, members])
 
@@ -318,7 +320,7 @@ export default function ScanQrModal({
                   className="flex items-center gap-2 rounded-lg border border-emerald-900/60 bg-emerald-950/30 px-3 py-1.5"
                 >
                   <IconCheck size={14} className="shrink-0 text-emerald-400" />
-                  <span className="min-w-0 flex-1 truncate text-sm text-slate-100">{m?.name ?? r.memberId}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-100">{m ? <NamaTampil anggota={m} /> : r.memberId}</span>
                   <span className="shrink-0 text-[11px] text-slate-500">{m?.code}</span>
                   <span className="shrink-0 text-[11px] text-slate-500">{formatTime(r.at)}</span>
                   <button
@@ -326,7 +328,7 @@ export default function ScanQrModal({
                       void onUndoRef.current(r.recordId)
                       setRecent((s) => s.filter((x) => x.recordId !== r.recordId))
                       seenRef.current.delete(r.raw)
-                      toastRef.current.push(`${m?.name ?? 'Data'} dibatalkan`, 'info')
+                      toastRef.current.push(`${m ? namaTampil(m, bacaModeNama()) : 'Data'} dibatalkan`, 'info')
                     }}
                     className="shrink-0 rounded-md border border-slate-700 px-2 py-0.5 text-[11px] text-slate-400 hover:border-rose-500 hover:text-rose-400"
                     title="Batalkan absensi ini"
@@ -372,7 +374,7 @@ export default function ScanQrModal({
                 }}
                 className="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-left text-sm hover:bg-slate-800"
               >
-                <span className="text-slate-200">{m.name}</span>
+                <span className="text-slate-200"><NamaTampil anggota={m} /></span>
                 <Badge>{m.code}</Badge>
               </button>
             ))}

@@ -37,6 +37,17 @@ export interface Member {
   /** Nomor/ID singkat yang tampil di chart (mis. "T1", "12") */
   code: string
   name: string
+  /**
+   * Nama panggilan di lapangan, mis. "Dede". Kosong = tidak ada.
+   * Yang tampil (nama lengkap atau panggilan) dipilih per perangkat, bukan
+   * di sini. Cetakan resmi tetap memakai `name`.
+   */
+  panggilan?: string
+  /**
+   * Id lama yang pernah merujuk orang yang sama — hasil penggabungan atau
+   * pencocokan impor. Impor berikutnya langsung cocok tanpa ditanya lagi.
+   */
+  alias?: string[]
   section: Section
   /**
    * Instrumen **sekaligus perlengkapan** yang dibawa pemain. Satu kolom saja
@@ -862,4 +873,9 @@ export interface ShareBundle {
    * memilikinya — yang membukanya tetap ditanya seperti dulu.
    */
   forMember?: string
+  /**
+   * Nama yang ditulis di berkas per anggota, lengkap dengan panggilan:
+   * "Andra Pratama (Dede)". Kosong di berkas grup.
+   */
+  namaPenerima?: string
 }

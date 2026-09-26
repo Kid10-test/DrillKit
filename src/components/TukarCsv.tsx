@@ -9,6 +9,7 @@ import {
   bacaCsvKoordinat,
 } from '../lib/csvKoordinat'
 import { toCSV } from '../lib/utils'
+import { namaDenganPanggilan } from '../lib/namaAnggota'
 import { Button, Field, Modal, Select, Textarea, useToast } from './ui'
 
 /* ========================================================================== */
@@ -368,7 +369,7 @@ export default function TukarCsvModal({
                         {cocok.pasangan.slice(0, 5).map(({ m, b }) => (
                           <tr key={m.id} className="border-t border-slate-800/70">
                             <td className="px-1 py-0.5 text-slate-300">
-                              {m.code} — {m.name}
+                              {m.code} — {namaDenganPanggilan(m)}
                             </td>
                             {b.pos.map((p, i) => (
                               <td key={i} className="px-1 py-0.5 text-slate-400">
