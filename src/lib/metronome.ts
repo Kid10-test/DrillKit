@@ -23,6 +23,8 @@
 
 import type { BiramaPola, LatihTempo, PolaRitme, SuaraKlik, TingkatKlik } from '../db/types'
 import type { HitungMundur, TandaBirama } from './birama'
+import { rapikanNaik, tempoPutaran, terapkanLatihan, tujuanTercapai } from './tempoLatihan'
+import type { NaikOtomatis, TempoLatihan } from './tempoLatihan'
 import {
   bikinPolaDariBirama,
   detikPerNot as hitungDetikPerNot,
@@ -87,15 +89,20 @@ export function tempoBerlaku(
     segmen?: SegmenTempo[]
     pakaiTempoMap?: boolean
     latih?: LatihTempo | null
+    /**
+     * #4 — tempo latihan (persen / geser BPM). Diterapkan **paling akhir**,
+     * sesudah tempo map, luncuran berangsur, dan latih tempo lama.
+     */
+    latihan?: TempoLatihan | null
   },
   ke: number,
 ): number {
   const segmen = opsi.segmen ?? []
   const pakai = (opsi.pakaiTempoMap ?? false) && segmen.length > 0
-  let bpm = pakai ? tempoPeta(segmen, ke, opsi.dasar) : opsi.dasar
+  const bpm = pakai ? tempoPeta(segmen, ke, opsi.dasar) : opsi.dasar
   // Yang lebih khusus menang; lihat penjelasan `adaBerangsur`.
-  if (pakai && adaBerangsur(segmen)) return bpm
-  return tempoLatih(bpm, opsi.latih ?? null, ke)
+  const berlaku = pakai && adaBerangsur(segmen) ? bpm : tempoLatih(bpm, opsi.latih ?? null, ke)
+  return terapkanLatihan(berlaku, opsi.latihan ?? null)
 }
 
 /**
@@ -307,6 +314,15 @@ export interface OpsiMetronom {
    * Kosong atau tidak sah = tidak ada pengulangan bagian.
    */
   ulangBagian?: { dari: number; sampai: number } | null
+  /** #4 — tempo latihan, diterapkan paling akhir (termasuk hitung mundur). */
+  latihan?: TempoLatihan | null
+  /**
+   * #4 — naik otomatis tiap putaran ulang bagian. Hanya berlaku kalau
+   * `ulangBagian` sah. Selama menyala, ia yang menentukan tempo latihan.
+   */
+  naikOtomatis?: NaikOtomatis | null
+  /** #4 — dipanggil tiap kali putaran ulang bagian dimulai (termasuk putaran 1). */
+  onPutaran?: (i: { putaran: number; tempo: TempoLatihan; tujuan: boolean }) => void
 }
 
 /** M1 — hitung mundur dianggap hidup kalau dinyalakan dan ulangannya masuk akal. */
@@ -417,6 +433,11 @@ export class Metronom {
   /** M5 — sudah mencapai akhir lagu: tidak ada birama baru dijadwalkan lagi. */
   private selesai = false
   private onSelesai: (() => void) | null = null
+  /** #4 — tempo latihan yang sedang dipakai. */
+  private latihan: TempoLatihan | null = null
+  private naik: NaikOtomatis | null = null
+  private putaran = 1
+  private onPutaran: OpsiMetronom['onPutaran'] | null = null
 
   get jalan() {
     return this.timer !== null
@@ -488,6 +509,15 @@ export class Metronom {
     this.ulangSampai = rentangSah ? sp : 0
     this.selesai = false
     this.onSelesai = opsi.onSelesai ?? null
+    // #4 — tempo latihan & naik otomatis.
+    this.latihan = opsi.latihan ?? null
+    this.onPutaran = opsi.onPutaran ?? null
+    this.naik = opsi.naikOtomatis && opsi.naikOtomatis.on && rentangSah ? rapikanNaik(opsi.naikOtomatis) : null
+    this.putaran = 1
+    if (this.naik) {
+      this.latihan = tempoPutaran(this.naik, 1)
+      this.onPutaran?.({ putaran: 1, tempo: this.latihan, tujuan: tujuanTercapai(this.naik, 1) })
+    }
     // Mulai dari birama yang sudah lewat akhir lagu = tidak ada yang diputar.
     if (this.biramaAkhir > 0 && mulaiDari > this.biramaAkhir) this.selesai = true
 
@@ -514,9 +544,21 @@ export class Metronom {
     this.onSelesai = null
     this.ulangDari = 0
     this.ulangSampai = 0
+    this.naik = null
+    this.onPutaran = null
     const ctx = this.ctx
     this.ctx = null
     if (ctx) ctx.close().catch(() => undefined)
+  }
+
+  /**
+   * #4 — ganti tempo latihan tanpa menghentikan metronom. Berlaku mulai
+   * birama berikutnya yang dijadwalkan. Diabaikan selama naik otomatis
+   * menyala (naik otomatis yang memegang tempo).
+   */
+  setLatihan(t: TempoLatihan | null) {
+    if (this.naik) return
+    this.latihan = t
   }
 
   /** Ubah volume tanpa menghentikan metronom. */
@@ -542,6 +584,7 @@ export class Metronom {
           segmen: this.segmen,
           pakaiTempoMap: this.pakaiTempoMap,
           latih: this.latih,
+          latihan: this.latihan,
         },
         ke,
       ),
@@ -674,6 +717,20 @@ export class Metronom {
       // awal rentang. Ini **menang** atas akhir lagu maupun `ulang`, karena
       // berlatih satu bagian berarti lagu memang tidak boleh berhenti.
       if (this.ulangSampai > 0 && biramaAbsolut > this.ulangSampai) {
+        // #4 — naik otomatis: tiap putaran baru, tempo latihan naik.
+        if (this.naik) {
+          if (tujuanTercapai(this.naik, this.putaran) && this.naik.akhir === 'berhenti') {
+            this.selesai = true
+            break
+          }
+          this.putaran++
+          this.latihan = tempoPutaran(this.naik, this.putaran)
+          this.onPutaran?.({
+            putaran: this.putaran,
+            tempo: this.latihan,
+            tujuan: tujuanTercapai(this.naik, this.putaran),
+          })
+        }
         this.pos = this.ulangDari - 1
         continue
       }

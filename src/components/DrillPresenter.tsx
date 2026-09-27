@@ -43,6 +43,9 @@ export function DrillPresenter({
   roster,
   startIdx = 0,
   tempoPerSet,
+  tempoAsliPerSet,
+  labelLatihan,
+  onTempoAsli,
   onClose,
 }: {
   drill: Drill
@@ -55,6 +58,12 @@ export function DrillPresenter({
    * memakai tempo lagu pada set itu, bukan satu tempo datar drill.
    */
   tempoPerSet?: number[]
+  /** #4 — tempo asli per set (sebelum tempo latihan), untuk "138 BPM (asli 172)". */
+  tempoAsliPerSet?: number[]
+  /** #4 — "Latihan 80%" kalau presenter sedang ikut melambat; `null` kalau tempo asli. */
+  labelLatihan?: string | null
+  /** #4 — kembali ke tempo asli. */
+  onTempoAsli?: () => void
   /** dipanggil saat ditutup — membawa indeks set terakhir yang dilihat */
   onClose: (idx: number) => void
 }) {
@@ -896,6 +905,29 @@ export function DrillPresenter({
           </g>
         </svg>
       </div>
+
+      {/* #4 — presenter ikut melambat mengikuti tempo latihan lagu */}
+      {labelLatihan && (
+        <div
+          className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 sm:mx-5"
+          data-testid="presenter-latihan"
+        >
+          <span className="text-xs text-amber-200">
+            <b>{labelLatihan}</b> · {Math.round(tempoUntuk(idx))} BPM
+            {tempoAsliPerSet?.[idx] != null ? ` (asli ${Math.round(tempoAsliPerSet[idx])})` : ''}
+          </span>
+          {onTempoAsli && (
+            <button
+              type="button"
+              onClick={onTempoAsli}
+              className="rounded-lg border border-amber-500/40 px-2 py-1 text-xs font-medium text-amber-100 active:scale-[.98]"
+              data-testid="presenter-tempo-asli"
+            >
+              Tempo asli
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Kontrol besar — mudah dipakai sambil berdiri */}
       <div className="flex items-center gap-3 px-3 pb-3 pt-2 sm:px-5">

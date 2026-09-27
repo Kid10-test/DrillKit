@@ -42,6 +42,8 @@ import type { SegmenWaktu } from '../lib/birama'
 import { hitungSetList, setListBaru } from '../lib/setlist'
 import { detikSatuPutaran, jumlahBirama, rentangValid } from '../lib/ulang'
 import { KartuSetList } from '../components/KartuSetList'
+import { KendaliTempoLatihan, LencanaLatihan } from '../components/KendaliTempoLatihan'
+import { useTempoLatihan } from '../hooks/useTempoLatihan'
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
 import { IndikatorKetuk, PanelSedangDiputar, StripSegmen } from '../components/PanelLagu'
 import { diam as hentikanUcapan, ucap as ucapkan } from '../lib/ucap'
@@ -147,6 +149,18 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
 
   const song = songs?.find((s) => s.id === selected)
   const segs = useMemo(() => song?.tempoMap ?? [], [song])
+  /* ------------------------ #4 — tempo latihan -------------------------- */
+  const tl = useTempoLatihan()
+  /** Tempo latihan lagu yang dipilih (per lagu, per perangkat). */
+  const latihan = tl.tempoUntuk(song?.id)
+  const naikOtomatis = tl.naikUntuk(song?.id)
+  /** Putaran naik otomatis yang sedang berjalan; `null` kalau tidak berjalan. */
+  const [putaran, setPutaran] = useState<number | null>(null)
+  /** Ubah tempo latihan saat berjalan → langsung terdengar di birama berikutnya. */
+  useEffect(() => {
+    if (engineRef.current.jalan) engineRef.current.setLatihan(latihan)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latihan.mode, latihan.persen, latihan.geser])
 
   /* ------------------------- M1 — mode lagu ------------------------------ */
   /** Segmen tempo ringkas untuk menghitung sukat & tempo yang berlaku. */
@@ -188,11 +202,17 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
             segmen: segs,
             pakaiTempoMap: useMap && segs.length > 0,
             latih,
+            // #4 — tempo latihan ikut, jadi durasi & sisa waktu memakai tempo latihan.
+            latihan,
           },
           bir,
         ),
       ),
-    [bpm, segs, useMap, latih],
+    [bpm, segs, useMap, latih, latihan],
+  )
+  /** #4 — tempo asli (tanpa tempo latihan) pada birama yang sedang berjalan. */
+  const tempoAsliSekarang = jepitTempo(
+    tempoBerlaku({ dasar: bpm, segmen: segs, pakaiTempoMap: useMap && segs.length > 0, latih }, measure),
   )
   /* --------------------- M5 — panjang lagu & ulang ---------------------- */
   /** Birama terakhir lagu. 0 = lagu tanpa akhir (perilaku lama). */
@@ -408,6 +428,8 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
      * mendengar birama sebelumnya dulu tiap kali menekan Mulai.
      */
     const mulai = ulangBagianAktif && ub ? ub.dari : m
+    const idLagu = song?.id
+    setPutaran(null)
     engineRef.current.mulai({
       bpm,
       beats,
@@ -429,10 +451,19 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
       ulang: ulangAktif,
       // M2 — rentang ulang. Kalau hidup, ini menang atas akhir lagu.
       ulangBagian: ulangBagianAktif && ub ? { dari: ub.dari, sampai: ub.sampai } : null,
+      // #4 — tempo latihan & naik otomatis tiap putaran bagian.
+      latihan,
+      naikOtomatis: ulangBagianAktif ? naikOtomatis : null,
+      onPutaran: (info) => {
+        setPutaran(info.putaran)
+        // Tempo terakhir yang dicapai diingat.
+        tl.aturTempo(idLagu, info.tempo)
+      },
       onSelesai: () => {
         setRunning(false)
         setAktif(null)
         setHabis(true)
+        setPutaran(null)
       },
       onKetuk: (i) => {
         setMeasure(i.birama)
@@ -474,6 +505,8 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
       volume: s.volume ?? volume,
       getar: s.getar === 1 || getar,
       latih: s.latih ?? null,
+      // #4 — set list memakai tempo latihan setiap lagu.
+      latihan: tl.tempoUntuk(s.id),
       segmen,
       pakaiTempoMap: segmen.length > 0,
       birama: meter,
@@ -533,6 +566,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
       setRunning(false)
       setAktif(null)
       setHabis(false)
+      setPutaran(null)
       // M3 — berhenti manual menghentikan set list juga.
       mainkanSetRef.current = false
       setIndeksMain(null)
@@ -684,6 +718,17 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
             </div>
           </div>
 
+          {/* #4 — tempo latihan, dekat tombol Mulai. Juga tersedia di mode anggota. */}
+          <KendaliTempoLatihan
+            nilai={latihan}
+            onUbah={(t) => tl.aturTempo(song?.id, t)}
+            bpmAsli={tempoAsliSekarang}
+            naik={naikOtomatis}
+            onNaik={(n) => tl.aturNaik(song?.id, n)}
+            bisaNaik={ulangBagianAktif}
+            putaran={running ? putaran : null}
+          />
+
           {/* M1 — mode lagu: panel informasi & strip segmen (hanya saat lagu dipilih) */}
           {song && (
             <div className="mt-4 space-y-2">
@@ -698,6 +743,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
                 segmenTempo={segs}
                 latih={latih}
                 tempoUntuk={tempoUntuk}
+                latihan={latihan}
               />
               {segmenLengkap.length > 0 && (
                 <StripSegmen
@@ -1305,6 +1351,8 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
                       harus tahu SEBELUM memutarnya, bukan terkejut ketika
                       temponya tiba-tiba naik sendiri.
                     */}
+                    {/* #4 — lagu yang sedang dilatih dengan tempo latihan */}
+                    <LencanaLatihan nilai={tl.tempoUntuk(s.id)} testId={`lencana-tempo-latihan-${s.id}`} />
                     {s.latih?.on && (
                       <span
                         className="ml-1 rounded-full border border-emerald-600/40 bg-emerald-600/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300"
@@ -1400,6 +1448,8 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
         songs={songs ?? []}
         laguDipilih={selected}
         sedangMain={running}
+        latihanUntuk={(id) => tl.tempoUntuk(id)}
+        onSemuaAsli={(ids) => tl.keAsli(ids)}
         indeksMain={indeksMain}
         onPilih={(id) => {
           mainkanSetRef.current = false

@@ -182,6 +182,14 @@ try {
     const t = await teks(B)
     cek('3: anggota punya tab Musik', /Musik & Metronom/.test(t), t.slice(0, 200))
     cek('3: metronomnya bisa dipakai', await ada(B, 'tombol-mulai'))
+    // #4 — tempo latihan juga tersedia di mode anggota.
+    cek('3: kendali tempo latihan ada', await ada(B, 'kartu-tempo-latihan'))
+    await B.click('[data-testid="latihan-kurang"]')
+    await wait(300)
+    const nilaiLatihan = await B.evaluate(() => document.querySelector('[data-testid="latihan-nilai"]')?.textContent ?? '')
+    cek('3: anggota bisa menurunkan tempo latihan (95%)', nilaiLatihan === '95%', nilaiLatihan)
+    await B.click('[data-testid="latihan-asli"]')
+    await wait(300)
   }
 
   /* ================ 4. Metronom benar-benar berdetak ==================== */

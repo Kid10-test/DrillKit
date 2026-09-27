@@ -41,6 +41,8 @@ import { FieldSurface } from './FieldSurface'
 import { NamaTampil } from './NamaTampil'
 import { MarkerLayer, PenandaPanel, butuhDuaTitik } from './FieldMarkers'
 import { DrillPresenter } from './DrillPresenter'
+import { useTempoLatihan } from '../hooks/useTempoLatihan'
+import { labelLatihan, latihanAktif, terapkanLatihan } from '../lib/tempoLatihan'
 
 import {
   coordText as coorTextSafe,
@@ -246,7 +248,24 @@ export function Editor({
     )
   }, [lagu, sets, drill.beatsPerCount])
   /** Tempo yang dipakai set ke-`i`: dari lagu kalau ditautkan, kalau tidak ya tempo drill. */
-  const tempoUntuk = useCallback((i: number) => tempoSet(petaSet, i, drill.tempo), [petaSet, drill.tempo])
+  /*
+   * #4 — tempo latihan lagu yang ditautkan. Presenter & animasi editor ikut
+   * melambat; analitik langkah tetap memakai tempo asli (yang dinilai adalah
+   * penampilan sungguhan, bukan latihannya).
+   */
+  const tl = useTempoLatihan()
+  const latihanDrill = drill.songId && lagu ? tl.tempoUntuk(drill.songId) : null
+  const adaLatihanDrill = latihanAktif(latihanDrill)
+  const tempoUntuk = useCallback(
+    (i: number) => terapkanLatihan(tempoSet(petaSet, i, drill.tempo), latihanDrill),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [petaSet, drill.tempo, latihanDrill?.mode, latihanDrill?.persen, latihanDrill?.geser],
+  )
+  /** #4 — kembali ke tempo asli: tempo latihan lagu dan pengali animasi. */
+  const keTempoAsli = () => {
+    if (drill.songId) tl.keAsli([drill.songId])
+    ubah('cepat', 1)
+  }
   const [dotSheet, setDotSheet] = useState(false)
   /** DD4 — sudut putar blok (derajat). */
   const [sudutPutar, setSudutPutar] = useState(45)
@@ -368,8 +387,9 @@ export function Editor({
   /** B2 — lama perpindahan set ini (detik) setelah dikali kecepatan. */
   const durasiDetik = useMemo(() => {
     const counts = Math.max(1, set?.counts ?? 8)
-    return ((counts * drill.beatsPerCount * 60) / Math.max(20, drill.tempo)) / Math.max(0.05, view.cepat)
-  }, [set?.counts, drill.beatsPerCount, drill.tempo, view.cepat])
+    // #4 — memakai tempo set ini setelah tempo latihan (sama dengan animasinya).
+    return ((counts * drill.beatsPerCount * 60) / Math.max(20, tempoUntuk(idx))) / Math.max(0.05, view.cepat)
+  }, [set?.counts, drill.beatsPerCount, tempoUntuk, idx, view.cepat])
 
   /** A7 — penanda lapangan milik drill ini (drill lama belum punya → []). */
   const markers = useMemo(() => drill?.markers ?? [], [drill?.markers])
@@ -2266,6 +2286,32 @@ export function Editor({
               <option value="1.5">1,5×</option>
               <option value="2">2×</option>
             </Select>
+            {/* #4 — tempo latihan lagu disatukan dengan pengali kecepatan. */}
+            {(adaLatihanDrill || view.cepat !== 1) && (
+              <span className="flex items-center gap-1" data-testid="drill-latihan">
+                <span
+                  className="whitespace-nowrap rounded-full border border-amber-500/50 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-200"
+                  title={
+                    adaLatihanDrill
+                      ? `Tempo latihan lagu ${lagu?.title ?? ''} × kecepatan animasi ${view.cepat}×`
+                      : 'Kecepatan animasi'
+                  }
+                >
+                  {adaLatihanDrill
+                    ? `${labelLatihan(latihanDrill)}${view.cepat !== 1 ? ` × ${String(view.cepat).replace('.', ',')}` : ''}`
+                    : `${String(view.cepat).replace('.', ',')}×`}
+                </span>
+                <button
+                  type="button"
+                  data-kiosk-allow
+                  onClick={keTempoAsli}
+                  className="whitespace-nowrap rounded-md border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-slate-800"
+                  data-testid="drill-tempo-asli"
+                >
+                  Tempo asli
+                </button>
+              </span>
+            )}
 
             <Button
               size="sm"
@@ -3280,7 +3326,14 @@ export function Editor({
         <DrillPresenter
           drill={drill}
           sets={sets}
-          tempoPerSet={petaSet ? daftarTempo(petaSet, drill.tempo, sets.length) : undefined}
+          tempoPerSet={
+            petaSet
+              ? daftarTempo(petaSet, drill.tempo, sets.length).map((t) => terapkanLatihan(t, latihanDrill))
+              : undefined
+          }
+          tempoAsliPerSet={petaSet ? daftarTempo(petaSet, drill.tempo, sets.length) : undefined}
+          labelLatihan={adaLatihanDrill ? labelLatihan(latihanDrill) : null}
+          onTempoAsli={adaLatihanDrill ? () => drill.songId && tl.keAsli([drill.songId]) : undefined}
           roster={roster}
           startIdx={idx}
           onClose={(i) => {

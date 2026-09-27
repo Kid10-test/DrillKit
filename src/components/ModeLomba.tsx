@@ -10,6 +10,8 @@
  * dihitung oleh `posisiHari` (murni, teruji di node), jadi tampilan ini
  * hanya menyajikan.
  */
+import { useTempoLatihan } from '../hooks/useTempoLatihan'
+import { latihanAktif } from '../lib/tempoLatihan'
 import { useEffect, useMemo, useState } from 'react'
 import { db } from '../db/db'
 import type { ChecklistItem, SetList, Song } from '../db/types'
@@ -55,7 +57,12 @@ export function ModeLomba({
 
   const tampil = pos.tampilan
   const sl = tampil?.setListId ? setlists.find((s) => s.id === tampil.setListId) : undefined
+  // #4 — layar hari H SELALU memakai tempo asli: hitungSetList dipanggil
+  // tanpa tempo latihan. Lagu yang di perangkat ini sedang dilatih lebih
+  // lambat diberi peringatan, supaya tidak ada yang terkecoh.
   const hitung = sl ? hitungSetList(sl, songs) : null
+  const { tempoUntuk: latihanLagu } = useTempoLatihan()
+  const laguDilatih = (hitung?.baris ?? []).filter((b) => latihanAktif(latihanLagu(b.id)))
 
   const ubahCentang = async (sesiId: string, daftar: ChecklistItem[]) => {
     await db.sessions.update(sesiId, { checklist: daftar })
@@ -170,6 +177,15 @@ export function ModeLomba({
               {tampil.judul} · total {formatDetik(hitung?.total ?? 0)}
               {hitung?.tanpaPanjang ? ' (perkiraan — ada lagu tanpa panjang)' : ''}
             </p>
+            {laguDilatih.length > 0 && (
+              <p
+                className="mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-200"
+                data-testid="peringatan-tempo-latihan"
+              >
+                Layar hari H memakai <b>tempo asli</b>. Tempo latihan di perangkat ini diabaikan untuk{' '}
+                {laguDilatih.map((b) => b.judul).join(', ')}.
+              </p>
+            )}
             <ol className="space-y-1" data-testid="daftar-lagu">
               {(hitung?.baris ?? []).map((b, i) => (
                 <li key={b.id} className="flex items-baseline gap-3 text-lg sm:text-xl">
