@@ -85,4 +85,6 @@ rakit src/lib/namaAnggota.ts namaAnggota
 rakit src/lib/terbit.ts terbit
 # Bagian kedua #2 — kunci pribadi AES-256-GCM & data terkunci.
 rakit src/lib/kunci.ts kunci
+# #3 — jadwal: kalender bulan, agenda, seri mingguan, cetak & .ics gabungan.
+rakit src/lib/kalender.ts kalender
 echo "== selesai =="

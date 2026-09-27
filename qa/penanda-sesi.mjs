@@ -57,6 +57,8 @@ const tombol = (t) =>
 
 await p.goto(BASE, { waitUntil: 'networkidle2' })
 await lewatSambutan(p)
+// #3 — uji ini memeriksa kartu sesi; pakai tampilan Daftar (semua kartu terbuka).
+await p.evaluate(() => localStorage.setItem('drillkit.jadwal.tampilan', 'daftar'))
 await wait(1500)
 await tombol('Muat data contoh')
 await wait(4000)
