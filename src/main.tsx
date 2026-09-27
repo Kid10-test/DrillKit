@@ -6,6 +6,26 @@ import './index.css'
 import { mulaiTampilan } from './lib/tampilan'
 
 /**
+ * QR kunci pribadi memakai fragment URL agar kunci tidak pernah dikirim ke
+ * server. Karena DrillKit juga memakai HashRouter, `#kunci` perlu diubah
+ * sebelum router membaca alamatnya; kalau tidak, router akan mengira kunci
+ * itu nama rute lalu membuangnya sebelum halaman anggota sempat membacanya.
+ */
+function siapkanKunciQr() {
+  if (typeof location === 'undefined') return
+  const hash = location.hash
+  if (!hash || hash === '#' || hash.startsWith('#/')) return
+  const kunci = hash.slice(1)
+  try {
+    history.replaceState(null, '', `${location.pathname}${location.search}#/berbagi?kunci=${encodeURIComponent(kunci)}`)
+  } catch {
+    /* history bisa diblokir pada sebagian pembuka berkas */
+  }
+}
+
+siapkanKunciQr()
+
+/**
  * HashRouter dipilih supaya aplikasi bisa dibuka dari mana saja
  * (file host statis, PWA offline, atau preview) tanpa perlu aturan
  * rewrite di server.

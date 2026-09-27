@@ -165,7 +165,17 @@ export function urlDenganKunci(alamat: string, kunci: string): string {
  */
 export function kunciDariUrl(): string {
   if (typeof location === 'undefined') return ''
-  return location.hash.replace(/^#\/?/, '').trim()
+  const hash = location.hash
+  // DrillKit memakai HashRouter (`#/berbagi`). Itu adalah rute, bukan QR
+  // kunci. `main.tsx` memindahkan fragment QR awal ke query DI DALAM hash
+  // (`#/berbagi?kunci=...`) sebelum router dipasang; keduanya tetap tidak
+  // pernah dikirim ke server.
+  if (hash.startsWith('#/')) {
+    const tandaTanya = hash.indexOf('?')
+    if (tandaTanya < 0) return ''
+    return new URLSearchParams(hash.slice(tandaTanya + 1)).get('kunci')?.trim() ?? ''
+  }
+  return hash.replace(/^#\/?/, '').trim()
 }
 
 /**
