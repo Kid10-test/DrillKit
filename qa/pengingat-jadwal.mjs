@@ -111,6 +111,8 @@ try {
   A.on('dialog', async (d) => { await d.accept() })
   await A.goto(BASE, { waitUntil: 'networkidle2' })
   await lewatSambutan(A)
+  // #3 — uji ini memeriksa kartu sesi; pakai tampilan Daftar.
+  await A.evaluate(() => localStorage.setItem('drillkit.jadwal.tampilan', 'daftar'))
   await wait(1200)
   await A.evaluate(() => {
     const b = [...document.querySelectorAll('button')].find((y) => y.textContent.includes('Muat data contoh'))

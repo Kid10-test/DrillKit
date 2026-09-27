@@ -121,6 +121,13 @@ export interface Session {
   realisasiLatihan?: RealisasiBlok[]
 
   /**
+   * #3 — penanda seri "ulangi mingguan". Sesi dengan `seriId` sama dibuat
+   * sekaligus; mengubah satu sesi bisa diterapkan ke semua berikutnya.
+   * Kosong = sesi tunggal. Tidak ada tabel seri tersendiri.
+   */
+  seriId?: string
+
+  /**
    * G3 — kapan **sesinya sendiri** benar-benar dimulai (epoch ms).
    *
    * Sengaja **terpisah** dari blok pertama. Sesi dimulai ketika pelatih
