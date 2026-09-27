@@ -259,7 +259,7 @@ function tabAnggota(): [string, string][] {
   return [
     [
       'Jadwal',
-      'Jadwal mendatang &amp; materinya. Spanduk di atas mengingatkan sesi <b>hari ini &amp; besok</b>. Tombol <b>Kalender</b> menyimpan sesi ke kalender HP, lengkap dengan alarm H-1 dan 1 jam sebelumnya.',
+      'Kalender <b>Bulan</b> dan <b>Agenda</b> berisi jadwal pelatih dan materi tiap sesi. Pilih tanggal untuk melihat detail; kalender anggota hanya baca. Status kehadiran pribadimu muncul dari catatan terkunci setelah paket diperbarui dengan QR kunci.',
     ],
     [
       'Formasi',

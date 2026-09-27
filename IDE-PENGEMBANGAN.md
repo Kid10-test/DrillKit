@@ -3,9 +3,18 @@
 Dokumen ini **bukan** rencana yang harus dikerjakan semua. Ini kandidat perbaikan,
 diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
 
-**Terakhir diperbarui: 26 Sep 2026 — #2 bagian kedua (kunci pribadi & data terkunci) rampung.**
+**Terakhir diperbarui: 27 Sep 2026 — #3 bagian pertama (kalender & agenda jadwal) rampung.**
+· **#3 bagian pertama rampung (27 Sep 2026)** — halaman Jadwal punya tampilan **Bulan**
+  (mulai Senin, label per jenis, % hadir sesi lewat, checklist sesi mendatang, detail hari,
+  titik di HP), **Agenda** (kartu sesi berikutnya + hitung mundur, per minggu, sesi lewat
+  tersembunyi) dan **Daftar** (tampilan lama). Tambahan: ulangi mingguan (ubah *sesi ini* /
+  *semua berikutnya*, hapus seri tidak menyentuh sesi berabsensi), duplikat, seret-pindah
+  dengan Batalkan, hitung mundur penampilan, cetak bulan (hex), satu `.ics` semua jadwal
+  mendatang. Data sesi hanya bertambah `seriId`. Logika di `src/lib/kalender.ts`.
+  Uji: `kalender-logika` 67/67, `kalender-jadwal` 31/31; uji lama jadwal tetap lulus.
+  **Sisa #3:** kalender di mode anggota (dari data terkunci #2).
 · **Rancangan lanjutan (26 Sep 2026)** — delapan rancangan hasil diskusi pelatih
-  disimpan di bagian paling bawah (**Rancangan lanjutan**). #3–#8 belum dikerjakan.
+  disimpan di bagian paling bawah (**Rancangan lanjutan**). #3 sebagian (lihat di atas); #4–#8 belum dikerjakan.
 · **#2 bagian kedua rampung (26 Sep 2026)** — kunci pribadi AES-256-GCM per anggota,
   data pribadi terkunci di berkas terbit, QR kunci, dan tombol Buat kunci baru.
 · **#2 bagian pertama rampung (26 Sep 2026)** — satu tombol menerbitkan materi
