@@ -87,4 +87,6 @@ rakit src/lib/terbit.ts terbit
 rakit src/lib/kunci.ts kunci
 # #3 — jadwal: kalender bulan, agenda, seri mingguan, cetak & .ics gabungan.
 rakit src/lib/kalender.ts kalender
+# #4 — tempo latihan: persen/BPM, naik otomatis, simpanan per lagu.
+rakit src/lib/tempoLatihan.ts tempoLatihan
 echo "== selesai =="

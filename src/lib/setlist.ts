@@ -12,6 +12,8 @@ import type { SetList, Song } from '../db/types'
 import { dariBeatsLama, detikTotal } from './birama'
 import type { SegmenWaktu, TandaBirama } from './birama'
 import { jepitTempo, tempoBerlaku } from './metronome'
+import { labelLatihan, latihanAktif, terapkanLatihan } from './tempoLatihan'
+import type { TempoLatihan } from './tempoLatihan'
 
 /** Satu baris ringkasan set list: durasi sebuah lagu. */
 export interface BarisSetList {
@@ -22,6 +24,10 @@ export interface BarisSetList {
   detik: number | null
   /** Sukat utama lagu, untuk ditampilkan. */
   sukat: TandaBirama
+  /** #4 — tempo dasar setelah tempo latihan (sama dengan `bpm` kalau tempo asli). */
+  bpmLatihan: number
+  /** #4 — "Latihan 80%"; `null` kalau lagu ini memakai tempo asli. */
+  latihan: string | null
 }
 
 /** Hasil perhitungan durasi satu set list. */
@@ -58,20 +64,20 @@ export function segmenLagu(s: Song): SegmenWaktu[] {
  * dengan aturan yang berbeda dari durasi yang benar-benar DIMAINKAN —
  * dan selisihnya tidak pernah berteriak, hanya mengendap.
  */
-export function tempoUntukLagu(s: Song): (birama: number) => number {
+export function tempoUntukLagu(s: Song, latihan?: TempoLatihan | null): (birama: number) => number {
   const segmen = s.tempoMap ?? []
   return (birama) =>
     jepitTempo(
       tempoBerlaku(
-        { dasar: s.bpm, segmen, pakaiTempoMap: segmen.length > 0, latih: s.latih ?? null },
+        { dasar: s.bpm, segmen, pakaiTempoMap: segmen.length > 0, latih: s.latih ?? null, latihan: latihan ?? null },
         birama,
       ),
     )
 }
 
 /** Durasi sebuah lagu dalam detik. `null` kalau panjangnya belum diisi. */
-export function durasiSatu(s: Song): number | null {
-  return detikTotal(segmenLagu(s), s.panjangBirama, sukatLagu(s), s.bpm, tempoUntukLagu(s))
+export function durasiSatu(s: Song, latihan?: TempoLatihan | null): number | null {
+  return detikTotal(segmenLagu(s), s.panjangBirama, sukatLagu(s), s.bpm, tempoUntukLagu(s, latihan))
 }
 
 /**
@@ -84,7 +90,16 @@ export function durasiSatu(s: Song): number | null {
  * Lagu yang id-nya tidak ketemu di `semua` dilewati (misalnya lagunya sudah
  * dihapus), supaya set list tidak rusak hanya karena satu lagu hilang.
  */
-export function hitungSetList(sl: SetList | null | undefined, semua: Song[]): HitunganSetList {
+/**
+ * #4 — `latihanUntuk` opsional: kalau diisi, durasi & tempo tiap lagu memakai
+ * tempo latihannya. Layar hari H (mode lomba) sengaja tidak mengisinya,
+ * jadi selalu tempo asli.
+ */
+export function hitungSetList(
+  sl: SetList | null | undefined,
+  semua: Song[],
+  latihanUntuk?: (songId: string) => TempoLatihan | null,
+): HitunganSetList {
   const peta = new Map(semua.map((s) => [s.id, s]))
   const baris: BarisSetList[] = []
   let total = 0
@@ -93,7 +108,8 @@ export function hitungSetList(sl: SetList | null | undefined, semua: Song[]): Hi
   for (const id of sl?.songIds ?? []) {
     const s = peta.get(id)
     if (!s) continue // lagu sudah dihapus — lewati, jangan dihitung
-    const detik = durasiSatu(s)
+    const lat = latihanUntuk?.(s.id) ?? null
+    const detik = durasiSatu(s, lat)
     if (detik === null) tanpaPanjang++
     else total += detik
     baris.push({
@@ -102,6 +118,8 @@ export function hitungSetList(sl: SetList | null | undefined, semua: Song[]): Hi
       bpm: s.bpm,
       detik,
       sukat: sukatLagu(s),
+      bpmLatihan: latihanAktif(lat) ? Math.round(terapkanLatihan(s.bpm, lat)) : s.bpm,
+      latihan: labelLatihan(lat),
     })
   }
   return { total, tanpaPanjang, baris }

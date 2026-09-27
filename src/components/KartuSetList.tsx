@@ -7,6 +7,7 @@
  */
 import { useState } from 'react'
 import type { SetList, Song } from '../db/types'
+import type { TempoLatihan } from '../lib/tempoLatihan'
 import { hitungSetList, naik, turun } from '../lib/setlist'
 import { formatWaktu, labelBirama } from '../lib/birama'
 import { Button, Card, Field, Input, Select } from './ui'
@@ -35,6 +36,8 @@ export function KartuSetList({
    * penampilan untuk dirinya sendiri tanpa pelatih tahu.
    */
   hanyaPutar = false,
+  latihanUntuk,
+  onSemuaAsli,
 }: {
   daftar: SetList[]
   aktif: SetList | null
@@ -54,10 +57,15 @@ export function KartuSetList({
   onPilihLagu: (id: string) => void
   onTambah?: (songId: string) => void
   hanyaPutar?: boolean
+  /** #4 — tempo latihan tiap lagu (per perangkat); durasi & tempo ikut. */
+  latihanUntuk?: (songId: string) => TempoLatihan | null
+  /** #4 — kembalikan semua lagu di set list ini ke tempo asli. */
+  onSemuaAsli?: (songIds: string[]) => void
 }) {
   const [tambahId, setTambahId] = useState('')
 
-  const h = hitungSetList(aktif, songs)
+  const h = hitungSetList(aktif, songs, latihanUntuk)
+  const adaLatihan = h.baris.some((b) => b.latihan)
   /** Lagu yang belum masuk set list ini — untuk pilihan "tambah". */
   const bisaDitambah = songs.filter((s) => !(aktif?.songIds ?? []).includes(s.id))
 
@@ -127,6 +135,26 @@ export function KartuSetList({
                 {formatWaktu(h.total)}
               </b>
             </span>
+            {adaLatihan && (
+              <span className="flex items-center gap-2">
+                <span
+                  className="rounded-full border border-amber-500/50 bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-200"
+                  data-testid="setlist-ada-latihan"
+                >
+                  memakai tempo latihan
+                </span>
+                {onSemuaAsli && (
+                  <button
+                    type="button"
+                    onClick={() => onSemuaAsli(h.baris.map((b) => b.id))}
+                    className="rounded-lg border border-slate-700 px-2 py-0.5 text-[10px] font-medium text-slate-200 hover:bg-slate-800"
+                    data-testid="setlist-semua-asli"
+                  >
+                    Semua ke tempo asli
+                  </button>
+                )}
+              </span>
+            )}
             {h.tanpaPanjang > 0 && (
               <span
                 className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-200"
@@ -180,7 +208,14 @@ export function KartuSetList({
                       )}
                     </p>
                     <p className="text-[10px] text-slate-500">
-                      {b.bpm} BPM · {labelBirama(b.sukat)} ·{' '}
+                      {b.latihan ? (
+                        <span className="text-amber-200" data-testid={`setlist-latihan-${i}`}>
+                          {b.bpmLatihan} BPM (asli {b.bpm}) · {b.latihan}
+                        </span>
+                      ) : (
+                        `${b.bpm} BPM`
+                      )}{' '}
+                      · {labelBirama(b.sukat)} ·{' '}
                       {b.detik === null ? (
                         <span className="text-amber-300/80">tanpa akhir</span>
                       ) : (

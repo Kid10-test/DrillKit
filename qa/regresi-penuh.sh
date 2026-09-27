@@ -60,8 +60,8 @@ bash regresi.sh "$BASE" \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill \
-  m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui \
+  m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \
   dd8 dd8b dd9-kompas dd10b-kartu dd10b-mode dd10b-override kartu-lipat

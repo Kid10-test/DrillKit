@@ -21,6 +21,8 @@ import {
 import { adaBerangsur, jepitTempo, luncuranPada, tempoBerlaku } from '../lib/metronome'
 import type { SegmenTempo } from '../lib/metronome'
 import type { LatihTempo, TandaBirama } from '../db/types'
+import { labelLatihan, latihanAktif, terapkanLatihan } from '../lib/tempoLatihan'
+import type { TempoLatihan } from '../lib/tempoLatihan'
 import { cx } from '../lib/utils'
 
 /* --------------------------- Indikator ketuk ------------------------------ */
@@ -165,6 +167,7 @@ export function PanelSedangDiputar({
   segmenTempo,
   latih,
   tempoUntuk,
+  latihan,
 }: {
   judul: string
   /** birama absolut yang sedang berjalan (1-based) */
@@ -186,6 +189,8 @@ export function PanelSedangDiputar({
   latih?: LatihTempo | null
   /** N7 — tempo per birama untuk hitungan waktu; lihat `detikSampai`. */
   tempoUntuk?: (birama: number) => number
+  /** #4 — tempo latihan; diterapkan paling akhir. */
+  latihan?: TempoLatihan | null
 }) {
   const idx = indexSegmen(segmen, measure)
   const seg = idx >= 0 ? segmen[idx] : null
@@ -210,12 +215,15 @@ export function PanelSedangDiputar({
       measure,
     ),
   )
+  /** #4 — tempo sebelum tempo latihan, untuk "138 BPM (asli 172)". */
+  const adaLatihan = latihanAktif(latihan)
+  const tempoLatihan = adaLatihan ? jepitTempo(terapkanLatihan(tempo, latihan)) : tempo
   const luncur = pakaiTempoMap ? luncuranPada(segmenTempo ?? [], measure) : null
   /** Luncuran menyeluruh dikesampingkan oleh luncuran per segmen? */
   const latihDikesampingkan =
     pakaiTempoMap && !!latih?.on && adaBerangsur(segmenTempo ?? [])
   const detik = detikSampai(segmen, measure, warisan, tempoDasar, tempoUntuk)
-  const lamaBirama = durasiBirama(meter, tempo)
+  const lamaBirama = durasiBirama(meter, tempoLatihan)
   /** Keterangan singkat di bawah angka tempo: kenapa angkanya bergerak. */
   const keteranganTempo = luncur
     ? `berangsur ke bar ${luncur.keBar} (${formatTempo(luncur.ke)} BPM)`
@@ -258,9 +266,13 @@ export function PanelSedangDiputar({
         />
         <Info
           label="Tempo"
-          nilai={`${formatTempo(tempo)} BPM`}
+          nilai={`${formatTempo(tempoLatihan)} BPM`}
           testId="panel-tempo"
-          tambahan={keteranganTempo ?? undefined}
+          tambahan={
+            adaLatihan
+              ? `asli ${formatTempo(tempo)} · ${labelLatihan(latihan)}${keteranganTempo ? ` · ${keteranganTempo}` : ''}`
+              : (keteranganTempo ?? undefined)
+          }
         />
         <Info
           label="Sukat"
