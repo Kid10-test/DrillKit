@@ -55,6 +55,21 @@ console.log('\n— Lagu tempo datar 4/4 @120 —')
   dekat('set 0 memajukan 2 birama → set 1 mulai birama 3', p[1].biramaMulai, 3)
   dekat('set 1 juga 4 detik', p[1].detik, 4)
   dekat('total 8 detik', totalDetik(p), 8)
+
+  /*
+   * #6 — `detik` adalah LAMA set; `detikMulai` adalah POSISI mulai di lini
+   * masa lagu. Dulu pemutar rekaman memakai `detik` untuk posisi, sehingga
+   * rekaman selalu berbunyi satu set terlalu jauh — dan pada lagu dengan set
+   * berlainan lama, makin jauh lagi.
+   */
+  dekat('#6 set 0 mulai di detik 0', p[0].detikMulai, 0)
+  dekat('#6 set 1 mulai di detik 4 (jumlah set sebelumnya)', p[1].detikMulai, 4)
+  dekat('#6 ujung lini masa = detikMulai + detik set terakhir', p[1].detikMulai + p[1].detik, totalDetik(p))
+
+  // Tiga set: detikMulai harus menjumlah, bukan mengulang lama set terakhir.
+  const t = petakanSetKeMusik([{ counts: 4 }, { counts: 8 }, { counts: 4 }], 1, lagu)
+  dekat('#6 set 2 mulai = lama set 0 + set 1', t[2].detikMulai, t[0].detik + t[1].detik)
+  dekat('#6 ujung tetap totalDetik', t[2].detikMulai + t[2].detik, totalDetik(t))
 }
 
 console.log('\n— Tempo berubah di tengah (4/4 @112 → 7/8 @132 di birama 9) —')
@@ -77,6 +92,8 @@ console.log('\n— Tempo berubah di tengah (4/4 @112 → 7/8 @132 di birama 9) �
   dekat('SET 1 sukat ikut lagu → 7/8', p[1].birama.pembilang, 7)
   dekat('SET 1 penyebut 8', p[1].birama.penyebut, 8)
   dekat('set 1 = 14 ketuk @132', p[1].detik, 14 * (60 / 132))
+  // Set berlainan lama: `detikMulai` tidak boleh tertukar dengan `detik`.
+  dekat('#6 set 1 mulai sesudah lama set 0', p[1].detikMulai, p[0].detik)
   // 14 ketuk pada 7/8 (1 ketuk = 1 not penyebut) = 2 birama
   uji('set 1 maju 2 birama 7/8', Math.abs(p[1].detik - 2 * lamaBirama(M78, 132)) < 1e-9, String(p[1].detik))
 }

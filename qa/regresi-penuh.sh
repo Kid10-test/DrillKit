@@ -46,6 +46,14 @@ BASE="${1:-http://localhost:4173}"
 
 bash bangun-logika.sh || exit 1
 
+# #6 — dua rangkaian yang menyusul dengan alasan yang sama seperti catatan
+# N14 di atas: `rekaman-lagu-logika` sudah ada sejak #6 tetapi modulnya tidak
+# pernah dirakit ke /tmp, sehingga mogok pada baris impornya; dan
+# `m6-klik-rekaman` (klik harus seiring rekaman, termasuk saat tempo latihan
+# mode BPM melambatkan kliknya) memang belum pernah ada. Keduanya sekarang
+# dirakit/dijalankan. Jangan keluarkan lagi tanpa mencatat alasannya di
+# IDE-PENGEMBANGAN.md.
+
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika uji-situs uji-rilis uji-lapangan \
   evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
@@ -60,8 +68,8 @@ bash regresi.sh "$BASE" \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill \
-  m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan \
+  m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \
   dd8 dd8b dd9-kompas dd10b-kartu dd10b-mode dd10b-override kartu-lipat

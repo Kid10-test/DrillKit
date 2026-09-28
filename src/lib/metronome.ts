@@ -27,13 +27,57 @@ import { rapikanNaik, tempoPutaran, terapkanLatihan, tujuanTercapai } from './te
 import type { NaikOtomatis, TempoLatihan } from './tempoLatihan'
 import {
   bikinPolaDariBirama,
+  biramaDefault,
+  biramaPadaDetik,
   detikPerNot as hitungDetikPerNot,
+  detikSampai,
+  durasiBirama,
   normalisasiBirama,
   posisiHitungMundur,
   ucapHitungMundur,
 } from './birama'
 
+/** #6 — matikan bunyi yang belum (atau baru saja) berbunyi, tanpa sisa letupan. */
+function hentikanSegera(osc: OscillatorNode | OscillatorNode[], ...lain: AudioNode[]): () => void {
+  return () => {
+    for (const o of Array.isArray(osc) ? osc : [osc]) {
+      try {
+        o.stop()
+      } catch {
+        /* sudah berhenti */
+      }
+      o.disconnect()
+    }
+    for (const n of lain) n.disconnect()
+  }
+}
+
 export type { SuaraKlik }
+
+/**
+ * #6 — Jam lagu: rekaman sebagai **patokan waktu**.
+ *
+ * Mengapa ini ada: mesin metronom menjadwalkan klik di jam `AudioContext`,
+ * sedangkan rekaman berbunyi di jam elemen `<audio>`. Dua jam itu tidak
+ * berjalan sama cepat — diukur di kotak pasir ini: 0,25 ms per sekon
+ * (±15 ms per menit) — dan titik mulainya juga berbeda, karena rekaman baru
+ * berbunyi sesudah berkasnya dibaca, digeser ke titik mulai, lalu di-`play()`.
+ * Selisih titik mulai itu tidak kecil dan tidak tetap: 40 ms di mesin cepat,
+ * **157 ms** saat utas utama diperlambat 8× — dan di HP yang sibuk bisa lebih.
+ *
+ * Dulu klik berjalan sendiri tanpa memperhatikan kapan rekaman benar-benar
+ * mulai, jadi tiap ketukan meleset dari lagunya. Sekarang, kalau ada jam lagu,
+ * mesin **menunggu rekaman berbunyi** dan menempatkan tiap klik pada posisi
+ * rekaman yang seharusnya — bukan pada hitungan sendiri.
+ */
+export interface JamLagu {
+  /** Posisi lagu sekarang, detik (0 = birama 1 ketuk 1). */
+  posisi: () => number
+  /** Laju nyata pemutaran rekaman (1 = tempo asli). */
+  laju: () => number
+  /** Rekaman benar-benar sedang berbunyi. */
+  jalan: () => boolean
+}
 
 /**
  * Satu segmen tempo map: mulai birama ke-`measure`, temponya `bpm`.
@@ -323,6 +367,15 @@ export interface OpsiMetronom {
   naikOtomatis?: NaikOtomatis | null
   /** #4 — dipanggil tiap kali putaran ulang bagian dimulai (termasuk putaran 1). */
   onPutaran?: (i: { putaran: number; tempo: TempoLatihan; tujuan: boolean }) => void
+  /**
+   * #6 — kalau diisi, klik mengikuti jam rekaman: ia baru mulai berbunyi
+   * setelah rekamannya benar-benar berjalan, dan tiap ketukan ditempatkan
+   * menurut posisi rekaman — bukan menurut hitungan mesin sendiri.
+   *
+   * Diisi hanya oleh pemanggil yang benar-benar memutar rekaman. Tanpa jam
+   * ini, perilakunya persis seperti sediakala (metronom mandiri).
+   */
+  jam?: JamLagu | null
 }
 
 /** M1 — hitung mundur dianggap hidup kalau dinyalakan dan ulangannya masuk akal. */
@@ -349,6 +402,25 @@ export function jepitTempo(bpm: number): number {
 
 /** Berapa detik ke depan jadwal ditanam (lookahead). */
 const LIHAT_KE_DEPAN = 0.18
+
+/**
+ * #6 — cadangan jadwal saat klik mengikuti jam rekaman.
+ *
+ * Lebih panjang daripada jalur mandiri dengan sengaja: pada jalur jam,
+ * menanam lebih awal tidak berisiko (acuannya posisi rekaman, bukan hitungan
+ * sendiri), sedangkan menanam terlambat berarti ketukan hilang. Utas utama
+ * yang sibuk — HP yang sekaligus menggambar formasi — bisa tertahan lebih
+ * dari 180 ms, dan itulah yang dulu terdengar sebagai klik yang melambat.
+ */
+const LIHAT_KE_JAM = 0.45
+
+/**
+ * #6 — berapa lama menunggu rekaman benar-benar berbunyi sebelum menyerah.
+ *
+ * Rekaman besar di HP bisa perlu waktu; tetapi menunggu tanpa batas berarti
+ * metronom yang diam tanpa penjelasan ketika berkasnya gagal dimuat.
+ */
+const JAM_TUNGGU = 2.5
 
 function bikinBiramaKosong(beats: number, subdiv: number): TingkatKlik[] {
   return new Array(Math.max(1, beats * subdiv)).fill(0 as TingkatKlik)
@@ -411,6 +483,8 @@ export class Metronom {
   private getar = false
   private onKetuk: (i: InfoKetuk) => void = () => {}
   private antrean: { waktu: number; info: InfoKetuk }[] = []
+  /** #6 — bunyi yang sudah ditanam tetapi belum terdengar; bisa dibatalkan. */
+  private terjadwal: { waktu: number; batalkan: () => void }[] = []
   private birama: TandaBirama | null = null
   private suaraHitung: SuaraKlik = 'bel'
   /** M1 — true kalau `opsi.pola` berisi pola buatan pemakai (bukan turunan meter). */
@@ -438,6 +512,19 @@ export class Metronom {
   private naik: NaikOtomatis | null = null
   private putaran = 1
   private onPutaran: OpsiMetronom['onPutaran'] | null = null
+  /**
+   * #6 — jam lagu (rekaman) yang menjadi patokan waktu, kalau ada.
+   * Selama jam ini terpasang, mesin tidak memakai hitungan waktunya sendiri.
+   */
+  private jam: JamLagu | null = null
+  /** #6 — batas tunggu rekaman berbunyi sebelum kembali ke metronom mandiri. */
+  private jamBatas = 0
+  /**
+   * #6 — posisi lagu (detik, skala asli) di awal birama berikutnya yang akan
+   * dijadwalkan. Ini pengganti `waktuBirama` pada jalur jam: yang dihitung
+   * adalah *musiknya*, bukan jam dinding — jam dindingnya ikut rekaman.
+   */
+  private detikLagu = 0
 
   get jalan() {
     return this.timer !== null
@@ -466,6 +553,10 @@ export class Metronom {
     this.segmen = [...(opsi.segmen ?? [])].sort((a, b) => a.measure - b.measure)
     this.pakaiTempoMap = (opsi.pakaiTempoMap ?? false) && this.segmen.length > 0
     this.onKetuk = opsi.onKetuk ?? (() => {})
+    // #6 — jam lagu (rekaman). Dijepit: tanpa tanda birama, batas birama
+    // tidak bisa dihitung, jadi jalur jam dimatikan dan perilakunya kembali
+    // seperti metronom mandiri.
+    this.jam = opsi.jam && opsi.birama ? opsi.jam : null
 
     this.beatsDasar = Math.max(1, Math.min(12, opsi.beats))
     this.subdivDasar = Math.max(1, Math.min(4, opsi.subdiv))
@@ -521,23 +612,35 @@ export class Metronom {
     // Mulai dari birama yang sudah lewat akhir lagu = tidak ada yang diputar.
     if (this.biramaAkhir > 0 && mulaiDari > this.biramaAkhir) this.selesai = true
 
+    // #6 — titik mulai jalur jam: detik lagu di awal birama pertama yang
+    // dimainkan. Rekaman sudah digeser ke titik yang sama oleh pemanggil.
+    this.detikLagu = this.detikPadaBirama(mulaiDari)
+
     const Ctor =
       window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
     this.ctx = new Ctor()
 
     let waktu = this.ctx.currentTime + 0.08
     const h = opsi.hitungMundur
-    if (h && h.on && ctxHitungValid(h) && this.birama) {
+    /*
+     * #6 — hitung mundur dimatikan saat rekaman menjadi patokan waktu.
+     * Kalau tidak, klik menghitung mundur N ketukan sementara lagunya sudah
+     * berjalan dari birama 1: yang terdengar adalah klik yang tertinggal satu
+     * hitung mundur penuh, dan penomoran biramanya meleset.
+     */
+    if (h && h.on && ctxHitungValid(h) && this.birama && !this.jam) {
       this.suaraHitung = h.suara === 'suara' ? 'bel' : h.suara
       waktu = this.jadwalkanHitungMundur(h, waktu, mulaiDari)
     }
     this.waktuBirama = waktu
+    this.jamBatas = this.ctx.currentTime + JAM_TUNGGU
     this.timer = window.setInterval(() => this.jadwalkan(), 25)
   }
 
   berhenti() {
     if (this.timer !== null) window.clearInterval(this.timer)
     this.timer = null
+    this.terjadwal = []
     this.antrean = []
     // M5 — jangan panggil `onSelesai` saat pemakai berhenti sendiri.
     this.selesai = false
@@ -572,6 +675,99 @@ export class Metronom {
     // N7 — jepitTempo diekspor supaya tampilan memakai aturan yang sama.
     return jepitTempo(bpm)
   }
+
+  /**
+   * #6 — tempo ASLI birama ke-`ke`: tempo map, luncuran, dan latih tempo lama
+   * ikut, tetapi **tempo latihan tidak**.
+   *
+   * Ini yang menentukan posisi di sepanjang rekaman. Rekaman adalah partitur:
+   * ketukan ke-100 selalu ada di detik yang sama, berapa pun lambatnya ia
+   * diputar. Tempo latihan diwujudkan oleh `playbackRate` dan oleh laju jam —
+   * bukan oleh hitungan detik lagunya. Kalau tempo latihan ikut dihitung di
+   * sini, posisi klik dan posisi rekaman dihitung dua kali dari dua arah yang
+   * berbeda, dan keduanya berpisah lagi.
+   */
+  private hitungBpmAsli(ke: number): number {
+    return this.batasi(
+      tempoBerlaku(
+        { dasar: this.bpmDasar, segmen: this.segmen, pakaiTempoMap: this.pakaiTempoMap, latih: this.latih },
+        ke,
+      ),
+    )
+  }
+
+  /** #6 — tanda birama warisan, untuk menghitung detik lagu. */
+  private meterWarisan(): TandaBirama {
+    return this.birama ?? biramaDefault()
+  }
+
+  /** #6 — tempo asli sebagai fungsi, untuk `detikSampai`/`biramaPadaDetik`. */
+  private tempoAsliUntuk = (b: number): number => this.hitungBpmAsli(b)
+
+  /** #6 — detik lagu di awal birama ke-`b` (birama 1 = 0 detik). */
+  private detikPadaBirama(b: number): number {
+    return detikSampai(this.segmen, b, this.meterWarisan(), this.bpmDasar, this.tempoAsliUntuk)
+  }
+
+  /** #6 — lama birama ke-`ke` dalam detik lagu (skala asli). */
+  private durasiLaguBirama(ke: number): number {
+    // Tanpa tanda birama, batas birama tidak terdefinisi — jalur jam memang
+    // dimatikan di `mulai` untuk keadaan itu; ini pengaman terakhir.
+    return durasiBirama(this.meterUntuk(ke) ?? this.meterWarisan(), this.hitungBpmAsli(ke))
+  }
+
+  /**
+   * #6 — tarik jalan-biarawal ke posisi rekaman yang sebenarnya.
+   *
+   * Dijalankan tiap tick dan memang murah: selama posisi rekaman masih di
+   * dalam birama yang sedang berjalan, tidak ada yang dikerjakan. Yang
+   * ditangani hanya lompatan — pengguna menggeser garis waktu, satu bagian
+   * diulang, atau tab tidak aktif sekian lama sehingga mesin tertinggal jauh.
+   * Tanpa ini, klik akan mencoba "mengejar" dengan membunyikan ketukan yang
+   * sudah lewat, satu per satu.
+   */
+  private selaraskanKeJam() {
+    const jam = this.jam
+    if (!jam) return
+    const pos = jam.posisi()
+    const laju = Math.max(0.1, jam.laju())
+    /*
+     * Jalan-biarawal selalu sedikit di depan rekaman: birama berikutnya memang
+     * ditanam begitu mulainya masuk jendela lihat-ke-depan. Karena itu
+     * "posisi ada di dalam birama yang belum dijadwalkan" itu NORMAL.
+     *
+     * Yang perlu disusulkan hanya dua hal:
+     *  - rekaman menyalip jadwal (posisi sudah melewati birama yang belum
+     *    dijadwalkan) — mis. lagu digeser maju; dan
+     *  - rekaman tertinggal jauh di belakang jadwal — mis. bagian diulang.
+     * Satu versi pertama fungsi ini menuntut posisi ada di dalam birama yang
+     * akan dijadwalkan; akibatnya jalan-biarawal ditarik mundur TIAP tick dan
+     * birama pertama dijadwalkan ulang tanpa henti (2.621 klik dalam 26 detik
+     * alih-alih 88).
+     */
+    const lalu = this.durasiLaguBirama(Math.max(1, this.pos))
+    const menyalip = pos >= this.detikLagu
+    const tertinggal = pos < this.detikLagu - lalu - laju * LIHAT_KE_JAM - 0.25
+    if (!menyalip && !tertinggal) return
+
+    // Klik yang terlanjur ditanam untuk posisi lama dibuang: rekamannya sudah
+    // pindah, jadi ketukan itu tidak cocok lagi dengan apa pun.
+    for (const t of this.terjadwal) t.batalkan()
+    this.terjadwal = []
+    this.antrean = []
+
+    const b = biramaPadaDetik(this.segmen, pos, this.meterWarisan(), this.bpmDasar, this.tempoAsliUntuk)
+    this.pos = b.birama - 1
+    this.detikLagu = this.detikPadaBirama(b.birama)
+    /*
+     * Birama yang sedang berjalan bisa saja sudah dimulai sebelum detik ini
+     * (klik di tengah birama) — ketukan yang sudah lewat tidak dibunyikan,
+     * dan itu memang yang diinginkan: lebih baik masuk di ketukan berikutnya
+     * daripada berbunyi di tempat yang salah.
+     */
+    this.waktuBirama = this.ctx ? this.ctx.currentTime + (this.detikLagu - pos) / laju : this.waktuBirama
+  }
+
 
   /** Tempo untuk birama absolut ke-`ke` (1-based): tempo dasar + tempo map + latih tempo. */
   private hitungBpm(ke: number): number {
@@ -707,10 +903,50 @@ export class Metronom {
       if (this.getar) bergetar(e.info.sel === 2 ? 28 : 12)
     }
 
-    while (this.waktuBirama < ctx.currentTime + LIHAT_KE_DEPAN) {
-      // M5 — setelah akhir lagu tidak ada birama baru yang dijadwalkan;
-      // bunyi yang sudah terlanjur diantrekan tetap dibiarkan habis.
-      if (this.selesai) break
+    /*
+     * #6 — selama rekaman belum benar-benar berbunyi, klik belum mulai.
+     *
+     * Inilah yang dulu tidak ada: mesin mulai menghitung sejak tombol ditekan,
+     * sedangkan rekaman baru berbunyi setelah berkasnya dibaca dari IndexedDB,
+     * digeser ke titik mulai, dan `play()`-nya benar-benar berjalan. Klik jadi
+     * selalu mendahului lagunya — 40 ms di mesin cepat, dan makin lebar di
+     * perangkat sibuk (terukur 157 ms saat utas utama diperlambat 8×).
+     */
+    if (this.jam && !this.jam.jalan()) {
+      /*
+       * Rekaman belum berbunyi. Biasanya ini hanya sekejap (berkas sedang
+       * dibaca & digeser ke titik mulai), tetapi kalau rekamannya gagal
+       * dimuat atau ditolak peramban, menunggu selamanya berarti metronom
+       * yang diam tanpa penjelasan. Karena itu ada batas tunggu: sesudahnya
+       * mesin berjalan seperti metronom mandiri.
+       */
+      if (ctx.currentTime <= this.jamBatas) return
+      this.jam = null
+      this.waktuBirama = ctx.currentTime + 0.08
+    }
+    const jam = this.jam
+    if (jam) this.selaraskanKeJam()
+
+    const laju = jam ? Math.max(0.1, jam.laju()) : 1
+    const posLagu = jam ? jam.posisi() : 0
+    /*
+     * Jalur jam boleh melihat lebih jauh ke depan, karena acuannya posisi
+     * rekaman — bukan akumulasi mesin sendiri. Jadi satu hiccup utas utama
+     * tidak langsung memakan ketukan berikutnya (yang dulu terjadi: 180 ms
+     * cadangan bisa habis oleh satu render berat, lalu ketukan berbunyi
+     * terlambat).
+     */
+    const lihat = jam ? LIHAT_KE_JAM : LIHAT_KE_DEPAN
+
+    // Bunyi yang waktunya sudah lewat tidak perlu bisa dibatalkan lagi.
+    if (this.terjadwal.length) this.terjadwal = this.terjadwal.filter((t) => t.waktu > ctx.currentTime)
+
+    while (!this.selesai) {
+      // #6 — waktu AudioContext saat birama ini MULAI. Pada jalur jam, ini
+      // dihitung dari posisi rekaman, bukan dari akumulasi mesin sendiri.
+      const awalCtx = jam ? ctx.currentTime + (this.detikLagu - posLagu) / laju : this.waktuBirama
+      if (awalCtx > ctx.currentTime + lihat) break
+
       const biramaAbsolut = this.pos + 1
 
       // M2 — ulang bagian: lewat batas akhir rentang, langsung kembali ke
@@ -732,6 +968,7 @@ export class Metronom {
           })
         }
         this.pos = this.ulangDari - 1
+        this.detikLagu = this.detikPadaBirama(this.ulangDari)
         continue
       }
 
@@ -742,13 +979,16 @@ export class Metronom {
           // `biramaAkhir` (diperiksa di `mulai`), jadi tidak mungkin
           // berputar di tempat tanpa batas.
           this.pos = this.awal - 1
+          this.detikLagu = this.detikPadaBirama(this.awal)
           continue
         }
         this.selesai = true
         break
       }
 
-      const bpm = this.hitungBpm(biramaAbsolut)
+      // Pada jalur jam, tempo yang menentukan posisi di sepanjang rekaman
+      // adalah tempo ASLI — tempo latihan hidup di laju jam, bukan di sini.
+      const bpm = jam ? this.hitungBpmAsli(biramaAbsolut) : this.hitungBpm(biramaAbsolut)
       // M1 — meter bisa berubah tiap segmen tempo, jadi birama & durasinya
       // ditentukan untuk birama yang sedang berjalan.
       const meterAktif = this.meterUntuk(biramaAbsolut)
@@ -757,15 +997,26 @@ export class Metronom {
         ? this.bars[idx]
         : this.barUntuk(meterAktif, this.subdivDasar)
       const durasiKetuk = this.detikPerNotUntuk(bpm, meterAktif)
-      const durasiBirama = bar.beats * durasiKetuk
+      const durasiBarLagu = bar.beats * durasiKetuk
       const durasiLangkah = durasiKetuk / bar.subdiv
+      // Detik lagu → detik nyata. Tanpa jam, laju = 1 dan angkanya sama
+      // persis dengan perilaku lama.
+      const langkahCtx = durasiLangkah / laju
 
       // Pola utama: tiap kotak yang tidak diam dijadwalkan pada waktunya.
       for (let i = 0; i < bar.cells.length; i++) {
         const sel = bar.cells[i]
         if (!sel) continue
-        const waktu = this.waktuBirama + i * durasiLangkah
-        this.bunyi(ctx, waktu, sel === 2)
+        const waktu = awalCtx + i * langkahCtx
+        /*
+         * Jalur jam: ketukan yang waktunya sudah lewat dilewati, tidak
+         * dibunyikan terlambat — kecuali yang baru lewat sekejap (30 ms).
+         * Toleransi sekecil itu membuat ketukan pertama saat kita "ikut
+         * bergabung" dengan rekaman tidak hilang, tanpa membuat ketukan lama
+         * berbunyi bertumpuk sesudah lompatan.
+         */
+        if (jam && waktu < ctx.currentTime - 0.03) continue
+        this.terjadwal.push({ waktu, batalkan: this.bunyi(ctx, waktu, sel === 2) })
         this.antrean.push({
           waktu,
           info: {
@@ -774,7 +1025,8 @@ export class Metronom {
             sub: i % bar.subdiv,
             sel,
             birama: biramaAbsolut,
-            bpm,
+            // Yang terdengar adalah tempo latihan, jadi itu yang dilaporkan.
+            bpm: jam ? this.hitungBpm(biramaAbsolut) : bpm,
             suara: 1,
           },
         })
@@ -784,12 +1036,13 @@ export class Metronom {
       if (this.poly) {
         const p = this.poly
         const jumlah = Math.max(1, p.beats * p.subdiv)
-        const langkah = durasiBirama / jumlah
+        const langkah = durasiBarLagu / jumlah / laju
         for (let j = 0; j < jumlah; j++) {
           const sel = p.cells[j] ?? 0
           if (!sel) continue
-          const waktu = this.waktuBirama + j * langkah
-          this.bunyi(ctx, waktu, sel === 2, true)
+          const waktu = awalCtx + j * langkah
+          if (jam && waktu < ctx.currentTime - 0.03) continue
+          this.terjadwal.push({ waktu, batalkan: this.bunyi(ctx, waktu, sel === 2, true) })
           this.antrean.push({
             waktu,
             info: { bar: idx, beat: j, sub: 0, sel, birama: biramaAbsolut, bpm, suara: 2 },
@@ -797,7 +1050,8 @@ export class Metronom {
         }
       }
 
-      this.waktuBirama += durasiBirama
+      this.waktuBirama = awalCtx + durasiBarLagu / laju
+      this.detikLagu += durasiBarLagu
       this.pos++
     }
 
@@ -816,12 +1070,19 @@ export class Metronom {
   }
 
   /** Satu bunyi klik. `aksen` = lebih keras & lebih tinggi, `kedua` = suara poliritme. */
-  private bunyi(ctx: AudioContext, waktu: number, aksen: boolean, kedua = false) {
+  /**
+   * #6 — bunyikan satu ketukan; kembalikan cara membatalkannya.
+   *
+   * Pembatalan dipakai kalau rekaman melompat (ulang bagian, geser): klik
+   * yang sudah ditanam untuk posisi lama tetapi belum berbunyi harus dibuang,
+   * kalau tidak ia berbunyi di tempat yang sudah tidak cocok lagi.
+   */
+  private bunyi(ctx: AudioContext, waktu: number, aksen: boolean, kedua = false): () => void {
     const v = this.volume * (aksen ? 0.22 : 0.12)
-    if (v <= 0) return
-    if (this.suara === 'kayu') this.bunyiKayu(ctx, waktu, v, aksen, kedua)
-    else if (this.suara === 'bel') this.bunyiBel(ctx, waktu, v, aksen, kedua)
-    else this.bunyiKlik(ctx, waktu, v, aksen, kedua)
+    if (v <= 0) return () => undefined
+    if (this.suara === 'kayu') return this.bunyiKayu(ctx, waktu, v, aksen, kedua)
+    if (this.suara === 'bel') return this.bunyiBel(ctx, waktu, v, aksen, kedua)
+    return this.bunyiKlik(ctx, waktu, v, aksen, kedua)
   }
 
   private bunyiKlik(ctx: AudioContext, waktu: number, v: number, aksen: boolean, kedua: boolean) {
@@ -835,6 +1096,7 @@ export class Metronom {
     gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.05)
     osc.start(waktu)
     osc.stop(waktu + 0.07)
+    return hentikanSegera(osc, gain)
   }
 
   /** Woodblock: segitiga pendek dengan bunyi "tok" yang lebih padat. */
@@ -850,10 +1112,11 @@ export class Metronom {
     gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.045)
     osc.start(waktu)
     osc.stop(waktu + 0.06)
+    return hentikanSegera(osc, gain)
   }
 
   /** Cowbell: dua osilator kotak (interval ~6th) seperti bel sapi. */
-  private bunyiBel(ctx: AudioContext, waktu: number, v: number, aksen: boolean, kedua: boolean) {
+  private bunyiBel(ctx: AudioContext, waktu: number, v: number, aksen: boolean, kedua: boolean): () => void {
     const gain = ctx.createGain()
     const filter = ctx.createBiquadFilter()
     filter.type = 'bandpass'
@@ -861,6 +1124,7 @@ export class Metronom {
     filter.Q.value = 4
     gain.connect(filter)
     filter.connect(ctx.destination)
+    const osilator: OscillatorNode[] = []
     for (const f of kedua ? [680, 1010] : aksen ? [620, 930] : [540, 800]) {
       const osc = ctx.createOscillator()
       osc.type = 'square'
@@ -868,9 +1132,11 @@ export class Metronom {
       osc.connect(gain)
       osc.start(waktu)
       osc.stop(waktu + 0.14)
+      osilator.push(osc)
     }
     gain.gain.setValueAtTime(v * 0.5, waktu)
     gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.16)
+    return hentikanSegera(osilator, gain)
   }
 }
 

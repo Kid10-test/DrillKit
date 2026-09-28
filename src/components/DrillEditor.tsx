@@ -42,7 +42,7 @@ import { NamaTampil } from './NamaTampil'
 import { MarkerLayer, PenandaPanel, butuhDuaTitik } from './FieldMarkers'
 import { DrillPresenter } from './DrillPresenter'
 import { useTempoLatihan } from '../hooks/useTempoLatihan'
-import { labelLatihan, latihanAktif, terapkanLatihan } from '../lib/tempoLatihan'
+import { labelLatihan, latihanAktif, lajuRekaman, terapkanLatihan } from '../lib/tempoLatihan'
 
 import {
   coordText as coorTextSafe,
@@ -1516,10 +1516,15 @@ export function Editor({
 
       // #6 — sinkronkan posisi scrubber ke audio bila lagu memiliki rekaman
       if (lagu?.rekaman && petaSet?.[idx]) {
-        const counts = Math.max(1, set?.counts ?? 8)
-        const beats = counts * drill.beatsPerCount
-        const durasiSet = beats * (60 / Math.max(20, tempoUntuk(idx)))
-        const posAudio = (lagu.rekaman.titikMulaiDetik || 0) + (petaSet[idx].detik || 0) + p * durasiSet
+        /*
+         * #6 — posisi di berkas rekaman selalu dihitung pada tempo PARTITUR,
+         * bukan tempo latihan: rekaman itu partitur yang dipercepat atau
+         * diperlambat lewat `playbackRate`, jadi detiknya tidak berubah.
+         * Dulu durasi set di sini memakai `tempoUntuk` (tempo latihan),
+         * sehingga penanda scrubber meleset dari bunyinya setiap kali
+         * tempo latihan bukan 100%.
+         */
+        const posAudio = (lagu.rekaman.titikMulaiDetik || 0) + petaSet[idx].detikMulai + p * petaSet[idx].detik
         PemutarRekaman.get().lompat(posAudio)
       }
     },
@@ -1559,8 +1564,14 @@ export function Editor({
         if (!siap) return
         const mode = lagu.rekaman?.modeBunyi ?? 'keduanya'
         pemutar.setVolume(mode === 'klik' ? 0 : (lagu.rekaman?.volumeAudio ?? 1.0))
-        pemutar.setKecepatan(cepatRef.current)
-        const dtkMulai = (lagu.rekaman?.titikMulaiDetik ?? 0) + (petaSet[idx].detik || 0)
+        /*
+         * #6 — laju rekaman = rasio tempo latihan (aturan yang sama dengan
+         * klik: mode persen ATAU BPM) × pengali kecepatan editor. Tanpa
+         * rasio itu, klik melambat sementara rekaman berjalan di tempo asli.
+         */
+        const laju = lajuRekaman(tempoSet(petaSet, idx, drill.tempo), latihanDrill) * cepatRef.current
+        pemutar.setKecepatan(laju)
+        const dtkMulai = (lagu.rekaman?.titikMulaiDetik ?? 0) + petaSet[idx].detikMulai
         pemutar.putar(dtkMulai)
       })
     }
@@ -3364,7 +3375,8 @@ export function Editor({
           roster={roster}
           startIdx={idx}
           song={lagu ?? null}
-          detikPerSet={petaSet ? petaSet.map((p) => p.detik) : undefined}
+          detikMulaiPerSet={petaSet ? petaSet.map((p) => p.detikMulai) : undefined}
+          lajuPerSet={petaSet ? petaSet.map((p) => lajuRekaman(p.bpm, latihanDrill)) : undefined}
           onClose={(i) => {
             setIdx(i)
             setPresenter(false)

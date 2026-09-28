@@ -9,7 +9,7 @@ BASE="${1:-http://localhost:4173}"
 shift || true
 DAFTAR=("$@")
 if [ ${#DAFTAR[@]} -eq 0 ]; then
-  DAFTAR=(m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill uji-birama uji-gabung-musik
+  DAFTAR=(m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill uji-birama uji-gabung-musik m6-klik-rekaman
     e3 e4 f3 f3b f4 d4 smoke-drill
     dd2 dd2b dd3 dd4 dd4b dd4c dd5-busur dd5b dd6 dd8 dd8b
     dd9-kompas dd9-scrub-tapak dd10b-kartu dd10b-mode dd10b-override

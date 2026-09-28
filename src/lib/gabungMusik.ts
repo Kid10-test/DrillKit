@@ -48,6 +48,14 @@ export interface PetaSet {
   birama: TandaBirama
   /** lama perpindahan set ini (detik) */
   detik: number
+  /**
+   * #6 — detik lagu saat set ini MULAI (jumlah lama set-set sebelumnya).
+   *
+   * Dipakai untuk menempatkan rekaman audio pada posisi yang benar. Dulu
+   * pemanggil memakai `detik` — yang artinya *lama* set, bukan *posisi
+   * mulainya — sehingga rekaman selalu berbunyi satu set terlalu jauh.
+   */
+  detikMulai: number
   /** jumlah hitungan set ini */
   counts: number
 }
@@ -75,6 +83,7 @@ export function petakanSetKeMusik(
   const bpc = Math.max(0.25, beatsPerCount)
   const out: PetaSet[] = []
   let pos = 1
+  let mulai = 0
 
   for (let i = 0; i < sets.length; i++) {
     const m = Math.max(1, Math.floor(pos))
@@ -99,15 +108,18 @@ export function petakanSetKeMusik(
     const perBirama = ketukPerBirama(meter)
     const detikPerKetuk = 60 / Math.max(20, Math.min(400, bpm))
 
+    const detik = ketuk * detikPerKetuk
     out.push({
       index: i,
       biramaMulai: pos,
       bpm,
       birama: meter,
-      detik: ketuk * detikPerKetuk,
+      detik,
+      detikMulai: mulai,
       counts,
     })
 
+    mulai += detik
     pos += perBirama > 0 ? ketuk / perBirama : 0
   }
   return out

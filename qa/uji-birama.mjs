@@ -28,6 +28,7 @@ import {
   tempoPada,
   detikBiramaPada,
   detikSampai,
+  biramaPadaDetik,
   formatWaktu,
 } from '/tmp/birama.mjs'
 
@@ -270,6 +271,33 @@ console.log('\n— Lini masa lagu (mode lagu) —')
 
   dekat('detikBiramaPada ikut sukat & tempo segmen', detikBiramaPada(seg, 5, M44, 120), 7 * (60 / 132), 1e-9)
   uji('detikSampai dibatasi (tidak membeku)', Number.isFinite(detikSampai(seg, 999999, M44, 120)))
+
+  /*
+   * #6 — `biramaPadaDetik` adalah KEBALIKAN `detikSampai`, dan dipakai mesin
+   * metronom untuk menyusulkan klik ketika rekaman melompat atau tertinggal.
+   * Kalau kebalikannya tidak tepat, klik akan mendarat di birama tetangga.
+   */
+  dekat('#6 biramaPadaDetik(0) = birama 1', biramaPadaDetik(seg, 0, M44, 120).birama, 1)
+  dekat('#6 sisa = kelebihan detik di dalam birama', biramaPadaDetik(seg, 3, M44, 120).sisa, 1, 1e-9)
+  dekat('#6 tepat di batas birama → birama berikutnya, sisa 0', biramaPadaDetik(seg, 8, M44, 120).birama, 5)
+  dekat('#6 detik sebelum batas tetap di birama itu', biramaPadaDetik(seg, 7.9, M44, 120).birama, 4)
+
+  // Pulang-pergi: detikSampai(biramaPadaDetik(t)) tidak boleh melewati t.
+  for (const t of [0, 0.4, 2, 5.5, 8, 9.2, 15.7]) {
+    const b = biramaPadaDetik(seg, t, M44, 120)
+    const kembali = detikSampai(seg, b.birama, M44, 120) + b.sisa
+    dekat(`#6 pulang-pergi detik ${t}`, kembali, t, 1e-9)
+  }
+
+  // Dengan tempo meluncur (N7/N9), kebalikannya harus memakai tempo yang sama.
+  const segLuncur = [{ measure: 1, bpm: 172, berangsur: { ke: 100, birama: 9 } }]
+  const bpmLuncur = (b) => 172 + (100 - 172) * Math.min(1, Math.max(0, (b - 1) / 8))
+  for (const t of [0, 1.3, 3.6, 6.2]) {
+    const b = biramaPadaDetik(segLuncur, t, M44, 172, bpmLuncur)
+    const kembali = detikSampai(segLuncur, b.birama, M44, 172, bpmLuncur) + b.sisa
+    dekat(`#6 pulang-pergi meluncur detik ${t}`, kembali, t, 1e-9)
+  }
+  uji('#6 dibatasi 5000 birama (tidak menggantung)', biramaPadaDetik(seg, 9999999, M44, 120).birama === 5000)
 }
 
 console.log(`\n${gagal === 0 ? 'LULUS' : 'GAGAL'}: ${lulus} lulus, ${gagal} gagal\n`)

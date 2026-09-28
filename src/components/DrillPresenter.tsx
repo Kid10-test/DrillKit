@@ -49,7 +49,8 @@ export function DrillPresenter({
   onTempoAsli,
   onClose,
   song,
-  detikPerSet,
+  detikMulaiPerSet,
+  lajuPerSet,
 }: {
   drill: Drill
   sets: DrillSet[]
@@ -72,7 +73,9 @@ export function DrillPresenter({
   /** #6 — lagu tertaut untuk sinkronisasi rekaman audio */
   song?: Song | null
   /** #6 — detik mulai tiap set dari lini masa lagu */
-  detikPerSet?: number[]
+  detikMulaiPerSet?: number[]
+  /** #6 — laju rekaman tiap set (tempo latihan ÷ tempo partitur) */
+  lajuPerSet?: number[]
 }) {
   /**
    * G2b — kunci layar.
@@ -431,7 +434,12 @@ export function DrillPresenter({
         if (!siap) return
         const mode = song.rekaman?.modeBunyi ?? 'keduanya'
         pemutar.setVolume(mode === 'klik' ? 0 : (song.rekaman?.volumeAudio ?? 1.0))
-        const dtkMulai = (song.rekaman?.titikMulaiDetik ?? 0) + (detikPerSet?.[idx] ?? 0)
+        /*
+         * #6 — rekaman ikut melambat bersama kliknya (tempo latihan), dan
+         * dimulai dari posisi set ini di lini masa lagu.
+         */
+        pemutar.setKecepatan(lajuPerSet?.[idx] ?? 1)
+        const dtkMulai = (song.rekaman?.titikMulaiDetik ?? 0) + (detikMulaiPerSet?.[idx] ?? 0)
         pemutar.putar(dtkMulai)
       })
     }
