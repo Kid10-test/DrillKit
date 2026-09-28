@@ -21,9 +21,10 @@ diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
   mulai setelah rekaman benar-benar berbunyi, tiap birama ditempatkan menurut
   posisi rekaman, dan jadwal yang terlanjur ditanam dibatalkan saat rekaman
   digeser/diulang. Editor & presenter drill ikut memakai titik mulai segmen
-  (`detikMulai`) dan laju rekaman yang benar. Uji: `m6-klik-rekaman` 14/14
-  (peramban, baru), `uji-birama` 123/123, `uji-gabung-musik` 50/50,
-  `rekaman-lagu-logika` 35/35.
+  (`detikMulai`) dan laju rekaman yang benar. Uji: `m6-klik-rekaman` 14/14 dan
+  `m6-drill-rekaman` 32/32 (peramban, keduanya baru; yang kedua 22/10 bila
+  dijalankan ke build sebelum perbaikan), `uji-birama` 123/123,
+  `uji-gabung-musik` 50/50, `rekaman-lagu-logika` 35/35.
 · **#4 rampung (27 Sep 2026, PR #10)** — Kendali tempo latihan persen (40–150%) atau
   BPM (−60…+30) di halaman Musik, diterapkan paling akhir pada tempo berlaku, batas
   bawah 20 BPM. Diingat per lagu per perangkat (localStorage). Lencana "Latihan 80%"
@@ -5835,12 +5836,25 @@ editor menggeser rekaman ke `titikMulaiDetik + detikMulai` dan memakai laju
   latihan mode BPM (−20 BPM). Pos rekaman dibandingkan dengan ketukan yang
   seharusnya tiap klik; **14/14**. Tanpa perbaikan, versi lama gagal di kedua
   skenario (meleset ratusan ms, sampai ribuan ms di mode BPM).
+- `qa/m6-drill-rekaman.mjs` (peramban, baru) — pemutar drill: tiga set
+  **berlama beda** (8/16/8 s), sengaja, supaya "lama set" tidak mungkin
+  tertukar lagi dengan "titik mulai set". Yang diperiksa: rekaman mulai di
+  `titikMulai + detikMulai` set yang sedang dipilih (8,5 s untuk set 2, 24,5 s
+  untuk set 3), bilah waktu menggeser rekaman ke posisi lini masa yang benar,
+  presenter juga, dan lajunya = tempo latihan ÷ tempo partitur (mode BPM −20
+  → 100/120). Hasil **32/32**. Dijalankan juga ke build **sebelum** perbaikan
+  (worktree `cfb4825`, port kedua): **22 lulus, 10 gagal** — rekaman mulai
+  8 detik terlalu jauh (16,4 s alih-alih 8,5 s) dan lajunya tetap 1,0 di mode
+  BPM. Jadi rangkaian ini benar-benar menjaga cacatnya, bukan sekadar
+  menemani. Satu jebakan yang tercatat di dalamnya: bilah waktu punya mode
+  *per hitungan* (langkah bulat) dan *bebas*, dan mode terakhir diingat
+  perangkat — memasang nilai 0,5 di mode per hitungan dibulatkan ke 1.
 - `qa/diagnosa-klik-rekaman.mjs` (alat diagnosa angka, bukan rangkaian asersi) —
   skenario `dasar`, `hitung`, `bpm`, `persen`; mencetak posisi rekaman vs
   ketukan yang seharusnya dan laju jam audio vs `AudioContext`.
 - `uji-birama` 107→**123** (kebalikan `biramaPadaDetik`), `rekaman-lagu-logika`
   21→**35** (laju & lompatan), `uji-gabung-musik` 45→**50** (`detikMulai`).
-- Kedua rangkaian baru didaftarkan di `qa/regresi.sh` dan `qa/regresi-penuh.sh`
+- Ketiga rangkaian baru didaftarkan di `qa/regresi.sh` dan `qa/regresi-penuh.sh`
   — sebelumnya tidak pernah ikut berjalan (kegagalan sunyi kelas N14).
 
 ---
