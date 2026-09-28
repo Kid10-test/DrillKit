@@ -15,6 +15,15 @@ diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
   validasi sidik jari (✔ cocok / ⚠ berbeda), persistensi audio saat pembaruan paket,
   panduan anggota diperbarui dengan tips PWA iOS. Backup + rekaman ZIP lewat `zip.ts`
   dan pemulihan otomatis. Uji: `qa/rekaman-lagu-logika.mjs` (21/21), 19 rangkaian uji logika lulus.
+· **Susulan #6 rampung (28 Sep 2026)** — keluhan "klik melambat/terlambat saat
+  metronom diputar bersama lagu" diperbaiki: mesin metronom kini mengikuti **jam
+  rekaman** (`JamLagu`), bukan menghitung sendiri sejak tombol ditekan. Klik baru
+  mulai setelah rekaman benar-benar berbunyi, tiap birama ditempatkan menurut
+  posisi rekaman, dan jadwal yang terlanjur ditanam dibatalkan saat rekaman
+  digeser/diulang. Editor & presenter drill ikut memakai titik mulai segmen
+  (`detikMulai`) dan laju rekaman yang benar. Uji: `m6-klik-rekaman` 14/14
+  (peramban, baru), `uji-birama` 123/123, `uji-gabung-musik` 50/50,
+  `rekaman-lagu-logika` 35/35.
 · **#4 rampung (27 Sep 2026, PR #10)** — Kendali tempo latihan persen (40–150%) atau
   BPM (−60…+30) di halaman Musik, diterapkan paling akhir pada tempo berlaku, batas
   bawah 20 BPM. Diingat per lagu per perangkat (localStorage). Lencana "Latihan 80%"
@@ -5774,6 +5783,65 @@ Seluruh rancangan #6 (Rekaman lagu MP3) telah dikerjakan penuh:
   ekspor "Backup + rekaman (ZIP)" di `src/lib/backup.ts` dan pemulihan ZIP di `src/pages/Settings.tsx`.
 - **Uji**: `qa/rekaman-lagu-logika.mjs` (21 butir uji lulus), terdaftar di `qa/bangun-logika.sh`,
   seluruh 19 uji logika lulus tanpa gagal.
+
+### Susulan #6 — "klik melambat" saat metronom diputar bersama lagu (28 Sep 2026)
+
+**Yang memicu:** keluhan pemakaian. "Ketika playback metronome beserta lagunya,
+metronome kesulitan bermain bersama; kliknya melambat atau terlambat." Rekamannya
+ekspor Sibelius — temponya benar dan birama mulainya sudah sama — jadi yang dicari
+bukan selisih berkas, melainkan selisih waktu di dalam aplikasi.
+
+**Sebabnya.** Klik dan rekaman berjalan di **dua jam berbeda** dan tidak pernah
+saling menengok:
+
+- klik dijadwalkan di jam `AudioContext`, mulai `+0,08 s` sejak tombol ditekan;
+- rekaman (elemen `<audio>`) baru berbunyi setelah blobnya dibaca dari IndexedDB,
+  digeser ke titik mulai, lalu `play()` — tidak ada yang menjamin kapan.
+
+Titik mulai keduanya karena itu selalu berbeda: **±40 ms di mesin cepat** dan
+**±157 ms saat utas utama diperlambat 8×** (di HP yang sekaligus menggambar
+formasi bisa lebih lebar lagi). Lajunya pun tidak persis sama — terukur
+**≈0,25 ms per sekon (±15 ms per menit)** di kotak pasir ini. Selisih kecil yang
+menumpuk sepanjang lagu; itulah "klik yang melambat".
+
+**Perbaikannya.** Rekaman dijadikan **patokan waktu** (`JamLagu` di
+`src/lib/metronome.ts`):
+
+- `jalan()` — klik tidak mulai sebelum rekaman benar-benar berbunyi (batas tunggu
+  2,5 s; kalau berkasnya gagal dimuat, mesin kembali ke mode metronom mandiri);
+- `posisi()` + `laju()` — tiap birama ditempatkan menurut posisi rekaman
+  (`awalCtx = ctx.currentTime + (detikLagu − pos)/laju`), bukan akumulasi hitungan
+  mesin sendiri. Tempo latihan hidup di **laju**, bukan di posisi, supaya tempo
+  asli rekaman tetap yang menentukan letak birama;
+- `selaraskanKeJam()` — rekaman yang menyalip atau tertinggal jauh (lompat birama,
+  ulang bagian) dikejar lagi; bunyi yang terlanjur ditanam dibatalkan
+  (`batalkan()`) supaya tidak ada klik "hantu" dari posisi lama;
+- jendela lihat-ke-depan di jalur jam dinaikkan ke 0,45 s (jalur mandiri tetap
+  0,18 s), supaya satu render berat tidak memakan ketukan berikutnya.
+
+Di halaman Musik & Metronome: `putarTunggu()` menunggu rekaman benar-benar
+berbunyi sebelum mesin dijalankan, dan laju pemutaran mengikuti tempo latihan
+yang berlaku (mode BPM −20 BPM pun tidak lagi memutar rekaman di tempo aslinya).
+
+**Susulan sekelas di pemutar drill.** Garis waktu drill dulu memakai `detik`
+(lama sebuah set) sebagai titik mulai audio, dan tempo latihan untuk posisi
+rekaman. `PetaSet` sekarang punya `detikMulai` (jumlah lama set sebelumnya);
+editor menggeser rekaman ke `titikMulaiDetik + detikMulai` dan memakai laju
+`lajuRekaman(tempoSet(...))`; presenter memakai `detikMulaiPerSet`/`lajuPerSet`.
+
+**Diuji:**
+
+- `qa/m6-klik-rekaman.mjs` (peramban, baru) — dua skenario: bawaan dan tempo
+  latihan mode BPM (−20 BPM). Pos rekaman dibandingkan dengan ketukan yang
+  seharusnya tiap klik; **14/14**. Tanpa perbaikan, versi lama gagal di kedua
+  skenario (meleset ratusan ms, sampai ribuan ms di mode BPM).
+- `qa/diagnosa-klik-rekaman.mjs` (alat diagnosa angka, bukan rangkaian asersi) —
+  skenario `dasar`, `hitung`, `bpm`, `persen`; mencetak posisi rekaman vs
+  ketukan yang seharusnya dan laju jam audio vs `AudioContext`.
+- `uji-birama` 107→**123** (kebalikan `biramaPadaDetik`), `rekaman-lagu-logika`
+  21→**35** (laju & lompatan), `uji-gabung-musik` 45→**50** (`detikMulai`).
+- Kedua rangkaian baru didaftarkan di `qa/regresi.sh` dan `qa/regresi-penuh.sh`
+  — sebelumnya tidak pernah ikut berjalan (kegagalan sunyi kelas N14).
 
 ---
 
