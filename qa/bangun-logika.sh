@@ -89,4 +89,6 @@ rakit src/lib/kunci.ts kunci
 rakit src/lib/kalender.ts kalender
 # #4 — tempo latihan: persen/BPM, naik otomatis, simpanan per lagu.
 rakit src/lib/tempoLatihan.ts tempoLatihan
+# #6 — rekaman lagu: hash, sidik jari, konversi lini masa audio & segmen.
+rakit src/lib/rekaman.ts rekaman
 echo "== selesai =="

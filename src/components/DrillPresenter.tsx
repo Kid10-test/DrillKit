@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
-import type { Drill, DrillSet, Member } from '../db/types'
+import type { Drill, DrillSet, Member, Song } from '../db/types'
 import { facingDeg, ukurTitik } from '../lib/field'
 import { cocokPutaran, deltaBusur, gerakOf, progresPemain, titikJalur } from '../lib/gerak'
 import { TINGKAT_LABEL, URUTAN_TINGKAT, analisisPerpindahan, lebihBerat } from '../lib/analitik'
@@ -19,6 +19,7 @@ import {
 import { bacaTampilan, langgananTampilan, ubahTampilan } from '../lib/tampilan'
 import type { Tampilan } from '../lib/tampilan'
 import { Metronom, klikUntukDrill } from '../lib/metronome'
+import { PemutarRekaman } from '../lib/rekaman'
 import { FieldSurface } from './FieldSurface'
 import { LayarTerkunci, TombolKunci, pakaiKunciLayar } from './KunciPresenter'
 import { diDalamLayarKunci, kunciMenahan } from '../lib/kunciLayar'
@@ -47,6 +48,8 @@ export function DrillPresenter({
   labelLatihan,
   onTempoAsli,
   onClose,
+  song,
+  detikPerSet,
 }: {
   drill: Drill
   sets: DrillSet[]
@@ -66,6 +69,10 @@ export function DrillPresenter({
   onTempoAsli?: () => void
   /** dipanggil saat ditutup — membawa indeks set terakhir yang dilihat */
   onClose: (idx: number) => void
+  /** #6 — lagu tertaut untuk sinkronisasi rekaman audio */
+  song?: Song | null
+  /** #6 — detik mulai tiap set dari lini masa lagu */
+  detikPerSet?: number[]
 }) {
   /**
    * G2b — kunci layar.
@@ -76,6 +83,19 @@ export function DrillPresenter({
    * inti presenter, bukan tambahan di pinggir.
    */
   const { terkunci: layarTerkunci, kunci: kunciLayar, buka: bukaLayar } = pakaiKunciLayar()
+
+  // #6 — Layar hari lomba / kunci layar memaksa tempo asli (100%)
+  useEffect(() => {
+    if (layarTerkunci && onTempoAsli && labelLatihan) {
+      onTempoAsli()
+    }
+  }, [layarTerkunci, onTempoAsli, labelLatihan])
+
+  useEffect(() => () => {
+    if (song?.id && song.rekaman) {
+      PemutarRekaman.get().jeda()
+    }
+  }, [song?.id])
 
   /** M1 — tempo untuk set ke-`i`: dari lagu kalau ada, selain itu tempo drill. */
   const tempoUntuk = (i: number) => tempoPerSet?.[i] ?? drill.tempo
@@ -403,6 +423,19 @@ export function DrillPresenter({
     // M1 — pakai tempo lagu pada set ini kalau drill ditautkan.
     const total = counts * drill.beatsPerCount * (60_000 / Math.max(20, tempoUntuk(idx)))
     mulaiKlik(counts, idx)
+
+    // #6 — putar rekaman audio tersinkronisasi bila tersedia
+    if (song?.id && song.rekaman) {
+      const pemutar = PemutarRekaman.get()
+      void pemutar.muat(song.id).then((siap) => {
+        if (!siap) return
+        const mode = song.rekaman?.modeBunyi ?? 'keduanya'
+        pemutar.setVolume(mode === 'klik' ? 0 : (song.rekaman?.volumeAudio ?? 1.0))
+        const dtkMulai = (song.rekaman?.titikMulaiDetik ?? 0) + (detikPerSet?.[idx] ?? 0)
+        pemutar.putar(dtkMulai)
+      })
+    }
+
     const t0 = performance.now()
     // Vektor gerak tiap pemain (satuan gambar SVG) — dihitung sekali.
     const vec: [string, number, number][] = []
@@ -442,6 +475,9 @@ export function DrillPresenter({
     return () => {
       cancelAnimationFrame(rafRef.current)
       hentiKlik()
+      if (song?.id && song.rekaman) {
+        PemutarRekaman.get().jeda()
+      }
       // Bersihkan sisa transform kalau animasi dibatalkan di tengah jalan.
       for (const [id] of vec) dotRefs.current.get(id)?.removeAttribute('transform')
     }

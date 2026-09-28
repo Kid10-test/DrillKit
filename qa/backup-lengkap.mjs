@@ -31,6 +31,9 @@
  *   riwayat dan simpanan di perangkat tetap utuh setelah backup dipulihkan.
  *   Bila kelak riwayat mau ikut backup, hapus dari daftar ini SEKALIGUS
  *   tambahkan ke `buildBackupPayload` dan ke transaksi `importBackup`.
+ * - `rekamanAudio` (6) — berkas biner audio MP3/WAV/dll berukuran besar
+ *   (bisa puluhan MB), sengaja tidak dimasukkan ke dalam JSON teks sesuai
+ *   rancangan #6. Ditangani terpisah via "Backup + rekaman (ZIP)".
  */
 import puppeteer from 'puppeteer'
 import { lewatSambutan } from './sambutan.mjs'
@@ -43,7 +46,7 @@ const UNDUH = path.join(QA, 'unduhan-lengkap')
 fs.rmSync(UNDUH, { recursive: true, force: true })
 fs.mkdirSync(UNDUH, { recursive: true })
 
-const DIKECUALIKAN = new Set(['settings', 'packages', 'simpanan', 'riwayat'])
+const DIKECUALIKAN = new Set(['settings', 'packages', 'simpanan', 'riwayat', 'rekamanAudio'])
 
 const browser = await puppeteer.launch({
   args: ['--no-sandbox', '--disable-dev-shm-usage'],

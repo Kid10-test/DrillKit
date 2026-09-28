@@ -82,6 +82,7 @@ import {
 } from '../lib/gerak'
 import { downloadHtmlFile, esc, printHtml, printShell } from '../lib/print'
 import { Metronom, klikUntukDrill } from '../lib/metronome'
+import { PemutarRekaman } from '../lib/rekaman'
 import { dariBeatsLama, labelBirama } from '../lib/birama'
 import { daftarTempo, petakanSetKeMusik, tempoSet } from '../lib/gabungMusik'
 import { hapusTandaSet } from '../lib/kemajuan'
@@ -1512,8 +1513,17 @@ export function Editor({
         }
       }
       tulisCount(p)
+
+      // #6 — sinkronkan posisi scrubber ke audio bila lagu memiliki rekaman
+      if (lagu?.rekaman && petaSet?.[idx]) {
+        const counts = Math.max(1, set?.counts ?? 8)
+        const beats = counts * drill.beatsPerCount
+        const durasiSet = beats * (60 / Math.max(20, tempoUntuk(idx)))
+        const posAudio = (lagu.rekaman.titikMulaiDetik || 0) + (petaSet[idx].detik || 0) + p * durasiSet
+        PemutarRekaman.get().lompat(posAudio)
+      }
     },
-    [playing, vektorGerak, seksiAnimasi, seksiMember, tulisCount],
+    [playing, vektorGerak, seksiAnimasi, seksiMember, tulisCount, lagu?.rekaman, petaSet, idx, set?.counts, drill.beatsPerCount, tempoUntuk],
   )
 
   /** B2 — kembalikan semua titik ke posisi awal set ini. */
@@ -1541,6 +1551,20 @@ export function Editor({
       const k = klikUntukDrill(tempoUntuk(idx) * cepatRef.current, drill.beatsPerCount, counts)
       metronomRef.current.mulai({ bpm: k.bpm, beats: k.beats, subdiv: 1, suara: 'kayu', volume: 0.9 })
     }
+
+    // #6 — putar rekaman audio tersinkronisasi jika lagu memiliki rekaman
+    if (lagu?.id && lagu.rekaman && petaSet?.[idx]) {
+      const pemutar = PemutarRekaman.get()
+      void pemutar.muat(lagu.id).then((siap) => {
+        if (!siap) return
+        const mode = lagu.rekaman?.modeBunyi ?? 'keduanya'
+        pemutar.setVolume(mode === 'klik' ? 0 : (lagu.rekaman?.volumeAudio ?? 1.0))
+        pemutar.setKecepatan(cepatRef.current)
+        const dtkMulai = (lagu.rekaman?.titikMulaiDetik ?? 0) + (petaSet[idx].detik || 0)
+        pemutar.putar(dtkMulai)
+      })
+    }
+
     let t0 = performance.now()
     // Vektor gerak tiap pemain (dalam satuan gambar SVG) — dihitung sekali.
     const vec = vektorGerak()
@@ -1602,6 +1626,9 @@ export function Editor({
     return () => {
       cancelAnimationFrame(raf)
       animatingRef.current = false
+      if (lagu?.id && lagu.rekaman) {
+        PemutarRekaman.get().jeda()
+      }
       // B5 — klik ikut berhenti saat animasi selesai, dijeda, atau dibatalkan.
       metronomRef.current.berhenti()
     }
@@ -3336,6 +3363,8 @@ export function Editor({
           onTempoAsli={adaLatihanDrill ? () => drill.songId && tl.keAsli([drill.songId]) : undefined}
           roster={roster}
           startIdx={idx}
+          song={lagu ?? null}
+          detikPerSet={petaSet ? petaSet.map((p) => p.detik) : undefined}
           onClose={(i) => {
             setIdx(i)
             setPresenter(false)

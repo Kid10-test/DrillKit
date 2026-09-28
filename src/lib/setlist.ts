@@ -28,6 +28,8 @@ export interface BarisSetList {
   bpmLatihan: number
   /** #4 — "Latihan 80%"; `null` kalau lagu ini memakai tempo asli. */
   latihan: string | null
+  /** #6 — true bila lagu memiliki rekaman audio yang diselaraskan */
+  adaRekaman?: boolean
 }
 
 /** Hasil perhitungan durasi satu set list. */
@@ -120,6 +122,7 @@ export function hitungSetList(
       sukat: sukatLagu(s),
       bpmLatihan: latihanAktif(lat) ? Math.round(terapkanLatihan(s.bpm, lat)) : s.bpm,
       latihan: labelLatihan(lat),
+      adaRekaman: !!s.rekaman,
     })
   }
   return { total, tanpaPanjang, baris }

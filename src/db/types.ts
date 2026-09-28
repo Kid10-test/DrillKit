@@ -687,6 +687,55 @@ export interface Song {
    * lagu tidak akan berhenti sendiri selama pengulangan bagian menyala.
    */
   ulangBagian?: UlangBagian
+  /**
+   * #6 — Pengaturan rekaman audio (MP3/WAV/M4A/OGG) untuk lagu ini.
+   * Berkas binernya (Blob) disimpan di IndexedDB tabel `rekamanAudio`.
+   */
+  rekaman?: RekamanAudioMeta | null
+}
+
+/**
+ * #6 — Metadata rekaman audio untuk lagu.
+ *
+ * Rekaman bertempo stabil (render notasi atau rekaman dengan klik).
+ * Dibawa dalam berkas show dan ekspor repertoar; berkas audionya sendiri
+ * dikirim terpisah atau via ZIP.
+ */
+export interface RekamanAudioMeta {
+  namaFile: string
+  tipe: string
+  ukuran: number
+  durasi: number
+  /** SHA-256 hash atau sidik biner hex */
+  hash: string
+  /** Titik mulai (birama 1 ketuk 1) dalam detik pada berkas audio. Bawaan 0. */
+  titikMulaiDetik: number
+  /** Koreksi offset waktu per segmen (ms) untuk fermata/rit. */
+  koreksiSegmen?: Record<string, number>
+  /** Volume audio rekaman (0–1). Bawaan 1. */
+  volumeAudio?: number
+  /** Volume bunyi klik metronom (0–1). Bawaan 0.8. */
+  volumeKlik?: number
+  /** Pilihan bunyi: rekaman saja, rekaman + klik, atau klik saja. */
+  modeBunyi?: 'rekaman' | 'keduanya' | 'klik'
+  /** Ringkasan puncak gelombang suara (peaks) untuk canvas waveform. */
+  peaks?: number[]
+}
+
+/**
+ * #6 — Rekaman audio yang tersimpan di IndexedDB perangkat ini.
+ */
+export interface AudioRekamanItem {
+  /** Id unik, disamakan dengan songId lagu pemilik */
+  id: string
+  songId: string
+  blob: Blob
+  namaFile: string
+  tipe: string
+  ukuran: number
+  durasi: number
+  hash: string
+  updatedAt: number
 }
 
 /**

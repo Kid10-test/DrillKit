@@ -25,7 +25,8 @@ import {
   useToast,
 } from '../components/ui'
 import { IconDownload, IconUpload } from '../components/Icons'
-import { backupNotes, daysSince, downloadBackup, formatBytes, lastBackup } from '../lib/backup'
+import { backupNotes, daysSince, downloadBackup, downloadBackupZip, formatBytes, lastBackup } from '../lib/backup'
+import { bukaZip } from '../lib/zip'
 import { KartuSimpanOtomatis } from '../components/SimpanOtomatis'
 import { AMBANG, AMBANG_LANGKAH } from '../lib/analitik'
 import type { AmbangTingkat } from '../db/types'
@@ -113,6 +114,7 @@ export default function Settings() {
     lokal: Member[]
     saran: SaranBaris[]
     keputusan: Record<string, KeputusanCocok>
+    audioEntries?: { songId: string; namaFile: string; blob: Blob; durasi?: number; hash?: string }[]
   } | null>(null)
 
   /** Riwayat backup — diisi saat halaman dibuka & setelah mengunduh backup. */
@@ -151,10 +153,18 @@ export default function Settings() {
     toast.push('Backup diunduh — simpan di tempat aman')
   }
 
+  /** #6 — Unduh backup ZIP menyertakan seluruh rekaman audio biner. */
+  async function exportBackupZip() {
+    await downloadBackupZip()
+    setCatatanBackup(backupNotes())
+    toast.push('Backup lengkap + rekaman (ZIP) diunduh')
+  }
+
   async function tulisBackup(
     data: Record<string, any>,
     anggotaLokal: Member[],
     kep: Record<string, KeputusanCocok>,
+    audioEntries?: { songId: string; namaFile: string; blob: Blob; durasi?: number; hash?: string }[],
   ) {
     const masuk = Array.isArray(data.members) ? (data.members as Member[]) : []
     const hasil = terapkanCocok({
@@ -204,12 +214,85 @@ export default function Settings() {
       },
     )
     if (diubah.settings) await db.settings.put({ ...diubah.settings, key: 'team' })
-    toast.push(bentrok.length ? `Backup dipulihkan · ${bentrok.length} bentrok dilaporkan` : 'Backup dipulihkan')
+
+    // #6 — Pulihkan rekaman audio biner dari ZIP jika ada
+    let jmlAudio = 0
+    if (audioEntries && audioEntries.length > 0) {
+      for (const a of audioEntries) {
+        await db.rekamanAudio.put({
+          id: a.songId,
+          songId: a.songId,
+          blob: a.blob,
+          namaFile: a.namaFile,
+          tipe: a.blob.type || 'audio/mpeg',
+          ukuran: a.blob.size,
+          durasi: a.durasi || 0,
+          hash: a.hash || '',
+          updatedAt: Date.now(),
+        })
+        jmlAudio++
+      }
+    }
+
+    const infoAudio = jmlAudio > 0 ? ` (+ ${jmlAudio} rekaman audio)` : ''
+    toast.push(bentrok.length ? `Backup dipulihkan · ${bentrok.length} bentrok dilaporkan${infoAudio}` : `Backup dipulihkan${infoAudio}`)
   }
 
   async function importBackup(file: File) {
     try {
-      const text = await readFileAsText(file)
+      let text = ''
+      const audioEntries: { songId: string; namaFile: string; blob: Blob; durasi?: number; hash?: string }[] = []
+
+      if (file.name.endsWith('.zip') || file.type.includes('zip')) {
+        const ab = await file.arrayBuffer()
+        const unzipped = bukaZip(new Uint8Array(ab))
+        const jsonEntry = unzipped.find((z) => z.nama.endsWith('.json') && !z.nama.startsWith('audio/'))
+        if (!jsonEntry) {
+          toast.push('Berkas ZIP tidak memuat berkas JSON backup DrillKit', 'err')
+          return
+        }
+        text = jsonEntry.teks()
+
+        // Baca manifest audio jika ada
+        const manifestEntry = unzipped.find((z) => z.nama === 'audio/manifest.json')
+        let manifest: Record<string, { songId: string; namaFile: string; durasi: number; hash: string }> = {}
+        if (manifestEntry) {
+          try {
+            manifest = JSON.parse(manifestEntry.teks())
+          } catch {
+            // abaikan error parse manifest
+          }
+        }
+
+        for (const z of unzipped) {
+          if (z.nama.startsWith('audio/') && !z.nama.endsWith('.json')) {
+            const m = manifest[z.nama]
+            let songId = m?.songId
+            let namaFile = m?.namaFile
+            if (!songId) {
+              const base = z.nama.replace(/^audio\//, '')
+              const firstUnder = base.indexOf('_')
+              if (firstUnder > 0) {
+                songId = base.substring(0, firstUnder)
+                namaFile = base.substring(firstUnder + 1)
+              }
+            }
+            if (songId && namaFile) {
+              const blob = new Blob([new Uint8Array(z.bita)], { type: 'audio/mpeg' })
+              audioEntries.push({
+                songId,
+                namaFile,
+                blob,
+                durasi: m?.durasi,
+                hash: m?.hash,
+              })
+            }
+          }
+        }
+      } else {
+        text = await readFileAsText(file)
+      }
+
       const data = JSON.parse(text)
       if (!['drillkit-backup', 'drillkit-share'].includes(data.format)) {
         toast.push('Format file tidak dikenali', 'err')
@@ -220,10 +303,10 @@ export default function Settings() {
       const saran = susunSaran(masuk, lokal)
       const kep = keputusanAwal(saran)
       if (perluDitanya(saran, lokal.length)) {
-        setCocokBackup({ data, lokal, saran, keputusan: kep })
+        setCocokBackup({ data, lokal, saran, keputusan: kep, audioEntries })
         return
       }
-      await tulisBackup(data, lokal, kep)
+      await tulisBackup(data, lokal, kep, audioEntries)
     } catch (e) {
       toast.push('Gagal memulihkan backup', 'err')
     }
@@ -575,15 +658,18 @@ export default function Settings() {
             <Button onClick={exportBackup}>
               <IconDownload size={16} /> Ekspor backup (JSON)
             </Button>
+            <Button onClick={exportBackupZip} variant="outline" title="Ekspor data tim berserta seluruh rekaman audio MP3">
+              <IconDownload size={16} /> Backup + rekaman (ZIP)
+            </Button>
             <Button
               onClick={() => document.getElementById('restore-input')?.click()}
             >
-              <IconUpload size={16} /> Pulihkan backup
+              <IconUpload size={16} /> Pulihkan backup (JSON / ZIP)
             </Button>
             <input
               id="restore-input"
               type="file"
-              accept="application/json,.json"
+              accept="application/json,.json,.zip,application/zip"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]
@@ -751,7 +837,12 @@ export default function Settings() {
               data-testid="pulihkan-setelah-cocok"
               onClick={() => {
                 if (!cocokBackup) return
-                void tulisBackup(cocokBackup.data, cocokBackup.lokal, cocokBackup.keputusan)
+                void tulisBackup(
+                  cocokBackup.data,
+                  cocokBackup.lokal,
+                  cocokBackup.keputusan,
+                  cocokBackup.audioEntries,
+                )
                   .then(() => setCocokBackup(null))
                   .catch(() => toast.push('Gagal memulihkan backup', 'err'))
               }}

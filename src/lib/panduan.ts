@@ -276,7 +276,7 @@ function tabAnggota(): [string, string][] {
     ['Catatan', 'Catatan evaluasi dari pelatih, khusus untukmu.'],
     [
       'Musik',
-      'Metronom, lagu &amp; perubahan temponya, set list, penala, dan nada dengung. Bisa dipakai walau belum memilih nama.',
+      'Metronom, lagu, set list, penala, dan rekaman audio latihan (MP3). Tekan <b>Tambahkan rekaman dari pelatih</b> untuk menyelaraskan audio dengan tempo & formasi. Rekaman tetap tersimpan walau paket diperbarui.',
     ],
   ]
 }
@@ -306,6 +306,10 @@ function macetAnggota(disajikan: boolean): [string, string][] {
     [
       'Terlanjur memilih <i>Saya pelatih</i>',
       'Buka menu <b>Berbagi</b> → <b>Lihat mode anggota</b>. Kalau HP ini diminta PIN untuk keluar dari mode anggota, itu memang disengaja pelatih.',
+    ],
+    [
+      'Rekaman audio di iPhone/Safari terhapus sendiri',
+      'Di iPhone/iPad (Safari), pasang DrillKit ke Layar Utama (<b>Add to Home Screen</b>) agar browser tidak membersihkan rekaman audio setelah 7 hari tidak dibuka.',
     ],
   )
   return baris
@@ -360,8 +364,12 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
     </table>
     <p style="margin:2px 0 3px">Tekan <b>Putar dengung</b> (tombol cepat <b>Bb konser</b>), lalu <b>Dengarkan</b> dan mainkan nadanya. Jarum hijau di tengah (±5 sen) = tepat. Angka <b>minus</b> = terlalu rendah (dorong slide/mouthpiece masuk); <b>plus</b> = terlalu tinggi (tarik keluar).</p>`)
 
-  /* 5. Materi berubah */
-  bagian.push(`<h2>5. Kalau materi berubah</h2>
+  /* 5. Rekaman audio */
+  bagian.push(`<h2>5. Rekaman audio latihan</h2>
+    <p style="margin:2px 0 3px">Pelatih membagikan berkas MP3 lagu? Di tab <b>Musik</b>, buka lagu lalu tekan <b>Tambahkan rekaman dari pelatih</b>. Sistem akan mencocokkan sidik rekaman (✔). Berkas disimpan offline di HP dan <b>tidak terhapus</b> saat kamu memperbarui materi paket.</p>`)
+
+  /* 6. Materi berubah */
+  bagian.push(`<h2>6. Kalau materi berubah</h2>
     <ul>
       ${
         disajikan
@@ -372,8 +380,8 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
       <li>Yang kamu ubah di HP-mu <b>tidak</b> terkirim ke pelatih. Absensi selalu diisi pelatih.</li>
     </ul>`)
 
-  /* 6. Kalau macet */
-  bagian.push(`<h2>6. Kalau macet</h2>
+  /* 7. Kalau macet */
+  bagian.push(`<h2>7. Kalau macet</h2>
     <table>
       <thead><tr><th style="width:38%">Gejala</th><th>Cara mengatasi</th></tr></thead>
       <tbody>${macetAnggota(disajikan).map(([a, b]) => tr(a, b)).join('')}</tbody>
