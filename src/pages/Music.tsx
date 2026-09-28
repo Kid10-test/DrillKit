@@ -40,6 +40,9 @@ import {
 } from '../lib/birama'
 import type { SegmenWaktu } from '../lib/birama'
 import { hitungSetList, setListBaru } from '../lib/setlist'
+import { ModalRekamanLagu } from '../components/ModalRekamanLagu'
+import { PemutarRekaman, waktuBiramaKeDetikAudio } from '../lib/rekaman'
+import type { RekamanAudioMeta } from '../db/types'
 import { detikSatuPutaran, jumlahBirama, rentangValid } from '../lib/ulang'
 import { KartuSetList } from '../components/KartuSetList'
 import { KendaliTempoLatihan, LencanaLatihan } from '../components/KendaliTempoLatihan'
@@ -156,9 +159,19 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
   const naikOtomatis = tl.naikUntuk(song?.id)
   /** Putaran naik otomatis yang sedang berjalan; `null` kalau tidak berjalan. */
   const [putaran, setPutaran] = useState<number | null>(null)
+
+  /* ----------------------- #6 — Rekaman Lagu MP3 ------------------------- */
+  const [modalRekamanOpen, setModalRekamanOpen] = useState(false)
+  const pemutarAudio = useRef<PemutarRekaman>(PemutarRekaman.get())
+
   /** Ubah tempo latihan saat berjalan → langsung terdengar di birama berikutnya. */
   useEffect(() => {
     if (engineRef.current.jalan) engineRef.current.setLatihan(latihan)
+    // Sesuaikan playbackRate audio dengan tempo latihan
+    if (song?.rekaman) {
+      const rate = latihan?.persen ? latihan.persen / 100 : 1.0
+      pemutarAudio.current.setKecepatan(rate)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latihan.mode, latihan.persen, latihan.geser])
 
@@ -318,7 +331,10 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [song])
 
-  useEffect(() => () => engineRef.current.berhenti(), [])
+  useEffect(() => () => {
+    engineRef.current.berhenti()
+    pemutarAudio.current.jeda()
+  }, [])
 
   /** E3 — sunting satu kotak pola pada birama ke-`iBar`, sel ke-`iSel`. */
   function ubahSel(iBar: number, iSel: number) {
@@ -430,6 +446,20 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
     const mulai = ulangBagianAktif && ub ? ub.dari : m
     const idLagu = song?.id
     setPutaran(null)
+
+    if (song?.id && song.rekaman) {
+      const mode = song.rekaman.modeBunyi ?? 'keduanya'
+      const volAud = song.rekaman.volumeAudio ?? 1.0
+      const rate = latihan?.persen ? latihan.persen / 100 : 1.0
+      void pemutarAudio.current.muat(song.id).then((siap) => {
+        if (!siap) return
+        pemutarAudio.current.setVolume(mode === 'klik' ? 0 : volAud)
+        pemutarAudio.current.setKecepatan(rate)
+        const offsetDetik = waktuBiramaKeDetikAudio(mulai, song.rekaman!, segmenWaktu, birama, bpm, tempoUntuk)
+        pemutarAudio.current.putar(offsetDetik)
+      })
+    }
+
     engineRef.current.mulai({
       bpm,
       beats,
@@ -438,7 +468,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
       // berlaku, sehingga meter bisa berubah tiap segmen tempo.
       pola: pakaiPola ? pola : null,
       suara,
-      volume,
+      volume: song?.rekaman?.modeBunyi === 'rekaman' ? 0 : volume * (song?.rekaman?.volumeKlik ?? 1.0),
       getar,
       latih,
       segmen: segs,
@@ -458,8 +488,13 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
         setPutaran(info.putaran)
         // Tempo terakhir yang dicapai diingat.
         tl.aturTempo(idLagu, info.tempo)
+        if (song?.id && song.rekaman && ub) {
+          const offsetUlang = waktuBiramaKeDetikAudio(ub.dari, song.rekaman, segmenWaktu, birama, bpm, tempoUntuk)
+          pemutarAudio.current.putar(offsetUlang)
+        }
       },
       onSelesai: () => {
+        pemutarAudio.current.jeda()
         setRunning(false)
         setAktif(null)
         setHabis(true)
@@ -496,13 +531,28 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
       birama: t.birama,
     }))
     const pakaiPolaLagu = !!s.pola && s.pola.bars.length > 0
+
+    if (s.id && s.rekaman) {
+      const mode = s.rekaman.modeBunyi ?? 'keduanya'
+      const volAud = s.rekaman.volumeAudio ?? 1.0
+      void pemutarAudio.current.muat(s.id).then((siap) => {
+        if (!siap) return
+        pemutarAudio.current.setVolume(mode === 'klik' ? 0 : volAud)
+        const lat = tl.tempoUntuk(s.id)
+        const rate = lat?.persen ? lat.persen / 100 : 1.0
+        pemutarAudio.current.setKecepatan(rate)
+        const offsetDetik = waktuBiramaKeDetikAudio(1, s.rekaman!, segmen, meter, s.bpm)
+        pemutarAudio.current.putar(offsetDetik)
+      })
+    }
+
     return {
       bpm: s.bpm,
       beats: meter.pembilang,
       subdiv,
       pola: pakaiPolaLagu ? s.pola : null,
       suara: s.suara ?? suara,
-      volume: s.volume ?? volume,
+      volume: s.rekaman?.modeBunyi === 'rekaman' ? 0 : (s.volume ?? volume) * (s.rekaman?.volumeKlik ?? 1.0),
       getar: s.getar === 1 || getar,
       latih: s.latih ?? null,
       // #4 — set list memakai tempo latihan setiap lagu.
@@ -515,7 +565,10 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
       // M5 — berhenti di akhir lagu ini, lalu `selesai` memajukan set list.
       biramaAkhir: s.panjangBirama ?? 0,
       ulang: false,
-      onSelesai: selesai,
+      onSelesai: () => {
+        pemutarAudio.current.jeda()
+        selesai()
+      },
       onKetuk: (i: InfoKetuk) => {
         setMeasure(i.birama)
         setAktif(i)
@@ -563,6 +616,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
     if (running) {
       engineRef.current.berhenti()
       hentikanUcapan()
+      pemutarAudio.current.jeda()
       setRunning(false)
       setAktif(null)
       setHabis(false)
@@ -581,6 +635,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
     if (running) {
       engineRef.current.berhenti()
       hentikanUcapan()
+      pemutarAudio.current.jeda()
       setAktif(null)
       nyalakan(m)
     } else {
@@ -672,6 +727,10 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
     await db.songs.put(s)
     setOpen(false)
     toast.push('Lagu disimpan')
+  }
+
+  async function handleUpdateRekaman(songId: string, meta: RekamanAudioMeta | null) {
+    await db.songs.update(songId, { rekaman: meta })
   }
 
   return (
@@ -813,6 +872,39 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
                   </div>
                 </div>
               )}
+
+              {/* #6 — Rekaman lagu audio (MP3) */}
+              <div
+                className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5"
+                data-testid="kartu-rekaman-audio"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-200">
+                      🎵 {song.rekaman ? song.rekaman.namaFile : 'Rekaman Lagu'}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-slate-400">
+                      {song.rekaman
+                        ? `${formatWaktu(song.rekaman.durasi)} · Titik mulai: ${song.rekaman.titikMulaiDetik.toFixed(2)} dtk · Mode: ${
+                            song.rekaman.modeBunyi === 'rekaman'
+                              ? 'Audio saja'
+                              : song.rekaman.modeBunyi === 'klik'
+                                ? 'Klik saja'
+                                : 'Audio + Klik'
+                          }`
+                        : 'Belum ada rekaman audio yang diselaraskan.'}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={song.rekaman ? 'outline' : 'soft'}
+                    onClick={() => setModalRekamanOpen(true)}
+                    data-testid="tombol-kelola-rekaman"
+                  >
+                    {song.rekaman ? 'Kelola Rekaman' : '+ Rekaman Audio'}
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1481,6 +1573,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
             // Tekan lagi pada lagu yang sama = berhenti.
             engineRef.current.berhenti()
             hentikanUcapan()
+            pemutarAudio.current.jeda()
             mainkanSetRef.current = false
             setIndeksMain(null)
             setRunning(false)
@@ -1505,6 +1598,14 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
       />
 
       <SongModal open={open} song={editing} onClose={() => setOpen(false)} onSave={saveSong} />
+
+      <ModalRekamanLagu
+        open={modalRekamanOpen}
+        song={song ?? null}
+        onClose={() => setModalRekamanOpen(false)}
+        onUpdateSong={handleUpdateRekaman}
+        hanyaPutar={hanyaPutar}
+      />
     </div>
   )
 }

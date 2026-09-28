@@ -34,10 +34,10 @@ export function crc32(bita: Uint8Array): number {
 
 /** Satu berkas yang akan dimasukkan ke ZIP. */
 export interface EntriZip {
-  /** Nama berkas **di dalam** ZIP, mis. `DrillKit-Andra-A07.json`. */
+  /** Nama berkas **di dalam** ZIP, mis. `DrillKit-Andra-A07.json` atau `audio/song.mp3`. */
   nama: string
-  /** Isinya dalam bentuk teks; dikodekan UTF-8. */
-  isi: string
+  /** Isinya dalam bentuk teks (UTF-8) atau biner Uint8Array. */
+  isi: string | Uint8Array
 }
 
 /** Waktu DOS (16 bit): jam/menit/detik dan tanggal, untuk tajuk ZIP. */
@@ -67,7 +67,7 @@ export function bikinZip(entri: EntriZip[], sekarang = new Date()): Uint8Array {
   // diketahui sebelum mulai menulis.
   const siap = entri.map((e) => {
     const nama = teks.encode(e.nama)
-    const isi = teks.encode(e.isi)
+    const isi = typeof e.isi === 'string' ? teks.encode(e.isi) : e.isi
     return { nama, isi, crc: crc32(isi) }
   })
 
@@ -135,4 +135,46 @@ export function bikinZip(entri: EntriZip[], sekarang = new Date()): Uint8Array {
   u16(0)           // panjang komentar
 
   return out.subarray(0, o)
+}
+
+/** Berkas yang diekstrak dari ZIP. */
+export interface BerkasZipEkstrak {
+  nama: string
+  bita: Uint8Array
+  teks: () => string
+}
+
+/**
+ * Ekstrak berkas dari bita ZIP (metode 0 "stored" / tanpa pemadatan).
+ * Berjalan murni di memori, aman untuk browser dan node.js.
+ */
+export function bukaZip(data: Uint8Array): BerkasZipEkstrak[] {
+  const dec = new TextDecoder()
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength)
+  const hasil: BerkasZipEkstrak[] = []
+  let o = 0
+
+  while (o + 30 <= data.length) {
+    const sig = dv.getUint32(o, true)
+    if (sig !== 0x04034b50) break // bukan tajuk lokal (sudah masuk direktori pusat)
+    const compSize = dv.getUint32(o + 18, true)
+    const fnLen = dv.getUint16(o + 26, true)
+    const extraLen = dv.getUint16(o + 28, true)
+    const namaAwal = o + 30
+    const namaAkhir = namaAwal + fnLen
+    if (namaAkhir > data.length) break
+    const nama = dec.decode(data.subarray(namaAwal, namaAkhir))
+    const isiAwal = namaAkhir + extraLen
+    const isiAkhir = isiAwal + compSize
+    if (isiAkhir > data.length) break
+    const bita = data.subarray(isiAwal, isiAkhir)
+    hasil.push({
+      nama,
+      bita,
+      teks: () => dec.decode(bita),
+    })
+    o = isiAkhir
+  }
+
+  return hasil
 }

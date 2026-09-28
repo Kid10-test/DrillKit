@@ -3,8 +3,30 @@
 Dokumen ini **bukan** rencana yang harus dikerjakan semua. Ini kandidat perbaikan,
 diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
 
-**Terakhir diperbarui: 27 Sep 2026 — #3 bagian pertama (kalender & agenda jadwal) rampung.**
-· **#3 bagian pertama rampung (27 Sep 2026)** — halaman Jadwal punya tampilan **Bulan**
+**Terakhir diperbarui: 28 Sep 2026 — #6 (Rekaman lagu MP3) rampung.**
+· **#6 rampung (28 Sep 2026)** — Rekaman audio MP3, M4A, WAV, OGG disimpan di IndexedDB
+  (Blob). Sidik rekaman biner SHA-256 via WebCrypto + durasi. Penyelarasan titik mulai
+  birama 1 ketuk 1 dengan visualisasi waveform canvas, stepper ±10/50ms, tombol "Cek bersama klik",
+  koreksi offset per segmen, kontrol dual volume dan mode bunyi (rekaman, klik, keduanya).
+  Master clock: audio sinkron dengan metronom, lompat birama, loop ulang bagian (M2),
+  tempo latihan (`playbackRate` + `preservesPitch`), dan set list (badge 🎵). Integrasi
+  drill: editor scrubber & presenter bergerak selaras dengan linimasa audio, mode kunci
+  layar lomba memaksa tempo asli 100%. Mode anggota: "Tambahkan rekaman dari pelatih" dengan
+  validasi sidik jari (✔ cocok / ⚠ berbeda), persistensi audio saat pembaruan paket,
+  panduan anggota diperbarui dengan tips PWA iOS. Backup + rekaman ZIP lewat `zip.ts`
+  dan pemulihan otomatis. Uji: `qa/rekaman-lagu-logika.mjs` (21/21), 19 rangkaian uji logika lulus.
+· **#4 rampung (27 Sep 2026, PR #10)** — Kendali tempo latihan persen (40–150%) atau
+  BPM (−60…+30) di halaman Musik, diterapkan paling akhir pada tempo berlaku, batas
+  bawah 20 BPM. Diingat per lagu per perangkat (localStorage). Lencana "Latihan 80%"
+  dan "138 BPM (asli 172)" di daftar lagu, panel lagu, dan set list (+ tombol "Semua
+  ke tempo asli"). Presenter drill ikut melambat untuk drill yang ditautkan ke lagu;
+  layar hari H selalu tempo asli dan memberi peringatan. Naik otomatis saat mengulang
+  bagian (M2). Uji: `tempo-latihan-logika` 34/34, `tempo-latihan` 26/26, `musik-anggota` 45/45.
+· **#3 bagian kedua rampung (27 Sep 2026, PR #9)** — Kalender baca-saja di mode
+  anggota (`src/pages/Share.tsx`, `src/main.tsx`), menampilkan agenda & kalender
+  dengan status kehadiran pribadi (Hadir/Izin/Sakit/Alpa/Belum dicatat) dari data
+  terenkripsi (#2). Uji: `kalender-anggota` 33/33. #3 tuntas sepenuhnya.
+· **#3 bagian pertama rampung (27 Sep 2026, PR #8)** — halaman Jadwal punya tampilan **Bulan**
   (mulai Senin, label per jenis, % hadir sesi lewat, checklist sesi mendatang, detail hari,
   titik di HP), **Agenda** (kartu sesi berikutnya + hitung mundur, per minggu, sesi lewat
   tersembunyi) dan **Daftar** (tampilan lama). Tambahan: ulangi mingguan (ubah *sesi ini* /
@@ -12,9 +34,9 @@ diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
   dengan Batalkan, hitung mundur penampilan, cetak bulan (hex), satu `.ics` semua jadwal
   mendatang. Data sesi hanya bertambah `seriId`. Logika di `src/lib/kalender.ts`.
   Uji: `kalender-logika` 67/67, `kalender-jadwal` 31/31; uji lama jadwal tetap lulus.
-  **Sisa #3:** kalender di mode anggota (dari data terkunci #2).
 · **Rancangan lanjutan (26 Sep 2026)** — delapan rancangan hasil diskusi pelatih
-  disimpan di bagian paling bawah (**Rancangan lanjutan**). #3 sebagian (lihat di atas); #4–#8 belum dikerjakan.
+  disimpan di bagian paling bawah (**Rancangan lanjutan**). #1 s/d #4 rampung (PR #6–#10);
+  #5 (Drill × segmen lagu) menjadi giliran berikutnya; #6–#8 menunggu.
 · **#2 bagian kedua rampung (26 Sep 2026)** — kunci pribadi AES-256-GCM per anggota,
   data pribadi terkunci di berkas terbit, QR kunci, dan tombol Buat kunci baru.
 · **#2 bagian pertama rampung (26 Sep 2026)** — satu tombol menerbitkan materi
@@ -5151,18 +5173,18 @@ Setiap rancangan dijadikan PR tersendiri, sesuai kebiasaan proyek
 - Uji qa memakai asersi dan diakhiri `N lulus, M gagal` + kode keluar,
   lalu didaftarkan di `qa/regresi-penuh.sh`.
 
-## Urutan yang disarankan
+## Urutan yang disarankan & status pelaksanaan
 
-| # | Rancangan | Ukuran | Bergantung / catatan |
-|---|---|---|---|
-| 1 | Satu anggota, dua nama | Sedang | **Paling mendesak**: data pelatih sudah telanjur ganda |
-| 2 | Terbitkan ke anggota (2 PR) | Sedang–besar | Sesudah #1, supaya data pribadi menempel ke anggota yang benar |
-| 3 | Jadwal: kalender & agenda | Sedang | Kalender anggota memakai data terkunci dari #2 |
-| 4 | Tempo latihan | Kecil–sedang | Disatukan dengan pengatur kecepatan drill yang sudah ada (`view.cepat`) |
-| 5 | Drill × segmen lagu | Sedang | Sebaiknya sesudah #4, karena keduanya menyentuh tempo di drill |
-| 6 | Rekaman lagu (MP3) | Sedang–besar | Sesudah #4 dan #5 |
-| 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | Mengenali ZIP dari #6 bila sudah ada; memuat langkah pencocokan dari #1 |
-| 8 | PIN pelatih tim | Kecil–sedang | |
+| # | Rancangan | Ukuran | Status | Bergantung / catatan |
+|---|---|---|---|---|
+| 1 | Satu anggota, dua nama | Sedang | **Selesai (PR #6)** | Panggilan, gabung anggota, pencocokan saat impor, daftar induk |
+| 2 | Terbitkan ke anggota (2 PR) | Sedang–besar | **Selesai (PR #7)** | Tahap 1 terbit materi grup; Tahap 2 kunci AES-256-GCM & data terkunci |
+| 3 | Jadwal: kalender & agenda | Sedang | **Selesai (PR #8 & #9)** | Tahap 1 kalender/agenda/seri/cetak/.ics; Tahap 2 kalender baca-saja anggota |
+| 4 | Tempo latihan | Kecil–sedang | **Selesai (PR #10)** | Persen & BPM per lagu, naik otomatis saat ulang, presenter ikut melambat, hari H asli |
+| 5 | Drill × segmen lagu | Sedang | **Berikutnya** | Sebaiknya sesudah #4, karena keduanya menyentuh tempo di drill |
+| 6 | Rekaman lagu (MP3) | Sedang–besar | Menunggu (#5) | Sesudah #4 dan #5 |
+| 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | Menunggu (#6) | Mengenali ZIP dari #6 bila sudah ada; memuat langkah pencocokan dari #1 |
+| 8 | PIN pelatih tim | Kecil–sedang | Menunggu | Pagar mode pelatih via hash ENV |
 
 ---
 
@@ -5495,6 +5517,53 @@ tanggal akhir; *ubah sesi ini* vs *semua berikutnya*; sesi berabsensi
 tidak terhapus; tampilan HP 360 px; seret-pindah dengan undo; cetak;
 kalender anggota.
 
+### Hasil #3, bagian pertama — kalender & agenda (27 Sep 2026)
+
+Bagian pertama selesai (PR #8). Halaman Jadwal (`src/pages/Schedule.tsx`)
+mendukung tiga mode tampilan: **Bulan**, **Agenda**, dan **Daftar** (lama).
+
+**Tampilan Bulan.** Kotak 7 kolom mulai Senin. Sesi lewat menampilkan % hadir
+dengan warna predikat kehadiran (Sangat Baik / Baik / Cukup / Kurang mengikuti
+ambang J1). Sesi mendatang menampilkan progress checklist materi dan penanda
+rencana latihan / set list. Ketuk hari membuka panel detail / form sesi baru
+dengan tanggal terisi. Di layar HP, tampilan beralih ke kalender ringkas
+ber-dot warna per jenis kegiatan.
+
+**Tampilan Agenda.** Kartu besar sesi berikutnya dengan hitung mundur. Sesi lain
+dikelompokkan per minggu; sesi yang lewat disembunyikan di balik toggle
+"Tampilkan yang sudah lewat".
+
+**Seri mingguan & pengelolaan.** Ulangi mingguan pada hari tertentu dengan batas
+tanggal akhir. Pengubahan seri mendukung opsi *hanya sesi ini* atau *semua
+berikutnya*. Penghapusan seri diproteksi: sesi yang sudah memiliki catatan
+absensi tidak pernah dihapus. Ditambah fitur duplikat sesi dan seret-pindah
+tanggal di kalender laptop dengan tombol Batalkan (undo).
+
+**Cetak & ekspor.** Cetak kalender satu bulan berbasis warna hex murni (aman
+browser lama) dengan pratinjau / unduh HTML fallback. Ekspor `.ics` tunggal
+berisi seluruh jadwal mendatang.
+
+**Modul logika.** `src/lib/kalender.ts` menangani pembuatan grid bulan, seri
+mingguan, format ICS RFC 5545, dan hitung mundur lomba terdekat. Data
+`Session` hanya bertambah kolom opsional `seriId`.
+
+**Uji yang lulus:** `qa/kalender-logika.mjs` (67 butir) dan
+`qa/kalender-jadwal.mjs` (31 butir). Regresi jadwal lama (`latihan-jadwal`,
+`pacu-latihan`, `penanda-sesi`, `pengingat-jadwal`) tetap bersih.
+
+### Hasil #3, bagian kedua — kalender baca-saja mode anggota (27 Sep 2026)
+
+Bagian kedua selesai (PR #9). Mode anggota (`src/pages/Share.tsx`, `src/main.tsx`)
+kini memiliki akses ke kalender jadwal baca-saja.
+
+**Kalender & Agenda anggota.** Menampilkan agenda dan kalender bulan untuk anggota
+tanpa wewenang menyunting. Untuk setiap sesi, menampilkan status kehadiran
+pribadi anggota (Hadir, Izin, Sakit, Alpa, atau Belum dicatat) yang didekripsi
+dari paket terbitan terkunci (hasil #2). Rencana materi latihan dapat dibaca.
+
+**Uji yang lulus:** `qa/kalender-anggota.mjs` (33 butir). Terdaftar di
+`qa/regresi-penuh.sh`. Seluruh rancangan #3 tuntas.
+
 ---
 
 ## 4. Tempo latihan
@@ -5537,6 +5606,48 @@ yang sudah ada memakai angka BPM tetap, jadi tidak cocok untuk tempo map.
 138 → 112; batas 20 BPM; naik otomatis berhenti di tujuan; nilai diingat
 setelah dibuka ulang; presenter ikut melambat; layar hari H tetap asli;
 mode anggota.
+
+### Hasil #4 — tempo latihan persen & BPM, naik otomatis, drill melambat (27 Sep 2026)
+
+Rancangan selesai penuh (PR #10). Kendali tempo latihan diterapkan per lagu
+tanpa mengubah tempo map asli dan tanpa mengotori basis data.
+
+**Kendali tempo latihan.** Widget `src/components/KendaliTempoLatihan.tsx`
+ditempatkan di dekat kendali putar lagu di halaman Musik (`src/pages/Music.tsx`
+dan `src/components/PanelLagu.tsx`). Mendukung mode persen (40–150%, tombol
+`−5%` / `+5%`) dan mode BPM (−60 s/d +30). Diterapkan paling akhir pada tempo
+berlaku (tempo map, accelerando/ritardando berangsur, latih tempo lama, dan
+hitung mundur), dengan batas bawah pengaman 20 BPM.
+
+**Penyimpanan per lagu.** Menggunakan hook `src/hooks/useTempoLatihan.ts` dan
+pustaka `src/lib/tempoLatihan.ts`. Nilai disimpan di `localStorage` per lagu
+per perangkat (`drillkit_tempo_latihan_<laguId>`), sehingga tidak masuk ke
+berkas backup atau paket berbagi. Tersedia juga di mode anggota.
+
+**Penanda visual & Set list.** Lencana "Latihan 80%" dan label "138 BPM (asli 172)"
+tampil jelas di daftar lagu, panel lagu, dan set list (`KartuSetList.tsx`).
+Durasi total set list otomatis menghitung tempo latihan setiap lagu, dilengkapi
+tombol "Semua ke tempo asli".
+
+**Integrasi Drill.** Presenter drill (`DrillPresenter.tsx`) dan editor
+(`DrillEditor.tsx`) ikut melambat sesuai tempo latihan lagu yang ditautkan.
+Penanda disatukan dengan `view.cepat` dan disertai tombol kembali ke tempo asli.
+Analitik formasi tetap menggunakan tempo asli lagu.
+
+**Layar hari H.** Pada `ModeLomba.tsx`, layar hari H selalu memaksakan tempo
+asli lagu dan memberikan peringatan mencolok jika ada setelan tempo latihan
+yang sedang aktif pada lagu yang ditampilkan.
+
+**Naik otomatis saat ulang bagian (M2).** Pengaturan otomatis: mulai persen/BPM,
+kenaikan tiap N putaran, batas target, dan tindakan setelah target tercapai
+(tetap lanjut di tempo target atau berhenti). Menampilkan indikator putaran
+("Putaran 3 · 80% → 100%"). Tempo terakhir yang dicapai diingat.
+
+**Uji yang lulus:** `qa/tempo-latihan-logika.mjs` (34 butir),
+`qa/tempo-latihan.mjs` (26 butir), dan `qa/musik-anggota.mjs` (45 butir).
+Seluruh regresi terkait (`m1-tempo-lagu-drill`, `m2-ulang-bagian`, `m3-setlist`,
+`perubahan-tempo`, `mode-lomba`) lulus bersih. Terdaftar di
+`qa/regresi-penuh.sh`.
 
 ---
 
@@ -5641,6 +5752,28 @@ otomatis.
 mulai dan koreksi segmen tepat ±20 ms; ulang bagian; sinkron dengan
 drill; sinkron saat diperlambat; sidik cocok dan tidak cocok;
 bertahan setelah paket diperbarui; ZIP dipulihkan utuh.
+
+### Status: Selesai (28 Sep 2026)
+
+Seluruh rancangan #6 (Rekaman lagu MP3) telah dikerjakan penuh:
+- **Penyimpanan biner Blob**: Dexie v9 dengan tabel `rekamanAudio` (`src/db/db.ts`),
+  pustaka manajemen audio `src/lib/rekaman.ts`, pengecekan kuota `navigator.storage`,
+  permintaan persistensi, dan deteksi iOS Safari.
+- **Sidik unik**: Hash biner SHA-256 via WebCrypto dan validasi toleransi durasi (<0.75s).
+- **Penyelarasan & Waveform**: Modal `ModalRekamanLagu.tsx` dengan canvas waveform 120 peak bar,
+  penanda titik mulai ketuk 1, tombol geser ±10/50ms, uji keselarasan "Cek bersama klik",
+  koreksi offset per segmen, dan kontrol dual volume (audio vs klik).
+- **Sinkronisasi pemutaran**: Pemutar singleton `PemutarRekaman` terintegrasi dengan
+  `Music.tsx` (loncat segmen, loop ulang bagian, bypass countdown), tempo latihan
+  (`playbackRate` + `preservesPitch`), dan set list (badge 🎵).
+- **Integrasi Drill**: Garis waktu scrubber `DrillEditor.tsx` menyinkronkan audio `currentTime`,
+  dan `DrillPresenter.tsx` memutar audio set terkait serta memaksa tempo asli pada kunci layar lomba.
+- **Mode Anggota**: Fitur "Tambahkan rekaman dari pelatih", validasi sidik jari, audio
+  persisten antar pembaruan paket, dan panduan anggota diperbarui.
+- **Backup & ZIP**: Dekompresi `bukaZip` dan kompresi biner `bikinZip` di `src/lib/zip.ts`,
+  ekspor "Backup + rekaman (ZIP)" di `src/lib/backup.ts` dan pemulihan ZIP di `src/pages/Settings.tsx`.
+- **Uji**: `qa/rekaman-lagu-logika.mjs` (21 butir uji lulus), terdaftar di `qa/bangun-logika.sh`,
+  seluruh 19 uji logika lulus tanpa gagal.
 
 ---
 

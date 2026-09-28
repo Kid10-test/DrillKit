@@ -198,6 +198,15 @@ export function KartuSetList({
                   >
                     <p className="truncate text-sm font-medium text-slate-100">
                       {b.judul}
+                      {b.adaRekaman && (
+                        <span
+                          className="ml-1.5 inline-flex items-center text-[10px] text-emerald-400"
+                          title="Lagu ini memiliki rekaman audio"
+                          data-testid={`setlist-rekaman-${i}`}
+                        >
+                          🎵
+                        </span>
+                      )}
                       {dimuat && (
                         <span
                           className="ml-1.5 rounded-full bg-slate-700/70 px-1.5 py-0.5 text-[9px] font-medium text-slate-300"

@@ -15,6 +15,7 @@ import type {
   TeamSettings,
   RiwayatSnapshot,
   Simpanan,
+  AudioRekamanItem,
 } from './types'
 
 /**
@@ -45,6 +46,8 @@ export class DrillKitDB extends Dexie {
   riwayat!: Table<RiwayatSnapshot, string>
   /** 1b — berkas backup yang ditulisi sendiri (Chromium desktop saja). */
   simpanan!: Table<Simpanan, string>
+  /** #6 — berkas rekaman audio lagu (Blob). Kuncinya id (songId). */
+  rekamanAudio!: Table<AudioRekamanItem, string>
 
   constructor() {
     super('drillkit')
@@ -77,6 +80,9 @@ export class DrillKitDB extends Dexie {
     })
     this.version(8).stores({
       simpanan: 'key',
+    })
+    this.version(9).stores({
+      rekamanAudio: 'id, songId, updatedAt',
     })
   }
 }

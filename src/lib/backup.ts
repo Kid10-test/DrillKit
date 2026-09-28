@@ -1,5 +1,6 @@
 import { db, getSettings } from '../db/db'
-import { downloadFile } from './utils'
+import { downloadBlob, downloadFile } from './utils'
+import { bikinZip, type EntriZip } from './zip'
 
 /**
  * Backup otomatis — pengingat & riwayat backup.
@@ -151,6 +152,59 @@ export async function downloadBackup(): Promise<BackupNote> {
   const note: BackupNote = {
     at: payload.exportedAt,
     bytes: new Blob([text]).size,
+    members: payload.members.length,
+    drills: payload.drills.length,
+    sets: payload.sets.length,
+  }
+  noteBackup(note)
+  return note
+}
+
+/**
+ * #6 — Unduh berkas backup lengkap berserta rekaman audio (ZIP).
+ * Mengemas JSON teks + berkas biner audio MP3/WAV/dll.
+ */
+export async function downloadBackupZip(): Promise<BackupNote> {
+  const payload = await buildBackupPayload()
+  const text = JSON.stringify(payload, null, 2)
+  const stamp = new Date(payload.exportedAt).toISOString().slice(0, 10)
+  const audioItems = await db.rekamanAudio.toArray()
+
+  const entries: EntriZip[] = [
+    { nama: `drillkit-backup-${stamp}.json`, isi: text },
+  ]
+
+  const manifestAudio: Record<string, { songId: string; namaFile: string; durasi: number; hash: string }> = {}
+
+  for (const item of audioItems) {
+    const ab = await item.blob.arrayBuffer()
+    const safeName = item.namaFile.replace(/[^\w.-]/g, '_')
+    const pathZip = `audio/${item.songId}_${safeName}`
+    entries.push({
+      nama: pathZip,
+      isi: new Uint8Array(ab),
+    })
+    manifestAudio[pathZip] = {
+      songId: item.songId,
+      namaFile: item.namaFile,
+      durasi: item.durasi,
+      hash: item.hash,
+    }
+  }
+
+  if (audioItems.length > 0) {
+    entries.push({
+      nama: 'audio/manifest.json',
+      isi: JSON.stringify(manifestAudio, null, 2),
+    })
+  }
+
+  const zipData = bikinZip(entries)
+  downloadBlob(`drillkit-backup-${stamp}.zip`, zipData)
+
+  const note: BackupNote = {
+    at: payload.exportedAt,
+    bytes: zipData.length,
     members: payload.members.length,
     drills: payload.drills.length,
     sets: payload.sets.length,
