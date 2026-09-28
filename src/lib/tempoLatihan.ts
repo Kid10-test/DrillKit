@@ -119,6 +119,64 @@ export function terapkanLatihan(bpm: number, t: TempoLatihan | null | undefined)
   return jepit(hasil, BPM_TERENDAH, BPM_TERTINGGI)
 }
 
+/**
+ * #6 — Laju pemutaran rekaman yang membuat rekaman berbunyi **setara dengan
+ * kliknya**.
+ *
+ * Mengapa ini ada — dan mengapa bukan sekadar `persen / 100`:
+ *
+ * Rekaman tidak punya tempo sendiri. Ia hanya bisa *dilambatkan* lewat
+ * `playbackRate`, dan seberapa lambat harus dihitung dari aturan tempo yang
+ * sama dengan yang dipakai mesin metronom. Dulu di sini ada dua aturan yang
+ * berbeda: klik memakai `terapkanLatihan` (yang tahu dua mode), sedangkan
+ * rekaman memakai `latihan.persen / 100` **tanpa melihat modenya**.
+ *
+ * Akibatnya, pada mode **BPM** — di mana `persen` tetap 100 — klik melambat
+ * 20 BPM sementara rekaman tetap berjalan di tempo aslinya. Keduanya berpisah
+ * makin jauh tiap ketukan: pada 172 BPM, selisihnya mencapai **2,7 detik
+ * dalam 25 detik**. Yang terdengar: "kliknya melambat, tidak mau ikut lagu".
+ *
+ * Modenya harus dihormati:
+ * - **persen**: laju = persen/100 (172 BPM @ 80% → 0,8).
+ * - **BPM**: laju = (bpm + geser)/bpm (172 BPM @ −20 → 0,8837…).
+ *
+ * Dijepit ke 0,25–3,0 karena di luar itu peramban menolaknya; pemanggil yang
+ * butuh tahu bisa membandingkan hasilnya dengan nilai mentahnya.
+ */
+export const LAJU_MIN = 0.25
+export const LAJU_MAKS = 3
+
+/** Laju mentah (belum dijepit) — untuk memberitahu pemakai kalau tak tercapai. */
+export function lajuRekamanMentah(bpm: number, t: TempoLatihan | null | undefined): number {
+  const asli = Number.isFinite(bpm) && bpm > 0 ? bpm : 120
+  if (!t || !latihanAktif(t)) return 1
+  const r = rapikanTempo(t)
+  const target = r.mode === 'bpm' ? asli + r.geser : (asli * r.persen) / 100
+  return target / asli
+}
+
+/** Laju pemutaran rekaman (0,25–3,0) yang sepadan dengan tempo latihan. */
+export function lajuRekaman(bpm: number, t: TempoLatihan | null | undefined): number {
+  return jepit(lajuRekamanMentah(bpm, t), LAJU_MIN, LAJU_MAKS)
+}
+
+/**
+ * #6 — apakah laju rekaman bisa diwakili SATU angka untuk seluruh lagu.
+ *
+ * Pada mode persen selalu bisa (semua tempo dikali angka yang sama). Pada
+ * mode BPM, geseran 20 BPM berarti rasio yang berbeda di tiap tempo — jadi
+ * lagu bertempo map tidak bisa diputar "sama lambatnya" dengan kliknya
+ * memakai satu `playbackRate`. Ini harus dikatakan, bukan disembunyikan:
+ * pemakainya mendengar klik dan rekaman berpisah perlahan, dan tanpa
+ * keterangan ia akan menyalahkan berkas rekamannya.
+ */
+export function lajuSeragam(bpm: number, segmen: { bpm: number }[], t: TempoLatihan | null | undefined): boolean {
+  const r = rapikanTempo(t)
+  if (!latihanAktif(r) || r.mode !== 'bpm') return true
+  const dasar = Number.isFinite(bpm) && bpm > 0 ? bpm : 120
+  return (segmen ?? []).every((s) => !Number.isFinite(s?.bpm) || Math.abs(s.bpm - dasar) < 1e-6)
+}
+
 /** Ganti nilai menurut mode saat ini (dijepit ke batas). */
 export function setelNilai(t: TempoLatihan, nilai: number): TempoLatihan {
   return rapikanTempo(t.mode === 'bpm' ? { ...t, geser: nilai } : { ...t, persen: nilai })

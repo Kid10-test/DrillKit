@@ -19,6 +19,7 @@ import {
 } from '/tmp/rekaman.mjs'
 import { bikinZip, bukaZip } from '/tmp/zip.mjs'
 import { hitungSetList } from '/tmp/setlist.mjs'
+import { LAJU_MAKS, LAJU_MIN, lajuRekaman, lajuSeragam, terapkanLatihan } from '/tmp/tempoLatihan.mjs'
 
 let lulus = 0
 const gagal = []
@@ -189,6 +190,56 @@ const cek = (nama, syarat, ket = '') => {
   cek('5.1: set list menghitung 2 baris', hitung.baris.length === 2)
   cek('5.2: lagu dengan rekaman ditandai adaRekaman = true', hitung.baris[0].adaRekaman === true)
   cek('5.3: lagu tanpa rekaman memiliki adaRekaman = false', hitung.baris[1].adaRekaman === false)
+}
+
+/* -------- 6. Keiringan rekaman × tempo latihan (#6) ---------------------- */
+{
+  const BPM = 172
+  const dekat = (nama, a, b, tol = 1e-9) => cek(nama, Math.abs(a - b) <= tol, `${a} vs ${b}`)
+
+  cek('6.1: tanpa latihan → laju 1', lajuRekaman(BPM, null) === 1)
+  cek('6.2: latihan netral (100%) → laju 1', lajuRekaman(BPM, { mode: 'persen', persen: 100, geser: 0 }) === 1)
+  dekat('6.3: persen 80 → laju 0,8', lajuRekaman(BPM, { mode: 'persen', persen: 80, geser: 0 }), 0.8)
+  dekat('6.4: BPM −20 @172 → laju 152/172', lajuRekaman(BPM, { mode: 'bpm', persen: 100, geser: -20 }), 152 / 172)
+
+  /*
+   * INTI perbaikan: laju yang benar adalah rasio antara tempo yang BERBUNYI
+   * (klik) dan tempo partitur. Kalau tidak sama, klik dan rekaman berpisah
+   * makin jauh tiap ketukan — 2,7 detik dalam 25 detik pada kasus 172→152.
+   */
+  for (const t of [
+    { mode: 'persen', persen: 80, geser: 0 },
+    { mode: 'persen', persen: 120, geser: 0 },
+    { mode: 'bpm', persen: 100, geser: -20 },
+    { mode: 'bpm', persen: 100, geser: 12 },
+  ]) {
+    dekat(
+      `6.5: laju × tempo dasar = tempo klik (${t.mode} ${t.mode === 'bpm' ? t.geser : t.persen})`,
+      lajuRekaman(BPM, t) * BPM,
+      terapkanLatihan(BPM, t),
+      1e-9,
+    )
+  }
+
+  // Di luar 0,25–3,0 peramban menolak `playbackRate`; laju harus dijepit.
+  // Nilai ekstrem tetap mungkin: tempo lagu boleh serendah 20, geseran BPM
+  // boleh −60…+30.
+  cek(
+    '6.6: laju dijepit ke batas bawah',
+    lajuRekaman(20, { mode: 'bpm', persen: 100, geser: -60 }) === LAJU_MIN,
+    String(lajuRekaman(20, { mode: 'bpm', persen: 100, geser: -60 })),
+  )
+  cek(
+    '6.7: laju dijepit ke batas atas',
+    lajuRekaman(12, { mode: 'bpm', persen: 100, geser: 30 }) === LAJU_MAKS,
+    String(lajuRekaman(12, { mode: 'bpm', persen: 100, geser: 30 })),
+  )
+
+  // 6.8 — lagu bertempo map: mode BPM tidak bisa diwakili satu laju.
+  cek('6.8: persen selalu seragam', lajuSeragam(172, [{ bpm: 172 }, { bpm: 140 }], { mode: 'persen', persen: 80, geser: 0 }))
+  cek('6.9: BPM + tempo berbeda → tidak seragam', !lajuSeragam(172, [{ bpm: 172 }, { bpm: 140 }], { mode: 'bpm', persen: 100, geser: -20 }))
+  cek('6.10: BPM + tempo sama → seragam', lajuSeragam(172, [{ bpm: 172 }, { bpm: 172 }], { mode: 'bpm', persen: 100, geser: -20 }))
+  cek('6.11: tanpa latihan selalu seragam', lajuSeragam(172, [{ bpm: 172 }, { bpm: 140 }], { mode: 'bpm', persen: 100, geser: 0 }))
 }
 
 console.log(`${lulus} lulus, ${gagal.length} gagal`)

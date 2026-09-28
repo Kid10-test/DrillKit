@@ -586,8 +586,47 @@ export function detikSampai(
   return detik
 }
 
-/* ------------------------------- M5 — panjang lagu ------------------------------ */
+/**
+ * #6 — Kebalikan `detikSampai`: birama ke berapa (dan sisa detik di dalamnya)
+ * pada detik lagu ke-`detik`.
+ *
+ * Mengapa perlu: begitu rekaman dijadikan **patokan waktu** (lihat `JamLagu`
+ * di metronome.ts), penjadwal klik tidak lagi boleh menebak posisinya sendiri
+ * — ia harus bisa bertanya "rekaman sekarang ada di birama berapa?", termasuk
+ * sesudah pemakai menggeser garis waktu atau mengulang satu bagian. Pertanyaan
+ * itu tidak bisa dijawab `detikSampai` (yang arahnya ke depan).
+ *
+ * Memakai `tempoUntuk` yang sama seperti `detikSampai`, jadi kedua arah
+ * memakai tempo yang berbunyi — bukan tempo tangga.
+ */
+export function biramaPadaDetik(
+  segmen: SegmenWaktu[],
+  detik: number,
+  warisan: TandaBirama,
+  tempoDasar: number,
+  /** N7 — seperti `detikSampai`: tanpa ini, tempo dianggap bertangga. */
+  tempoUntuk?: (birama: number) => number,
+): { birama: number; sisa: number } {
+  const s = urut(segmen)
+  const target = Math.max(0, detik)
+  let akumulasi = 0
+  let i = 0
+  let aktif = -1
+  for (let birama = 1; birama <= 5000; birama++) {
+    while (i < s.length && s[i].measure <= birama) {
+      aktif = i
+      i++
+    }
+    const meter = normalisasiBirama(aktif >= 0 ? (s[aktif].birama ?? warisan) : warisan)
+    const bpm = tempoUntuk ? tempoUntuk(birama) : aktif >= 0 ? s[aktif].bpm : tempoDasar
+    const dur = durasiBirama(meter, bpm)
+    if (akumulasi + dur > target) return { birama, sisa: target - akumulasi }
+    akumulasi += dur
+  }
+  return { birama: 5000, sisa: 0 }
+}
 
+/* ------------------------------- M5 — panjang lagu ------------------------------ */
 /**
  * M5 — total durasi lagu yang panjangnya `panjangBirama` birama.
  *

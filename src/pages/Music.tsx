@@ -24,7 +24,7 @@ import {
   ringkasLuncuran,
   tempoBerlaku,
 } from '../lib/metronome'
-import type { InfoKetuk } from '../lib/metronome'
+import type { InfoKetuk, JamLagu } from '../lib/metronome'
 import {
   bikinPolaDariBirama,
   biramaDefault,
@@ -42,6 +42,7 @@ import type { SegmenWaktu } from '../lib/birama'
 import { hitungSetList, setListBaru } from '../lib/setlist'
 import { ModalRekamanLagu } from '../components/ModalRekamanLagu'
 import { PemutarRekaman, waktuBiramaKeDetikAudio } from '../lib/rekaman'
+import { lajuRekaman } from '../lib/tempoLatihan'
 import type { RekamanAudioMeta } from '../db/types'
 import { detikSatuPutaran, jumlahBirama, rentangValid } from '../lib/ulang'
 import { KartuSetList } from '../components/KartuSetList'
@@ -120,6 +121,15 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
    * sekali saat pemutaran dimulai — karena itu harus berupa ref, bukan state.
    */
   const mainkanSetRef = useRef(false)
+  /**
+   * #6 — penanda upaya pemutaran yang sedang berjalan.
+   *
+   * Memulai pemutaran dengan rekaman itu asinkron (baca berkas → geser →
+   * tunggu benar-benar berbunyi). Tanpa penanda ini, menekan Mulai lalu
+   * Berhenti dengan cepat akan tetap menyalakan metronom sesudahnya — mesin
+   * yang berbunyi setelah pemakainya membatalkannya.
+   */
+  const mulaiTokenRef = useRef(0)
   const daftarSetList = useLiveQuery(() => db.setlists.orderBy('updatedAt').reverse().toArray(), [], [])
   const setlistAktif: SetList | null = daftarSetList?.find((x) => x.id === setlistId) ?? null
   const hitunganSet = useMemo(() => hitungSetList(setlistAktif, songs ?? []), [setlistAktif, songs])
@@ -167,10 +177,15 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
   /** Ubah tempo latihan saat berjalan → langsung terdengar di birama berikutnya. */
   useEffect(() => {
     if (engineRef.current.jalan) engineRef.current.setLatihan(latihan)
-    // Sesuaikan playbackRate audio dengan tempo latihan
+    /*
+     * #6 — laju rekaman memakai aturan tempo yang SAMA dengan kliknya
+     * (`lajuRekaman`), jadi kedua mode tempo latihan ikut terlayani. Dulu di
+     * sini ada `latihan.persen / 100`: pada mode BPM angka itu selalu 100,
+     * sehingga klik melambat 20 BPM sementara rekaman berjalan di tempo asli
+     * — selisihnya 2,7 detik dalam 25 detik.
+     */
     if (song?.rekaman) {
-      const rate = latihan?.persen ? latihan.persen / 100 : 1.0
-      pemutarAudio.current.setKecepatan(rate)
+      pemutarAudio.current.setKecepatan(lajuRekaman(song.bpm, latihan))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latihan.mode, latihan.persen, latihan.geser])
@@ -227,6 +242,37 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
   const tempoAsliSekarang = jepitTempo(
     tempoBerlaku({ dasar: bpm, segmen: segs, pakaiTempoMap: useMap && segs.length > 0, latih }, measure),
   )
+  /**
+   * #6 — tempo ASLI (tanpa tempo latihan) sebagai fungsi.
+   *
+   * Dipakai untuk **memetakan birama ke detik berkas rekaman**. Rekaman itu
+   * partitur: ketukan ke-100 selalu di detik yang sama, berapa pun lambatnya
+   * ia diputar. Tempo latihan diwujudkan oleh `playbackRate`, bukan oleh
+   * hitungan detiknya. Dulu pemetaan ini memakai `tempoUntuk` — yang sudah
+   * termasuk tempo latihan — sehingga "lompat ke birama 20" saat latihan
+   * 80% mendarat 25% terlalu jauh di dalam rekaman.
+   */
+  const tempoAsliUntuk = useMemo(
+    () => (bir: number) =>
+      jepitTempo(
+        tempoBerlaku({ dasar: bpm, segmen: segs, pakaiTempoMap: useMap && segs.length > 0, latih }, bir),
+      ),
+    [bpm, segs, useMap, latih],
+  )
+
+  /**
+   * #6 — jam rekaman untuk mesin metronom: posisi, laju, dan apakah benar-benar
+   * berbunyi. Dibaca langsung dari pemutar pada tiap tick penjadwalan — jadi
+   * klik selalu mengikuti rekaman, termasuk sesudah digeser atau diulang.
+   */
+  const jamLagu = (meta: RekamanAudioMeta): JamLagu => {
+    const titik = meta.titikMulaiDetik || 0
+    return {
+      posisi: () => Math.max(0, pemutarAudio.current.currentTime - titik),
+      laju: () => pemutarAudio.current.laju,
+      jalan: () => pemutarAudio.current.berbunyi,
+    }
+  }
   /* --------------------- M5 — panjang lagu & ulang ---------------------- */
   /** Birama terakhir lagu. 0 = lagu tanpa akhir (perilaku lama). */
   const panjangBirama = Math.max(0, Math.floor(song?.panjangBirama ?? 0))
@@ -447,71 +493,105 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
     const idLagu = song?.id
     setPutaran(null)
 
-    if (song?.id && song.rekaman) {
-      const mode = song.rekaman.modeBunyi ?? 'keduanya'
-      const volAud = song.rekaman.volumeAudio ?? 1.0
-      const rate = latihan?.persen ? latihan.persen / 100 : 1.0
-      void pemutarAudio.current.muat(song.id).then((siap) => {
-        if (!siap) return
-        pemutarAudio.current.setVolume(mode === 'klik' ? 0 : volAud)
-        pemutarAudio.current.setKecepatan(rate)
-        const offsetDetik = waktuBiramaKeDetikAudio(mulai, song.rekaman!, segmenWaktu, birama, bpm, tempoUntuk)
-        pemutarAudio.current.putar(offsetDetik)
+    /*
+     * #6 — satu jalur untuk menyalakan mesin, dipakai baik oleh pemutaran
+     * dengan rekaman maupun tanpa. Bedanya hanya satu: kalau rekaman menjadi
+     * patokan waktu, `jam` diisi dan **hitung mundur dimatikan** (klik tidak
+     * boleh menghitung mundur sementara lagunya sudah berjalan).
+     */
+    const jalankanMesin = (jam: JamLagu | null) => {
+      engineRef.current.mulai({
+        bpm,
+        beats,
+        subdiv,
+        // M1 — tanpa pola kustom, mesin yang membuat birama dari meter yang
+        // berlaku, sehingga meter bisa berubah tiap segmen tempo.
+        pola: pakaiPola ? pola : null,
+        suara,
+        volume: song?.rekaman?.modeBunyi === 'rekaman' ? 0 : volume * (song?.rekaman?.volumeKlik ?? 1.0),
+        getar,
+        latih,
+        segmen: segs,
+        pakaiTempoMap: useMap && segs.length > 0,
+        birama,
+        mulaiDari: mulai,
+        hitungMundur: jam ? null : hitungMundur,
+        jam,
+        // M5 — batas akhir lagu & ulang.
+        biramaAkhir: panjangBirama,
+        ulang: ulangAktif,
+        // M2 — rentang ulang. Kalau hidup, ini menang atas akhir lagu.
+        ulangBagian: ulangBagianAktif && ub ? { dari: ub.dari, sampai: ub.sampai } : null,
+        // #4 — tempo latihan & naik otomatis tiap putaran bagian.
+        latihan,
+        naikOtomatis: ulangBagianAktif ? naikOtomatis : null,
+        onPutaran: (info) => {
+          setPutaran(info.putaran)
+          // Tempo terakhir yang dicapai diingat.
+          tl.aturTempo(idLagu, info.tempo)
+          if (song?.id && song.rekaman && ub) {
+            // Tempo putaran baru juga berlaku untuk rekamannya: klik yang
+            // naik sementara rekaman tetap akan berpisah makin jauh.
+            pemutarAudio.current.setKecepatan(lajuRekaman(bpm, info.tempo))
+            const offsetUlang = waktuBiramaKeDetikAudio(ub.dari, song.rekaman, segmenWaktu, birama, bpm, tempoAsliUntuk)
+            pemutarAudio.current.putar(offsetUlang)
+          }
+        },
+        onSelesai: () => {
+          pemutarAudio.current.jeda()
+          setRunning(false)
+          setAktif(null)
+          setHabis(true)
+          setPutaran(null)
+        },
+        onKetuk: (i) => {
+          setMeasure(i.birama)
+          setAktif(i)
+          // M1 — ucapkan angka hitung mundur. Ucapan hanya lapisan: ketukannya
+          // sudah dijadwalkan Web Audio, jadi ketukan pertama lagu tetap tepat.
+          if (i.tahap === 'hitung' && i.ucap) ucapkan(i.ucap)
+        },
       })
+      setRunning(true)
+      setAktif(null)
+      setMeasure(mulai)
+      setHabis(false)
     }
 
-    engineRef.current.mulai({
-      bpm,
-      beats,
-      subdiv,
-      // M1 — tanpa pola kustom, mesin yang membuat birama dari meter yang
-      // berlaku, sehingga meter bisa berubah tiap segmen tempo.
-      pola: pakaiPola ? pola : null,
-      suara,
-      volume: song?.rekaman?.modeBunyi === 'rekaman' ? 0 : volume * (song?.rekaman?.volumeKlik ?? 1.0),
-      getar,
-      latih,
-      segmen: segs,
-      pakaiTempoMap: useMap && segs.length > 0,
-      birama,
-      mulaiDari: mulai,
-      hitungMundur,
-      // M5 — batas akhir lagu & ulang.
-      biramaAkhir: panjangBirama,
-      ulang: ulangAktif,
-      // M2 — rentang ulang. Kalau hidup, ini menang atas akhir lagu.
-      ulangBagian: ulangBagianAktif && ub ? { dari: ub.dari, sampai: ub.sampai } : null,
-      // #4 — tempo latihan & naik otomatis tiap putaran bagian.
-      latihan,
-      naikOtomatis: ulangBagianAktif ? naikOtomatis : null,
-      onPutaran: (info) => {
-        setPutaran(info.putaran)
-        // Tempo terakhir yang dicapai diingat.
-        tl.aturTempo(idLagu, info.tempo)
-        if (song?.id && song.rekaman && ub) {
-          const offsetUlang = waktuBiramaKeDetikAudio(ub.dari, song.rekaman, segmenWaktu, birama, bpm, tempoUntuk)
-          pemutarAudio.current.putar(offsetUlang)
-        }
-      },
-      onSelesai: () => {
-        pemutarAudio.current.jeda()
-        setRunning(false)
-        setAktif(null)
-        setHabis(true)
-        setPutaran(null)
-      },
-      onKetuk: (i) => {
-        setMeasure(i.birama)
-        setAktif(i)
-        // M1 — ucapkan angka hitung mundur. Ucapan hanya lapisan: ketukannya
-        // sudah dijadwalkan Web Audio, jadi ketukan pertama lagu tetap tepat.
-        if (i.tahap === 'hitung' && i.ucap) ucapkan(i.ucap)
-      },
-    })
-    setRunning(true)
-    setAktif(null)
-    setMeasure(mulai)
-    setHabis(false)
+    if (!song?.id || !song.rekaman) {
+      jalankanMesin(null)
+      return
+    }
+
+    /*
+     * #6 — rekaman sebagai patokan waktu: klik baru dimulai setelah rekaman
+     * benar-benar berbunyi, dan sepanjang pemutaran ia mengikuti posisi
+     * rekaman. Sebelumnya klik mulai lebih dulu — di mesin cepat selisihnya
+     * 40 ms, di perangkat sibuk sampai ratusan milidetik — dan tidak ada
+     * yang menyusulnya kembali.
+     */
+    const rekaman = song.rekaman
+    const mode = rekaman.modeBunyi ?? 'keduanya'
+    const volAud = rekaman.volumeAudio ?? 1.0
+    const token = ++mulaiTokenRef.current
+    void (async () => {
+      const siap = await pemutarAudio.current.muat(song.id)
+      if (!siap || token !== mulaiTokenRef.current) return
+      pemutarAudio.current.setVolume(mode === 'klik' ? 0 : volAud)
+      // #6 — laju yang sepadan dengan tempo latihan (mode persen ATAU BPM).
+      pemutarAudio.current.setKecepatan(lajuRekaman(bpm, latihan))
+      const offsetDetik = waktuBiramaKeDetikAudio(mulai, rekaman, segmenWaktu, birama, bpm, tempoAsliUntuk)
+      const berbunyi = await pemutarAudio.current.putarTunggu(offsetDetik)
+      if (token !== mulaiTokenRef.current) return
+      if (!berbunyi) {
+        // Rekaman ditolak peramban atau gagal dimuat: metronom tetap dipakai,
+        // tetapi tanpa jam lagu — dan itu dikatakan, bukan didiamkan.
+        toast.push('Rekaman tidak mulai berbunyi — metronom jalan tanpa patokan rekaman', 'err')
+        jalankanMesin(null)
+        return
+      }
+      jalankanMesin(jamLagu(rekaman))
+    })()
   }
 
   /**
@@ -535,15 +615,15 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
     if (s.id && s.rekaman) {
       const mode = s.rekaman.modeBunyi ?? 'keduanya'
       const volAud = s.rekaman.volumeAudio ?? 1.0
-      void pemutarAudio.current.muat(s.id).then((siap) => {
+      void (async () => {
+        const siap = await pemutarAudio.current.muat(s.id)
         if (!siap) return
         pemutarAudio.current.setVolume(mode === 'klik' ? 0 : volAud)
-        const lat = tl.tempoUntuk(s.id)
-        const rate = lat?.persen ? lat.persen / 100 : 1.0
-        pemutarAudio.current.setKecepatan(rate)
+        // #6 — aturan tempo yang sama dengan kliknya (mode persen ATAU BPM).
+        pemutarAudio.current.setKecepatan(lajuRekaman(s.bpm, tl.tempoUntuk(s.id)))
         const offsetDetik = waktuBiramaKeDetikAudio(1, s.rekaman!, segmen, meter, s.bpm)
-        pemutarAudio.current.putar(offsetDetik)
-      })
+        await pemutarAudio.current.putarTunggu(offsetDetik)
+      })()
     }
 
     return {
@@ -561,7 +641,10 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
       pakaiTempoMap: segmen.length > 0,
       birama: meter,
       mulaiDari: 1,
-      hitungMundur,
+      // #6 — rekaman menjadi patokan waktu; hitung mundur dimatikan (kalau
+      // tidak, klik tertinggal satu hitung mundur penuh dari lagunya).
+      jam: s.rekaman ? jamLagu(s.rekaman) : null,
+      hitungMundur: s.rekaman ? null : hitungMundur,
       // M5 — berhenti di akhir lagu ini, lalu `selesai` memajukan set list.
       biramaAkhir: s.panjangBirama ?? 0,
       ulang: false,
@@ -614,6 +697,8 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
 
   function toggle() {
     if (running) {
+      // #6 — batalkan juga pemutaran yang masih menunggu rekaman berbunyi.
+      mulaiTokenRef.current++
       engineRef.current.berhenti()
       hentikanUcapan()
       pemutarAudio.current.jeda()

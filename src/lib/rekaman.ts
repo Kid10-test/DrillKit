@@ -450,6 +450,53 @@ export class PemutarRekaman {
     })
   }
 
+  /**
+   * #6 — putar lalu **tunggu sampai rekaman benar-benar berbunyi**.
+   *
+   * `putar()` mengembalikan kendali sebelum satu pun sampel terdengar:
+   * berkasnya masih dibaca, `currentTime` masih digeser ke titik mulai, dan
+   * `play()`-nya masih berjalan asinkron. Pemanggil yang menjadikan rekaman
+   * sebagai patokan waktu tidak boleh memulai kliknya sebelum itu — kalau
+   * tidak, klik memulai lebih dulu dan lagunya menyusul (terukur 40 ms di
+   * mesin cepat, 157 ms saat utas utama diperlambat 8×).
+   *
+   * `false` berarti rekaman tidak jadi berbunyi dalam batas waktu (atau
+   * ditolak peramban): pemanggil sebaiknya memulai metronom tanpa jam lagu
+   * supaya aplikasinya tidak diam saja.
+   */
+  async putarTunggu(detikMulai?: number, tungguMs = 2000): Promise<boolean> {
+    const a = this.audio
+    if (!a) return false
+    if (detikMulai !== undefined && Number.isFinite(detikMulai)) {
+      try {
+        a.currentTime = Math.max(0, detikMulai)
+      } catch {
+        /* abaikan: sebagian peramban melempar kalau durasi belum diketahui */
+      }
+    }
+    const sudahBerbunyi = () => !a.paused && a.currentTime > 0
+    if (sudahBerbunyi()) return true
+    return await new Promise<boolean>((selesai) => {
+      let beres = false
+      const tutup = (hasil: boolean) => {
+        if (beres) return
+        beres = true
+        a.removeEventListener('playing', padaPlaying)
+        a.removeEventListener('timeupdate', padaWaktu)
+        clearTimeout(batas)
+        selesai(hasil)
+      }
+      const padaPlaying = () => tutup(true)
+      const padaWaktu = () => {
+        if (sudahBerbunyi()) tutup(true)
+      }
+      const batas = setTimeout(() => tutup(sudahBerbunyi()), Math.max(200, tungguMs))
+      a.addEventListener('playing', padaPlaying)
+      a.addEventListener('timeupdate', padaWaktu)
+      void a.play().catch(() => tutup(false))
+    })
+  }
+
   jeda() {
     if (this.audio) {
       this.audio.pause()
@@ -480,6 +527,22 @@ export class PemutarRekaman {
 
   get paused(): boolean {
     return this.audio?.paused ?? true
+  }
+
+  /** #6 — laju pemutaran yang sedang berlaku (1 = tempo asli). */
+  get laju(): number {
+    return this.audio?.playbackRate ?? 1
+  }
+
+  /**
+   * #6 — apakah rekaman benar-benar sedang berbunyi.
+   *
+   * Dipakai sebagai `JamLagu.jalan`: sebelum ini benar, klik tidak boleh
+   * mulai menghitung.
+   */
+  get berbunyi(): boolean {
+    const a = this.audio
+    return !!a && !a.paused && !a.ended && a.currentTime > 0
   }
 
   get duration(): number {
