@@ -70,6 +70,6 @@ bash regresi.sh "$BASE" \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
   nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill \
-  m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman \
+  m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman m6-drill-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \
   dd8 dd8b dd9-kompas dd10b-kartu dd10b-mode dd10b-override kartu-lipat
