@@ -55,7 +55,7 @@ bash bangun-logika.sh || exit 1
 # IDE-PENGEMBANGAN.md.
 
 bash regresi.sh "$BASE" \
-  mode-logika bagikan-logika perubahan-tempo-logika uji-situs uji-rilis uji-lapangan \
+  mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika uji-situs uji-rilis uji-lapangan \
   evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
   sambutan-mode buka-paket tab-absensi formasi-anggota perbarui-materi \
   musik-anggota kuis-anggota pengingat-jadwal lebar-hp luring mikrofon-ditolak tim-besar cap-rilis \

@@ -558,18 +558,30 @@ export interface TempoSegment {
    */
   birama?: TandaBirama
   /**
-   * N6 — kalau 1, tempo MENJU segmen berikutnya berangsur, bukan melompat.
-   *
-   * Cara pakainya persis seperti yang diminta pelatih: ketik 172 di
-   * bar 88, ketik 140 di bar 91, lalu nyalakan tanda ini pada segmen
-   * bar 88. Maka bar 89 dan 90 meluncur pelan-pelan dari 172 ke 140.
-   * Kalau tidak dinyalakan, bar 91 tetap melompat seperti sediakala —
-   * sehingga perubahan ini tidak pernah merusak lagu yang sudah ada.
-   *
-   * 0/1 mengikuti kebiasaan tabel lain di aplikasi ini (lihat `getar`).
-   * Opsional karena segmen yang dibuat versi lama tidak memilikinya.
+   * N6 — legacy bar-to-bar ramp.  Keberadaannya mempertahankan perilaku
+   * tempo map lama; new maps should use `rampCounts` for an explicit length.
    */
   berangsur?: 0 | 1
+  /**
+   * Fine-grained position within `measure` (1-based, counted in written
+   * denominator-note beats).  Missing values mean beat 1, subdivision 1/1,
+   * which is exactly the legacy bar-start position.
+   */
+  beat?: number
+  subdivision?: number
+  subdivisionsPerBeat?: number
+  /**
+   * Explicit inclusive ramp length.  The row's BPM is the target; the first
+   * changed count occurs at this row's position and count N reaches target.
+   */
+  rampCounts?: number
+  /** Musical distance between ramp counts. `tempoBeat` means the BPM note
+   * unit (including dotted-note acuan), `beat` means one written beat. */
+  rampUnit?: 'beat' | 'tempoBeat' | 'subdivision' | 'tempoSubdivision' | 'bar'
+  /** Subdivisions per written beat when rampUnit is `subdivision` (e.g. 3). */
+  rampSubdivisions?: number
+  /** Optional explicit pre-ramp BPM; omitted = evaluator uses the active BPM. */
+  rampFromBpm?: number
 }
 
 /* ------------------- M1 — Tanda birama & hitung mundur -------------------- */

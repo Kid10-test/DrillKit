@@ -17,15 +17,15 @@
  */
 
 import type { LatihTempo, TandaBirama } from '../db/types'
+import type { TempoLatihan } from './tempoLatihan'
 import {
   durasiBirama,
   formatWaktu,
-  meterPada,
   normalisasiBirama,
   notPerAcuan,
 } from './birama'
 import type { SegmenWaktu } from './birama'
-import { jepitTempo, tempoBerlaku } from './metronome'
+import { createTempoTimeline } from './tempoTimeline'
 
 /** Lagu dalam bentuk yang dibutuhkan pemetaan (tanpa mengimpor tipe Song). */
 export interface LaguRingkas {
@@ -46,8 +46,16 @@ export interface PetaSet {
   bpm: number
   /** sukat lagu yang berlaku pada set ini */
   birama: TandaBirama
-  /** lama perpindahan set ini (detik) */
+  /** Lama set pada tempo partitur (detik), untuk sinkronisasi/scrub audio. */
   detik: number
+  /** Lama set setelah tempo latihan lokal (detik), untuk animasi & klik drill. */
+  detikLatihan: number
+  /** Offset klik tiap hitungan set, dihitung oleh TempoTimeline (detik). */
+  offsetKlikLatihan: number[]
+  /** BPM partitur pada setiap hitungan set (untuk label/analitik). */
+  bpmPerHitungan: number[]
+  /** BPM setelah tempo latihan lokal, yaitu tempo yang dipakai bunyi/animasi. */
+  bpmLatihanPerHitungan: number[]
   /**
    * #6 — detik lagu saat set ini MULAI (jumlah lama set-set sebelumnya).
    *
@@ -70,57 +78,62 @@ export function ketukPerBirama(t: TandaBirama): number {
 /**
  * Petakan urutan set drill ke lini masa lagu.
  *
- * Dijalankan berurutan dari set pertama: tiap set memajukan posisi birama
- * sesuai hitungannya, lalu tempo & sukat untuk set berikutnya dibaca pada
- * posisi baru itu. Karena itu perubahan tempo & sukat lagu diikuti dengan
- * benar meski terjadi di tengah drill.
+ * Dijalankan berurutan pada posisi quarter-note yang sama dengan evaluator
+ * tempo lagu. Tiap hitungan drill dimajukan sebagai pulsa acuan BPM; durasi,
+ * posisi audio, dan offset klik tiap hitungan berasal dari evaluator itu juga.
  */
 export function petakanSetKeMusik(
   sets: { counts: number }[],
   beatsPerCount: number,
   lagu: LaguRingkas,
+  latihan?: TempoLatihan | null,
 ): PetaSet[] {
   const bpc = Math.max(0.25, beatsPerCount)
+  const timeline = createTempoTimeline({
+    bpm: lagu.bpm,
+    meter: lagu.tandaBirama,
+    segments: lagu.tempoMap,
+    latih: lagu.latih ?? null,
+  })
   const out: PetaSet[] = []
-  let pos = 1
-  let mulai = 0
+  let startQuarter = 0
 
-  for (let i = 0; i < sets.length; i++) {
-    const m = Math.max(1, Math.floor(pos))
-    const meter = meterPada(lagu.tempoMap, m, lagu.tandaBirama)
-    /*
-     * N9 — tempo yang BERBUNYI pada birama ini, bukan tempo tangganya.
-     *
-     * Dulu yang dipakai `tempoPada`, yang hanya tahu tempo per segmen.
-     * Kalau lagunya meluncur 172 → 140, tiap set di dalam rentang itu
-     * dipetakan seolah temponya 172 — padahal telinga mendengar 161,3
-     * lalu 150,7. Drill-nya berjalan lebih cepat daripada musiknya, dan
-     * pemain tiba di set berikutnya sebelum lagunya sampai di situ.
-     */
-    const bpm = jepitTempo(
-      tempoBerlaku(
-        { dasar: lagu.bpm, segmen: lagu.tempoMap, pakaiTempoMap: true, latih: lagu.latih ?? null },
-        m,
-      ),
-    )
+  for (let i = 0; i < sets.length; i += 1) {
     const counts = Math.max(1, Math.floor(sets[i].counts))
-    const ketuk = counts * bpc
-    const perBirama = ketukPerBirama(meter)
-    const detikPerKetuk = 60 / Math.max(20, Math.min(400, bpm))
+    const position = timeline.positionAtQuarter(startQuarter)
+    const meter = timeline.meterAtQuarter(startQuarter)
+    const bpm = timeline.tempoAtQuarter(startQuarter)
+    const originalStart = timeline.secondsAtQuarter(startQuarter)
+    const practiceStart = timeline.secondsAtQuarter(startQuarter, latihan)
+    const clickOffsets: number[] = []
+    const bpmPerHitungan: number[] = []
+    const bpmLatihanPerHitungan: number[] = []
+    let clickQuarter = startQuarter
 
-    const detik = ketuk * detikPerKetuk
+    for (let count = 0; count < counts; count += 1) {
+      clickOffsets.push(Math.max(0, timeline.secondsAtQuarter(clickQuarter, latihan) - practiceStart))
+      bpmPerHitungan.push(timeline.tempoAtQuarter(clickQuarter))
+      bpmLatihanPerHitungan.push(timeline.tempoAtQuarter(clickQuarter, latihan))
+      clickQuarter = timeline.advanceTempoBeats(clickQuarter, bpc)
+    }
+
+    const endQuarter = timeline.advanceTempoBeats(startQuarter, counts * bpc)
+    const detik = timeline.secondsBetween(startQuarter, endQuarter)
+    const detikLatihan = timeline.secondsBetween(startQuarter, endQuarter, latihan)
     out.push({
       index: i,
-      biramaMulai: pos,
+      biramaMulai: position.measurePosition,
       bpm,
       birama: meter,
       detik,
-      detikMulai: mulai,
+      detikLatihan,
+      offsetKlikLatihan: clickOffsets,
+      bpmPerHitungan,
+      bpmLatihanPerHitungan,
+      detikMulai: originalStart,
       counts,
     })
-
-    mulai += detik
-    pos += perBirama > 0 ? ketuk / perBirama : 0
+    startQuarter = endQuarter
   }
   return out
 }

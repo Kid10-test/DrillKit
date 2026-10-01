@@ -7,9 +7,10 @@
  */
 
 import { db } from '../db/db'
-import type { AudioRekamanItem, RekamanAudioMeta, TandaBirama } from '../db/types'
-import { detikSampai, durasiBirama, meterPada, tempoPada } from './birama'
+import type { AudioRekamanItem, LatihTempo, RekamanAudioMeta, TandaBirama } from '../db/types'
+import { detikSampai } from './birama'
 import type { SegmenWaktu } from './birama'
+import { createTempoTimeline } from './tempoTimeline'
 
 /* ------------------------------- Hash & Sidik ----------------------------- */
 
@@ -231,9 +232,16 @@ export function waktuBiramaKeDetikAudio(
   warisanMeter: TandaBirama,
   bpmDasar: number,
   tempoUntuk?: (b: number) => number,
+  latih?: LatihTempo | null,
 ): number {
   const offsetMulai = meta.titikMulaiDetik || 0
-  const detikLagu = detikSampai(segmen, birama, warisanMeter, bpmDasar, tempoUntuk)
+  const fineMap = segmen.some((segment) =>
+    segment.beat !== undefined || segment.subdivision !== undefined || segment.rampCounts !== undefined,
+  )
+  const detikLagu = tempoUntuk && !fineMap && !latih
+    ? detikSampai(segmen, birama, warisanMeter, bpmDasar, tempoUntuk)
+    : createTempoTimeline({ bpm: bpmDasar, meter: warisanMeter, segments: segmen, latih })
+      .secondsAtPosition({ measure: birama, beat: 1 })
   // Periksa koreksi segmen jika ada (bisa berdasarkan key id segmen atau nomor birama)
   let koreksi = 0
   if (meta.koreksiSegmen && segmen.length > 0) {
@@ -291,17 +299,8 @@ export function detikAudioKeBirama(
   const detikLagu = detikAudioKeDetikLagu(detikAudio, meta)
   if (detikLagu <= 0) return 1
 
-  let b = 1
-  let akumulasi = 0
-  while (akumulasi < detikLagu && b < 1000) {
-    const meter = meterPada(segmen, b, warisanMeter)
-    const bpm = tempoPada(segmen, b, bpmDasar)
-    const dur = durasiBirama(meter, bpm)
-    if (akumulasi + dur > detikLagu) break
-    akumulasi += dur
-    b++
-  }
-  return b
+  const timeline = createTempoTimeline({ bpm: bpmDasar, meter: warisanMeter, segments: segmen })
+  return timeline.positionAtSeconds(detikLagu).measure
 }
 
 /* ----------------------- Status Penyimpanan & iOS ------------------------- */

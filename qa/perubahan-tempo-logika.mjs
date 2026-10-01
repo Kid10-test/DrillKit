@@ -13,7 +13,7 @@
  * menjalankan peramban dengan AudioContext sungguhan, yang mustahil
  * diuji. Sekarang bisa.
  */
-import { tempoLatih, tempoPeta, tempoBerlaku, adaBerangsur, jepitTempo, luncuranPada, daftarLuncuran, ringkasLuncuran, jejakLuncuran } from '/tmp/metronome.mjs'
+import { tempoLatih, tempoRampBpm, tempoPeta, tempoBerlaku, adaBerangsur, jepitTempo, luncuranPada, daftarLuncuran, ringkasLuncuran, jejakLuncuran } from '/tmp/metronome.mjs'
 import { biramaBaku, detikSampai, detikSisa, detikTotal, tempoPada } from '/tmp/birama.mjs'
 import { detikSatuPutaran } from '/tmp/ulang.mjs'
 
@@ -454,6 +454,43 @@ const cek = (nama, syarat, keterangan = '') => {
   cek('14: tempo bar 89 sesuai luncuran yang diiklankan (161,3)',
     Math.abs(tempoBerlaku({ dasar: 120, segmen: berangsur, pakaiTempoMap: true }, 89) - 161.333) < 0.01,
     String(tempoBerlaku({ dasar: 120, segmen: berangsur, pakaiTempoMap: true }, 89)))
+}
+
+/* ============ 15 — Ramp per hitungan dengan batas inklusif ============
+ *
+ * Contoh Sibelius/Tonal Energy dari pelatih:
+ * - Accelerando 160 → 180 selama 8 hitungan: tempo 160 berlaku SEBELUM
+ *   ramp; hitungan 1 sudah menjadi 162,5 dan hitungan 8 tepat 180.
+ * - Ritardando 172 → 140 selama 6 hitungan: hitungan 1 sudah berubah,
+ *   hitungan 6 tepat 140. Jangan menyimpulkan jumlah langkah dari birama.
+ */
+{
+  const akselHarapan = [162.5, 165, 167.5, 170, 172.5, 175, 177.5, 180]
+  const aksel = akselHarapan.map((_, i) => tempoRampBpm(160, 180, 8, i + 1))
+  cek('15: sebelum accelerando, hitungan 0 masih 160', tempoRampBpm(160, 180, 8, 0) === 160)
+  cek('15: akselerando 8 hitungan tepat mengikuti Sibelius',
+    aksel.every((bpm, i) => Math.abs(bpm - akselHarapan[i]) < 1e-9),
+    aksel.map((bpm) => bpm.toFixed(2)).join(' → '))
+  cek('15: hitungan pertama sudah berubah ke 162,5', aksel[0] === 162.5, String(aksel[0]))
+  cek('15: hitungan kedelapan tepat mencapai 180', aksel[7] === 180, String(aksel[7]))
+  cek('15: accelerando menahan tempo tujuan sesudah hitungan 8',
+    tempoRampBpm(160, 180, 8, 9) === 180, String(tempoRampBpm(160, 180, 8, 9)))
+  cek('15: jarak tiap langkah accelerando tepat 2,5 BPM',
+    aksel.every((bpm, i) => i === 0 || Math.abs((bpm - aksel[i - 1]) - 2.5) < 1e-9))
+
+  const ritHarapan = Array.from({ length: 6 }, (_, i) => 172 + ((140 - 172) * (i + 1)) / 6)
+  const rit = ritHarapan.map((_, i) => tempoRampBpm(172, 140, 6, i + 1))
+  cek('15: sebelum ritardando, hitungan 0 masih 172', tempoRampBpm(172, 140, 6, 0) === 172)
+  cek('15: ritardando 6 hitungan tepat mengikuti tempo pulse Sibelius',
+    rit.every((bpm, i) => Math.abs(bpm - ritHarapan[i]) < 1e-9),
+    rit.map((bpm) => bpm.toFixed(2)).join(' → '))
+  cek('15: hitungan pertama ritardando sudah berubah', rit[0] < 172, String(rit[0]))
+  cek('15: hitungan keenam tepat mencapai 140', Math.abs(rit[5] - 140) < 1e-9, String(rit[5]))
+  cek('15: ritardando menahan tempo tujuan sesudah hitungan 6',
+    tempoRampBpm(172, 140, 6, 7) === 140, String(tempoRampBpm(172, 140, 6, 7)))
+  const langkahRit = (140 - 172) / 6
+  cek('15: jarak tiap langkah ritardando tetap −32/6 BPM',
+    rit.every((bpm, i) => i === 0 || Math.abs((bpm - rit[i - 1]) - langkahRit) < 1e-9))
 }
 
 console.log(`\n${lulus} lulus, ${gagal.length} gagal`)

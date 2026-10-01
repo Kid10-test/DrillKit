@@ -18,7 +18,8 @@ import {
   simpanRekamanAudio,
   type InfoPenyimpanan,
 } from '../lib/rekaman'
-import { formatWaktu } from '../lib/birama'
+import { dariBeatsLama, formatWaktu } from '../lib/birama'
+import { Metronom } from '../lib/metronome'
 import { formatBytes } from '../lib/backup'
 import { Button, Modal, useToast } from './ui'
 import { IconCheck, IconPause, IconPlay, IconTrash, IconUpload } from './Icons'
@@ -39,6 +40,7 @@ export function ModalRekamanLagu({
   const toast = useToast()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const metronomCekRef = useRef(new Metronom())
 
   const [loading, setLoading] = useState(false)
   const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null)
@@ -58,7 +60,6 @@ export function ModalRekamanLagu({
   const [storageInfo, setStorageInfo] = useState<InfoPenyimpanan | null>(null)
   // Mode cek bersama klik
   const [cekKlikAktif, setCekKlikAktif] = useState(false)
-  const timerKlikRef = useRef<number | null>(null)
 
   // Inisialisasi saat song berubah
   useEffect(() => {
@@ -101,10 +102,7 @@ export function ModalRekamanLagu({
     return () => {
       revoked = true
       if (audioBlobUrl) URL.revokeObjectURL(audioBlobUrl)
-      if (timerKlikRef.current !== null) {
-        window.clearInterval(timerKlikRef.current)
-        timerKlikRef.current = null
-      }
+      metronomCekRef.current.berhenti()
     }
   }, [open, song?.id])
 
@@ -285,45 +283,37 @@ export function ModalRekamanLagu({
     }
   }
 
-  // Cek bersama klik metronom
+  // Cek bersama klik memakai mesin metronom yang sama dengan pemutaran lagu.
   const mulaiCekKlik = () => {
     if (!song || !audioRef.current) return
     const audio = audioRef.current
     audio.currentTime = titikMulai
-    audio.play().catch(() => {})
+    void audio.play().catch(() => toast.push('Peramban memblokir putar otomatis', 'err'))
     setCekKlikAktif(true)
 
-    // Bunyikan Web Audio beeps sesuai BPM pada ketukan
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-    const ctx = new AudioCtx()
-    const bpm = song.bpm || 120
-    const intervalMs = (60 / bpm) * 1000
-
-    let beat = 0
-    const bunyikan = () => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-
-      const aksen = beat % (song.beats || 4) === 0
-      osc.frequency.value = aksen ? 1000 : 800
-      gain.gain.setValueAtTime(volKlik * 0.7, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05)
-      osc.start(ctx.currentTime)
-      osc.stop(ctx.currentTime + 0.05)
-      beat++
-    }
-
-    bunyikan()
-    timerKlikRef.current = window.setInterval(bunyikan, intervalMs)
+    const meter = song.tandaBirama ?? dariBeatsLama(song.beats)
+    metronomCekRef.current.mulai({
+      bpm: song.bpm || 120,
+      beats: meter.pembilang,
+      subdiv: 1,
+      birama: meter,
+      pola: song.pola ?? null,
+      suara: song.suara ?? 'klik',
+      volume: volKlik,
+      getar: song.getar === 1,
+      latih: song.latih ?? null,
+      segmen: song.tempoMap ?? [],
+      pakaiTempoMap: (song.tempoMap ?? []).length > 0,
+      jam: {
+        posisi: () => Math.max(0, audio.currentTime - titikMulai),
+        laju: () => Math.max(0.1, audio.playbackRate || 1),
+        jalan: () => !audio.paused && !audio.ended,
+      },
+    })
   }
 
   const hentikanCekKlik = () => {
-    if (timerKlikRef.current !== null) {
-      window.clearInterval(timerKlikRef.current)
-      timerKlikRef.current = null
-    }
+    metronomCekRef.current.berhenti()
     setCekKlikAktif(false)
   }
 

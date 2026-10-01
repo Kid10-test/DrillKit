@@ -12,7 +12,7 @@ bash bangun-logika.sh >> "$LOG" 2>&1
 
 echo "== BLOK 1: rangkaian yang sudah ada ==" >> "$LOG"
 bash regresi.sh "$BASE" \
-  mode-logika bagikan-logika perubahan-tempo-logika uji-situs uji-rilis uji-lapangan \
+  mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika uji-situs uji-rilis uji-lapangan \
   sambutan-mode buka-paket tab-absensi formasi-anggota perbarui-materi \
   musik-anggota lebar-hp luring mikrofon-ditolak tim-besar cap-rilis \
   perubahan-tempo \
