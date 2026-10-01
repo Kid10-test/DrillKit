@@ -446,6 +446,15 @@ export interface SegmenWaktu {
    * tanpa ini perilakunya persis seperti sediakala.
    */
   berangsur?: 0 | 1
+  /** Posisi 1-based dalam birama; opsional supaya map lama tetap kompatibel. */
+  beat?: number
+  subdivision?: number
+  subdivisionsPerBeat?: number
+  /** Durasi ramp eksplisit dan unit hitungannya. */
+  rampCounts?: number
+  rampUnit?: 'beat' | 'tempoBeat' | 'subdivision' | 'tempoSubdivision' | 'bar'
+  rampSubdivisions?: number
+  rampFromBpm?: number
 }
 
 /** Urutkan segmen berdasarkan birama mulaimya. */

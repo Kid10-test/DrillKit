@@ -22,21 +22,18 @@ import {
   putarSel,
   rapikanBirama,
   ringkasLuncuran,
-  tempoBerlaku,
 } from '../lib/metronome'
+import { createTempoTimeline } from '../lib/tempoTimeline'
 import type { InfoKetuk, JamLagu } from '../lib/metronome'
 import {
   bikinPolaDariBirama,
   biramaDefault,
   dariBeatsLama,
-  detikSisa,
-  detikTotal,
   formatWaktu,
   hitungMundurDefault,
   labelBirama,
   meterPada,
   normalisasiBirama,
-  rasioProgres,
 } from '../lib/birama'
 import type { SegmenWaktu } from '../lib/birama'
 import { hitungSetList, setListBaru } from '../lib/setlist'
@@ -44,7 +41,7 @@ import { ModalRekamanLagu } from '../components/ModalRekamanLagu'
 import { PemutarRekaman, waktuBiramaKeDetikAudio } from '../lib/rekaman'
 import { lajuRekaman } from '../lib/tempoLatihan'
 import type { RekamanAudioMeta } from '../db/types'
-import { detikSatuPutaran, jumlahBirama, rentangValid } from '../lib/ulang'
+import { jumlahBirama, rentangValid } from '../lib/ulang'
 import { KartuSetList } from '../components/KartuSetList'
 import { KendaliTempoLatihan, LencanaLatihan } from '../components/KendaliTempoLatihan'
 import { useTempoLatihan } from '../hooks/useTempoLatihan'
@@ -192,10 +189,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
 
   /* ------------------------- M1 — mode lagu ------------------------------ */
   /** Segmen tempo ringkas untuk menghitung sukat & tempo yang berlaku. */
-  const segmenWaktu = useMemo<SegmenWaktu[]>(
-    () => segs.map((t) => ({ measure: t.measure, bpm: t.bpm, birama: t.birama })),
-    [segs],
-  )
+  const segmenWaktu = useMemo<SegmenWaktu[]>(() => segs, [segs])
   /** Segmen lengkap (id & label) untuk strip, sudah urut berdasarkan birama. */
   const segmenLengkap = useMemo(
     () =>
@@ -209,55 +203,29 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
     () => meterPada(segmenWaktu, measure, birama),
     [segmenWaktu, measure, birama],
   )
+  const tempoTimeline = useMemo(
+    () => createTempoTimeline({
+      bpm,
+      meter: birama,
+      segments: useMap ? segs : [],
+      latih,
+    }),
+    [bpm, birama, segs, useMap, latih],
+  )
   /**
-   * N7 — tempo yang berlaku pada birama tertentu, **diambil dari fungsi
-   * yang sama dengan mesin metronom** (`tempoBerlaku`).
-   *
-   * Sebelumnya panel lagu menghitung temponya sendiri (tangga per segmen)
-   * dan semua hitungan waktu memakai tempo datar. Begitu ada luncuran,
-   * tampilan dan bunyi berbeda: panel menampilkan 172 pada empat birama
-   * yang sebenarnya sedang turun 172 → 140, dan hitungan "sisa waktu"
-   * menganggap keempat birama itu sama panjang. Dua hal yang berbeda
-   * tentang hal yang sama paling cepat terasa di telinga, paling lambat
-   * ketahuan di layar — jadi keduanya kini memakai satu fungsi.
+   * Single evaluator for the audible tempo at every beat/subdivision. The
+   * timeline also supplies the seconds used by audio offsets and progress.
    */
   const tempoUntuk = useMemo(
     () => (bir: number) =>
-      jepitTempo(
-        tempoBerlaku(
-          {
-            dasar: bpm,
-            segmen: segs,
-            pakaiTempoMap: useMap && segs.length > 0,
-            latih,
-            // #4 — tempo latihan ikut, jadi durasi & sisa waktu memakai tempo latihan.
-            latihan,
-          },
-          bir,
-        ),
-      ),
-    [bpm, segs, useMap, latih, latihan],
+      jepitTempo(tempoTimeline.tempoAtPosition({ measure: bir, beat: 1 }, latihan)),
+    [tempoTimeline, latihan],
   )
   /** #4 — tempo asli (tanpa tempo latihan) pada birama yang sedang berjalan. */
   const tempoAsliSekarang = jepitTempo(
-    tempoBerlaku({ dasar: bpm, segmen: segs, pakaiTempoMap: useMap && segs.length > 0, latih }, measure),
-  )
-  /**
-   * #6 — tempo ASLI (tanpa tempo latihan) sebagai fungsi.
-   *
-   * Dipakai untuk **memetakan birama ke detik berkas rekaman**. Rekaman itu
-   * partitur: ketukan ke-100 selalu di detik yang sama, berapa pun lambatnya
-   * ia diputar. Tempo latihan diwujudkan oleh `playbackRate`, bukan oleh
-   * hitungan detiknya. Dulu pemetaan ini memakai `tempoUntuk` — yang sudah
-   * termasuk tempo latihan — sehingga "lompat ke birama 20" saat latihan
-   * 80% mendarat 25% terlalu jauh di dalam rekaman.
-   */
-  const tempoAsliUntuk = useMemo(
-    () => (bir: number) =>
-      jepitTempo(
-        tempoBerlaku({ dasar: bpm, segmen: segs, pakaiTempoMap: useMap && segs.length > 0, latih }, bir),
-      ),
-    [bpm, segs, useMap, latih],
+    aktif && aktif.tahap !== 'hitung'
+      ? (aktif.bpmAsli ?? aktif.bpm)
+      : tempoTimeline.tempoAtPosition({ measure, beat: 1 }),
   )
 
   /**
@@ -279,21 +247,31 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
   const adaPanjang = panjangBirama > 0
   /** Durasi total lagu; `null` kalau lagu tidak punya panjang. */
   const durasiLagu = useMemo(
-    () => detikTotal(segmenWaktu, panjangBirama, birama, bpm, tempoUntuk),
-    [segmenWaktu, panjangBirama, birama, bpm, tempoUntuk],
+    () => panjangBirama > 0
+      ? tempoTimeline.secondsAtPosition({ measure: panjangBirama + 1, beat: 1 }, latihan)
+      : null,
+    [tempoTimeline, panjangBirama, latihan],
   )
   /** Detik yang tersisa mulai awal birama yang sedang berjalan. */
-  const sisaDetik = useMemo(
-    () => detikSisa(segmenWaktu, panjangBirama, measure, birama, bpm, tempoUntuk),
-    [segmenWaktu, panjangBirama, measure, birama, bpm, tempoUntuk],
-  )
+  const sisaDetik = useMemo(() => {
+    if (durasiLagu === null) return null
+    const sudah = tempoTimeline.secondsAtPosition({ measure: Math.min(measure, panjangBirama + 1), beat: 1 }, latihan)
+    return Math.max(0, durasiLagu - sudah)
+  }, [tempoTimeline, durasiLagu, measure, panjangBirama, latihan])
   /**
    * 0 di awal, 1 di akhir — dihitung dari waktu, bukan jumlah birama.
    * `habis` memaksanya genap 100% setelah lagu selesai.
    */
   const progres = useMemo(
-    () => (habis ? 1 : rasioProgres(segmenWaktu, panjangBirama, measure, birama, bpm, tempoUntuk)),
-    [habis, segmenWaktu, panjangBirama, measure, birama, bpm, tempoUntuk],
+    () => durasiLagu === null || durasiLagu <= 0
+      ? null
+      : habis
+        ? 1
+        : Math.min(1, Math.max(0, tempoTimeline.secondsAtPosition({
+            measure: Math.min(measure, panjangBirama + 1),
+            beat: 1,
+          }, latihan) / durasiLagu)),
+    [habis, tempoTimeline, durasiLagu, measure, panjangBirama, latihan],
   )
   /** Ulang hanya berarti kalau lagu punya panjang. */
   const ulangAktif = adaPanjang && song?.ulang === 1
@@ -306,8 +284,11 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
   const ulangBagianAktif = !!ub && ub.aktif === 1 && ubSah
   /** Durasi satu putaran rentang. */
   const detikPutaran = useMemo(
-    () => (ub ? detikSatuPutaran(segmenWaktu, ub.dari, ub.sampai, birama, bpm, tempoUntuk) : 0),
-    [ub, segmenWaktu, birama, bpm, tempoUntuk],
+    () => ub
+      ? Math.max(0, tempoTimeline.secondsAtPosition({ measure: ub.sampai + 1, beat: 1 }, latihan) -
+        tempoTimeline.secondsAtPosition({ measure: ub.dari, beat: 1 }, latihan))
+      : 0,
+    [ub, tempoTimeline, latihan],
   )
   /** Tulis rentang ke lagu. */
   const setUlangBagian = (patch: Partial<UlangBagian>) => {
@@ -533,7 +514,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
             // Tempo putaran baru juga berlaku untuk rekamannya: klik yang
             // naik sementara rekaman tetap akan berpisah makin jauh.
             pemutarAudio.current.setKecepatan(lajuRekaman(bpm, info.tempo))
-            const offsetUlang = waktuBiramaKeDetikAudio(ub.dari, song.rekaman, segmenWaktu, birama, bpm, tempoAsliUntuk)
+            const offsetUlang = waktuBiramaKeDetikAudio(ub.dari, song.rekaman, segmenWaktu, birama, bpm, undefined, latih)
             pemutarAudio.current.putar(offsetUlang)
           }
         },
@@ -580,7 +561,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
       pemutarAudio.current.setVolume(mode === 'klik' ? 0 : volAud)
       // #6 — laju yang sepadan dengan tempo latihan (mode persen ATAU BPM).
       pemutarAudio.current.setKecepatan(lajuRekaman(bpm, latihan))
-      const offsetDetik = waktuBiramaKeDetikAudio(mulai, rekaman, segmenWaktu, birama, bpm, tempoAsliUntuk)
+      const offsetDetik = waktuBiramaKeDetikAudio(mulai, rekaman, segmenWaktu, birama, bpm, undefined, latih)
       const berbunyi = await pemutarAudio.current.putarTunggu(offsetDetik)
       if (token !== mulaiTokenRef.current) return
       if (!berbunyi) {
@@ -605,11 +586,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
    */
   function opsiDariLagu(s: Song, selesai: () => void) {
     const meter = s.tandaBirama ? normalisasiBirama(s.tandaBirama) : dariBeatsLama(s.beats)
-    const segmen = (s.tempoMap ?? []).map((t) => ({
-      measure: t.measure,
-      bpm: t.bpm,
-      birama: t.birama,
-    }))
+    const segmen = s.tempoMap ?? []
     const pakaiPolaLagu = !!s.pola && s.pola.bars.length > 0
 
     if (s.id && s.rekaman) {
@@ -621,7 +598,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
         pemutarAudio.current.setVolume(mode === 'klik' ? 0 : volAud)
         // #6 — aturan tempo yang sama dengan kliknya (mode persen ATAU BPM).
         pemutarAudio.current.setKecepatan(lajuRekaman(s.bpm, tl.tempoUntuk(s.id)))
-        const offsetDetik = waktuBiramaKeDetikAudio(1, s.rekaman!, segmen, meter, s.bpm)
+        const offsetDetik = waktuBiramaKeDetikAudio(1, s.rekaman!, segmen, meter, s.bpm, undefined, s.latih ?? null)
         await pemutarAudio.current.putarTunggu(offsetDetik)
       })()
     }
@@ -749,7 +726,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
    * di metronome.ts) — dan yang terpenting, hal itu harus DIBERITAHUKAN,
    * bukan terjadi diam-diam.
    */
-  const laguPunyaBerangsur = (song?.tempoMap ?? []).some((t) => t.berangsur === 1)
+  const laguPunyaBerangsur = (song?.tempoMap ?? []).some((t) => t.berangsur === 1 || (t.rampCounts ?? 0) > 0)
 
   /** Arah perubahan tempo yang sedang dipilih. */
   const arahLatih: 'datar' | 'accel' | 'ritard' = !latih.on
@@ -825,7 +802,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
         subtitle={
           hanyaPutar
             ? 'Latihan mandiri: ikuti metronom, dengarkan lagu, mainkan set list'
-            : 'Klik track untuk latihan, tempo map per birama, dan repertoar'
+            : 'Klik track untuk latihan, tempo map per ketukan/subdivisi, dan repertoar'
         }
         actions={
           hanyaPutar ? undefined : (
@@ -888,6 +865,11 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
                 latih={latih}
                 tempoUntuk={tempoUntuk}
                 latihan={latihan}
+                tempoKetuk={aktif && aktif.tahap !== 'hitung'
+                  ? { asli: aktif.bpmAsli ?? aktif.bpm, latihan: aktif.bpm }
+                  : null}
+                waktuBiramaUntuk={(bir) => tempoTimeline.secondsAtPosition({ measure: bir, beat: 1 }, latihan)}
+                durasiBiramaUntuk={(bir) => tempoTimeline.barDurationSeconds(bir, latihan)}
               />
               {segmenLengkap.length > 0 && (
                 <StripSegmen
@@ -1859,9 +1841,12 @@ function SongModal({
 
   /* N6 — segmen terurut: dipakai untuk mengetahui segmen SESUDAH sebuah
      segmen, karena luncuran temponya menuju segmen berikutnya. */
-  const urutSegmen = [...s.tempoMap].sort((a, b) => a.measure - b.measure)
+  const urutSegmen = [...s.tempoMap].sort((a, b) =>
+    a.measure - b.measure || (a.beat ?? 1) - (b.beat ?? 1) ||
+    (a.subdivision ?? 1) - (b.subdivision ?? 1),
+  )
   /** N6 — kalau ada segmen berangsur, luncuran menyeluruh dikesampingkan. */
-  const adaBerangsurDiLagu = s.tempoMap.some((t) => t.berangsur === 1)
+  const adaBerangsurDiLagu = s.tempoMap.some((t) => t.berangsur === 1 || (t.rampCounts ?? 0) > 0)
 
   const addSeg = () => {
     const lastMeasure = s.tempoMap.length ? Math.max(...s.tempoMap.map((t) => t.measure)) + 8 : 1
@@ -1871,6 +1856,10 @@ function SongModal({
       measure: lastMeasure,
       bpm: s.tempoMap.at(-1)?.bpm ?? s.bpm,
       beats: s.beats,
+      beat: 1,
+      subdivision: 1,
+      subdivisionsPerBeat: 1,
+      rampUnit: 'beat',
     }
     setS({ ...s, tempoMap: [...s.tempoMap, seg] })
   }
@@ -2006,14 +1995,18 @@ function SongModal({
 
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs font-medium text-slate-400">Tempo map (perubahan tempo per birama)</span>
+          <span className="text-xs font-medium text-slate-400">Tempo map (posisi birama / ketuk / subdivisi)</span>
           <Button size="sm" onClick={addSeg}>
             <IconPlus size={14} /> Segmen
           </Button>
         </div>
+        <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
+          Ketuk dan subdivisi memakai indeks 1-based. Ramp menyimpan jumlah hitungan dan satuannya secara eksplisit;
+          perubahan pada hitungan pertama sudah bergerak, dan hitungan terakhir mencapai BPM target.
+        </p>
         <div className="space-y-2">
           {[...s.tempoMap]
-            .sort((a, b) => a.measure - b.measure)
+            .sort((a, b) => a.measure - b.measure || (a.beat ?? 1) - (b.beat ?? 1) || (a.subdivision ?? 1) - (b.subdivision ?? 1))
             .map((t) => (
               <div key={t.id} className="space-y-1.5 rounded-lg border border-slate-800 bg-slate-950/40 p-2" data-testid={`segmen-${t.id}`}>
                 {(() => {
@@ -2032,9 +2025,11 @@ function SongModal({
                   }
                 />
                 <Input
-                  className="col-span-3"
+                  className="col-span-2"
                   type="number"
+                  min={1}
                   placeholder="Birama"
+                  aria-label={`Birama segmen ${t.label}`}
                   data-testid={`segmen-birama-${t.id}`}
                   value={t.measure}
                   onChange={(e) =>
@@ -2045,7 +2040,22 @@ function SongModal({
                   }
                 />
                 <Input
-                  className="col-span-4"
+                  className="col-span-2"
+                  type="number"
+                  min={1}
+                  placeholder="Ketuk"
+                  aria-label={`Ketuk segmen ${t.label}`}
+                  data-testid={`segmen-ketuk-${t.id}`}
+                  value={t.beat ?? 1}
+                  onChange={(e) =>
+                    setS({
+                      ...s,
+                      tempoMap: s.tempoMap.map((x) => (x.id === t.id ? { ...x, beat: Number(e.target.value) || 1 } : x)),
+                    })
+                  }
+                />
+                <Input
+                  className="col-span-3"
                   type="number"
                   placeholder="BPM"
                   data-testid={`segmen-bpm-${t.id}`}
@@ -2060,6 +2070,39 @@ function SongModal({
                 >
                   ✕
                 </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <Field label="Subdivisi posisi">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={t.subdivision ?? 1}
+                      aria-label={`Subdivisi posisi segmen ${t.label}`}
+                      data-testid={`segmen-subdivisi-${t.id}`}
+                      onChange={(e) => setS({
+                        ...s,
+                        tempoMap: s.tempoMap.map((x) => x.id === t.id
+                          ? { ...x, subdivision: Number(e.target.value) || 1 }
+                          : x),
+                      })}
+                    />
+                  </Field>
+                  <Field label="Subdivisi per ketuk">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={64}
+                      value={t.subdivisionsPerBeat ?? 1}
+                      aria-label={`Jumlah subdivisi segmen ${t.label}`}
+                      data-testid={`segmen-jumlah-subdivisi-${t.id}`}
+                      onChange={(e) => setS({
+                        ...s,
+                        tempoMap: s.tempoMap.map((x) => x.id === t.id
+                          ? { ...x, subdivisionsPerBeat: Number(e.target.value) || 1 }
+                          : x),
+                      })}
+                    />
+                  </Field>
                 </div>
                 {/* M1 — sukat per segmen: lagu bisa berganti meter di tengah */}
                 <div className="flex items-center gap-2">
@@ -2081,15 +2124,94 @@ function SongModal({
                   </div>
                 </div>
 
-                {/* N6 — luncuran tempo menuju segmen berikutnya.
+                <div className="border-t border-slate-800/60 pt-2">
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <Field label="Panjang ramp (hitungan)" hint="kosong = perubahan langsung">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10000}
+                        placeholder="mis. 6"
+                        value={t.rampCounts ?? ''}
+                        data-testid={`segmen-ramp-hitungan-${t.id}`}
+                        onChange={(e) => {
+                          const counts = Number(e.target.value)
+                          setS({
+                            ...s,
+                            tempoMap: s.tempoMap.map((x) => x.id === t.id
+                              ? { ...x, rampCounts: counts > 0 ? Math.floor(counts) : undefined, berangsur: 0 }
+                              : x),
+                          })
+                        }}
+                      />
+                    </Field>
+                    <Field label="Satuan hitungan ramp">
+                      <Select
+                        value={t.rampUnit ?? 'beat'}
+                        data-testid={`segmen-ramp-unit-${t.id}`}
+                        onChange={(e) => setS({
+                          ...s,
+                          tempoMap: s.tempoMap.map((x) => x.id === t.id
+                            ? { ...x, rampUnit: e.target.value as TempoSegment['rampUnit'] }
+                            : x),
+                        })}
+                      >
+                        <option value="beat">Ketuk tertulis</option>
+                        <option value="tempoBeat">Ketuk acuan BPM</option>
+                        <option value="subdivision">Subdivisi ketuk tertulis</option>
+                        <option value="tempoSubdivision">Subdivisi acuan BPM</option>
+                        <option value="bar">Birama</option>
+                      </Select>
+                    </Field>
+                    <Field label="Dari BPM" hint="kosong = tempo yang sedang berlaku">
+                      <Input
+                        type="number"
+                        min={20}
+                        max={400}
+                        placeholder="otomatis"
+                        value={t.rampFromBpm ?? ''}
+                        data-testid={`segmen-ramp-dari-${t.id}`}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : Number(e.target.value)
+                          setS({
+                            ...s,
+                            tempoMap: s.tempoMap.map((x) => x.id === t.id ? { ...x, rampFromBpm: value } : x),
+                          })
+                        }}
+                      />
+                    </Field>
+                  </div>
+                  {(t.rampUnit === 'subdivision' || t.rampUnit === 'tempoSubdivision') && (
+                    <Field label="Subdivisi per hitungan" hint="3 = triplet">
+                      <Input
+                        type="number"
+                        min={2}
+                        max={64}
+                        value={t.rampSubdivisions ?? 3}
+                        data-testid={`segmen-ramp-subdivisi-${t.id}`}
+                        onChange={(e) => setS({
+                          ...s,
+                          tempoMap: s.tempoMap.map((x) => x.id === t.id
+                            ? { ...x, rampSubdivisions: Number(e.target.value) || 3 }
+                            : x),
+                        })}
+                      />
+                    </Field>
+                  )}
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                    Posisi perubahan: birama / ketuk / subdivisi (semuanya mulai dari 1). BPM di atas adalah
+                    target. Pada ramp berdurasi N hitungan, hitungan 1 sudah berubah dan hitungan N tepat
+                    mencapai target.
+                  </p>
+                  {(t.rampCounts ?? 0) > 0 && (
+                    <p className="mt-1 text-[11px] text-emerald-300/90" data-testid={`segmen-ramp-ringkasan-${t.id}`}>
+                      Ramp {t.rampFromBpm ?? 'tempo aktif'} → {t.bpm} BPM selama {t.rampCounts} hitungan.
+                    </p>
+                  )}
+                </div>
 
-                    Inilah yang diminta pelatih: ketik tempo di dua segmen,
-                    lalu tandai segmen awalnya supaya birama di antaranya
-                    MELUNCUR, bukan melompat. Kalau tidak ditandai, segmen
-                    berikutnya tetap mengubah tempo secara mendadak —
-                    jadi lagu yang sudah ada tidak pernah berubah
-                    perilakunya dengan sendirinya. */}
-                <div className="border-t border-slate-800/60 pt-1.5">
+                {/* Legacy ramp: retained for existing bar-to-bar maps. */}
+                {(t.rampCounts ?? 0) <= 0 && <div className="border-t border-slate-800/60 pt-1.5">
                   <Toggle
                     testId={`segmen-berangsur-${t.id}`}
                     checked={t.berangsur === 1}
@@ -2134,7 +2256,7 @@ function SongModal({
                       {berikut.bpm > t.bpm ? ' (accelerando)' : berikut.bpm < t.bpm ? ' (ritardando)' : ''}.
                     </p>
                   )}
-                </div>
+                </div>}
                 </>
                   )
                 })()}

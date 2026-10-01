@@ -28,6 +28,8 @@ rakit src/lib/modePerangkat.ts modePerangkat
 rakit src/lib/bagikan.ts      bagikan
 rakit src/lib/zip.ts          zip
 rakit src/lib/metronome.ts    metronome
+# TempoTimeline is the shared evaluator for metronome, recordings, and drills.
+rakit src/lib/tempoTimeline.ts tempoTimeline
 # N7 — birama & ulang ikut dirakit: hitungan waktu lagu kini menerima
 # tempo per birama, dan satu-satunya cara mengujinya tanpa peramban adalah
 # mengimpor modulnya langsung (uji-birama & uji-panjang-lagu juga butuhnya).

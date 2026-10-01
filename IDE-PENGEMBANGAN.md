@@ -3,7 +3,7 @@
 Dokumen ini **bukan** rencana yang harus dikerjakan semua. Ini kandidat perbaikan,
 diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
 
-**Terakhir diperbarui: 28 Sep 2026 — #6 (Rekaman lagu MP3) rampung.**
+**Terakhir diperbarui: 1 Okt 2026 — tempo map custom per ketuk/subdivisi dan ramp eksplisit terintegrasi.**
 · **#6 rampung (28 Sep 2026)** — Rekaman audio MP3, M4A, WAV, OGG disimpan di IndexedDB
   (Blob). Sidik rekaman biner SHA-256 via WebCrypto + durasi. Penyelarasan titik mulai
   birama 1 ketuk 1 dengan visualisasi waveform canvas, stepper ±10/50ms, tombol "Cek bersama klik",
@@ -5936,3 +5936,32 @@ mode anggota dengan PIN tim.
 
 - **I1 — Log perubahan show** (siapa mengubah set apa dan kapan).
   Ditunda karena masalahnya belum pernah terjadi.
+
+---
+
+## Tempo map custom per hitungan dan ramp eksplisit (1 Okt 2026)
+
+Tempo map mendukung posisi 1-based pada **birama, ketuk tertulis, dan
+subdivisi ketuk**. Ramp menyimpan jumlah hitungan secara eksplisit dan dapat
+memakai satuan ketuk tertulis, ketuk acuan BPM, subdivisi, atau birama;
+opsional, tempo awalnya juga dapat ditentukan.
+
+Semantik ramp: count 0 adalah tempo tepat sebelum ramp; count 1 sudah
+berubah sebesar 1/N; count N mencapai BPM target. Contoh uji:
+
+- 160 → 180 selama 8 hitungan: **162,5; 165; 167,5; 170; 172,5; 175;
+  177,5; 180 BPM**.
+- 172 → 140 selama 6 hitungan: hitungan 1 sudah turun dan hitungan 6
+  tepat mencapai 140 BPM.
+
+`TempoTimeline` adalah evaluator bersama untuk BPM, durasi dan konversi
+posisi/waktu. Metronom, pemeriksaan klik MP3, pemetaan tempo serta klik
+per-hitungan drill, waktu/progres lagu, rekaman, dan set list menggunakannya.
+Tempo map warisan per birama tetap didukung; fitur posisi/ramp baru tidak
+mengubah data lama yang tidak memakainya.
+
+**Diuji lokal:** `npm run typecheck`, `npm run build`, dan `git diff --check`
+lulus. Rangkaian terarah: `tempo-map-logika.mjs` 25, `perubahan-tempo-logika.mjs`
+90, `uji-gabung-musik.mjs` 51, dan `uji-setlist.mjs` 107 — total **273 lulus,
+0 gagal**. GitHub Actions/regresi penuh dan uji audio dengan aplikasi Sibelius
+sendiri tidak dijalankan.

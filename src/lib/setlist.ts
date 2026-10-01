@@ -9,9 +9,9 @@
  * yang sudah dicari pemanggilnya.
  */
 import type { SetList, Song } from '../db/types'
-import { dariBeatsLama, detikTotal } from './birama'
+import { dariBeatsLama } from './birama'
 import type { SegmenWaktu, TandaBirama } from './birama'
-import { jepitTempo, tempoBerlaku } from './metronome'
+import { createTempoTimeline } from './tempoTimeline'
 import { labelLatihan, latihanAktif, terapkanLatihan } from './tempoLatihan'
 import type { TempoLatihan } from './tempoLatihan'
 
@@ -48,13 +48,7 @@ export function sukatLagu(s: Song): TandaBirama {
 
 /** Tempo map lagu dalam bentuk ringkas untuk perhitungan waktu. */
 export function segmenLagu(s: Song): SegmenWaktu[] {
-  return (s.tempoMap ?? []).map((t) => ({
-    measure: t.measure,
-    bpm: t.bpm,
-    birama: t.birama,
-    // N9 — tanda berangsur ikut, supaya durasinya menghitung luncuran.
-    berangsur: t.berangsur,
-  }))
+  return s.tempoMap ?? []
 }
 
 /**
@@ -67,19 +61,26 @@ export function segmenLagu(s: Song): SegmenWaktu[] {
  * dan selisihnya tidak pernah berteriak, hanya mengendap.
  */
 export function tempoUntukLagu(s: Song, latihan?: TempoLatihan | null): (birama: number) => number {
-  const segmen = s.tempoMap ?? []
-  return (birama) =>
-    jepitTempo(
-      tempoBerlaku(
-        { dasar: s.bpm, segmen, pakaiTempoMap: segmen.length > 0, latih: s.latih ?? null, latihan: latihan ?? null },
-        birama,
-      ),
-    )
+  const timeline = createTempoTimeline({
+    bpm: s.bpm,
+    meter: sukatLagu(s),
+    segments: segmenLagu(s),
+    latih: s.latih ?? null,
+  })
+  return (birama) => timeline.tempoAtPosition({ measure: birama, beat: 1 }, latihan)
 }
 
 /** Durasi sebuah lagu dalam detik. `null` kalau panjangnya belum diisi. */
 export function durasiSatu(s: Song, latihan?: TempoLatihan | null): number | null {
-  return detikTotal(segmenLagu(s), s.panjangBirama, sukatLagu(s), s.bpm, tempoUntukLagu(s, latihan))
+  const panjang = Math.floor(s.panjangBirama ?? 0)
+  if (!Number.isFinite(panjang) || panjang < 1) return null
+  const timeline = createTempoTimeline({
+    bpm: s.bpm,
+    meter: sukatLagu(s),
+    segments: segmenLagu(s),
+    latih: s.latih ?? null,
+  })
+  return timeline.secondsAtPosition({ measure: panjang + 1, beat: 1 }, latihan)
 }
 
 /**

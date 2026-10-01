@@ -389,6 +389,10 @@ hitungan, segmen 18 hitungan). Ini **wajar**. Yang jadi masalah:
    - Berlaku untuk animasi, klik, garis waktu, durasi total, dan
      presenter.
    - Posisi pemain tetap rata per hitungan.
+   - Untuk ramp berdurasi N hitungan, tempo awal berlaku tepat sebelum
+     hitungan 1; hitungan 1 sudah mendapat langkah pertama dan hitungan N
+     tepat mencapai tempo tujuan. Jumlah hitungan tempo dinyatakan
+     eksplisit, bukan ditebak dari jumlah birama atau meter.
    - Drill tanpa set yang melewati perubahan tempo tidak berubah.
    - Presenter menampilkan "Set 2 · hitungan 7/12 · birama 5" dan
      berkedip kecil saat tempo berubah.
@@ -399,9 +403,12 @@ hitungan, segmen 18 hitungan). Ini **wajar**. Yang jadi masalah:
    - Gabung dengan set berikutnya.
    - Keduanya masuk riwayat formasi dan bisa di-undo.
 
-**Uji:** set 2 dalam contoh berdurasi 5,25 detik; drill tanpa perubahan
-tempo durasinya tetap; animasi identik setelah dipecah; garis waktu dan
-⚡; Pas ke batas segmen; undo.
+**Uji:** set 2 dalam contoh berdurasi 5,25 detik; accelerando 160 → 180
+selama 8 hitungan menghasilkan 162,5; 165; 167,5; 170; 172,5; 175;
+177,5; 180 BPM; ritardando 172 → 140 selama 6 hitungan mulai berubah
+pada hitungan 1 dan tepat mencapai 140 pada hitungan 6; drill tanpa
+perubahan tempo durasinya tetap; animasi identik setelah dipecah; garis
+waktu dan ⚡; Pas ke batas segmen; undo.
 
 ---
 

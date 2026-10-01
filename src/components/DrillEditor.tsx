@@ -224,8 +224,15 @@ export function Editor({
   )
   /** Semua lagu di repertoar, untuk pilihan tautan. */
   const daftarLagu = useLiveQuery(() => db.songs.orderBy('title').toArray(), [], [])
+  /*
+   * #4 — tempo latihan lagu yang ditautkan. Peta waktunya dibuat setelah hook
+   * ini agar durasi drill dan offset klik ikut memakai tempo latihan yang sama.
+   */
+  const tl = useTempoLatihan()
+  const latihanDrill = drill.songId && lagu ? tl.tempoUntuk(drill.songId) : null
+  const adaLatihanDrill = latihanAktif(latihanDrill)
   /**
-   * Pemetaan tiap set ke birama, tempo, dan sukat lagu.
+   * Pemetaan tiap set ke posisi, tempo, dan sukat lagu.
    * `null` kalau drill tidak ditautkan → semua perilaku lama berlaku.
    */
   const petaSet = useMemo(() => {
@@ -238,25 +245,13 @@ export function Editor({
         tandaBirama: lagu.tandaBirama ?? dariBeatsLama(lagu.beats),
         // N9 — `berangsur` & `latih` ikut dikirim: tanpanya pemetaan
         // menghitung tempo tangga, padahal lagunya meluncur.
-        tempoMap: lagu.tempoMap.map((t) => ({
-          measure: t.measure,
-          bpm: t.bpm,
-          birama: t.birama,
-          berangsur: t.berangsur,
-        })),
+        tempoMap: lagu.tempoMap,
         latih: lagu.latih ?? null,
       },
+      latihanDrill,
     )
-  }, [lagu, sets, drill.beatsPerCount])
+  }, [lagu, sets, drill.beatsPerCount, latihanDrill?.mode, latihanDrill?.persen, latihanDrill?.geser])
   /** Tempo yang dipakai set ke-`i`: dari lagu kalau ditautkan, kalau tidak ya tempo drill. */
-  /*
-   * #4 — tempo latihan lagu yang ditautkan. Presenter & animasi editor ikut
-   * melambat; analitik langkah tetap memakai tempo asli (yang dinilai adalah
-   * penampilan sungguhan, bukan latihannya).
-   */
-  const tl = useTempoLatihan()
-  const latihanDrill = drill.songId && lagu ? tl.tempoUntuk(drill.songId) : null
-  const adaLatihanDrill = latihanAktif(latihanDrill)
   const tempoUntuk = useCallback(
     (i: number) => terapkanLatihan(tempoSet(petaSet, i, drill.tempo), latihanDrill),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -388,9 +383,10 @@ export function Editor({
   /** B2 — lama perpindahan set ini (detik) setelah dikali kecepatan. */
   const durasiDetik = useMemo(() => {
     const counts = Math.max(1, set?.counts ?? 8)
-    // #4 — memakai tempo set ini setelah tempo latihan (sama dengan animasinya).
-    return ((counts * drill.beatsPerCount * 60) / Math.max(20, tempoUntuk(idx))) / Math.max(0.05, view.cepat)
-  }, [set?.counts, drill.beatsPerCount, tempoUntuk, idx, view.cepat])
+    const durasiPartitur = (counts * drill.beatsPerCount * 60) / Math.max(20, tempoUntuk(idx))
+    const durasiTimeline = petaSet?.[idx]?.detikLatihan ?? durasiPartitur
+    return durasiTimeline / Math.max(0.05, view.cepat)
+  }, [set?.counts, drill.beatsPerCount, tempoUntuk, idx, view.cepat, petaSet])
 
   /** A7 — penanda lapangan milik drill ini (drill lama belum punya → []). */
   const markers = useMemo(() => drill?.markers ?? [], [drill?.markers])
@@ -1547,14 +1543,28 @@ export function Editor({
     if (!playing) return
     const counts = Math.max(1, set?.counts ?? 8)
     const beats = counts * drill.beatsPerCount
-    // M1 — tempo datar diganti tempo lagu pada set ini (kalau ditautkan).
+    // Durasi dan klik per hitungan berasal dari TempoTimeline saat drill tertaut.
     const msPerBeat = 60_000 / Math.max(20, tempoUntuk(idx))
-    const total = beats * msPerBeat
-    // B5 — klik tempo: satu detak per count, aksen di count pertama tiap set.
-    // Tempo dikalikan pengali kecepatan supaya klik tetap seirama dengan animasi.
+    const total = (petaSet?.[idx]?.detikLatihan ?? (beats * msPerBeat) / 1000) * 1000
     if (klikRef.current) {
-      const k = klikUntukDrill(tempoUntuk(idx) * cepatRef.current, drill.beatsPerCount, counts)
-      metronomRef.current.mulai({ bpm: k.bpm, beats: k.beats, subdiv: 1, suara: 'kayu', volume: 0.9 })
+      const jadwal = petaSet?.[idx]?.offsetKlikLatihan
+      if (jadwal?.length) {
+        metronomRef.current.mulai({
+          bpm: tempoUntuk(idx),
+          beats: counts,
+          subdiv: 1,
+          suara: 'kayu',
+          volume: 0.9,
+          jadwalKlik: jadwal.map((offset, i) => ({
+            offset: offset / Math.max(0.05, cepatRef.current),
+            bpm: petaSet?.[idx]?.bpmLatihanPerHitungan[i],
+            bpmAsli: petaSet?.[idx]?.bpmPerHitungan[i],
+          })),
+        })
+      } else {
+        const k = klikUntukDrill(tempoUntuk(idx) * cepatRef.current, drill.beatsPerCount, counts)
+        metronomRef.current.mulai({ bpm: k.bpm, beats: k.beats, subdiv: 1, suara: 'kayu', volume: 0.9 })
+      }
     }
 
     // #6 — putar rekaman audio tersinkronisasi jika lagu memiliki rekaman
@@ -3370,6 +3380,14 @@ export function Editor({
               : undefined
           }
           tempoAsliPerSet={petaSet ? daftarTempo(petaSet, drill.tempo, sets.length) : undefined}
+          durasiPerSet={petaSet ? petaSet.map((p) => p.detikLatihan) : undefined}
+          offsetKlikPerSet={petaSet ? petaSet.map((p) =>
+            p.offsetKlikLatihan.map((offset, i) => ({
+              offset,
+              bpm: p.bpmLatihanPerHitungan[i],
+              bpmAsli: p.bpmPerHitungan[i],
+            })),
+          ) : undefined}
           labelLatihan={adaLatihanDrill ? labelLatihan(latihanDrill) : null}
           onTempoAsli={adaLatihanDrill ? () => drill.songId && tl.keAsli([drill.songId]) : undefined}
           roster={roster}

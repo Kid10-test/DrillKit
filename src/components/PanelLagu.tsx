@@ -18,7 +18,7 @@ import {
   meterPada,
   rentangSegmen,
 } from '../lib/birama'
-import { adaBerangsur, jepitTempo, luncuranPada, tempoBerlaku } from '../lib/metronome'
+import { jepitTempo, luncuranPada, tempoBerlaku } from '../lib/metronome'
 import type { SegmenTempo } from '../lib/metronome'
 import type { LatihTempo, TandaBirama } from '../db/types'
 import { labelLatihan, latihanAktif, terapkanLatihan } from '../lib/tempoLatihan'
@@ -168,6 +168,9 @@ export function PanelSedangDiputar({
   latih,
   tempoUntuk,
   latihan,
+  tempoKetuk,
+  waktuBiramaUntuk,
+  durasiBiramaUntuk,
 }: {
   judul: string
   /** birama absolut yang sedang berjalan (1-based) */
@@ -191,6 +194,12 @@ export function PanelSedangDiputar({
   tempoUntuk?: (birama: number) => number
   /** #4 — tempo latihan; diterapkan paling akhir. */
   latihan?: TempoLatihan | null
+  /** Exact original/practice BPM at the last emitted beat, including mid-bar changes. */
+  tempoKetuk?: { asli: number; latihan: number } | null
+  /** Exact song seconds at measure start from TempoTimeline. */
+  waktuBiramaUntuk?: (birama: number) => number
+  /** Exact integrated measure duration from TempoTimeline. */
+  durasiBiramaUntuk?: (birama: number) => number
 }) {
   const idx = indexSegmen(segmen, measure)
   const seg = idx >= 0 ? segmen[idx] : null
@@ -204,26 +213,38 @@ export function PanelSedangDiputar({
    * bunyinya bergerak. Itu berbahaya justru saat mencoba — pelatih
    * melihat angka datar dan menyimpulkan luncurannya tidak jalan.
    */
-  const tempo = jepitTempo(
-    tempoBerlaku(
-      {
-        dasar: tempoDasar,
-        segmen: segmenTempo ?? [],
-        pakaiTempoMap,
-        latih: latih ?? null,
-      },
-      measure,
-    ),
-  )
+  const tempo = jepitTempo(tempoKetuk?.asli ?? tempoBerlaku(
+    {
+      dasar: tempoDasar,
+      segmen: segmenTempo ?? [],
+      pakaiTempoMap,
+      latih: latih ?? null,
+      birama: warisan,
+    },
+    measure,
+  ))
   /** #4 — tempo sebelum tempo latihan, untuk "138 BPM (asli 172)". */
   const adaLatihan = latihanAktif(latihan)
-  const tempoLatihan = adaLatihan ? jepitTempo(terapkanLatihan(tempo, latihan)) : tempo
+  const tempoLatihan = tempoKetuk
+    ? jepitTempo(tempoKetuk.latihan)
+    : adaLatihan
+      ? jepitTempo(terapkanLatihan(tempo, latihan))
+      : tempo
   const luncur = pakaiTempoMap ? luncuranPada(segmenTempo ?? [], measure) : null
-  /** Luncuran menyeluruh dikesampingkan oleh luncuran per segmen? */
-  const latihDikesampingkan =
-    pakaiTempoMap && !!latih?.on && adaBerangsur(segmenTempo ?? [])
-  const detik = detikSampai(segmen, measure, warisan, tempoDasar, tempoUntuk)
-  const lamaBirama = durasiBirama(meter, tempoLatihan)
+  const fineMap = (segmenTempo ?? []).some((segment) =>
+    segment.beat !== undefined || segment.subdivision !== undefined || segment.rampCounts !== undefined,
+  )
+  /** Luncuran per-segmen maupun ramp eksplisit mengesampingkan ramp umum. */
+  const hasSpecificRamp = (segmenTempo ?? []).some((segment) =>
+    segment.berangsur === 1 || (segment.rampCounts ?? 0) > 0,
+  )
+  const latihDikesampingkan = pakaiTempoMap && !!latih?.on && hasSpecificRamp
+  const detik = waktuBiramaUntuk
+    ? waktuBiramaUntuk(measure)
+    : detikSampai(segmen, measure, warisan, tempoDasar, tempoUntuk)
+  const lamaBirama = durasiBiramaUntuk
+    ? durasiBiramaUntuk(measure)
+    : durasiBirama(meter, tempoLatihan)
   /** Keterangan singkat di bawah angka tempo: kenapa angkanya bergerak. */
   const keteranganTempo = luncur
     ? `berangsur ke bar ${luncur.keBar} (${formatTempo(luncur.ke)} BPM)`
@@ -231,7 +252,9 @@ export function PanelSedangDiputar({
       ? 'luncuran menyeluruh dikesampingkan'
       : latih?.on
         ? `latihan ${latih.langkah > 0 ? '+' : ''}${latih.langkah.toFixed(1)} tiap ${latih.tiap} bar`
-        : null
+        : fineMap
+          ? 'tempo map per ketuk/subdivisi'
+          : null
 
   return (
     <div
