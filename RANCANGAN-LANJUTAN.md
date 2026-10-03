@@ -8,7 +8,7 @@ Semuanya siap dikerjakan di sesi baru. Setiap rancangan dijadikan PR
 tersendiri, sesuai kebiasaan proyek (satu ide = satu commit/PR,
 disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 
-**Status per 3 Okt 2026 (pemutakhiran pasca PR #14):**
+**Status per 3 Okt 2026 (pemutakhiran pasca PR #14 + fondasi #9):**
 - **#1, #2, #3, dan #4 telah rampung penuh** (PR #6 hingga PR #10).
 - **#5 sebagian rampung** — fondasi tempo map custom per ketuk/subdivisi
   dan ramp eksplisit telah terintegrasi lewat **PR #14** (`TempoTimeline`);
@@ -17,9 +17,10 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 - **#6 Rekaman lagu (MP3) telah rampung penuh** (PR #11 + susulan PR #12,
   28 Sep 2026).
 - **#7 dan #8 menunggu** — siap dikerjakan setelah #5 sisa.
-- **#9–#11 usulan baru** (grid/patok yard–meter custom, impor Pyware, partitur
-  full score/per instrumen + latihan per bar/frasa) ditambahkan sebagai
-  kandidat berikutnya; hanya roadmap/prioritas yang dirapikan, tanpa ubah kode.
+- **#9 fondasi selesai (3 Okt 2026)** — tipe & geometri grid/patok terpisah,
+  toggle yard↔meter tanpa geser, batas huruf/T & satuanJarak; UI + uji 41 butir.
+- **#10–#11 usulan baru** (impor Pyware, partitur) menunggu — tidak disentuh
+  pada tahap fondasi ini, sesuai instruksi.
 
 **Aturan proyek yang tetap berlaku untuk semuanya:**
 
@@ -43,12 +44,12 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 6 | Rekaman lagu (MP3) | Sedang–besar | **Selesai (PR #11 + susulan PR #12, 28 Sep 2026)** | Berkas Blob IndexedDB, sidik SHA-256, waveform & titik mulai, jam rekaman sinkron |
 | 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | **Menunggu** | Mengenali ZIP dari #6, memuat langkah pencocokan dari #1; siap setelah #5 sisa |
 | 8 | PIN pelatih tim | Kecil–sedang | **Menunggu** | Pagar mode pelatih via hash ENV; tanpa ketergantungan, bisa disisipkan kapan saja |
-| 9 | Grid & patok yard–meter custom | Kecil–sedang | **Usulan baru — menunggu** | Grid kustom, patok kustom, toggle yard↔meter; presisi lapangan GOR/bola/sekolah |
-| 10 | Impor drill Pyware | Sedang | **Usulan baru — menunggu** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo |
-| 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Usulan baru — menunggu** | MusicXML offline (OSMD) + PDF fallback, full score & part, highlight sinkron, loop bar/frasa |
+| 9 | Grid & patok yard–meter custom | Kecil–sedang | **Fondasi selesai (3 Okt 2026)** | Tipe, geometri & UI terpisah; yard↔meter tanpa geser; batas E/T26; 41 butir uji baru |
+| 10 | Impor drill Pyware | Sedang | **Menunggu — jangan mulai pada tahap ini** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo |
+| 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Menunggu — jangan mulai pada tahap ini** | MusicXML offline (OSMD) + PDF fallback, full score & part, highlight sinkron, loop bar/frasa |
 
-> **Urutan prioritas yang disarankan pasca PR #14 (hanya roadmap, tanpa ubah kode):**
-> **#5 sisa → #7 → #9 → #10 → #11 → #8.**
+> **Urutan prioritas yang disarankan pasca PR #14 + fondasi #9 (3 Okt 2026):**
+> **#5 sisa → #7 → #10 → #11 → #8** (fondasi #9 selesai; sisa polish grid/patok tidak memblokir impor).
 > Alasan: selesaikan sisa **#5** yang sudah punya fondasi tempo (PR #14) agar
 > drill×musik benar-benar menyatu; **#7** merapikan 5 jenis berkas + ZIP rekaman
 > sehingga impor Pyware (#10) dan MusicXML (#11) punya pintu masuk yang jelas;
@@ -688,9 +689,11 @@ dan patok **kustom** yang tetap kompatibel dengan data lama.
 **Tidak dilakukan pada tahap ini:** mengubah geometri lapangan atau
 menambah jenis hash baru di luar NFHS/NCAA/NFL/none.
 
-**Uji (rencana):** toggle yard↔meter konsisten (68 m ↔ 74,37 yard),
-grid 2 m di GOR 40×20 m proporsional, patok jarak 6 langkah koordinat
-`-10 yard → −16 langkah` tetap benar, buku saku DD10 tidak regresi.
+**Uji (fondasi 3 Okt 2026):** `qa/grid-patok-logika.mjs` 41 butir — A=YL50 (0), B 5 yard (8×0.625) & A# 2.5 yard, T-T 5 yard, yard↔meter identik (geometri tidak geser), batas E & T26 memotong patok saja (grid tetap 21 garis, grid/subgrid/hash terpisah), metrik 5 m =5.468 yard ≠8 langkah/5 yard (8 langkah=4.572 m); `qa/uji-lapangan.mjs` 94 & `qa/lapangan-ui.mjs` tetap lulus.
+
+### Status: Fondasi selesai (3 Okt 2026) — tanpa Pyware/partitur
+
+Fondasi grid & patok diselesaikan tanpa menyentuh impor Pyware/partitur, sesuai instruksi. Yang dikerjakan: audit `field.ts`/`FieldConfigEditor`/`FieldSurface`/tipe, perbaikan `gantiSatuan` (hanya `patch({satuan})` — geometri tetap yard internal, konversi hanya tampil `*YD_TO_M`), pemisahan `gridUtama/subgrid/hash` (`gridTampil/subgridTampil/hashTampil/subgridYd`) dan `garis patok/label patok` (`tampilGaris/tampilLabel`), patok `daftarPatok` menghormati `maksHuruf` simetris (E=4 → A..E & E' simetris) & `maksT` per sumbu serta `satuanJarak: 'langkah'|'yard'` (8-to-5=8 langkah=5 yard=4.57 m, grid 5 m=5.468 yard beda fisik — tidak dipaksa snap), UI menjelaskan yard vs meter & pilihan jarak berbasis langkah vs yard, `typecheck` & regresi bersih.
 
 ---
 
