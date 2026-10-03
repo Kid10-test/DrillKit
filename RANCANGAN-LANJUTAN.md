@@ -1,14 +1,25 @@
-# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026)
+# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 3 Okt 2026 pasca PR #14)
 
-Dokumen ini merangkum delapan rancangan yang sudah didiskusikan dan
-diputuskan bersama pelatih. Semuanya siap dikerjakan di sesi baru.
-Setiap rancangan dijadikan PR tersendiri, sesuai kebiasaan proyek
-(satu ide = satu commit/PR, disertai uji dan catatan di
-`IDE-PENGEMBANGAN.md`).
+Dokumen ini merangkum delapan rancangan awal yang sudah didiskusikan dan
+diputuskan bersama pelatih, ditambah tiga usulan baru pasca PR #14
+(grid/patok yard–meter custom, impor Pyware, partitur full score/per instrumen)
+— total sebelas rancangan.
+Semuanya siap dikerjakan di sesi baru. Setiap rancangan dijadikan PR
+tersendiri, sesuai kebiasaan proyek (satu ide = satu commit/PR,
+disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 
-**Status per 27–28 Sep 2026:**
+**Status per 3 Okt 2026 (pemutakhiran pasca PR #14):**
 - **#1, #2, #3, dan #4 telah rampung penuh** (PR #6 hingga PR #10).
-- Rancangan berikutnya yang akan dikerjakan: **#5. Drill × segmen lagu**.
+- **#5 sebagian rampung** — fondasi tempo map custom per ketuk/subdivisi
+  dan ramp eksplisit telah terintegrasi lewat **PR #14** (`TempoTimeline`);
+  sisa pekerjaan #5 (garis waktu musik × drill, bantuan hitungan, pecah/gabung set)
+  masih menunggu.
+- **#6 Rekaman lagu (MP3) telah rampung penuh** (PR #11 + susulan PR #12,
+  28 Sep 2026).
+- **#7 dan #8 menunggu** — siap dikerjakan setelah #5 sisa.
+- **#9–#11 usulan baru** (grid/patok yard–meter custom, impor Pyware, partitur
+  full score/per instrumen + latihan per bar/frasa) ditambahkan sebagai
+  kandidat berikutnya; hanya roadmap/prioritas yang dirapikan, tanpa ubah kode.
 
 **Aturan proyek yang tetap berlaku untuk semuanya:**
 
@@ -28,10 +39,25 @@ Setiap rancangan dijadikan PR tersendiri, sesuai kebiasaan proyek
 | 2 | Terbitkan ke anggota (2 PR) | Sedang–besar | **Selesai (PR #7)** | Tahap 1 terbit materi grup; Tahap 2 kunci AES-256-GCM & data terkunci |
 | 3 | Jadwal: kalender & agenda | Sedang | **Selesai (PR #8 & #9)** | Tahap 1 kalender/agenda/seri/cetak/.ics; Tahap 2 kalender baca-saja anggota |
 | 4 | Tempo latihan | Kecil–sedang | **Selesai (PR #10)** | Persen & BPM per lagu, naik otomatis saat ulang, presenter ikut melambat, hari H asli |
-| 5 | Drill × segmen lagu | Sedang | **Berikutnya** | Sebaiknya sesudah #4, karena keduanya menyentuh tempo di drill |
-| 6 | Rekaman lagu (MP3) | Sedang–besar | Menunggu (#5) | Sesudah #4 dan #5 |
-| 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | Menunggu (#6) | Mengenali ZIP dari #6 bila sudah ada; memuat langkah pencocokan dari #1 |
-| 8 | PIN pelatih tim | Kecil–sedang | Menunggu | Pagar mode pelatih via hash ENV |
+| 5 | Drill × segmen lagu | Sedang | **Sebagian rampung (PR #14)** — tempo map custom & ramp eksplisit terintegrasi; **sisa:** garis waktu, bantuan hitungan, pecah/gabung | Fondasi `TempoTimeline` selesai 1 Okt 2026; sisa UI drill×musik tetap menunggu |
+| 6 | Rekaman lagu (MP3) | Sedang–besar | **Selesai (PR #11 + susulan PR #12, 28 Sep 2026)** | Berkas Blob IndexedDB, sidik SHA-256, waveform & titik mulai, jam rekaman sinkron |
+| 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | **Menunggu** | Mengenali ZIP dari #6, memuat langkah pencocokan dari #1; siap setelah #5 sisa |
+| 8 | PIN pelatih tim | Kecil–sedang | **Menunggu** | Pagar mode pelatih via hash ENV; tanpa ketergantungan, bisa disisipkan kapan saja |
+| 9 | Grid & patok yard–meter custom | Kecil–sedang | **Usulan baru — menunggu** | Grid kustom, patok kustom, toggle yard↔meter; presisi lapangan GOR/bola/sekolah |
+| 10 | Impor drill Pyware | Sedang | **Usulan baru — menunggu** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo |
+| 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Usulan baru — menunggu** | MusicXML offline (OSMD) + PDF fallback, full score & part, highlight sinkron, loop bar/frasa |
+
+> **Urutan prioritas yang disarankan pasca PR #14 (hanya roadmap, tanpa ubah kode):**
+> **#5 sisa → #7 → #9 → #10 → #11 → #8.**
+> Alasan: selesaikan sisa **#5** yang sudah punya fondasi tempo (PR #14) agar
+> drill×musik benar-benar menyatu; **#7** merapikan 5 jenis berkas + ZIP rekaman
+> sehingga impor Pyware (#10) dan MusicXML (#11) punya pintu masuk yang jelas;
+> **#9** grid/patok kustom memberi akurasi lapangan sebelum migrasi massal;
+> **#10** Pyware mempercepat migrasi tim yang sudah punya drill; **#11**
+> partitur adalah fitur terbesar yang bertumpu pada TempoTimeline + rekaman +
+> tempo latihan, sehingga wajar di akhir; **#8** PIN bersifat pagar dan dapat
+> disisipkan kapan saja tanpa memblokir fitur musik/drill. **I1** (log perubahan
+> show) tetap ditunda.
 
 ---
 
@@ -410,6 +436,32 @@ pada hitungan 1 dan tepat mencapai 140 pada hitungan 6; drill tanpa
 perubahan tempo durasinya tetap; animasi identik setelah dipecah; garis
 waktu dan ⚡; Pas ke batas segmen; undo.
 
+### Status: Sebagian rampung (1 Okt 2026, PR #14) — fondasi tempo terintegrasi
+
+**Sudah terintegrasi (PR #14, 1 Okt 2026):**
+- Tempo map kini mendukung posisi **1-based pada birama, ketuk tertulis,
+  dan subdivisi ketuk** serta ramp dengan **jumlah hitungan eksplisit**
+  (satuan: ketuk tertulis / ketuk acuan BPM / subdivisi / birama; tempo
+  awal opsional). Semantik: hitungan 0 = sebelum ramp, hitungan 1 sudah
+  1/N, hitungan N = BPM target.
+- Evaluator bersama **`TempoTimeline`** (`src/lib/tempoTimeline.ts`,
+  `src/lib/tempoRamp.ts`) dipakai untuk BPM, durasi, konversi posisi/ waktu,
+  serta tempo latihan. Metronom, cek klik MP3, pemetaan drill per-hitungan,
+  waktu/progres lagu, rekaman, dan set list semuanya memakai evaluator ini;
+  tempo map lama per birama tetap kompatibel.
+- Verifikasi: `tempo-map-logika` 25, `perubahan-tempo-logika` 90,
+  `uji-gabung-musik` 51, `uji-setlist` 107 — total 273 lulus.
+
+**Sisa yang masih menunggu (tanpa ubah kode pada pemutakhiran ini):**
+- **(1) Garis waktu musik × drill** — penggaris hitungan dua baris + tanda ⚡.
+- **(2) Bantuan hitungan** — keterangan "mulai di hitungan … / sisa segmen",
+  tombol Pas ke batas segmen, panjang segmen dalam hitungan di editor lagu.
+- **(4) Pecah & gabung set** — pecah di batas segmen/hitungan (interpolasi
+  busur), gabung, keduanya undoable.
+
+> Pemutakhiran ini **hanya merapikan roadmap**; tidak ada perubahan kode
+> untuk sisa #5. Fondasi tempo sudah siap dipakai oleh sisa pekerjaan tersebut.
+
 ---
 
 ## 6. Rekaman lagu (MP3)
@@ -462,7 +514,7 @@ mulai dan koreksi segmen tepat ±20 ms; ulang bagian; sinkron dengan
 drill; sinkron saat diperlambat; sidik cocok dan tidak cocok;
 bertahan setelah paket diperbarui; ZIP dipulihkan utuh.
 
-### Status: Selesai (28 Sep 2026)
+### Status: Selesai (28 Sep 2026, PR #11 + susulan PR #12)
 
 Seluruh rancangan #6 (Rekaman lagu MP3) telah dikerjakan penuh:
 - **Penyimpanan Biner Blob & IndexedDB**:
@@ -498,6 +550,14 @@ Seluruh rancangan #6 (Rekaman lagu MP3) telah dikerjakan penuh:
 - **Uji**:
   - Pengujian logika komprehensif `qa/rekaman-lagu-logika.mjs` (21 butir uji) mencakup sidik jari, toleransi, perhitungan detik ke birama dan sebaliknya, round-trip ZIP biner, serta integrasi set list.
   - `qa/bangun-logika.sh` memaketkan `rekaman.ts`. Seluruh 19 rangkaian uji logika lulus bersih (0 gagal).
+
+**Susulan #6 — "klik melambat" (28 Sep 2026, PR #12):**
+- Metronom kini mengikuti **jam rekaman** (`JamLagu` di `src/lib/metronome.ts`),
+  bukan jam sendiri; klik mulai setelah rekaman berbunyi, tiap birama diposisikan
+  dari `currentTime` rekaman, dan jadwal yang terlanjur ditanam dibatalkan saat
+  rekaman digeser/diulang. Editor & presenter drill memakai `detikMulai` +
+  `lajuRekaman` yang benar. Uji: `m6-klik-rekaman` 14/14, `uji-birama` 123,
+  `uji-gabung-musik` 50, `rekaman-lagu-logika` 35.
 
 ---
 
@@ -585,6 +645,149 @@ mode pelatih **ditanya sekali**.
 **Uji:** tanpa env = perilaku lama; PIN salah ditahan; PIN benar diingat
 setelah dibuka ulang; ganti PIN menyebabkan ditanya lagi; keluar dari
 mode anggota dengan PIN tim.
+
+---
+
+## 9. Grid & patok yard–meter custom
+
+**Masalah.** Preset lapangan saat ini (DCI, NFHS, NFL, tanpa hash,
+sepak bola 105×68 m, GOR 40×20 m) sudah menutup sebagian kebutuhan,
+tetapi jarak grid, patok, dan satuan masih kaku. Latihan di GOR kecil,
+lapangan sekolah tanpa end zone, atau lapangan bola metrik menuntut
+jarak grid/patok yang berbeda; pelatih juga ingin mengganti satuan
+tampilan yard ↔ meter ↔ langkah tanpa kehilangan presisi internal
+(yard tetap satuan simpan).
+
+**Keputusan:** tidak menambah preset baru saja, melainkan membuat grid
+dan patok **kustom** yang tetap kompatibel dengan data lama.
+
+1. **Grid kustom**
+   - Jarak grid dapat diatur (mis. 2 m, 5 yard, 10 yard) dan jumlah
+     garis dihitung otomatis dari `fieldBox`; warna & ketebalan garis
+     memakai hex (aman cetak/portabel).
+   - Toggle satuan tampil **yard / meter / langkah** — nilai tersimpan
+     tetap yard (`STEP_YD`, `M_TO_YD` di `src/lib/field.ts`), konversi
+     hanya di lapisan tampil/cetak.
+   - Pratinjau lapangan langsung; grid ikut skala titik & warna lapangan.
+
+2. **Patok kustom**
+   - Jarak huruf (A, B, C…), hash (#), dan T dapat diatur terpisah
+     (mis. 8 langkah = 5 yard pada 8-to-5, tapi bisa 6 atau 10);
+     `awalanT`, `dariTengah`, `penandaSisi` S1/S2, dan `tampil` tetap
+     seperti `PATOK_DEFAULT`.
+   - Patok dihitung dari garis tengah (`fieldBox`) sehingga tanda `−`/`+`
+     tidak terbalik di sisi S1 (cacat DD10 yang sudah diperbaiki tetap
+     aman).
+   - Opsi "Tanpa patok" untuk lapangan indoor kecil.
+
+3. **Tetap offline & aman data lama**
+   - `FieldConfig` lama tanpa `patok`/`gridYd` kustom tetap terbaca via
+     `patokOf()`; tidak ada migrasi paksa.
+   - Cetak/buku saku memakai hex yang sama; tidak ada `oklch()`.
+
+**Tidak dilakukan pada tahap ini:** mengubah geometri lapangan atau
+menambah jenis hash baru di luar NFHS/NCAA/NFL/none.
+
+**Uji (rencana):** toggle yard↔meter konsisten (68 m ↔ 74,37 yard),
+grid 2 m di GOR 40×20 m proporsional, patok jarak 6 langkah koordinat
+`-10 yard → −16 langkah` tetap benar, buku saku DD10 tidak regresi.
+
+---
+
+## 10. Impor drill Pyware
+
+**Masalah.** Banyak tim sudah mempunyai drill di **Pyware 3D** (atau
+Excel) dan menulis ulang titik per set di DrillKit memakan waktu.
+Format Pyware tidak terbuka lebar, tetapi ekspor **coordinate sheet CSV**
+umum dipakai untuk bertukar dengan Excel — alur DD7 sudah membuktikan
+manfaatnya.
+
+**Keputusan:** impor **satu arah Pyware → DrillKit** lewat CSV
+koordinat, memakai fondasi yang sudah ada, tanpa server.
+
+1. **Format masuk**
+   - CSV koordinat Pyware/Excel dengan kolom minimal: `Set`, `Count`,
+     `Kode/Member`, `X`, `Y` (yard atau meter + penanda satuan).
+     Nilai X membujur (S1↔S2 dari A), Y melintang (front↔back) — konsisten
+     dengan `src/lib/field.ts`.
+   - Dukungan meter: bila satuan meter, konversi otomatis via `M_TO_YD`.
+
+2. **Alur impor**
+   - Lewat pintu **#7 "Buka berkas DrillKit"** — jenis dikenali dari isi
+     (header CSV). Pratinjau menampilkan jumlah set, jumlah anggota,
+     rentang hitungan, dan posisi di luar lapangan yang akan diperingatkan.
+   - **Pencocokan anggota** memakai layar "Cocokkan anggota" dari **#1**:
+     kode Pyware dipetakan ke `Member` DrillKit (berdasarkan kode/section/
+     kemiripan nama), alias diingat untuk impor berikutnya.
+   - Posisi diinterpolasi linear antar set (busur tetap lurus pada impor
+     awal; busur Pyware dapat ditambah manual setelah impor).
+
+3. **Keamanan & kompatibilitas**
+   - Pratinjau sebelum tulis, impor tidak menimpa show aktif tanpa
+     konfirmasi ("Timpa / Gabung / Salinan" seperti show).
+   - Riwayat formasi (`RiwayatSnapshot`) mencatat impor sehingga bisa
+     di-undo satu langkah.
+   - Berkas show lama tetap kompatibel; impor Pyware hanya menambah.
+
+**Uji (rencana):** CSV 3 set × 20 anggota masuk utuh (60 titik × 3 set),
+konversi meter↔yard tepat, anggota tak dikenal dipetakan manual dan
+diingat, posisi di luar `fieldBox` diberi peringatan, undo menghapus
+hasil impor.
+
+---
+
+## 11. Partitur full score & per instrumen + latihan per bar/frasa
+
+**Masalah.** Halaman Musik sudah punya repertoar, tempo map, metronom,
+rekaman (#6), dan tempo latihan (#4), tetapi **belum ada notasi**.
+Pelatih dan anggota membutuhkan partitur untuk melihat frase, melatih
+per birama, dan mengulang bagian yang sulit — saat ini hanya mengandalkan
+hafalan atau PDF terpisah yang tidak sinkron dengan audio/drill.
+
+**Keputusan:** partitur menjadi **lapisan baca + latihan**, bukan editor
+notasi. Tetap offline, tanpa server, memakai fondasi `TempoTimeline`
+(PR #14).
+
+1. **Sumber & penyimpanan**
+   - **MusicXML** (ekspor MuseScore/Sibelius) sebagai sumber utama —
+     disimpan sebagai Blob di IndexedDB (pola sama seperti rekaman #6),
+     dirender offline dengan **OSMD (OpenSheetMusicDisplay)** yang
+     menghasilkan SVG/Canvas hex (aman portabel).
+   - **PDF / gambar** sebagai fallback: ditampilkan sebagai lembar
+     statis (tanpa sinkron highlight) bila MusicXML tidak tersedia.
+   - Berkas show & repertoar dapat membawa rujukan partitur (id lagu),
+     bukan notasi penuh, agar ukuran paket tetap wajar.
+
+2. **Tampilan**
+   - **Full score** (semua instrumen) dan **part per instrumen/section**
+     (filter: Brass, Battery, Pit, Guard, atau per instrumen) —
+     instrumen mengikuti `section` anggota yang sudah ada.
+   - Di laptop: dua panel (notasi + lapangan/metronom); di HP: tab
+     Partitur. Cetak part per instrumen memakai hex, pratinjau/unduh HTML.
+
+3. **Latihan per bar/frasa**
+   - Pilih rentang birama (mis. Bar 5–8 = frase 1) langsung di partitur
+     atau di daftar segmen lagu; rentang diingat per lagu per perangkat
+     (seperti tempo latihan #4).
+   - **Sinkron highlight**: birama aktif disorot mengikuti
+     `TempoTimeline` — saat metronom, rekaman, atau drill berjalan,
+     partitur menggulir/highlight bar yang sedang dimainkan.
+   - **Loop frasa** (reuse M2 "Ulang bagian") + **tempo latihan** (#4) +
+     **count-off** (M1) berlaku pada frasa; lencana "Frasa 5–8 · 80%"
+     tampil di panel lagu & set list.
+   - Set list dapat menautkan frasa partitur ke set drill tertentu
+     (mis. Set 4–6 = Bar 9–16).
+
+4. **Tetap offline & hemat memori**
+   - `navigator.storage.persist()` dipakai bila ukuran MusicXML besar;
+     ada peringatan kuota (seperti #6) dan catatan iPhone.
+   - Tanpa MusicXML, fitur latihan frasa tetap jalan via tempo map
+     (fallback).
+
+**Uji (rencana):** MusicXML 32 birama dirender (full score + part
+trumpet), highlight sinkron ±1 birama dengan rekaman & metronom,
+loop Bar 5–8 mengulang tepat 4 birama pada 80% tempo, cetak part
+hex 1 halaman, impor MusicXML round-trip ZIP tidak hilang.
 
 ---
 

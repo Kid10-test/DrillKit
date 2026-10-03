@@ -3,7 +3,8 @@
 Dokumen ini **bukan** rencana yang harus dikerjakan semua. Ini kandidat perbaikan,
 diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
 
-**Terakhir diperbarui: 1 Okt 2026 — tempo map custom per ketuk/subdivisi dan ramp eksplisit terintegrasi.**
+**Terakhir diperbarui: 3 Okt 2026 — roadmap dirapikan pasca PR #14: tempo map custom (PR #14) terintegrasi sebagian ke #5, #6 Rekaman tuntas, usulan baru #9–#11 (grid/patok, Pyware, partitur) ditambahkan — hanya roadmap/prioritas, tanpa ubah kode.**
+· **Pemutakhiran roadmap 3 Okt 2026 (pasca PR #14)** — fondasi **tempo map custom per ketuk/subdivisi & ramp eksplisit** (`TempoTimeline`, `tempoRamp`, PR #14 — 1 Okt 2026) **terintegrasi sebagian ke #5 Drill × segmen lagu**; evaluasinya dipakai bersama untuk metronom, drill per hitungan, rekaman, dan set list (verifikasi 273 lulus). **#6 Rekaman (MP3)** ditegaskan **selesai** (PR #11 + susulan PR #12, 28 Sep 2026). **Usulan baru #9 grid/patok yard–meter custom, #10 impor drill Pyware, #11 partitur full score/per instrumen + latihan per bar/frasa** ditambahkan ke roadmap; urutan prioritas dirapikan menjadi **#5 sisa → #7 → #9 → #10 → #11 → #8** (hanya penataan dokumen, tanpa perubahan kode).
 · **#6 rampung (28 Sep 2026)** — Rekaman audio MP3, M4A, WAV, OGG disimpan di IndexedDB
   (Blob). Sidik rekaman biner SHA-256 via WebCrypto + durasi. Penyelarasan titik mulai
   birama 1 ketuk 1 dengan visualisasi waveform canvas, stepper ±10/50ms, tombol "Cek bersama klik",
@@ -14,7 +15,7 @@ diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
   layar lomba memaksa tempo asli 100%. Mode anggota: "Tambahkan rekaman dari pelatih" dengan
   validasi sidik jari (✔ cocok / ⚠ berbeda), persistensi audio saat pembaruan paket,
   panduan anggota diperbarui dengan tips PWA iOS. Backup + rekaman ZIP lewat `zip.ts`
-  dan pemulihan otomatis. Uji: `qa/rekaman-lagu-logika.mjs` (21/21), 19 rangkaian uji logika lulus.
+  dan pemulihan otomatis. Uji: `qa/rekaman-lagu-logika.mjs` (21/21 → 35/35 setelah susulan), 19 rangkaian uji logika lulus.
 · **Susulan #6 rampung (28 Sep 2026)** — keluhan "klik melambat/terlambat saat
   metronom diputar bersama lagu" diperbaiki: mesin metronom kini mengikuti **jam
   rekaman** (`JamLagu`), bukan menghitung sendiri sejak tombol ditekan. Klik baru
@@ -43,9 +44,7 @@ diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
   dengan Batalkan, hitung mundur penampilan, cetak bulan (hex), satu `.ics` semua jadwal
   mendatang. Data sesi hanya bertambah `seriId`. Logika di `src/lib/kalender.ts`.
   Uji: `kalender-logika` 67/67, `kalender-jadwal` 31/31; uji lama jadwal tetap lulus.
-· **Rancangan lanjutan (26 Sep 2026)** — delapan rancangan hasil diskusi pelatih
-  disimpan di bagian paling bawah (**Rancangan lanjutan**). #1 s/d #4 rampung (PR #6–#10);
-  #5 (Drill × segmen lagu) menjadi giliran berikutnya; #6–#8 menunggu.
+· **Rancangan lanjutan (26 Sep 2026, pemutakhiran 3 Okt 2026 pasca PR #14)** — delapan rancangan awal (#1–#4 rampung PR #6–#10). **Tempo map custom (PR #14, 1 Okt 2026) terintegrasi sebagian ke #5** (`TempoTimeline` + ramp eksplisit per ketuk/subdivisi); **#6 Rekaman tuntas** (PR #11 + susulan PR #12). **Usulan baru #9 grid/patok yard–meter custom, #10 impor drill Pyware, #11 partitur full score/per instrumen + latihan per bar/frasa** ditambahkan; roadmap baru **#5 sisa → #7 → #9 → #10 → #11 → #8**. Rincian di bagian **Rancangan lanjutan** paling bawah — pemutakhiran ini hanya merapikan dokumen, tanpa ubah kode.
 · **#2 bagian kedua rampung (26 Sep 2026)** — kunci pribadi AES-256-GCM per anggota,
   data pribadi terkunci di berkas terbit, QR kunci, dan tombol Buat kunci baru.
 · **#2 bagian pertama rampung (26 Sep 2026)** — satu tombol menerbitkan materi
@@ -5157,20 +5156,35 @@ bersih, 3.048 butir lulus, 0 gagal.** `tsc --noEmit` bersih, `vite build` dan
 
 ---
 
-## Rancangan lanjutan (26 Sep 2026)
+## Rancangan lanjutan (26 Sep 2026, pemutakhiran 3 Okt 2026 pasca PR #14)
 
 Disalin dari `RANCANGAN-LANJUTAN.md` supaya daftar ide dan keputusan diskusi
 tinggal di dokumen ini. Berkas aslinya tetap ada sebagai ringkasan yang bisa
 dibaca terpisah. Pengerjaan mengikuti urutan tabel; tiap rancangan selesai
 dicatat di bawah salinannya.
 
-# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026)
+# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 3 Okt 2026 pasca PR #14)
 
-Dokumen ini merangkum delapan rancangan yang sudah didiskusikan dan
-diputuskan bersama pelatih. Semuanya siap dikerjakan di sesi baru.
-Setiap rancangan dijadikan PR tersendiri, sesuai kebiasaan proyek
-(satu ide = satu commit/PR, disertai uji dan catatan di
-`IDE-PENGEMBANGAN.md`).
+Dokumen ini merangkum delapan rancangan awal yang sudah didiskusikan dan
+diputuskan bersama pelatih, ditambah tiga usulan baru pasca PR #14
+(grid/patok yard–meter custom, impor Pyware, partitur full score/per instrumen)
+— total sebelas rancangan.
+Semuanya siap dikerjakan di sesi baru. Setiap rancangan dijadikan PR
+tersendiri, sesuai kebiasaan proyek (satu ide = satu commit/PR,
+disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
+
+**Status per 3 Okt 2026 (pemutakhiran pasca PR #14):**
+- **#1, #2, #3, dan #4 telah rampung penuh** (PR #6 hingga PR #10).
+- **#5 sebagian rampung** — fondasi tempo map custom per ketuk/subdivisi
+  dan ramp eksplisit telah terintegrasi lewat **PR #14** (`TempoTimeline`);
+  sisa pekerjaan #5 (garis waktu musik × drill, bantuan hitungan, pecah/gabung set)
+  masih menunggu.
+- **#6 Rekaman lagu (MP3) telah rampung penuh** (PR #11 + susulan PR #12,
+  28 Sep 2026).
+- **#7 dan #8 menunggu** — siap dikerjakan setelah #5 sisa.
+- **#9–#11 usulan baru** (grid/patok yard–meter custom, impor Pyware, partitur
+  full score/per instrumen + latihan per bar/frasa) ditambahkan sebagai
+  kandidat berikutnya; hanya roadmap/prioritas yang dirapikan, tanpa ubah kode.
 
 **Aturan proyek yang tetap berlaku untuk semuanya:**
 
@@ -5190,10 +5204,25 @@ Setiap rancangan dijadikan PR tersendiri, sesuai kebiasaan proyek
 | 2 | Terbitkan ke anggota (2 PR) | Sedang–besar | **Selesai (PR #7)** | Tahap 1 terbit materi grup; Tahap 2 kunci AES-256-GCM & data terkunci |
 | 3 | Jadwal: kalender & agenda | Sedang | **Selesai (PR #8 & #9)** | Tahap 1 kalender/agenda/seri/cetak/.ics; Tahap 2 kalender baca-saja anggota |
 | 4 | Tempo latihan | Kecil–sedang | **Selesai (PR #10)** | Persen & BPM per lagu, naik otomatis saat ulang, presenter ikut melambat, hari H asli |
-| 5 | Drill × segmen lagu | Sedang | **Berikutnya** | Sebaiknya sesudah #4, karena keduanya menyentuh tempo di drill |
-| 6 | Rekaman lagu (MP3) | Sedang–besar | Menunggu (#5) | Sesudah #4 dan #5 |
-| 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | Menunggu (#6) | Mengenali ZIP dari #6 bila sudah ada; memuat langkah pencocokan dari #1 |
-| 8 | PIN pelatih tim | Kecil–sedang | Menunggu | Pagar mode pelatih via hash ENV |
+| 5 | Drill × segmen lagu | Sedang | **Sebagian rampung (PR #14)** — tempo map custom & ramp eksplisit terintegrasi; **sisa:** garis waktu, bantuan hitungan, pecah/gabung | Fondasi `TempoTimeline` selesai 1 Okt 2026; sisa UI drill×musik tetap menunggu |
+| 6 | Rekaman lagu (MP3) | Sedang–besar | **Selesai (PR #11 + susulan PR #12, 28 Sep 2026)** | Berkas Blob IndexedDB, sidik SHA-256, waveform & titik mulai, jam rekaman sinkron |
+| 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | **Menunggu** | Mengenali ZIP dari #6, memuat langkah pencocokan dari #1; siap setelah #5 sisa |
+| 8 | PIN pelatih tim | Kecil–sedang | **Menunggu** | Pagar mode pelatih via hash ENV; tanpa ketergantungan, bisa disisipkan kapan saja |
+| 9 | Grid & patok yard–meter custom | Kecil–sedang | **Usulan baru — menunggu** | Grid kustom, patok kustom, toggle yard↔meter; presisi lapangan GOR/bola/sekolah |
+| 10 | Impor drill Pyware | Sedang | **Usulan baru — menunggu** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo |
+| 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Usulan baru — menunggu** | MusicXML offline (OSMD) + PDF fallback, full score & part, highlight sinkron, loop bar/frasa |
+
+> **Urutan prioritas yang disarankan pasca PR #14 (hanya roadmap, tanpa ubah kode):**
+> **#5 sisa → #7 → #9 → #10 → #11 → #8.**
+> Alasan: selesaikan sisa **#5** yang sudah punya fondasi tempo (PR #14) agar
+> drill×musik benar-benar menyatu; **#7** merapikan 5 jenis berkas + ZIP rekaman
+> sehingga impor Pyware (#10) dan MusicXML (#11) punya pintu masuk yang jelas;
+> **#9** grid/patok kustom memberi akurasi lapangan sebelum migrasi massal;
+> **#10** Pyware mempercepat migrasi tim yang sudah punya drill; **#11**
+> partitur adalah fitur terbesar yang bertumpu pada TempoTimeline + rekaman +
+> tempo latihan, sehingga wajar di akhir; **#8** PIN bersifat pagar dan dapat
+> disisipkan kapan saja tanpa memblokir fitur musik/drill. **I1** (log perubahan
+> show) tetap ditunda.
 
 ---
 
@@ -5256,52 +5285,23 @@ riwayat formasi); pencocokan saat impor show yang diingat untuk impor
 berikutnya; pertukaran dua arah yang berakhir dengan id sama; paket
 anggota berisi jadwal sekaligus posisi drill.
 
-### Hasil #1 (26 Sep 2026)
+### Status: Selesai (26 Sep 2026, PR #6)
 
-Keempat bagian dikerjakan. Nama yang tampil dipilih **per perangkat**
-(Pengaturan → Tampilan layar). Laporan, kartu kehadiran, dan lembar
-titik tetap memakai nama lengkap — itu cetakan resmi, dan asumsi ini
-belum dikonfirmasi pelatih.
-
-**Nama panggilan.** Kolom `panggilan` dan `alias` pada anggota. Keduanya
-opsional, jadi berkas lama tetap terbaca tanpa menaikkan versi basis
-data. Formulir, CSV (judul `Panggilan`; berkas tanpa judul itu tetap
-posisional), backup, dan berkas show membawanya. Pencarian menemukan
-keduanya. Paket anggota menulis `Andra Pratama (Dede)` dan nama
-berkasnya `DrillKit-Andra-Pratama-Dede-A07.json`.
-
-**Gabungkan.** Menu Anggota → *Gabungkan anggota ganda*. Saran muncul
-bila kode chart sama, atau section sama **dan** satu punya absensi
-sementara yang lain punya posisi drill. Yang dipertahankan menang bila
-satu sesi atau satu tanggal bentrok; sisanya dilaporkan, tidak
-disembunyikan. Nama yang dibuang menjadi panggilan, id lamanya menjadi
-alias. Selalu ada pratinjau dan tombol backup sebelum menulis.
-
-**Cocokkan saat impor.** Berkas show, data pilihan, dan backup tidak
-langsung menambah anggota yang belum dikenal. Layarnya ada di dalam
-modal yang sudah ada (impor show tetap satu tombol *Proses*, supaya uji
-F3 tidak pecah). Pilihan lemah tidak diprapilih — anggota baru di
-section yang sama tidak terseret diam-diam. Yang sudah cocok lewat id
-atau alias tidak ditanya lagi. Posisi drill dipindah ke id yang dipilih;
-nama dari berkas disimpan sebagai panggilan bila berbeda. Anggota yang
-dipilih sebagai *anggota baru* tetap di berkas show, supaya token QR
-tetap dibuat seperti semula.
-
-**Daftar induk.** Menu Data punya petunjuk singkat. Pelatih kedua
-mengambil berkas pelatih utama, mencocokkan, lalu id lokalnya berganti
-ke id induk. Token QR perangkat itu tidak diganti, supaya stiker yang
-sudah tercetak tetap berlaku.
-
-Backup dan data pilihan tetap menimpa anggota yang **id-nya sama**
-(perilaku lama). Show tidak menimpa. Kalau dua baris memilih orang yang
-sama, yang pertama menang dan yang kedua dilaporkan sebagai anggota baru.
-
-**Uji yang lulus:** `qa/nama-anggota-logika.mjs` — 100 lulus, 0 gagal.
-Mencakup penggabungan dengan bentrok, dua drill, dan riwayat formasi;
-impor yang diingat lewat alias; pertukaran dua arah yang berakhir
-dengan id sama; serta paket yang memuat jadwal sekaligus posisi drill.
-`qa/bagikan-logika.mjs` tetap 58 lulus. Terdaftar di
-`qa/regresi-penuh.sh`.
+Keempat bagian telah dikerjakan penuh (commit `4a36566` / PR #6):
+- **Nama panggilan**: kolom `panggilan` dan `alias` di `Member`. Pilihan
+  tampilan nama di Pengaturan → Tampilan layar (*Nama lengkap* atau
+  *Nama panggilan*). Pencarian anggota menemukan keduanya. Paket anggota
+  menulis "Andra Pratama (Dede)". Cetakan resmi tetap nama lengkap.
+- **Gabungkan anggota ganda**: Menu Anggota → *Gabungkan anggota ganda*
+  dengan deteksi pasangan yang mungkin ganda (kode sama, section sama +
+  satu absensi & satu drill). Resolusi bentrokan sesi, nama lama jadi
+  panggilan, id lama jadi alias.
+- **Pencocokan saat impor**: Layar "Cocokkan anggota" pada impor show, data
+  pilihan, dan backup. Pilihan diingat lewat alias.
+- **Daftar anggota induk**: Alur panduan di menu Data untuk menyelaraskan
+  id anggota ke perangkat pelatih kedua tanpa merusak token QR.
+- **Uji**: `qa/nama-anggota-logika.mjs` (100 lulus, 0 gagal),
+  `qa/bagikan-logika.mjs` (58 lulus, 0 gagal). Terdaftar di `regresi-penuh.sh`.
 
 ---
 
@@ -5372,102 +5372,21 @@ terkunci identik dengan berkas per anggota; kunci baru menolak kunci
 lama; token ditolak memberi pesan jelas; pemberitahuan materi baru
 muncul.
 
-### Hasil #2, bagian pertama (26 Sep 2026)
+### Status: Selesai (26 Sep 2026, 2 tahap / PR #7)
 
-Rancangan ini dibagi dua. Yang selesai sekarang: tombol terbit,
-pemberitahuan di HP anggota, dan materi grup. **Kunci pribadi dan data
-pribadi terkunci belum dikerjakan.**
-
-**Pengaturan sekali.** Pengaturan → Terbitkan ke anggota. Empat langkah:
-buat repo publik `drillkit-materi`, buat token fine-grained yang hanya
-berhak Contents pada repo itu, tempel, uji sambungan. Token ditolak,
-kedaluwarsa, atau repo privat diberi pesan yang jelas. Token hanya di
-localStorage perangkat pelatih — tidak masuk backup dan tidak masuk
-paket. Cuplikan rewrite Vercel bisa disalin: `/paket.json` mengarah ke
-berkas mentah di repo, alamat bagi anggota tidak berubah.
-
-**Tombol Terbitkan ke anggota** di menu Berbagi. Pratinjau menghitung
-jadwal, show, lagu, dan menyebut bahwa belum ada anggota yang terkunci.
-Yang ditulis adalah berkas grup, sama dengan unduhan manual: tanpa
-absensi, catatan, telepon, dan token QR. Menulis lewat GitHub Contents
-API, dengan sidik berkas lama bila sudah ada. Riwayat terbitan bisa
-dikembalikan sebagai terbitan baru — riwayat GitHub tidak dihapus.
-Saat luring, tombol ditolak dan unduh manual tetap ada.
-
-**Di HP anggota.** Saat online, aplikasi memeriksa `paket.json`. Kalau
-lebih baru, muncul "Ada materi baru dari pelatih (tanggal)" dan anggota
-yang menekan Perbarui. Tidak diterapkan sendiri. Absensi, catatan,
-penanda pemilik, dan setelan latihan yang anggota ubah sendiri tidak
-ditimpa. Panduan anggota (situs) menyebut pemberitahuan itu. Versi
-berkas portabel tidak menyebutnya, karena tombolnya memang tidak ada.
-
-**Uji yang lulus:** `qa/terbit-logika.mjs`. Terdaftar di
-`qa/regresi-penuh.sh`. Uji yang masih menunggu bagian kedua: kunci salah
-gagal membuka, isi terkunci identik dengan berkas per anggota, dan kunci
-baru menolak kunci lama.
-
-### Hasil #2, bagian kedua — kunci pribadi & data terkunci (26 Sep 2026)
-
-Bagian kedua selesai: kunci pribadi AES-256-GCM per anggota, data
-pribadi terkunci di dalam berkas terbit, dan QR kunci.
-
-**Modul kunci (`src/lib/kunci.ts`).** AES-256-GCM lewat WebCrypto.
-Kunci acak 256 bit per anggota, IV 12 byte acak per terbitan. Kunci
-dalam format base64url (aman untuk URL fragment). Tersimpan di
-localStorage perangkat pelatih (`drillkit.kunciPribadi`), tidak pernah
-masuk backup atau paket.
-
-- `buatKunci()` — kunci acak baru
-- `enkripsi(teks, kunci)` — menghasilkan `base64url(IV ‖ ciphertext)`
-- `dekripsi(data, kunci)` — kunci salah mengembalikan `null`, bukan melempar
-- `cryptoTersedia()` — memeriksa `crypto.subtle` (tidak tersedia di `file://`)
-
-**Berkas terbit sekarang punya dua bagian.** Bagian terbuka = materi
-grup, persis seperti bagian pertama. Bagian terkunci =
-`locked: { "<id>": { d: "<base64url>" } }` — data pribadi per anggota
-yang dienkripsi. Tanpa kunci, bagian `locked` kosong — perilaku persis
-seperti bagian pertama.
-
-**Isi bagian terkunci per anggota** identik dengan berkas per anggota
-yang sudah ada (`paketAnggota`): absensi, evaluasi, kemajuan, catatan
-pribadi. Mengikuti aturan berbagi aman — kolom rahasia (token QR, phone,
-notes pelatih) tidak ikut. Nilai evaluasi terstruktur tidak ikut
-(keputusan yang sudah ditetapkan sebelumnya).
-
-**Kunci diberikan lewat QR** yang berisi alamat situs dan kunci di
-bagian `#` — fragment tidak terkirim ke server. Bisa juga lewat berkas
-per anggota yang kini membawa kuncinya. Tombol **Buat kunci baru** bila
-kunci bocor — catatan jujur di aplikasi: terbitan lama di riwayat repo
-tetap terbuka dengan kunci lama.
-
-**Di HP anggota.** Kunci dibaca dari URL fragment (`location.hash`),
-disimpan di localStorage (`drillkit.kunciAnggota`). Setelah Perbarui,
-aplikasi mencoba dekripsi bagian terkunci. Bila berhasil, data pribadi
-(kehadiran, catatan) ditampilkan di tab Absensi dan Catatan. Tanpa
-kunci, materi grup tetap terbuka dengan catatan untuk meminta QR kunci
-ke pelatih. Data yang dicatat anggota sendiri tidak pernah ditimpa.
-
-**Terbitan lama tetap terbuka dengan kunci lama** — catatan ini
-tertulis di UI (modal QR kunci dan tombol Buat kunci baru). Mengganti
-kunci hanya berlaku untuk terbitan berikutnya.
-
-**Panduan anggota (J1) belum diperbarui** — sengaja, karena belum tahu
-apakah QR kunci akan benar-benar dipakai lewat panduan atau langsung
-dikirim pelatih.
-
-**Uji yang lulus:** `qa/terbit-kunci-logika.mjs` — 69 lulus, 0 gagal.
-Mencakup:
-- kunci salah gagal membuka
-- anggota A tidak bisa membuka data B
-- isi terkunci identik dengan berkas per anggota (`paketAnggota`)
-- kunci baru menolak kunci lama
-- terbitan tanpa kunci = bagian pertama (perilaku lama)
-- `crypto.subtle` tersedia di Node.js
-- evaluasi terstruktur tidak ikut berkas terbit
-
-Terdaftar di `qa/regresi-penuh.sh` bersama `terbit-logika` (58 lulus).
-`qa/bagikan-logika.mjs` tetap 58 lulus.
-`tsc --noEmit` bersih, `npm run build` sukses.
+Kedua tahap telah dikerjakan penuh:
+- **Tahap 1 (commit `db39bd0`)**: Pengaturan token GitHub sekali di
+  Pengaturan → Terbitkan ke anggota, tombol "Terbitkan ke anggota" di
+  menu Berbagi, rewrite Vercel `/paket.json`, dan penanda pemberitahuan
+  materi baru di HP anggota.
+- **Tahap 2 (PR #7, commit `88c375c`)**: Modul enkripsi AES-256-GCM
+  (`src/lib/kunci.ts`), paket terbit dengan bagian terkunci per anggota
+  (`src/lib/terbit.ts`), QR kunci pribadi via hash URL (`#`), tombol
+  Buat kunci baru, dekripsi otomatis di HP anggota. Data pribadi (absensi,
+  evaluasi, kemajuan, catatan) terkunci tanpa nama/skor terstruktur.
+- **Uji**: `qa/terbit-logika.mjs` (58 lulus, 0 gagal),
+  `qa/terbit-kunci-logika.mjs` (69 lulus, 0 gagal). Terdaftar di
+  `qa/regresi-penuh.sh`.
 
 ---
 
@@ -5526,52 +5445,31 @@ tanggal akhir; *ubah sesi ini* vs *semua berikutnya*; sesi berabsensi
 tidak terhapus; tampilan HP 360 px; seret-pindah dengan undo; cetak;
 kalender anggota.
 
-### Hasil #3, bagian pertama — kalender & agenda (27 Sep 2026)
+### Status: Selesai (27 Sep 2026, PR #8 & PR #9)
 
-Bagian pertama selesai (PR #8). Halaman Jadwal (`src/pages/Schedule.tsx`)
-mendukung tiga mode tampilan: **Bulan**, **Agenda**, dan **Daftar** (lama).
-
-**Tampilan Bulan.** Kotak 7 kolom mulai Senin. Sesi lewat menampilkan % hadir
-dengan warna predikat kehadiran (Sangat Baik / Baik / Cukup / Kurang mengikuti
-ambang J1). Sesi mendatang menampilkan progress checklist materi dan penanda
-rencana latihan / set list. Ketuk hari membuka panel detail / form sesi baru
-dengan tanggal terisi. Di layar HP, tampilan beralih ke kalender ringkas
-ber-dot warna per jenis kegiatan.
-
-**Tampilan Agenda.** Kartu besar sesi berikutnya dengan hitung mundur. Sesi lain
-dikelompokkan per minggu; sesi yang lewat disembunyikan di balik toggle
-"Tampilkan yang sudah lewat".
-
-**Seri mingguan & pengelolaan.** Ulangi mingguan pada hari tertentu dengan batas
-tanggal akhir. Pengubahan seri mendukung opsi *hanya sesi ini* atau *semua
-berikutnya*. Penghapusan seri diproteksi: sesi yang sudah memiliki catatan
-absensi tidak pernah dihapus. Ditambah fitur duplikat sesi dan seret-pindah
-tanggal di kalender laptop dengan tombol Batalkan (undo).
-
-**Cetak & ekspor.** Cetak kalender satu bulan berbasis warna hex murni (aman
-browser lama) dengan pratinjau / unduh HTML fallback. Ekspor `.ics` tunggal
-berisi seluruh jadwal mendatang.
-
-**Modul logika.** `src/lib/kalender.ts` menangani pembuatan grid bulan, seri
-mingguan, format ICS RFC 5545, dan hitung mundur lomba terdekat. Data
-`Session` hanya bertambah kolom opsional `seriId`.
-
-**Uji yang lulus:** `qa/kalender-logika.mjs` (67 butir) dan
-`qa/kalender-jadwal.mjs` (31 butir). Regresi jadwal lama (`latihan-jadwal`,
-`pacu-latihan`, `penanda-sesi`, `pengingat-jadwal`) tetap bersih.
-
-### Hasil #3, bagian kedua — kalender baca-saja mode anggota (27 Sep 2026)
-
-Bagian kedua selesai (PR #9). Mode anggota (`src/pages/Share.tsx`, `src/main.tsx`)
-kini memiliki akses ke kalender jadwal baca-saja.
-
-**Kalender & Agenda anggota.** Menampilkan agenda dan kalender bulan untuk anggota
-tanpa wewenang menyunting. Untuk setiap sesi, menampilkan status kehadiran
-pribadi anggota (Hadir, Izin, Sakit, Alpa, atau Belum dicatat) yang didekripsi
-dari paket terbitan terkunci (hasil #2). Rencana materi latihan dapat dibaca.
-
-**Uji yang lulus:** `qa/kalender-anggota.mjs` (33 butir). Terdaftar di
-`qa/regresi-penuh.sh`. Seluruh rancangan #3 tuntas.
+Kedua tahap telah dikerjakan penuh:
+- **Tahap 1 (PR #8, commit `5bdcd54`)**:
+  - Halaman Jadwal (`src/pages/Schedule.tsx`): 3 tab tampilan (Bulan,
+    Agenda, Daftar).
+  - Tampilan Bulan: grid 7 kolom Senin–Minggu, warna predikat kehadiran
+    sesi lewat, checklist sesi mendatang, penanda rencana latihan & set
+    list, panel detail hari / buat jadwal terisi, titik berwarna di HP.
+  - Tampilan Agenda: kartu besar sesi berikutnya + hitung mundur, sesi
+    per minggu, sembunyikan sesi lewat.
+  - Alur cepat: ulangi mingguan (ubah sesi ini / semua berikutnya;
+    proteksi sesi berabsensi tidak terhapus), duplikat sesi, seret-pindah
+    tanggal dengan tombol Batalkan (undo).
+  - Ekspor `.ics` jadwal mendatang, cetak kalender sebulan (hex murni)
+    dengan pratinjau / unduh HTML.
+  - Modul logika: `src/lib/kalender.ts`. Kolom `seriId` pada `Session`.
+  - Uji: `qa/kalender-logika.mjs` (67 butir), `qa/kalender-jadwal.mjs`
+    (31 butir). Regresi jadwal lama tetap lulus.
+- **Tahap 2 (PR #9, commit `0f20a89`)**:
+  - Mode anggota (`src/pages/Share.tsx`, `src/main.tsx`): tab Kalender
+    dan Agenda baca-saja.
+  - Menampilkan jadwal dan status kehadiran pribadi (Hadir/Izin/Sakit/Alpa/Belum dicatat)
+    dari data terkunci per anggota (#2).
+  - Uji: `qa/kalender-anggota.mjs` (33 butir). Terdaftar di `regresi-penuh.sh`.
 
 ---
 
@@ -5616,47 +5514,33 @@ yang sudah ada memakai angka BPM tetap, jadi tidak cocok untuk tempo map.
 setelah dibuka ulang; presenter ikut melambat; layar hari H tetap asli;
 mode anggota.
 
-### Hasil #4 — tempo latihan persen & BPM, naik otomatis, drill melambat (27 Sep 2026)
+### Status: Selesai (27 Sep 2026, PR #10)
 
-Rancangan selesai penuh (PR #10). Kendali tempo latihan diterapkan per lagu
-tanpa mengubah tempo map asli dan tanpa mengotori basis data.
-
-**Kendali tempo latihan.** Widget `src/components/KendaliTempoLatihan.tsx`
-ditempatkan di dekat kendali putar lagu di halaman Musik (`src/pages/Music.tsx`
-dan `src/components/PanelLagu.tsx`). Mendukung mode persen (40–150%, tombol
-`−5%` / `+5%`) dan mode BPM (−60 s/d +30). Diterapkan paling akhir pada tempo
-berlaku (tempo map, accelerando/ritardando berangsur, latih tempo lama, dan
-hitung mundur), dengan batas bawah pengaman 20 BPM.
-
-**Penyimpanan per lagu.** Menggunakan hook `src/hooks/useTempoLatihan.ts` dan
-pustaka `src/lib/tempoLatihan.ts`. Nilai disimpan di `localStorage` per lagu
-per perangkat (`drillkit_tempo_latihan_<laguId>`), sehingga tidak masuk ke
-berkas backup atau paket berbagi. Tersedia juga di mode anggota.
-
-**Penanda visual & Set list.** Lencana "Latihan 80%" dan label "138 BPM (asli 172)"
-tampil jelas di daftar lagu, panel lagu, dan set list (`KartuSetList.tsx`).
-Durasi total set list otomatis menghitung tempo latihan setiap lagu, dilengkapi
-tombol "Semua ke tempo asli".
-
-**Integrasi Drill.** Presenter drill (`DrillPresenter.tsx`) dan editor
-(`DrillEditor.tsx`) ikut melambat sesuai tempo latihan lagu yang ditautkan.
-Penanda disatukan dengan `view.cepat` dan disertai tombol kembali ke tempo asli.
-Analitik formasi tetap menggunakan tempo asli lagu.
-
-**Layar hari H.** Pada `ModeLomba.tsx`, layar hari H selalu memaksakan tempo
-asli lagu dan memberikan peringatan mencolok jika ada setelan tempo latihan
-yang sedang aktif pada lagu yang ditampilkan.
-
-**Naik otomatis saat ulang bagian (M2).** Pengaturan otomatis: mulai persen/BPM,
-kenaikan tiap N putaran, batas target, dan tindakan setelah target tercapai
-(tetap lanjut di tempo target atau berhenti). Menampilkan indikator putaran
-("Putaran 3 · 80% → 100%"). Tempo terakhir yang dicapai diingat.
-
-**Uji yang lulus:** `qa/tempo-latihan-logika.mjs` (34 butir),
-`qa/tempo-latihan.mjs` (26 butir), dan `qa/musik-anggota.mjs` (45 butir).
-Seluruh regresi terkait (`m1-tempo-lagu-drill`, `m2-ulang-bagian`, `m3-setlist`,
-`perubahan-tempo`, `mode-lomba`) lulus bersih. Terdaftar di
-`qa/regresi-penuh.sh`.
+Seluruh rancangan telah dikerjakan penuh (commit `a7e835f` / PR #10):
+- **Kendali tempo latihan**: Komponen `src/components/KendaliTempoLatihan.tsx`
+  di halaman Musik (`Music.tsx`, `PanelLagu.tsx`). Dua mode: persen
+  (40–150%, `−5%` / `+5%`) dan BPM (−60…+30), tombol "Tempo asli".
+  Diterapkan paling akhir pada tempo berlaku, batas bawah 20 BPM.
+- **Penyimpanan per lagu**: Hook `src/hooks/useTempoLatihan.ts` dan pustaka
+  `src/lib/tempoLatihan.ts`. Disimpan di `localStorage` per lagu per
+  perangkat (`drillkit_tempo_latihan_<laguId>`); tidak masuk backup atau
+  paket berbagi. Tersedia juga di mode anggota.
+- **Penanda visual & Set list**: Lencana "Latihan 80%" dan label
+  "138 BPM (asli 172)" di daftar lagu, panel lagu, dan set list
+  (`KartuSetList.tsx`). Durasi set list menghitung tempo latihan + tombol
+  "Semua ke tempo asli".
+- **Presenter drill ikut melambat**: Animasi editor (`DrillEditor.tsx`)
+  dan presenter (`DrillPresenter.tsx`) melambat untuk drill yang ditautkan
+  ke lagu; lencana disatukan dengan `view.cepat` + tombol "Tempo asli".
+  Analitik tetap memakai tempo asli.
+- **Layar hari H**: Pada `ModeLomba.tsx`, layar hari H selalu memakai
+  tempo asli dan memberi peringatan bila ada tempo latihan yang aktif.
+- **Naik otomatis saat ulang bagian (M2)**: Pengaturan otomatis naik
+  tempo tiap N putaran hingga target tercapai (tetap/berhenti), dengan
+  tampilan "Putaran 3 · 80% → 100%".
+- **Uji**: `qa/tempo-latihan-logika.mjs` (34 butir), `qa/tempo-latihan.mjs`
+  (26 butir), `qa/musik-anggota.mjs` (45 butir). Seluruh regresi terkait
+  lulus bersih. Terdaftar di `regresi-penuh.sh`.
 
 ---
 
@@ -5696,6 +5580,10 @@ hitungan, segmen 18 hitungan). Ini **wajar**. Yang jadi masalah:
    - Berlaku untuk animasi, klik, garis waktu, durasi total, dan
      presenter.
    - Posisi pemain tetap rata per hitungan.
+   - Untuk ramp berdurasi N hitungan, tempo awal berlaku tepat sebelum
+     hitungan 1; hitungan 1 sudah mendapat langkah pertama dan hitungan N
+     tepat mencapai tempo tujuan. Jumlah hitungan tempo dinyatakan
+     eksplisit, bukan ditebak dari jumlah birama atau meter.
    - Drill tanpa set yang melewati perubahan tempo tidak berubah.
    - Presenter menampilkan "Set 2 · hitungan 7/12 · birama 5" dan
      berkedip kecil saat tempo berubah.
@@ -5706,9 +5594,38 @@ hitungan, segmen 18 hitungan). Ini **wajar**. Yang jadi masalah:
    - Gabung dengan set berikutnya.
    - Keduanya masuk riwayat formasi dan bisa di-undo.
 
-**Uji:** set 2 dalam contoh berdurasi 5,25 detik; drill tanpa perubahan
-tempo durasinya tetap; animasi identik setelah dipecah; garis waktu dan
-⚡; Pas ke batas segmen; undo.
+**Uji:** set 2 dalam contoh berdurasi 5,25 detik; accelerando 160 → 180
+selama 8 hitungan menghasilkan 162,5; 165; 167,5; 170; 172,5; 175;
+177,5; 180 BPM; ritardando 172 → 140 selama 6 hitungan mulai berubah
+pada hitungan 1 dan tepat mencapai 140 pada hitungan 6; drill tanpa
+perubahan tempo durasinya tetap; animasi identik setelah dipecah; garis
+waktu dan ⚡; Pas ke batas segmen; undo.
+
+### Status: Sebagian rampung (1 Okt 2026, PR #14) — fondasi tempo terintegrasi
+
+**Sudah terintegrasi (PR #14, 1 Okt 2026):**
+- Tempo map kini mendukung posisi **1-based pada birama, ketuk tertulis,
+  dan subdivisi ketuk** serta ramp dengan **jumlah hitungan eksplisit**
+  (satuan: ketuk tertulis / ketuk acuan BPM / subdivisi / birama; tempo
+  awal opsional). Semantik: hitungan 0 = sebelum ramp, hitungan 1 sudah
+  1/N, hitungan N = BPM target.
+- Evaluator bersama **`TempoTimeline`** (`src/lib/tempoTimeline.ts`,
+  `src/lib/tempoRamp.ts`) dipakai untuk BPM, durasi, konversi posisi/ waktu,
+  serta tempo latihan. Metronom, cek klik MP3, pemetaan drill per-hitungan,
+  waktu/progres lagu, rekaman, dan set list semuanya memakai evaluator ini;
+  tempo map lama per birama tetap kompatibel.
+- Verifikasi: `tempo-map-logika` 25, `perubahan-tempo-logika` 90,
+  `uji-gabung-musik` 51, `uji-setlist` 107 — total 273 lulus.
+
+**Sisa yang masih menunggu (tanpa ubah kode pada pemutakhiran ini):**
+- **(1) Garis waktu musik × drill** — penggaris hitungan dua baris + tanda ⚡.
+- **(2) Bantuan hitungan** — keterangan "mulai di hitungan … / sisa segmen",
+  tombol Pas ke batas segmen, panjang segmen dalam hitungan di editor lagu.
+- **(4) Pecah & gabung set** — pecah di batas segmen/hitungan (interpolasi
+  busur), gabung, keduanya undoable.
+
+> Pemutakhiran ini **hanya merapikan roadmap**; tidak ada perubahan kode
+> untuk sisa #5. Fondasi tempo sudah siap dipakai oleh sisa pekerjaan tersebut.
 
 ---
 
@@ -5762,86 +5679,50 @@ mulai dan koreksi segmen tepat ±20 ms; ulang bagian; sinkron dengan
 drill; sinkron saat diperlambat; sidik cocok dan tidak cocok;
 bertahan setelah paket diperbarui; ZIP dipulihkan utuh.
 
-### Status: Selesai (28 Sep 2026)
+### Status: Selesai (28 Sep 2026, PR #11 + susulan PR #12)
 
 Seluruh rancangan #6 (Rekaman lagu MP3) telah dikerjakan penuh:
-- **Penyimpanan biner Blob**: Dexie v9 dengan tabel `rekamanAudio` (`src/db/db.ts`),
-  pustaka manajemen audio `src/lib/rekaman.ts`, pengecekan kuota `navigator.storage`,
-  permintaan persistensi, dan deteksi iOS Safari.
-- **Sidik unik**: Hash biner SHA-256 via WebCrypto dan validasi toleransi durasi (<0.75s).
-- **Penyelarasan & Waveform**: Modal `ModalRekamanLagu.tsx` dengan canvas waveform 120 peak bar,
-  penanda titik mulai ketuk 1, tombol geser ±10/50ms, uji keselarasan "Cek bersama klik",
-  koreksi offset per segmen, dan kontrol dual volume (audio vs klik).
-- **Sinkronisasi pemutaran**: Pemutar singleton `PemutarRekaman` terintegrasi dengan
-  `Music.tsx` (loncat segmen, loop ulang bagian, bypass countdown), tempo latihan
-  (`playbackRate` + `preservesPitch`), dan set list (badge 🎵).
-- **Integrasi Drill**: Garis waktu scrubber `DrillEditor.tsx` menyinkronkan audio `currentTime`,
-  dan `DrillPresenter.tsx` memutar audio set terkait serta memaksa tempo asli pada kunci layar lomba.
-- **Mode Anggota**: Fitur "Tambahkan rekaman dari pelatih", validasi sidik jari, audio
-  persisten antar pembaruan paket, dan panduan anggota diperbarui.
-- **Backup & ZIP**: Dekompresi `bukaZip` dan kompresi biner `bikinZip` di `src/lib/zip.ts`,
-  ekspor "Backup + rekaman (ZIP)" di `src/lib/backup.ts` dan pemulihan ZIP di `src/pages/Settings.tsx`.
-- **Uji**: `qa/rekaman-lagu-logika.mjs` (21 butir uji lulus), terdaftar di `qa/bangun-logika.sh`,
-  seluruh 19 uji logika lulus tanpa gagal.
+- **Penyimpanan Biner Blob & IndexedDB**:
+  - Skema database Dexie versi 9 dengan tabel `rekamanAudio: 'id, songId, updatedAt'` (`src/db/db.ts`).
+  - Tipe data `RekamanAudioMeta` dan `AudioRekamanItem` di `src/db/types.ts`.
+  - Pustaka `src/lib/rekaman.ts`: fungsi `simpanRekamanAudio`, `muatRekamanAudio`, `hapusRekamanAudio`, `cekPenyimpanan`, `mintaPenyimpananPersisten`, dan deteksi peramban iOS/iPadOS dengan pengingat batas 7 hari di Safari.
+- **Sidik Audio (Fingerprint) & Validasi**:
+  - Hash biner SHA-256 via WebCrypto SubtleCrypto (`hitungHashAudio`) dan pembacaan durasi.
+  - Validasi kesesuaian berkas audio pelatih vs unggahan anggota (`cekKesesuaianRekaman`).
+- **Penyelarasan Titik Mulai (Birama 1 Ketuk 1) & Waveform**:
+  - Komponen `src/components/ModalRekamanLagu.tsx`: visualisasi waveform canvas 120 bar dengan penanda garis vertikal titik mulai.
+  - Tombol penanda posisi ketuk 1 dan penyesuaian halus (±10 ms, ±50 ms).
+  - Tombol "Cek bersama klik" untuk memeriksa sinkronisasi audio vs beeps metronom.
+  - Koreksi offset milidetik per segmen tempo untuk fermata atau ritardando live.
+  - Pilihan mode bunyi (`rekaman`, `keduanya`, `klik`) dan kontrol dual volume (audio vs klik).
+- **Master Waktu & Sinkronisasi Pemutaran Lagu**:
+  - Singleton `PemutarRekaman` di `src/lib/rekaman.ts` dengan penanganan `playbackRate` dan pemeliharaan nada (`preservesPitch = true`).
+  - Halaman Musik (`src/pages/Music.tsx`): integrasi pemutar audio dengan kontrol mulai, jeda, lompat segmen, dan loop ulang bagian (M2).
+  - Set list (`src/components/KartuSetList.tsx` & `src/lib/setlist.ts`): penanda badge 🎵 untuk lagu yang memiliki rekaman audio dan pemutaran otomatis antar lagu.
+- **Integrasi Drill**:
+  - Scrubber garis waktu di editor (`src/components/DrillEditor.tsx`) menyinkronkan audio `currentTime` saat digeser.
+  - Animasi perpindahan set di editor dan presenter (`src/components/DrillPresenter.tsx`) memutar rekaman audio set terkait.
+  - Mode hari lomba / kunci layar di presenter memaksa tempo asli (100%).
+- **Mode Anggota**:
+  - Anggota dapat mengunggah rekaman dari pelatih ("Tambahkan rekaman dari pelatih").
+  - Sistem memeriksa kecocokan sidik jari (✔ cocok / ⚠ berbeda).
+  - Rekaman audio tersimpan di IndexedDB perangkat anggota secara mandiri dan tidak tertimpa saat paket tim diperbarui.
+  - Panduan anggota (`src/lib/panduan.ts`) diperbarui dengan instruksi rekaman audio dan catatan PWA iPhone/Safari.
+- **Backup & ZIP**:
+  - `src/lib/zip.ts` diperluas dengan dukungan data biner `Uint8Array` dan fungsi dekompresi `bukaZip`.
+  - Ekspor baru "Backup + rekaman (ZIP)" di `src/lib/backup.ts` dan Pengaturan (`src/pages/Settings.tsx`).
+  - Pemulihan berkas backup mendukung format `.zip` otomatis mengekstrak JSON data tim dan mengembalikan seluruh rekaman audio biner.
+- **Uji**:
+  - Pengujian logika komprehensif `qa/rekaman-lagu-logika.mjs` (21 butir uji) mencakup sidik jari, toleransi, perhitungan detik ke birama dan sebaliknya, round-trip ZIP biner, serta integrasi set list.
+  - `qa/bangun-logika.sh` memaketkan `rekaman.ts`. Seluruh 19 rangkaian uji logika lulus bersih (0 gagal).
 
-### Susulan #6 — "klik melambat" saat metronom diputar bersama lagu (28 Sep 2026)
-
-**Yang memicu:** keluhan pemakaian. "Ketika playback metronome beserta lagunya,
-metronome kesulitan bermain bersama; kliknya melambat atau terlambat." Rekamannya
-ekspor Sibelius — temponya benar dan birama mulainya sudah sama — jadi yang dicari
-bukan selisih berkas, melainkan selisih waktu di dalam aplikasi.
-
-**Sebabnya.** Klik dan rekaman berjalan di **dua jam berbeda** dan tidak pernah
-saling menengok:
-
-- klik dijadwalkan di jam `AudioContext`, mulai `+0,08 s` sejak tombol ditekan;
-- rekaman (elemen `<audio>`) baru berbunyi setelah blobnya dibaca dari IndexedDB,
-  digeser ke titik mulai, lalu `play()` — tidak ada yang menjamin kapan.
-
-Titik mulai keduanya karena itu selalu berbeda: **±40 ms di mesin cepat** dan
-**±157 ms saat utas utama diperlambat 8×** (di HP yang sekaligus menggambar
-formasi bisa lebih lebar lagi). Lajunya pun tidak persis sama — terukur
-**≈0,25 ms per sekon (±15 ms per menit)** di kotak pasir ini. Selisih kecil yang
-menumpuk sepanjang lagu; itulah "klik yang melambat".
-
-**Perbaikannya.** Rekaman dijadikan **patokan waktu** (`JamLagu` di
-`src/lib/metronome.ts`):
-
-- `jalan()` — klik tidak mulai sebelum rekaman benar-benar berbunyi (batas tunggu
-  2,5 s; kalau berkasnya gagal dimuat, mesin kembali ke mode metronom mandiri);
-- `posisi()` + `laju()` — tiap birama ditempatkan menurut posisi rekaman
-  (`awalCtx = ctx.currentTime + (detikLagu − pos)/laju`), bukan akumulasi hitungan
-  mesin sendiri. Tempo latihan hidup di **laju**, bukan di posisi, supaya tempo
-  asli rekaman tetap yang menentukan letak birama;
-- `selaraskanKeJam()` — rekaman yang menyalip atau tertinggal jauh (lompat birama,
-  ulang bagian) dikejar lagi; bunyi yang terlanjur ditanam dibatalkan
-  (`batalkan()`) supaya tidak ada klik "hantu" dari posisi lama;
-- jendela lihat-ke-depan di jalur jam dinaikkan ke 0,45 s (jalur mandiri tetap
-  0,18 s), supaya satu render berat tidak memakan ketukan berikutnya.
-
-Di halaman Musik & Metronome: `putarTunggu()` menunggu rekaman benar-benar
-berbunyi sebelum mesin dijalankan, dan laju pemutaran mengikuti tempo latihan
-yang berlaku (mode BPM −20 BPM pun tidak lagi memutar rekaman di tempo aslinya).
-
-**Susulan sekelas di pemutar drill.** Garis waktu drill dulu memakai `detik`
-(lama sebuah set) sebagai titik mulai audio, dan tempo latihan untuk posisi
-rekaman. `PetaSet` sekarang punya `detikMulai` (jumlah lama set sebelumnya);
-editor menggeser rekaman ke `titikMulaiDetik + detikMulai` dan memakai laju
-`lajuRekaman(tempoSet(...))`; presenter memakai `detikMulaiPerSet`/`lajuPerSet`.
-
-**Diuji:**
-
-- `qa/m6-klik-rekaman.mjs` (peramban, baru) — dua skenario: bawaan dan tempo
-  latihan mode BPM (−20 BPM). Pos rekaman dibandingkan dengan ketukan yang
-  seharusnya tiap klik; **14/14**. Tanpa perbaikan, versi lama gagal di kedua
-  skenario (meleset ratusan ms, sampai ribuan ms di mode BPM).
-- `qa/diagnosa-klik-rekaman.mjs` (alat diagnosa angka, bukan rangkaian asersi) —
-  skenario `dasar`, `hitung`, `bpm`, `persen`; mencetak posisi rekaman vs
-  ketukan yang seharusnya dan laju jam audio vs `AudioContext`.
-- `uji-birama` 107→**123** (kebalikan `biramaPadaDetik`), `rekaman-lagu-logika`
-  21→**35** (laju & lompatan), `uji-gabung-musik` 45→**50** (`detikMulai`).
-- Kedua rangkaian baru didaftarkan di `qa/regresi.sh` dan `qa/regresi-penuh.sh`
-  — sebelumnya tidak pernah ikut berjalan (kegagalan sunyi kelas N14).
+**Susulan #6 — "klik melambat" (28 Sep 2026, PR #12):**
+- Metronom kini mengikuti **jam rekaman** (`JamLagu` di `src/lib/metronome.ts`),
+  bukan jam sendiri; klik mulai setelah rekaman berbunyi, tiap birama diposisikan
+  dari `currentTime` rekaman, dan jadwal yang terlanjur ditanam dibatalkan saat
+  rekaman digeser/diulang. Editor & presenter drill memakai `detikMulai` +
+  `lajuRekaman` yang benar. Uji: `m6-klik-rekaman` 14/14, `uji-birama` 123,
+  `uji-gabung-musik` 50, `rekaman-lagu-logika` 35.
 
 ---
 
@@ -5932,14 +5813,163 @@ mode anggota dengan PIN tim.
 
 ---
 
+## 9. Grid & patok yard–meter custom
+
+**Masalah.** Preset lapangan saat ini (DCI, NFHS, NFL, tanpa hash,
+sepak bola 105×68 m, GOR 40×20 m) sudah menutup sebagian kebutuhan,
+tetapi jarak grid, patok, dan satuan masih kaku. Latihan di GOR kecil,
+lapangan sekolah tanpa end zone, atau lapangan bola metrik menuntut
+jarak grid/patok yang berbeda; pelatih juga ingin mengganti satuan
+tampilan yard ↔ meter ↔ langkah tanpa kehilangan presisi internal
+(yard tetap satuan simpan).
+
+**Keputusan:** tidak menambah preset baru saja, melainkan membuat grid
+dan patok **kustom** yang tetap kompatibel dengan data lama.
+
+1. **Grid kustom**
+   - Jarak grid dapat diatur (mis. 2 m, 5 yard, 10 yard) dan jumlah
+     garis dihitung otomatis dari `fieldBox`; warna & ketebalan garis
+     memakai hex (aman cetak/portabel).
+   - Toggle satuan tampil **yard / meter / langkah** — nilai tersimpan
+     tetap yard (`STEP_YD`, `M_TO_YD` di `src/lib/field.ts`), konversi
+     hanya di lapisan tampil/cetak.
+   - Pratinjau lapangan langsung; grid ikut skala titik & warna lapangan.
+
+2. **Patok kustom**
+   - Jarak huruf (A, B, C…), hash (#), dan T dapat diatur terpisah
+     (mis. 8 langkah = 5 yard pada 8-to-5, tapi bisa 6 atau 10);
+     `awalanT`, `dariTengah`, `penandaSisi` S1/S2, dan `tampil` tetap
+     seperti `PATOK_DEFAULT`.
+   - Patok dihitung dari garis tengah (`fieldBox`) sehingga tanda `−`/`+`
+     tidak terbalik di sisi S1 (cacat DD10 yang sudah diperbaiki tetap
+     aman).
+   - Opsi "Tanpa patok" untuk lapangan indoor kecil.
+
+3. **Tetap offline & aman data lama**
+   - `FieldConfig` lama tanpa `patok`/`gridYd` kustom tetap terbaca via
+     `patokOf()`; tidak ada migrasi paksa.
+   - Cetak/buku saku memakai hex yang sama; tidak ada `oklch()`.
+
+**Tidak dilakukan pada tahap ini:** mengubah geometri lapangan atau
+menambah jenis hash baru di luar NFHS/NCAA/NFL/none.
+
+**Uji (rencana):** toggle yard↔meter konsisten (68 m ↔ 74,37 yard),
+grid 2 m di GOR 40×20 m proporsional, patok jarak 6 langkah koordinat
+`-10 yard → −16 langkah` tetap benar, buku saku DD10 tidak regresi.
+
+---
+
+## 10. Impor drill Pyware
+
+**Masalah.** Banyak tim sudah mempunyai drill di **Pyware 3D** (atau
+Excel) dan menulis ulang titik per set di DrillKit memakan waktu.
+Format Pyware tidak terbuka lebar, tetapi ekspor **coordinate sheet CSV**
+umum dipakai untuk bertukar dengan Excel — alur DD7 sudah membuktikan
+manfaatnya.
+
+**Keputusan:** impor **satu arah Pyware → DrillKit** lewat CSV
+koordinat, memakai fondasi yang sudah ada, tanpa server.
+
+1. **Format masuk**
+   - CSV koordinat Pyware/Excel dengan kolom minimal: `Set`, `Count`,
+     `Kode/Member`, `X`, `Y` (yard atau meter + penanda satuan).
+     Nilai X membujur (S1↔S2 dari A), Y melintang (front↔back) — konsisten
+     dengan `src/lib/field.ts`.
+   - Dukungan meter: bila satuan meter, konversi otomatis via `M_TO_YD`.
+
+2. **Alur impor**
+   - Lewat pintu **#7 "Buka berkas DrillKit"** — jenis dikenali dari isi
+     (header CSV). Pratinjau menampilkan jumlah set, jumlah anggota,
+     rentang hitungan, dan posisi di luar lapangan yang akan diperingatkan.
+   - **Pencocokan anggota** memakai layar "Cocokkan anggota" dari **#1**:
+     kode Pyware dipetakan ke `Member` DrillKit (berdasarkan kode/section/
+     kemiripan nama), alias diingat untuk impor berikutnya.
+   - Posisi diinterpolasi linear antar set (busur tetap lurus pada impor
+     awal; busur Pyware dapat ditambah manual setelah impor).
+
+3. **Keamanan & kompatibilitas**
+   - Pratinjau sebelum tulis, impor tidak menimpa show aktif tanpa
+     konfirmasi ("Timpa / Gabung / Salinan" seperti show).
+   - Riwayat formasi (`RiwayatSnapshot`) mencatat impor sehingga bisa
+     di-undo satu langkah.
+   - Berkas show lama tetap kompatibel; impor Pyware hanya menambah.
+
+**Uji (rencana):** CSV 3 set × 20 anggota masuk utuh (60 titik × 3 set),
+konversi meter↔yard tepat, anggota tak dikenal dipetakan manual dan
+diingat, posisi di luar `fieldBox` diberi peringatan, undo menghapus
+hasil impor.
+
+---
+
+## 11. Partitur full score & per instrumen + latihan per bar/frasa
+
+**Masalah.** Halaman Musik sudah punya repertoar, tempo map, metronom,
+rekaman (#6), dan tempo latihan (#4), tetapi **belum ada notasi**.
+Pelatih dan anggota membutuhkan partitur untuk melihat frase, melatih
+per birama, dan mengulang bagian yang sulit — saat ini hanya mengandalkan
+hafalan atau PDF terpisah yang tidak sinkron dengan audio/drill.
+
+**Keputusan:** partitur menjadi **lapisan baca + latihan**, bukan editor
+notasi. Tetap offline, tanpa server, memakai fondasi `TempoTimeline`
+(PR #14).
+
+1. **Sumber & penyimpanan**
+   - **MusicXML** (ekspor MuseScore/Sibelius) sebagai sumber utama —
+     disimpan sebagai Blob di IndexedDB (pola sama seperti rekaman #6),
+     dirender offline dengan **OSMD (OpenSheetMusicDisplay)** yang
+     menghasilkan SVG/Canvas hex (aman portabel).
+   - **PDF / gambar** sebagai fallback: ditampilkan sebagai lembar
+     statis (tanpa sinkron highlight) bila MusicXML tidak tersedia.
+   - Berkas show & repertoar dapat membawa rujukan partitur (id lagu),
+     bukan notasi penuh, agar ukuran paket tetap wajar.
+
+2. **Tampilan**
+   - **Full score** (semua instrumen) dan **part per instrumen/section**
+     (filter: Brass, Battery, Pit, Guard, atau per instrumen) —
+     instrumen mengikuti `section` anggota yang sudah ada.
+   - Di laptop: dua panel (notasi + lapangan/metronom); di HP: tab
+     Partitur. Cetak part per instrumen memakai hex, pratinjau/unduh HTML.
+
+3. **Latihan per bar/frasa**
+   - Pilih rentang birama (mis. Bar 5–8 = frase 1) langsung di partitur
+     atau di daftar segmen lagu; rentang diingat per lagu per perangkat
+     (seperti tempo latihan #4).
+   - **Sinkron highlight**: birama aktif disorot mengikuti
+     `TempoTimeline` — saat metronom, rekaman, atau drill berjalan,
+     partitur menggulir/highlight bar yang sedang dimainkan.
+   - **Loop frasa** (reuse M2 "Ulang bagian") + **tempo latihan** (#4) +
+     **count-off** (M1) berlaku pada frasa; lencana "Frasa 5–8 · 80%"
+     tampil di panel lagu & set list.
+   - Set list dapat menautkan frasa partitur ke set drill tertentu
+     (mis. Set 4–6 = Bar 9–16).
+
+4. **Tetap offline & hemat memori**
+   - `navigator.storage.persist()` dipakai bila ukuran MusicXML besar;
+     ada peringatan kuota (seperti #6) dan catatan iPhone.
+   - Tanpa MusicXML, fitur latihan frasa tetap jalan via tempo map
+     (fallback).
+
+**Uji (rencana):** MusicXML 32 birama dirender (full score + part
+trumpet), highlight sinkron ±1 birama dengan rekaman & metronom,
+loop Bar 5–8 mengulang tepat 4 birama pada 80% tempo, cetak part
+hex 1 halaman, impor MusicXML round-trip ZIP tidak hilang.
+
+---
+
 ## Yang masih ditunda dari daftar lama
 
 - **I1 — Log perubahan show** (siapa mengubah set apa dan kapan).
   Ditunda karena masalahnya belum pernah terjadi.
 
+
 ---
 
-## Tempo map custom per hitungan dan ramp eksplisit (1 Okt 2026)
+## Tempo map custom per hitungan dan ramp eksplisit — terintegrasi sebagian ke #5 (1 Okt 2026, PR #14)
+
+> **Catatan pemutakhiran 3 Okt 2026:** bagian tempo map ini telah **terintegrasi
+> sebagian ke #5 Drill × segmen lagu** sebagai fondasi `TempoTimeline`. Rincian
+> status sisa #5 ada di **Rancangan lanjutan → #5** di atas. Pemutakhiran ini
+> hanya merapikan roadmap; tidak ada perubahan kode.
 
 Tempo map mendukung posisi 1-based pada **birama, ketuk tertulis, dan
 subdivisi ketuk**. Ramp menyimpan jumlah hitungan secara eksplisit dan dapat
@@ -5954,11 +5984,13 @@ berubah sebesar 1/N; count N mencapai BPM target. Contoh uji:
 - 172 → 140 selama 6 hitungan: hitungan 1 sudah turun dan hitungan 6
   tepat mencapai 140 BPM.
 
-`TempoTimeline` adalah evaluator bersama untuk BPM, durasi dan konversi
-posisi/waktu. Metronom, pemeriksaan klik MP3, pemetaan tempo serta klik
-per-hitungan drill, waktu/progres lagu, rekaman, dan set list menggunakannya.
-Tempo map warisan per birama tetap didukung; fitur posisi/ramp baru tidak
-mengubah data lama yang tidak memakainya.
+`TempoTimeline` (`src/lib/tempoTimeline.ts`, `src/lib/tempoRamp.ts`) adalah
+evaluator bersama untuk BPM, durasi dan konversi posisi/waktu. Metronom,
+pemeriksaan klik MP3, pemetaan tempo serta klik per-hitungan drill,
+waktu/progres lagu, rekaman, dan set list menggunakannya. Tempo map warisan
+per birama tetap didukung; fitur posisi/ramp baru tidak mengubah data lama
+yang tidak memakainya. Sisa pekerjaan #5 (garis waktu musik × drill, bantuan
+hitungan, pecah/gabung set) akan memakai fondasi ini tanpa mengubah evaluator.
 
 **Diuji lokal:** `npm run typecheck`, `npm run build`, dan `git diff --check`
 lulus. Rangkaian terarah: `tempo-map-logika.mjs` 25, `perubahan-tempo-logika.mjs`
