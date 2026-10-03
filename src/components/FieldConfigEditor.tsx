@@ -22,6 +22,7 @@ import {
   WARNA_LAPANGAN,
   daftarPatok,
   fieldBox,
+  hurufPatok,
   patokOf,
 } from '../lib/field'
 
@@ -71,26 +72,20 @@ export function FieldConfigEditor({
   const bulat = (v: number) => Math.round(v * 100) / 100
 
   /**
-   * Ganti satuan tampilan. Nilai yang tersimpan **tetap yard**, jadi angkanya
-   * ikut dikonversi — drill yang sudah ada tidak perlu diubah.
+   * Ganti satuan tampilan. **Nilai yang tersimpan tetap yard** — hanya
+   * label/satuan yang berubah. Geometri, yardline, dan patok tidak bergeser.
+   * Konversi hanya di lapisan tampil (f.widthYd * YD_TO_M), bukan di penyimpanan.
    */
   function gantiSatuan(s: 'yd' | 'm') {
     if (s === satuan) return
-    const k = s === 'm' ? YD_TO_M : M_TO_YD
-    patch({
-      satuan: s,
-      widthYd: bulat(f.widthYd * k),
-      lengthYd: bulat(f.lengthYd * k),
-      endZoneYd: bulat(f.endZoneYd * k),
-      gridYd: bulat(f.gridYd * k),
-    })
+    patch({ satuan: s })
   }
 
   // DD1 — sistem patok cara Indonesia.
   const p = patokOf(f)
   const gantiPatok = (q: Partial<PatokConfig>) => patch({ patok: { ...p, ...q } })
   /** Hitung jumlah patok walaupun gambarnya sedang disembunyikan. */
-  const fHitung = { ...f, patok: { ...p, tampil: 1 } }
+  const fHitung = { ...f, patok: { ...p, tampil: 1, tampilGaris: 1, tampilLabel: 1 } }
   const jmlHuruf = daftarPatok(fHitung, p.sumbuHuruf).length
   const jmlT = daftarPatok(fHitung, p.sumbuHuruf === 'y' ? 'x' : 'y').length
   /** Contoh koordinat: patok pertama (pasti tepat di patok) dan titik tengah. */
@@ -102,18 +97,18 @@ export function FieldConfigEditor({
   const contohPola =
     urut.length > 9 ? [...urut.slice(0, 4), '…', ...urut.slice(-4)].join(' ') : urut.join(' ')
 
+  const gridUtamaOn = (f.gridTampil ?? 1) === 1
+  const subgridOn = (f.subgridTampil ?? (f.subgridYd ? 1 : 0)) === 1
+  const hashOn = (f.hashTampil ?? (f.hash !== 'none' ? 1 : 0)) === 1
+  const patokGarisOn = (p.tampilGaris ?? p.tampil) === 1
+  const patokLabelOn = (p.tampilLabel ?? p.tampil) === 1
+
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field label="Satuan ukuran">
+      <Field label="Satuan ukuran" hint="Hanya mengubah tampilan — geometri & patok tetap di yard internal">
         <Select value={satuan} onChange={(e) => gantiSatuan(e.target.value as 'yd' | 'm')}>
           <option value="yd">Yard (standar DCI)</option>
           <option value="m">Meter (lapangan Indonesia)</option>
-        </Select>
-      </Field>
-      <Field label="Grid garis lapangan">
-        <Select value={f.gridYd} onChange={(e) => patch({ gridYd: Number(e.target.value) })}>
-          <option value={bulat(5 * (satuan === 'm' ? M_TO_YD : 1))}>Setiap 5 {nSatuan}</option>
-          <option value={bulat(10 * (satuan === 'm' ? M_TO_YD : 1))}>Setiap 10 {nSatuan}</option>
         </Select>
       </Field>
       <Field label={`Lebar lapangan (${nSatuan})`}>
@@ -152,16 +147,72 @@ export function FieldConfigEditor({
           min={0}
         />
       </Field>
-      <Field label="Jarak hash mark">
-        <Select value={f.hash} onChange={(e) => patch({ hash: e.target.value as HashPreset })}>
-          {(Object.keys(HASH_LABEL) as HashPreset[]).map((h) => (
-            <option key={h} value={h}>
-              {HASH_LABEL[h]}
-            </option>
-          ))}
+
+      {/* Grid utama & subgrid — terpisah dari patok */}
+      <Field label="Grid utama" hint="Garis yard tiap N — tidak dipotong oleh batas patok">
+        <div className="flex gap-2">
+          <Select value={gridUtamaOn ? 1 : 0} onChange={(e) => patch({ gridTampil: Number(e.target.value) })}>
+            <option value={1}>Tampilkan</option>
+            <option value={0}>Sembunyikan</option>
+          </Select>
+          <Select
+            value={f.gridYd}
+            onChange={(e) => patch({ gridYd: Number(e.target.value) })}
+            disabled={!gridUtamaOn}
+          >
+            <option value={bulat(5 * (satuan === 'm' ? M_TO_YD : 1))}>Setiap 5 {nSatuan}</option>
+            <option value={bulat(10 * (satuan === 'm' ? M_TO_YD : 1))}>Setiap 10 {nSatuan}</option>
+            <option value={bulat(1 * (satuan === 'm' ? M_TO_YD : 1))}>Setiap 1 {nSatuan}</option>
+            <option value={bulat(2 * (satuan === 'm' ? M_TO_YD : 1))}>Setiap 2 {nSatuan}</option>
+          </Select>
+        </div>
+      </Field>
+      <Field label="Subgrid" hint="Garis tipis di antara grid utama">
+        <div className="flex gap-2">
+          <Select value={subgridOn ? 1 : 0} onChange={(e) => patch({ subgridTampil: Number(e.target.value), subgridYd: Number(e.target.value) ? f.subgridYd ?? bulat(1 * (satuan === 'm' ? M_TO_YD : 1)) : f.subgridYd })}>
+            <option value={0}>Tanpa subgrid</option>
+            <option value={1}>Tampilkan</option>
+          </Select>
+          <Select
+            value={f.subgridYd ?? bulat(1 * (satuan === 'm' ? M_TO_YD : 1))}
+            onChange={(e) => patch({ subgridYd: Number(e.target.value), subgridTampil: 1 })}
+            disabled={!subgridOn}
+          >
+            <option value={bulat(1 * (satuan === 'm' ? M_TO_YD : 1))}>1 {nSatuan}</option>
+            <option value={bulat(2.5 * (satuan === 'm' ? M_TO_YD : 1))}>2,5 {nSatuan}</option>
+            <option value={bulat(2 * (satuan === 'm' ? M_TO_YD : 1))}>2 {nSatuan}</option>
+          </Select>
+        </div>
+      </Field>
+
+      <Field label="Hash mark" hint="Garis putus-putus sejajar sideline">
+        <div className="flex gap-2">
+          <Select value={hashOn ? 1 : 0} onChange={(e) => patch({ hashTampil: Number(e.target.value) })}>
+            <option value={1}>Tampilkan</option>
+            <option value={0}>Sembunyikan</option>
+          </Select>
+          <Select
+            value={f.hash}
+            onChange={(e) => patch({ hash: e.target.value as HashPreset })}
+            disabled={!hashOn}
+          >
+            {(Object.keys(HASH_LABEL) as HashPreset[]).map((h) => (
+              <option key={h} value={h}>
+                {HASH_LABEL[h]}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </Field>
+      <Field label="Garis lapangan" hint="tepi = garis putih tebal">
+        <Select value={f.garis ?? 1} onChange={(e) => patch({ garis: Number(e.target.value) })}>
+          <option value={1}>Tampilkan semua</option>
+          <option value={2}>Tanpa garis tepi</option>
+          <option value={0}>Sembunyikan semua</option>
         </Select>
       </Field>
-      <Field label="Ukuran langkah">
+
+      <Field label="Ukuran langkah" hint="8-to-5 = 8 langkah per 5 yard (4,57 m), bukan 5 meter">
         <Select
           data-testid="pilih-step" value={f.step} onChange={(e) => patch({ step: e.target.value as StepPreset })}>
           {(Object.keys(STEP_LABEL) as StepPreset[]).map((s) => (
@@ -185,6 +236,10 @@ export function FieldConfigEditor({
           />
         </Field>
       )}
+      <div className="sm:col-span-2 rounded-md border border-amber-700/30 bg-amber-950/20 p-2 text-[11px] leading-relaxed text-amber-200/80">
+        <b>Catatan yard ↔ meter:</b> 8-to-5 standar = <b>8 langkah per 5 yard</b> (22,5″ ≈ 0,5715 m per langkah, total 4,572 m). Grid <b>5 meter</b> = <b>5,468 yard</b> — jarak fisik berbeda. Aplikasi <b>tidak</b> mengubah panjang langkah atau memaksa snap saat mengganti satuan; grid & patok dihitung terpisah. Pilih “Satuan jarak patok” di bawah bila ingin patok mengikuti garis grid.
+      </div>
+
       <Field label="Label koordinat">
         <Select value={f.showLabels} onChange={(e) => patch({ showLabels: Number(e.target.value) })}>
           <option value={1}>Tampilkan</option>
@@ -192,13 +247,6 @@ export function FieldConfigEditor({
         </Select>
       </Field>
 
-      <Field label="Garis lapangan" hint="tepi = garis putih tebal">
-        <Select value={f.garis ?? 1} onChange={(e) => patch({ garis: Number(e.target.value) })}>
-          <option value={1}>Tampilkan semua</option>
-          <option value={2}>Tanpa garis tepi</option>
-          <option value={0}>Sembunyikan semua</option>
-        </Select>
-      </Field>
       <Field label="Warna lapangan">
         <Select value={f.warna ?? 'hijau'} onChange={(e) => patch({ warna: e.target.value })}>
           {WARNA_LAPANGAN.map((w) => (
@@ -229,7 +277,7 @@ export function FieldConfigEditor({
       <div className="rounded-lg border border-slate-700/60 bg-slate-950/40 p-3 sm:col-span-2">
         <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
           Patok huruf <b>A → # → B → # → C …</b> dan patok angka <b>T1 → T2 → T3 …</b>. Posisi pemain
-          dibaca gabungan keduanya, misalnya <b>A6</b> (patok A, patok T6) atau <b>B#8</b>.
+          dibaca gabungan keduanya, misalnya <b>A6</b> (patok A, patok T6) atau <b>B#8</b>. Grid <b>tidak</b> dipotong oleh batas patok.
         </p>
         <Toggle
           label="Pakai sistem patok"
@@ -247,10 +295,25 @@ export function FieldConfigEditor({
                 <option value="x">Membujur (kiri ↔ kanan)</option>
               </Select>
             </Field>
-            <Field label="Gambar patok di lapangan">
-              <Select value={p.tampil} onChange={(e) => gantiPatok({ tampil: Number(e.target.value) })}>
-                <option value={1}>Tampilkan</option>
-                <option value={0}>Sembunyikan</option>
+            <Field label="Satuan jarak patok" hint="langkah = ikut 8-to-5; yard = fisik sejajar grid">
+              <Select
+                value={p.satuanJarak ?? 'langkah'}
+                onChange={(e) => gantiPatok({ satuanJarak: e.target.value as 'langkah' | 'yard' })}
+              >
+                <option value="langkah">Langkah (8 per 5 yard)</option>
+                <option value="yard">Yard fisik (ikuti grid)</option>
+              </Select>
+            </Field>
+            <Field label="Garis patok">
+              <Select value={patokGarisOn ? 1 : 0} onChange={(e) => gantiPatok({ tampilGaris: Number(e.target.value), tampil: Number(e.target.value) || (p.tampilLabel ?? p.tampil) ? 1 : 0 })}>
+                <option value={1}>Tampilkan garis</option>
+                <option value={0}>Sembunyikan garis</option>
+              </Select>
+            </Field>
+            <Field label="Label patok">
+              <Select value={patokLabelOn ? 1 : 0} onChange={(e) => gantiPatok({ tampilLabel: Number(e.target.value), tampil: Number(e.target.value) || (p.tampilGaris ?? p.tampil) ? 1 : 0 })}>
+                <option value={1}>Tampilkan label</option>
+                <option value={0}>Sembunyikan label</option>
               </Select>
             </Field>
             <Field label="Pola patok huruf">
@@ -277,16 +340,16 @@ export function FieldConfigEditor({
                 <option value={1}>Beri tanda (B&apos; · B)</option>
               </Select>
             </Field>
-            <Field label="Jarak patok huruf → huruf (langkah)" hint="mis. A ke B">
+            <Field label="Jarak patok huruf → huruf" hint={p.satuanJarak === 'yard' ? 'dalam yard' : 'dalam langkah — mis. A ke B'}>
               <Input
                 type="number"
                 step="0.5"
-                min="1"
+                min="0.5"
                 value={p.jarakHuruf}
                 onChange={(e) => gantiPatok({ jarakHuruf: Number(e.target.value) })}
               />
             </Field>
-            <Field label="Jarak patok huruf → # (langkah)" hint="mis. A ke A#">
+            <Field label="Jarak patok huruf → # " hint={p.satuanJarak === 'yard' ? 'dalam yard' : 'dalam langkah — mis. A ke A#'}>
               <Input
                 type="number"
                 step="0.5"
@@ -295,16 +358,39 @@ export function FieldConfigEditor({
                 onChange={(e) => gantiPatok({ jarakHash: Number(e.target.value) })}
               />
             </Field>
-            <Field label="Jarak antar patok T (langkah)" hint="mis. T1 ke T2">
+            <Field label="Jarak antar patok T" hint={p.satuanJarak === 'yard' ? 'dalam yard — mis. T1 ke T2' : 'dalam langkah — mis. T1 ke T2'}>
               <Input
                 type="number"
                 step="0.5"
-                min="1"
+                min="0.5"
                 value={p.jarakT}
                 onChange={(e) => gantiPatok({ jarakT: Number(e.target.value) })}
               />
             </Field>
-            <div className="flex items-end">
+            <Field label="Batas huruf" hint="E = sampai E simetris; kosong = otomatis sampai tepi">
+              <div className="flex gap-2">
+                <Select
+                  value={p.maksHuruf === undefined ? '' : String(p.maksHuruf)}
+                  onChange={(e) => gantiPatok({ maksHuruf: e.target.value === '' ? undefined : Number(e.target.value) })}
+                >
+                  <option value="">Otomatis (sampai tepi)</option>
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <option key={i} value={i}>{hurufPatok(i)} (sampai {hurufPatok(i)})</option>
+                  ))}
+                </Select>
+              </div>
+            </Field>
+            <Field label="Batas T" hint="26 = T1..T26; kosong = otomatis">
+              <Input
+                type="number"
+                step="1"
+                min="1"
+                placeholder="otomatis"
+                value={p.maksT ?? ''}
+                onChange={(e) => gantiPatok({ maksT: e.target.value.trim() === '' ? undefined : Math.max(1, Math.floor(Number(e.target.value))) })}
+              />
+            </Field>
+            <div className="flex items-end sm:col-span-2">
               <p className="pb-2 text-[11px] leading-relaxed text-slate-500">
                 Lapangan ini: <b className="text-slate-300">{jmlHuruf}</b> patok huruf/# dan{' '}
                 <b className="text-slate-300">{jmlT}</b> patok angka.
@@ -314,6 +400,8 @@ export function FieldConfigEditor({
                 Patok pertama: <b className="text-slate-300">{contohPatok}</b>
                 <br />
                 Titik tengah: <b className="text-slate-300">{contohTengah}</b>
+                <br />
+                <span className="text-slate-600">A di tengah = YL50 pada lapangan simetris; B 5 yard dari A (8 langkah), A# 2,5 yard (4 langkah) bila 8-to-5.</span>
               </p>
             </div>
           </div>

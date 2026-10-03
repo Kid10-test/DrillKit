@@ -222,13 +222,21 @@ export interface FieldConfig {
   endZoneYd: number
   /** jarak antar hash mark */
   hash: HashPreset
-  /** jarak antar garis yard untuk grid, default 5 yard */
+  /** jarak antar garis yard untuk grid utama, default 5 yard */
   gridYd: number
+  /** jarak subgrid (yard) — 0/undefined = tanpa subgrid */
+  subgridYd?: number
+  /** 1 = tampilkan grid utama, 0 = sembunyikan (default 1) */
+  gridTampil?: number
+  /** 1 = tampilkan subgrid, 0 = sembunyikan */
+  subgridTampil?: number
+  /** 1 = tampilkan hash mark, 0 = sembunyikan (jika undefined, ikut `hash !== 'none'`) */
+  hashTampil?: number
   /** ukuran langkah */
   step: StepPreset
   /** jika step === 'custom', panjang 1 langkah dalam yard */
   customStepYd: number
-  /** tampilkan label yard line */
+  /** tampilkan label yard line (football) */
   showLabels: number
   /**
    * Satuan yang dipakai saat mengisi panjang/lebar di editor.
@@ -294,8 +302,25 @@ export interface PatokConfig {
   jarakHash: number
   /** jarak antar patok angka (T1→T2), dalam langkah */
   jarakT: number
-  /** 1 = gambar patok & labelnya di lapangan */
+  /** 1 = gambar patok & labelnya di lapangan (legacy, gabungan) */
   tampil: number
+  /**
+   * Batas huruf maksimum (0=A, 1=B, …, 4=E). Undefined = otomatis sampai tepi
+   * lapangan. Jika A di tengah, batas berlaku simetris ke dua sisi.
+   */
+  maksHuruf?: number
+  /** Batas T maksimum (1-based, mis. 26 = T1..T26). Undefined = otomatis. */
+  maksT?: number
+  /** 1 = tampilkan garis patok; 0 = sembunyikan (jika undefined, ikut `tampil`) */
+  tampilGaris?: number
+  /** 1 = tampilkan label patok; 0 = sembunyikan (jika undefined, ikut `tampil`) */
+  tampilLabel?: number
+  /**
+   * Satuan jarak patok: 'langkah' (bawaan) = jarak dalam langkah (ikut
+   * ukuran langkah 8-to-5); 'yard' = jarak fisik yard (mengikuti grid,
+   * tidak ikut langkah). Dipakai bila pelatih ingin patok sejajar garis grid.
+   */
+  satuanJarak?: 'langkah' | 'yard'
 }
 
 export type Facing = 'front' | 'back' | 'left' | 'right' | 'custom'

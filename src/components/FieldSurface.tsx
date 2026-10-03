@@ -1,5 +1,14 @@
 import type { FieldConfig } from '../db/types'
-import { daftarPatok, patokOf, warnaLapangan } from '../lib/field'
+import {
+  daftarPatok,
+  gridUtamaTampil,
+  hashGarisTampil,
+  patokGarisTampil,
+  patokLabelTampil,
+  patokOf,
+  subgridTampil,
+  warnaLapangan,
+} from '../lib/field'
 
 /**
  * Gambar lapangan (rumput, end zone, garis yard, hash mark, label yard).
@@ -32,11 +41,30 @@ export function FieldSurface({
   const warna = warnaLapangan(f)
   /** 1 = semua garis, 2 = tanpa garis tepi, 0 = semua disembunyikan. */
   const garis = f.garis ?? 1
+  const pCfg = patokOf(f)
+  const patokGarisOn = patokAktif && patokGarisTampil(pCfg)
+  const patokLabelOn = patokAktif && patokLabelTampil(pCfg)
   const patokX = patokAktif ? daftarPatok(f, 'x') : []
   const patokY = patokAktif ? daftarPatok(f, 'y') : []
 
+  const showGridUtama = gridUtamaTampil(f) && garis !== 0
+  const showSubgrid = subgridTampil(f) && garis !== 0 && !!f.subgridYd && f.subgridYd > 0 && f.subgridYd < f.gridYd
+  const showHash = hashGarisTampil(f) && garis !== 0 && f.hash !== 'none'
+
   const yardLines: number[] = []
-  for (let y = -f.lengthYd / 2; y <= f.lengthYd / 2 + 0.001; y += f.gridYd) yardLines.push(y)
+  if (showGridUtama) {
+    const step = f.gridYd > 0 ? f.gridYd : 5
+    for (let y = -f.lengthYd / 2; y <= f.lengthYd / 2 + 0.001; y += step) yardLines.push(y)
+  }
+  const subLines: number[] = []
+  if (showSubgrid) {
+    const step = f.subgridYd!
+    for (let y = -f.lengthYd / 2; y <= f.lengthYd / 2 + 0.001; y += step) {
+      // jangan duplikat garis utama
+      const isUtama = Math.abs((y / f.gridYd) - Math.round(y / f.gridYd)) < 1e-9
+      if (!isUtama) subLines.push(y)
+    }
+  }
 
   const yardValue = (y: number) => 50 - Math.abs(Math.round(y))
 
@@ -51,22 +79,36 @@ export function FieldSurface({
           <rect data-lap="zona" x={playEnd} y={0} width={f.endZoneYd} height={VH} fill={warna.zona} />
         </>
       )}
-      {/* Garis yard */}
-      {garis !== 0 &&
+      {/* Garis yard utama */}
+      {showGridUtama &&
         yardLines.map((y) => (
-        <line
-          key={`yl-${y}`}
-          x1={sx(y)}
-          y1={0}
-          x2={sx(y)}
-          y2={VH}
-          data-lap="garis"
-          stroke="rgba(255,255,255,0.55)"
-          strokeWidth={y === 0 ? 0.35 : 0.18}
-        />
-      ))}
-      {/* Hash marks */}
-      {garis !== 0 && f.hash !== 'none' && (
+          <line
+            key={`yl-${y}`}
+            x1={sx(y)}
+            y1={0}
+            x2={sx(y)}
+            y2={VH}
+            data-lap="garis"
+            stroke="rgba(255,255,255,0.55)"
+            strokeWidth={y === 0 ? 0.35 : 0.18}
+          />
+        ))}
+      {/* Subgrid — garis lebih tipis di antara garis utama */}
+      {showSubgrid &&
+        subLines.map((y) => (
+          <line
+            key={`sub-${y}`}
+            x1={sx(y)}
+            y1={0}
+            x2={sx(y)}
+            y2={VH}
+            data-lap="subgrid"
+            stroke="rgba(255,255,255,0.18)"
+            strokeWidth={0.1}
+          />
+        ))}
+      {/* Hash marks — terpisah dari grid utama */}
+      {showHash && (
         <>
           {[-1, 1].map((sgn) => {
             const offset = (f.hash === 'nfhs' ? (53 + 4 / 12) / 3 / 2 : f.hash === 'ncaa' ? 40 / 3 / 2 : (18 + 6 / 12) / 3 / 2) * sgn
@@ -111,60 +153,69 @@ export function FieldSurface({
         </>
       )}
 
-      {/* DD1 — Garis patok (huruf A,# ,B… dan angka T1,T2…) */}
-      {patokAktif && (
+      {/* DD1 — Garis & label patok terpisah — tidak memotong grid */}
+      {patokAktif && (patokGarisOn || patokLabelOn) && (
         <g data-lap="patok">
-          {patokX.map((g) => (
-            <line
-              key={`px-${g.pos}`}
-              x1={sx(g.pos)}
-              y1={0}
-              x2={sx(g.pos)}
-              y2={VH}
-              stroke="rgba(255,255,255,0.28)"
-              strokeWidth={0.12}
-              strokeDasharray="0.7 1.3"
-            />
-          ))}
-          {patokY.map((g) => (
-            <line
-              key={`py-${g.pos}`}
-              x1={0}
-              y1={sy(g.pos)}
-              x2={VW}
-              y2={sy(g.pos)}
-              stroke="rgba(255,255,255,0.28)"
-              strokeWidth={0.12}
-              strokeDasharray="0.7 1.3"
-            />
-          ))}
-          {/* Label patok angka (T) di tepi depan, patok huruf di tepi kiri */}
-          {patokX.map((g) => (
-            <text
-              key={`tx-${g.pos}`}
-              x={sx(g.pos)}
-              y={VH - 0.35}
-              textAnchor="middle"
-              fontSize={1.7}
-              fill="rgba(255,255,255,0.75)"
-              style={{ fontWeight: 600 }}
-            >
-              {g.label}
-            </text>
-          ))}
-          {patokY.map((g) => (
-            <text
-              key={`ty-${g.pos}`}
-              x={0.7}
-              y={sy(g.pos) + 0.55}
-              textAnchor="start"
-              fontSize={1.7}
-              fill="rgba(255,255,255,0.75)"
-              style={{ fontWeight: 600 }}
-            >
-              {g.label}
-            </text>
-          ))}
+          {/* Garis patok — dapat dimatikan tanpa menghilangkan grid atau label */}
+          {patokGarisOn && (
+            <>
+              {patokX.map((g) => (
+                <line
+                  key={`px-${g.pos}`}
+                  x1={sx(g.pos)}
+                  y1={0}
+                  x2={sx(g.pos)}
+                  y2={VH}
+                  stroke="rgba(255,255,255,0.28)"
+                  strokeWidth={0.12}
+                  strokeDasharray="0.7 1.3"
+                />
+              ))}
+              {patokY.map((g) => (
+                <line
+                  key={`py-${g.pos}`}
+                  x1={0}
+                  y1={sy(g.pos)}
+                  x2={VW}
+                  y2={sy(g.pos)}
+                  stroke="rgba(255,255,255,0.28)"
+                  strokeWidth={0.12}
+                  strokeDasharray="0.7 1.3"
+                />
+              ))}
+            </>
+          )}
+          {/* Label patok — dapat dimatikan terpisah dari garis */}
+          {patokLabelOn && (
+            <>
+              {patokX.map((g) => (
+                <text
+                  key={`tx-${g.pos}`}
+                  x={sx(g.pos)}
+                  y={VH - 0.35}
+                  textAnchor="middle"
+                  fontSize={1.7}
+                  fill="rgba(255,255,255,0.75)"
+                  style={{ fontWeight: 600 }}
+                >
+                  {g.label}
+                </text>
+              ))}
+              {patokY.map((g) => (
+                <text
+                  key={`ty-${g.pos}`}
+                  x={0.7}
+                  y={sy(g.pos) + 0.55}
+                  textAnchor="start"
+                  fontSize={1.7}
+                  fill="rgba(255,255,255,0.75)"
+                  style={{ fontWeight: 600 }}
+                >
+                  {g.label}
+                </text>
+              ))}
+            </>
+          )}
         </g>
       )}
 

@@ -45,6 +45,11 @@ export const PATOK_DEFAULT: PatokConfig = {
   jarakHash: 4,
   jarakT: 8,
   tampil: 1,
+  maksHuruf: undefined,
+  maksT: undefined,
+  tampilGaris: undefined,
+  tampilLabel: undefined,
+  satuanJarak: 'langkah',
 }
 
 /**
@@ -226,13 +231,19 @@ export const FIELD_PRESETS: {
  * yang belum punya `satuan`/`patok` tetap dikenali sebagai preset yang sama.
  */
 function kanonPreset(c: Record<string, unknown>): Record<string, unknown> {
+  const patokNorm = JSON.stringify({ ...PATOK_DEFAULT, ...((c.patok as object) ?? {}) })
+  const hashVal = c.hash as string | undefined
   return {
     ...c,
     satuan: c.satuan === 'm' ? 'm' : 'yd',
-    patok: JSON.stringify({ ...PATOK_DEFAULT, ...((c.patok as object) ?? {}) }),
+    patok: patokNorm,
     garis: c.garis ?? 1,
     warna: c.warna ?? 'hijau',
     ukuranTitik: c.ukuranTitik ?? 1,
+    gridTampil: (c.gridTampil as number | undefined) ?? 1,
+    subgridYd: (c.subgridYd as number | undefined) ?? undefined,
+    subgridTampil: (c.subgridTampil as number | undefined) ?? 0,
+    hashTampil: (c.hashTampil as number | undefined) ?? (hashVal && hashVal !== 'none' ? 1 : 0),
   }
 }
 
@@ -603,19 +614,77 @@ export interface GarisPatok {
   arah?: 1 | -1 | 0
 }
 
+export function patokGarisTampil(p: PatokConfig): boolean {
+  if (p.tampilGaris !== undefined) return p.tampilGaris === 1
+  return p.tampil === 1
+}
+export function patokLabelTampil(p: PatokConfig): boolean {
+  if (p.tampilLabel !== undefined) return p.tampilLabel === 1
+  return p.tampil === 1
+}
+export function gridUtamaTampil(f: FieldConfig): boolean {
+  return (f.gridTampil ?? 1) === 1
+}
+export function subgridTampil(f: FieldConfig): boolean {
+  if (f.subgridTampil !== undefined) return f.subgridTampil === 1
+  return !!f.subgridYd && f.subgridYd > 0
+}
+export function hashGarisTampil(f: FieldConfig): boolean {
+  if (f.hashTampil !== undefined) return f.hashTampil === 1
+  return f.hash !== 'none'
+}
+
+/**
+ * Normalisasi batas huruf: undefined = tak terbatas,
+ * 0=A, 1=B, …, 4=E. Nilai di-clamp >=0.
+ */
+function batasHurufNorm(v?: number): number | undefined {
+  if (v === undefined || v === null) return undefined
+  const n = Math.floor(Number(v))
+  if (!Number.isFinite(n) || n < 0) return undefined
+  return n
+}
+function batasTNorm(v?: number): number | undefined {
+  if (v === undefined || v === null) return undefined
+  const n = Math.floor(Number(v))
+  if (!Number.isFinite(n) || n < 1) return undefined
+  return n
+}
+
 /**
  * Daftar patok pada satu sumbu lengkap dengan posisinya (yard).
- * Dipakai untuk menggambar patok di lapangan.
+ * Dipakai untuk menggambar patok di lapangan dan untuk koordinat buku saku.
+ *
+ * Perubahan fondasi grid/patok:
+ * - `maksHuruf` & `maksT` membatasi label tanpa memotong grid.
+ * - `satuanJarak='yard'` mengartikan jarak sebagai yard fisik, bukan langkah.
+ * - Garis/label patok dapat diatur terpisah via `tampilGaris`/`tampilLabel`.
  */
 export function daftarPatok(f: FieldConfig, sumbu: 'x' | 'y'): GarisPatok[] {
   const p = patokOf(f)
-  if (p.tampil !== 1) return []
+  if (p.aktif !== 1) return []
+  // Garis/label patok hanya mengontrol tampilan di FieldSurface, bukan data
+  // patok itu sendiri. Snap & koordinat tetap memakai patok bila aktif,
+  // meski garis/label disembunyikan.
+
   const s = stepYd(f)
   const box = fieldBox(f)
   const min = sumbu === 'y' ? box.minY : box.minX
   const max = sumbu === 'y' ? box.maxY : box.maxX
-  const lenSteps = (max - min) / s
-  const { jh, jhash, jt } = jarakPatok(p)
+  // jarak dalam yard (jika satuanJarak='yard' jarak sudah yard, bukan langkah)
+  const satuanLangkah = (p.satuanJarak ?? 'langkah') === 'langkah'
+  const jarakLangkah = () => jarakPatok(p)
+  const jhLangkah = jarakLangkah().jh
+  const jhashLangkah = jarakLangkah().jhash
+  const jtLangkah = jarakLangkah().jt
+  const jhYd = satuanLangkah ? jhLangkah * s : jhLangkah
+  const jhashYd = satuanLangkah ? jhashLangkah * s : jhashLangkah
+  const jtYd = satuanLangkah ? jtLangkah * s : jtLangkah
+  // untuk batas tepi, hitung dalam satuan yard juga
+  const lenYd = max - min
+  const batasHuruf = batasHurufNorm(p.maksHuruf)
+  const batasT = batasTNorm(p.maksT)
+
   const out: GarisPatok[] = []
   if (sumbu === p.sumbuHuruf) {
     if (p.dariTengah === 1) {
@@ -623,43 +692,71 @@ export function daftarPatok(f: FieldConfig, sumbu: 'x' | 'y'): GarisPatok[] {
        * Kebiasaan tim: **A di titik tengah**, lalu keluar ke dua sisi.
        *   `# C # B # A # B # C #`
        * Sisi negatif bisa diberi tanda koma atas (`B'`) supaya tidak rancu.
+       * Batas huruf berlaku simetris.
        */
-      const tengah = min + ((max - min) / 2)
-      const batas = (max - min) / 2 / s
+      const tengah = min + (max - min) / 2
+      const batasYd = lenYd / 2
       const tandai = (label: string, arah: 1 | -1) =>
         p.penandaSisi === 1 && arah < 0 && label !== 'A' ? `${label}'` : label
       out.push({ pos: tengah, label: 'A', sumbu, arah: 0 })
       for (let k = 0; k < 200; k++) {
-        const jKres = k * jh + jhash
-        const jHuruf = (k + 1) * jh
+        const jKresYd = k * jhYd + jhashYd
+        const jHurufYd = (k + 1) * jhYd
         let ada = false
-        if (jKres <= batas + 1e-9) {
-          const lab = `${hurufPatok(k)}#`
-          out.push({ pos: tengah + jKres * s, label: tandai(lab, 1), sumbu, arah: 1 })
-          out.push({ pos: tengah - jKres * s, label: tandai(lab, -1), sumbu, arah: -1 })
+        const idxHash = k // hurufPatok(k) + '#'
+        const idxHuruf = k + 1 // hurufPatok(k+1)
+        const hashDalamBatas = jKresYd <= batasYd + 1e-9
+        const hurufDalamBatas = jHurufYd <= batasYd + 1e-9
+        const hashDiizinkan = batasHuruf === undefined ? true : idxHash < batasHuruf
+        // hash setelah huruf terakhir (mis. E# setelah E) tidak diizinkan
+        const hurufDiizinkan = batasHuruf === undefined ? true : idxHuruf <= batasHuruf
+
+        if (hashDalamBatas && hashDiizinkan) {
+          const lab = `${hurufPatok(idxHash)}#`
+          out.push({ pos: tengah + jKresYd, label: tandai(lab, 1), sumbu, arah: 1 })
+          out.push({ pos: tengah - jKresYd, label: tandai(lab, -1), sumbu, arah: -1 })
           ada = true
         }
-        if (jHuruf <= batas + 1e-9) {
-          const lab = hurufPatok(k + 1)
-          out.push({ pos: tengah + jHuruf * s, label: tandai(lab, 1), sumbu, arah: 1 })
-          out.push({ pos: tengah - jHuruf * s, label: tandai(lab, -1), sumbu, arah: -1 })
+        if (hurufDalamBatas && hurufDiizinkan) {
+          const lab = hurufPatok(idxHuruf)
+          out.push({ pos: tengah + jHurufYd, label: tandai(lab, 1), sumbu, arah: 1 })
+          out.push({ pos: tengah - jHurufYd, label: tandai(lab, -1), sumbu, arah: -1 })
           ada = true
         }
         if (!ada) break
+        // jika keduanya melebihi batasHuruf, berhenti
+        if (batasHuruf !== undefined && idxHuruf >= batasHuruf && idxHash >= batasHuruf) {
+          // huruf sudah mencapai batas, hash berikutnya juga di luar → selesai
+          // tapi loop akan berhenti sendiri via ada===false di iterasi berikutnya
+        }
       }
     } else {
       /** Pola lurus: A di tepi, lalu `#`, B, `#`, C … sampai tepi seberang. */
-      const n = Math.floor(lenSteps / jh)
+      const nMax = Math.floor(lenYd / jhYd)
+      const n = batasHuruf !== undefined ? Math.min(nMax, batasHuruf) : nMax
       for (let k = 0; k <= n; k++) {
-        out.push({ pos: min + k * jh * s, label: hurufPatok(k), sumbu })
-        if (k * jh + jhash <= lenSteps) {
-          out.push({ pos: min + (k * jh + jhash) * s, label: `${hurufPatok(k)}#`, sumbu })
+        out.push({ pos: min + k * jhYd, label: hurufPatok(k), sumbu })
+        // hash setelah k, hanya jika masih dalam batas huruf berikutnya
+        const hashIdx = k
+        const hashDiizinkan = batasHuruf === undefined ? true : hashIdx < batasHuruf
+        if (hashDiizinkan && k * jhYd + jhashYd <= lenYd + 1e-9) {
+          // jangan buat hash melewati batas huruf terakhir (E# setelah E)
+          if (batasHuruf !== undefined && k >= batasHuruf) {
+            // skip
+          } else {
+            out.push({ pos: min + (k * jhYd + jhashYd), label: `${hurufPatok(k)}#`, sumbu })
+          }
         }
       }
     }
   } else {
-    const n = Math.floor(lenSteps / jt)
-    for (let k = 0; k <= n; k++) out.push({ pos: min + k * jt * s, label: labelT(p, k + 1), sumbu })
+    const nMax = Math.floor(lenYd / jtYd)
+    const n =
+      batasT !== undefined ? Math.min(nMax + 1, batasT) : nMax + 1
+    // n adalah jumlah T yang akan digambar (1-based)
+    for (let k = 0; k < n; k++) {
+      out.push({ pos: min + k * jtYd, label: labelT(p, k + 1), sumbu })
+    }
   }
   return out
 }
