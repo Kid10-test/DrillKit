@@ -148,7 +148,16 @@ async function tanamDiHalaman(arg) {
 
 /* ------------------------------- peramban --------------------------------- */
 const CHROME = process.env.CHROME || (fs.existsSync('/tmp/chromium') ? '/tmp/chromium' : undefined)
-const LIB = process.env.CHROME_LIB || '/tmp/br/lib'
+/*
+ * Pustaka Chrome cadangan. Dulu bawaannya `/tmp/br/lib` saja — alamat yang
+ * hanya benar di satu kotak pasir lama; `qa/pulihkan.sh` menyiapkannya di
+ * `/home/user/chrome-lib`. Karena itu `/tmp` juga tidak ikut snapshot,
+ * direktori pertama yang ada dipakai, dan `CHROME_LIB` tetap menang.
+ */
+const LIB =
+  process.env.CHROME_LIB ||
+  ['/home/user/chrome-lib', '/tmp/br/lib'].find((d) => fs.existsSync(d)) ||
+  '/tmp/br/lib'
 const browser = await puppeteer.launch({
   headless: true,
   ...(CHROME ? { executablePath: CHROME, env: { ...process.env, LD_LIBRARY_PATH: LIB } } : {}),
