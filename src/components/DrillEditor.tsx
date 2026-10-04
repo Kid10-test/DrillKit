@@ -83,8 +83,10 @@ import {
 import { downloadHtmlFile, esc, printHtml, printShell } from '../lib/print'
 import { Metronom, klikUntukDrill } from '../lib/metronome'
 import { PemutarRekaman } from '../lib/rekaman'
-import { dariBeatsLama, labelBirama } from '../lib/birama'
+import { dariBeatsLama, formatWaktu, labelBirama } from '../lib/birama'
 import { daftarTempo, petakanSetKeMusik, tempoSet } from '../lib/gabungMusik'
+// #5 sisa — penggaris drill × segmen lagu, bantuan hitungan, pecah/gabung set.
+import { bantuanSet, fmtAngka, fmtBirama, gabungGerak, petaPenggaris, pecahSet } from '../lib/segmenDrill'
 import { hapusTandaSet } from '../lib/kemajuan'
 import {
   cx,
@@ -257,6 +259,39 @@ export function Editor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [petaSet, drill.tempo, latihanDrill?.mode, latihanDrill?.persen, latihanDrill?.geser],
   )
+  /**
+   * #5 sisa — penggaris drill × segmen lagu: baris segmen & baris set dalam
+   * satuan hitungan, dari evaluator tempo yang sama dengan pemutaran.
+   */
+  const penggaris = useMemo(() => {
+    if (!lagu) return null
+    return petaPenggaris(
+      sets.map((s) => ({ counts: s.counts, name: s.name })),
+      {
+        bpm: lagu.bpm,
+        tandaBirama: lagu.tandaBirama ?? dariBeatsLama(lagu.beats),
+        tempoMap: lagu.tempoMap,
+        latih: lagu.latih ?? null,
+      },
+      { beatsPerCount: drill.beatsPerCount, latihan: latihanDrill },
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lagu, sets, drill.beatsPerCount, latihanDrill?.mode, latihanDrill?.persen, latihanDrill?.geser])
+  /** #5 sisa — bantuan hitungan untuk set yang sedang dibuka. */
+  const bantuanHitungan = useMemo(
+    () => (penggaris ? bantuanSet(penggaris, idx, idx < sets.length - 1) : null),
+    [penggaris, idx, sets.length],
+  )
+  /** #5 sisa — keterangan tanda ⚡, dikumpulkan supaya terbaca juga di HP. */
+  const catatanLintas = useMemo(
+    () =>
+      (penggaris?.set ?? [])
+        .filter((b) => b.keterangan.length > 0)
+        .map((b) => ({ index: b.index, nama: b.nama, teks: b.keterangan.join(' · ') })),
+    [penggaris],
+  )
+  /** Lebar blok penggaris: sebanding hitungan, berlantai supaya teksnya muat. */
+  const lebarBlok = (hitungan: number) => `${Math.max(58, Math.min(520, hitungan * 16))}px`
   /** #4 — kembali ke tempo asli: tempo latihan lagu dan pengali animasi. */
   const keTempoAsli = () => {
     if (drill.songId) tl.keAsli([drill.songId])
@@ -297,6 +332,15 @@ export function Editor({
   /** > 0 kalau pengguna sedang/pernah menjepret (scrub) posisi — dipakai supaya
    *  pembersihan transform otomatis tidak menghapus jepretan itu. */
   const jepretRef = useRef(0)
+  /** #5 sisa — panel pecah set: berapa hitungan bagian pertama. */
+  const [pecahTerbuka, setPecahTerbuka] = useState(false)
+  const [pecahDi, setPecahDi] = useState(1)
+  /**
+   * #5 sisa — permintaan geser yang menunggu set aktif berpindah dulu.
+   * Mengetuk blok segmen di penggaris bisa menunjuk set lain; `geserKe` baru
+   * boleh dipanggil setelah React menggambar set itu.
+   */
+  const [geserPending, setGeserPending] = useState<{ idx: number; p: number } | null>(null)
   /** B3 — urutan latihan: mainkan semua set berurutan tanpa berhenti. */
   const [urutan, setUrutan] = useState(false)
   /** B5 — mesin klik tempo (menyertai animasi & urutan latihan). */
@@ -723,6 +767,115 @@ export function Editor({
     await Promise.all(rest.map((s, i) => (s.order === i ? null : db.sets.update(s.id, { order: i }))))
     setIdx(Math.max(0, idx - 1))
     toast.push('Set dihapus', 'info')
+  }
+
+  /* ------------------- #5 sisa — bantuan & pecah/gabung set ---------------- */
+
+  /** Isi hitungan set ini supaya berakhir tepat di batas segmen lagu. */
+  function pasKeBatasSegmen() {
+    if (!set || !bantuanHitungan?.bisaPas) return
+    set.counts = bantuanHitungan.sisaBulat
+    db.sets.update(set.id, { counts: bantuanHitungan.sisaBulat })
+    toast.push(
+      `Hitungan set diisi ${bantuanHitungan.sisaBulat} — berakhir di batas segmen ${bantuanHitungan.segmen?.label ?? ''}`,
+    )
+    forceRender()
+  }
+
+  /** Batas segmen yang jatuh **di dalam** set ini (hitungan 1..counts-1). */
+  function batasDiDalamSet(): number[] {
+    if (!set || !penggaris) return []
+    const n = Math.max(1, Math.floor(set.counts))
+    const mulai = penggaris.set[idx]?.mulai ?? 0
+    return penggaris.segmen
+      .map((s) => Math.round(s.mulai - mulai))
+      .filter((k) => k >= 1 && k <= n - 1)
+  }
+
+  /** Buka panel pecah, dengan usul hitungan yang paling masuk akal. */
+  function bukaPecah() {
+    if (!set) return
+    const n = Math.max(1, Math.floor(set.counts))
+    const batas = batasDiDalamSet()
+    const usul =
+      batas.length > 0
+        ? batas.reduce((a, b) =>
+            Math.abs(b - (bantuanHitungan?.sisaBulat ?? b)) <
+            Math.abs(a - (bantuanHitungan?.sisaBulat ?? a))
+              ? b
+              : a,
+          )
+        : Math.max(1, Math.floor(n / 2))
+    setPecahDi(Math.min(Math.max(1, usul), Math.max(1, n - 1)))
+    setPecahTerbuka(true)
+  }
+
+  /**
+   * Pecah set ini setelah hitungan ke-`di`.
+   *
+   * Posisi peralihan diambil dari jalur yang sudah ada (termasuk busur) oleh
+   * `pecahSet`, dan keadaan sebelum pecah difoto ke riwayat formasi — jadi
+   * hasilnya bisa dibatalkan walau halaman sudah ditutup.
+   */
+  async function pecahSetDi(di: number) {
+    if (!set || !nextSet) {
+      toast.push('Set terakhir tidak punya tujuan untuk dipecah', 'info')
+      return
+    }
+    const peta = petaSet?.[idx]
+    const porsi =
+      peta && peta.detikLatihan > 0
+        ? Math.min(1, Math.max(0, (peta.offsetKlikLatihan[di] ?? peta.detikLatihan) / peta.detikLatihan))
+        : di / Math.max(1, set.counts)
+    const hasil = pecahSet({
+      counts: set.counts,
+      points: set.points,
+      gerak: set.gerak,
+      tujuan: nextSet.points,
+      di,
+      porsi,
+      seksi: (id) => seksiMember.get(id),
+    })
+    if (!hasil) return
+
+    await foto(drill.id, 'sebelum-pecah-set')
+    const baru: DrillSet = {
+      id: uid('set_'),
+      drillId: drill.id,
+      order: idx + 1,
+      name: `${set.name} (pecahan)`,
+      counts: hasil.hitunganKedua,
+      points: hasil.tengah,
+      gerak: hasil.gerakKedua,
+      createdAt: Date.now(),
+    }
+    await db.sets.update(set.id, { counts: hasil.hitunganPertama, gerak: hasil.gerakPertama })
+    await db.sets.put(baru)
+    // Geser nomor urut set sesudahnya supaya pecahannya benar-benar tersisip.
+    await Promise.all(sets.slice(idx + 1).map((s, i) => db.sets.update(s.id, { order: idx + 2 + i })))
+    await db.drills.update(drill.id, { updatedAt: Date.now() })
+    setPecahTerbuka(false)
+    setIdx(idx + 1)
+    toast.push(`Set dipecah di hitungan ${di} — bisa dibatalkan lewat Riwayat formasi`)
+  }
+
+  /**
+   * Gabung set ini dengan set berikutnya: titik set berikutnya dibuang,
+   * hitungannya ditambahkan ke set ini, dan pengaturan geraknya digabung
+   * (`gabungGerak`) sehingga busur hasil pecahan bisa kembali utuh.
+   */
+  async function gabungSetBerikut() {
+    if (!set || !nextSet) return
+    await foto(drill.id, 'sebelum-gabung-set')
+    const counts = Math.max(1, Math.floor(set.counts)) + Math.max(1, Math.floor(nextSet.counts))
+    const gerak = gabungGerak(set.gerak, nextSet.gerak)
+    await db.sets.update(set.id, { counts, gerak })
+    await db.sets.delete(nextSet.id)
+    await hapusTandaSet(drill.id, nextSet.id)
+    await Promise.all(sets.slice(idx + 2).map((s, i) => db.sets.update(s.id, { order: idx + 1 + i })))
+    await db.drills.update(drill.id, { updatedAt: Date.now() })
+    setPecahTerbuka(false)
+    toast.push(`Set digabung — ${nextSet.name} dilebur (bisa dibatalkan lewat Riwayat formasi)`)
   }
 
   async function moveSetOrder(dir: -1 | 1) {
@@ -1526,6 +1679,31 @@ export function Editor({
     },
     [playing, vektorGerak, seksiAnimasi, seksiMember, tulisCount, lagu?.rekaman, petaSet, idx, set?.counts, drill.beatsPerCount, tempoUntuk],
   )
+
+  /**
+   * #5 sisa — lompat ke sebuah hitungan dari penggaris: pilih set yang
+   * memuatnya, lalu geser posisi animasi ke hitungan itu di dalam set.
+   */
+  function keHitungan(h: number) {
+    if (!penggaris || penggaris.set.length === 0) return
+    const blok =
+      penggaris.set.find((b) => h >= b.mulai - 1e-9 && h < b.akhir - 1e-9) ??
+      penggaris.set[penggaris.set.length - 1]
+    if (!blok) return
+    const p = Math.min(1, Math.max(0, (h - blok.mulai) / Math.max(1, blok.hitungan)))
+    setGeserPending({ idx: blok.index, p })
+    // Ketukan yang menunjuk set lain harus benar-benar berpindah set dulu;
+    // kalau tidak, permintaan gesernya menunggu selamanya.
+    if (blok.index !== idx) setIdx(blok.index)
+  }
+
+  /** Permintaan geser dari penggaris dijalankan setelah set aktifnya tergambar. */
+  useEffect(() => {
+    if (!geserPending) return
+    if (geserPending.idx !== idx) return
+    geserKe(geserPending.p)
+    setGeserPending(null)
+  }, [geserPending, idx, geserKe])
 
   /** B2 — kembalikan semua titik ke posisi awal set ini. */
   const resetAnimasi = useCallback(() => {
@@ -2412,6 +2590,105 @@ export function Editor({
             </div>
           </div>
 
+          {/* #5 sisa — penggaris musik × drill: satu penggaris hitungan, dua baris.
+              Baris atas = segmen lagu, baris bawah = set drill; keduanya dalam
+              satuan yang sama (hitungan), supaya mencocokkan tidak lagi menebak
+              dari birama. Di HP penggarisnya bisa digeser ke samping. */}
+          {lagu && penggaris && penggaris.set.length > 0 && (
+            <div className="border-t border-slate-800 px-3 py-2" data-testid="penggaris-drill">
+              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span className="text-[11px] font-medium text-slate-300">
+                  Garis waktu <b className="text-emerald-300">{lagu.title}</b>
+                  <span className="ml-1 text-slate-500">— segmen lagu × set drill, dalam hitungan</span>
+                </span>
+                <span className="text-[10px] tabular-nums text-slate-500" data-testid="penggaris-ringkas">
+                  {penggaris.totalHitungan} hitungan · {formatWaktu(penggaris.totalDetik)}
+                </span>
+              </div>
+              <div className="scroll-thin overflow-x-auto pb-1" data-testid="penggaris-gulir">
+                <div className="min-w-max space-y-1">
+                  {/* Baris segmen: nama, tempo, rentang hitungan & birama. */}
+                  <div className="flex items-stretch gap-1" data-testid="penggaris-baris-segmen">
+                    {penggaris.segmen.map((b) => (
+                      <button
+                        key={`g${b.index}`}
+                        type="button"
+                        data-kiosk-allow
+                        data-testid={`penggaris-segmen-${b.index}`}
+                        onClick={() => keHitungan(b.mulai)}
+                        style={{ width: lebarBlok(b.hitungan) }}
+                        title={
+                          `Segmen ${b.label} · ${b.luncur ? `${fmtAngka(b.bpm)} → ${fmtAngka(b.bpmAkhir)}` : fmtAngka(b.bpm)} BPM · ` +
+                          `hitungan ${fmtAngka(b.mulai + 1)}–${fmtAngka(b.akhir)} · ` +
+                          `birama ${fmtBirama(b.mulaiBirama)}–${fmtBirama(b.akhirBirama)} · ketuk untuk melompat`
+                        }
+                        className="shrink-0 rounded-md border border-sky-800/50 bg-sky-950/30 px-2 py-1 text-left transition hover:border-sky-600/60 hover:bg-sky-950/50"
+                      >
+                        <span className="block truncate text-[11px] font-medium text-sky-200">
+                          {b.dasar ? 'Awal lagu' : b.label}
+                        </span>
+                        <span className="block truncate text-[9px] tabular-nums text-slate-400">
+                          {b.luncur ? `${fmtAngka(b.bpm)}→${fmtAngka(b.bpmAkhir)}` : fmtAngka(b.bpm)} BPM ·{' '}
+                          {fmtAngka(b.mulai + 1)}–{fmtAngka(b.akhir)} · br {fmtBirama(b.mulaiBirama)}–{fmtBirama(b.akhirBirama)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {/* Baris set: rentang hitungan & birama, plus tanda ⚡. */}
+                  <div className="flex items-stretch gap-1" data-testid="penggaris-baris-set">
+                    {penggaris.set.map((b) => (
+                      <button
+                        key={`s${b.index}`}
+                        type="button"
+                        data-kiosk-allow
+                        data-testid={`penggaris-set-${b.index}`}
+                        onClick={() => keHitungan(b.mulai)}
+                        style={{ width: lebarBlok(b.hitungan) }}
+                        title={
+                          `${b.nama} · ${fmtAngka(b.mulai + 1)}–${fmtAngka(b.akhir)} hitungan · ` +
+                          `birama ${fmtBirama(b.mulaiBirama)}–${fmtBirama(b.akhirBirama)} · ${fmtAngka(b.bpm)} BPM` +
+                          (b.keterangan.length ? ` · ${b.keterangan.join(' · ')}` : '')
+                        }
+                        className={cx(
+                          'shrink-0 rounded-md border px-2 py-1 text-left transition',
+                          b.index === idx
+                            ? 'border-emerald-600/60 bg-emerald-600/15 text-emerald-200'
+                            : 'border-slate-800 bg-slate-900/40 text-slate-300 hover:bg-slate-800/60',
+                        )}
+                      >
+                        <span className="flex items-center gap-1 text-[11px] font-medium">
+                          <span className="truncate">{b.nama}</span>
+                          {(b.lintasTempo || b.lintasSukat) && (
+                            <span
+                              data-testid={`penggaris-lintas-${b.index}`}
+                              className="shrink-0 text-amber-300"
+                              title={b.keterangan.join(' · ')}
+                            >
+                              ⚡
+                            </span>
+                          )}
+                        </span>
+                        <span className="block truncate text-[9px] tabular-nums text-slate-400">
+                          {fmtAngka(b.mulai + 1)}–{fmtAngka(b.akhir)} · birama {fmtBirama(b.mulaiBirama)}–
+                          {fmtBirama(b.akhirBirama)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {catatanLintas.length > 0 && (
+                <ul className="mt-1 space-y-0.5 text-[10px] leading-snug text-amber-300/90" data-testid="penggaris-catatan">
+                  {catatanLintas.map((c) => (
+                    <li key={`c${c.index}`} data-testid={`penggaris-catatan-${c.index}`}>
+                      ⚡ <b>{c.nama}</b>: {c.teks}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {/* Keterangan */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-800 px-3 py-2 text-[11px] text-slate-500">
             <span>
@@ -2470,7 +2747,78 @@ export function Editor({
             >
               Ambil dari…
             </Button>
+            {/* #5 sisa — pecah & gabung set: alat bantu, tidak pernah otomatis. */}
+            <Button
+              size="sm"
+              variant={pecahTerbuka ? 'primary' : 'ghost'}
+              onClick={() => (pecahTerbuka ? setPecahTerbuka(false) : bukaPecah())}
+              disabled={!nextSet}
+              data-testid="tombol-pecah"
+              title="Pecah set ini di batas segmen atau di hitungan tertentu — posisi peralihan diambil dari jalur yang ada"
+            >
+              ✂ Pecah…
+            </Button>
+            <ConfirmButton
+              label="Gabung →"
+              testId="tombol-gabung"
+              disabled={!nextSet}
+              message={`Gabung ${set?.name ?? ''} dengan ${nextSet?.name ?? ''}?`}
+              onConfirm={gabungSetBerikut}
+            />
           </div>
+
+          {/* #5 sisa — panel pecah set. Sengaja di dalam kartu set, bukan modal:
+              pelatih bisa melihat hitungan & batas segmennya sambil mengisi. */}
+          {pecahTerbuka && set && (
+            <div className="mt-2 rounded-lg border border-amber-700/40 bg-amber-950/20 p-2.5" data-testid="panel-pecah">
+              <p className="text-[11px] text-amber-100">
+                Pecah <b>{set.name}</b> setelah hitungan{' '}
+                <Input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, Math.floor(set.counts) - 1)}
+                  value={pecahDi}
+                  data-testid="pecah-hitungan"
+                  onChange={(e) => setPecahDi(Number(e.target.value))}
+                  className="mx-1 inline-block w-16 px-2 py-0.5 text-xs"
+                />{' '}
+                dari {Math.max(1, Math.floor(set.counts))}
+              </p>
+              <p className="mt-0.5 text-[10px] leading-snug text-slate-400">
+                Set peralihan mengambil posisi pemain dari jalur yang sudah ada (termasuk busur), jadi
+                formasinya sama seperti di tengah perpindahan semula. Kedua bagian menyimpan pengaturan
+                jalurnya sendiri, dan hasilnya bisa dibatalkan lewat Riwayat formasi.
+              </p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {batasDiDalamSet().map((k) => (
+                  <Button
+                    key={k}
+                    size="sm"
+                    variant={pecahDi === k ? 'primary' : 'soft'}
+                    data-testid={`pecah-batas-${k}`}
+                    onClick={() => setPecahDi(k)}
+                    title="Batas segmen lagu yang jatuh di dalam set ini"
+                  >
+                    Batas segmen · {k}
+                  </Button>
+                ))}
+                <Button
+                  size="sm"
+                  variant={pecahDi === Math.max(1, Math.floor(set.counts / 2)) ? 'primary' : 'soft'}
+                  data-testid="pecah-tengah"
+                  onClick={() => setPecahDi(Math.max(1, Math.floor(set.counts / 2)))}
+                >
+                  Tengah
+                </Button>
+                <Button size="sm" variant="primary" data-testid="pecah-jalankan" onClick={() => pecahSetDi(pecahDi)}>
+                  ✂ Pecah sekarang
+                </Button>
+                <Button size="sm" variant="ghost" data-testid="pecah-batal" onClick={() => setPecahTerbuka(false)}>
+                  Batal
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="scroll-thin flex gap-2 overflow-x-auto pb-1">
             {sets.map((s, i) => (
               <button
@@ -2496,6 +2844,7 @@ export function Editor({
               <div>
                 <label className="mb-1 block text-[11px] text-slate-500">Nama set</label>
                 <Input
+                  data-testid="nama-set"
                   value={set.name}
                   onChange={(e) => {
                     set.name = e.target.value
@@ -2508,6 +2857,7 @@ export function Editor({
                 <label className="mb-1 block text-[11px] text-slate-500">Count ke set berikutnya</label>
                 <Input
                   type="number"
+                  data-testid="hitungan-set"
                   value={set.counts}
                   onChange={(e) => {
                     set.counts = Number(e.target.value)
@@ -2524,6 +2874,40 @@ export function Editor({
                   onChange={(e) => db.drills.update(drill.id, { tempo: Number(e.target.value), updatedAt: Date.now() })}
                 />
               </div>
+
+              {/* #5 sisa — bantuan mengisi hitungan: set ini mulai di hitungan
+                  berapa & di segmen mana, berapa lagi sampai batas segmennya. */}
+              {bantuanHitungan?.ada && (
+                <div className="rounded-lg border border-sky-800/40 bg-sky-950/20 p-2.5 sm:col-span-3" data-testid="bantuan-segmen">
+                  <p className="text-[11px] text-sky-100">{bantuanHitungan.teks}</p>
+                  <p className="mt-0.5 text-[10px] leading-snug text-slate-400" data-testid="bantuan-segmen-rinci">
+                    {bantuanHitungan.teksRinci}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant={bantuanHitungan.bisaPas ? 'primary' : 'soft'}
+                      disabled={!bantuanHitungan.bisaPas}
+                      data-testid="tombol-pas-segmen"
+                      onClick={pasKeBatasSegmen}
+                      title={
+                        bantuanHitungan.bisaPas
+                          ? `Isi ${bantuanHitungan.sisaBulat} hitungan supaya set ini berakhir tepat di batas segmen`
+                          : 'Tidak ada yang perlu diubah'
+                      }
+                    >
+                      Pas ke batas segmen
+                    </Button>
+                    <span className="text-[10px] text-slate-500">
+                      {bantuanHitungan.bisaPas
+                        ? `jadi ${bantuanHitungan.sisaBulat} hitungan`
+                        : idx >= sets.length - 1
+                          ? 'set terakhir tidak berpindah'
+                          : 'sudah tepat di batas segmen'}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/*
                 K1 — Catatan per set.

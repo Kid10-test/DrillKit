@@ -309,11 +309,16 @@ export function ConfirmButton({
   label = 'Hapus',
   message = 'Yakin ingin menghapus?',
   size = 'sm',
+  disabled = false,
+  testId,
 }: {
   onConfirm: () => void
   label?: string
   message?: string
   size?: 'sm' | 'md'
+  /** #5 sisa — tombol gabung set mati saat tidak ada set berikutnya. */
+  disabled?: boolean
+  testId?: string
 }) {
   const [armed, setArmed] = useState(false)
   useEffect(() => {
@@ -324,7 +329,7 @@ export function ConfirmButton({
 
   if (!armed)
     return (
-      <Button variant="ghost" size={size} onClick={() => setArmed(true)}>
+      <Button variant="ghost" size={size} disabled={disabled} data-testid={testId} onClick={() => setArmed(true)}>
         {label}
       </Button>
     )
@@ -332,6 +337,8 @@ export function ConfirmButton({
     <Button
       variant="danger"
       size={size}
+      disabled={disabled}
+      data-testid={testId ? `${testId}-konfirmasi` : undefined}
       onClick={() => {
         onConfirm()
         setArmed(false)

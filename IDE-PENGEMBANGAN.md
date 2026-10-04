@@ -3,7 +3,8 @@
 Dokumen ini **bukan** rencana yang harus dikerjakan semua. Ini kandidat perbaikan,
 diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
 
-**Terakhir diperbarui: 3 Okt 2026 — fondasi #9 grid/patok (41 butir uji) selesai tanpa Pyware/partitur; sebelumnya roadmap pasca PR #14 (tempo map custom terintegrasi ke #5, #6 Rekaman tuntas, #9–#11 ditambahkan).**
+**Terakhir diperbarui: 4 Okt 2026 — #5 Drill × segmen lagu rampung (penggaris dua baris + ⚡, bantuan hitungan & Pas ke batas segmen, panjang segmen dalam hitungan, pecah/gabung set ber-riwayat); sebelumnya fondasi #9 grid/patok (41 butir uji) dan roadmap pasca PR #14.**
+· **#5 Drill × segmen lagu rampung (4 Okt 2026)** — penggaris hitungan **dua baris** (segmen & set) di editor drill dengan tanda **⚡** + keterangan untuk set yang melewati perubahan tempo/sukat, bisa diketuk & digeser di HP; bantuan "mulai di hitungan … / sisa segmen" + tombol **Pas ke batas segmen**; panjang tiap segmen dalam **hitungan drill** di editor lagu; serta **pecah/gabung set** yang mengambil posisi peralihan dari jalur yang ada (termasuk busur, animasi identik) dan bisa dibatalkan lewat riwayat formasi. Modul murni baru `src/lib/segmenDrill.ts`; uji `segmen-drill-logika` 88 (murni) + `m1-penggaris-drill` 41 (peramban); regresi musik/drill sekitarnya tetap hijau.
 · **Fondasi #9 grid/patok selesai (3 Okt 2026)** — audit `field.ts`/`FieldConfigEditor`/`FieldSurface`/tipe, `gantiSatuan` diperbaiki (geometri tetap yard internal, konversi hanya tampil), grid utama/subgrid/hash & garis/label patok terpisah, batas `maksHuruf` simetris & `maksT`, `satuanJarak: langkah|yard`, UI jelaskan 8-to-5=8 langkah/5 yard (4.57 m) vs grid 5 m=5.468 yard ≠ disamakan; uji `grid-patok-logika` 41 lulus, `uji-lapangan` 94, `typecheck` bersih — **tanpa Pyware/partitur**.
 · **Pemutakhiran roadmap 3 Okt 2026 (pasca PR #14)** — fondasi **tempo map custom per ketuk/subdivisi & ramp eksplisit** (`TempoTimeline`, `tempoRamp`, PR #14 — 1 Okt 2026) **terintegrasi sebagian ke #5 Drill × segmen lagu**; evaluasinya dipakai bersama untuk metronom, drill per hitungan, rekaman, dan set list (verifikasi 273 lulus). **#6 Rekaman (MP3)** ditegaskan **selesai** (PR #11 + susulan PR #12, 28 Sep 2026). **Usulan baru #9 grid/patok yard–meter custom, #10 impor drill Pyware, #11 partitur full score/per instrumen + latihan per bar/frasa** ditambahkan ke roadmap; urutan prioritas awal **#5 sisa → #7 → #9 → #10 → #11 → #8**, kini fondasi #9 selesai → **#5 sisa → #7 → #10 → #11 → #8**.
 · **#6 rampung (28 Sep 2026)** — Rekaman audio MP3, M4A, WAV, OGG disimpan di IndexedDB
@@ -45,7 +46,7 @@ diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
   dengan Batalkan, hitung mundur penampilan, cetak bulan (hex), satu `.ics` semua jadwal
   mendatang. Data sesi hanya bertambah `seriId`. Logika di `src/lib/kalender.ts`.
   Uji: `kalender-logika` 67/67, `kalender-jadwal` 31/31; uji lama jadwal tetap lulus.
-· **Rancangan lanjutan (26 Sep 2026, pemutakhiran 3 Okt 2026 pasca PR #14)** — delapan rancangan awal (#1–#4 rampung PR #6–#10). **Tempo map custom (PR #14, 1 Okt 2026) terintegrasi sebagian ke #5** (`TempoTimeline` + ramp eksplisit per ketuk/subdivisi); **#6 Rekaman tuntas** (PR #11 + susulan PR #12). **Usulan baru #9 grid/patok yard–meter custom, #10 impor drill Pyware, #11 partitur full score/per instrumen + latihan per bar/frasa** ditambahkan; roadmap baru **#5 sisa → #7 → #9 → #10 → #11 → #8**. Rincian di bagian **Rancangan lanjutan** paling bawah — pemutakhiran ini hanya merapikan dokumen, tanpa ubah kode.
+· **Rancangan lanjutan (26 Sep 2026, pemutakhiran 4 Okt 2026)** — delapan rancangan awal (#1–#4 rampung PR #6–#10). **Tempo map custom (PR #14, 1 Okt 2026) kini terintegrasi penuh ke #5** (`TempoTimeline` + ramp eksplisit per ketuk/subdivisi), dan **#5 Drill × segmen lagu rampung 4 Okt 2026** (penggaris dua baris + ⚡, bantuan hitungan, pecah/gabung set); **#6 Rekaman tuntas** (PR #11 + susulan PR #12). **Usulan #9 grid/patok yard–meter custom, #10 impor drill Pyware, #11 partitur full score/per instrumen + latihan per bar/frasa** menunggu; urutan prioritas **#7 → #10 → #11 → #8**. Rincian di bagian **Rancangan lanjutan** paling bawah.
 · **#2 bagian kedua rampung (26 Sep 2026)** — kunci pribadi AES-256-GCM per anggota,
   data pribadi terkunci di berkas terbit, QR kunci, dan tombol Buat kunci baru.
 · **#2 bagian pertama rampung (26 Sep 2026)** — satu tombol menerbitkan materi
@@ -5174,15 +5175,15 @@ Semuanya siap dikerjakan di sesi baru. Setiap rancangan dijadikan PR
 tersendiri, sesuai kebiasaan proyek (satu ide = satu commit/PR,
 disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 
-**Status per 3 Okt 2026 (pemutakhiran pasca PR #14):**
+**Status per 4 Okt 2026 (pemutakhiran #5 rampung):**
 - **#1, #2, #3, dan #4 telah rampung penuh** (PR #6 hingga PR #10).
-- **#5 sebagian rampung** — fondasi tempo map custom per ketuk/subdivisi
-  dan ramp eksplisit telah terintegrasi lewat **PR #14** (`TempoTimeline`);
-  sisa pekerjaan #5 (garis waktu musik × drill, bantuan hitungan, pecah/gabung set)
-  masih menunggu.
+- **#5 telah rampung penuh** — fondasi tempo map custom per ketuk/subdivisi
+  dan ramp eksplisit lewat **PR #14** (`TempoTimeline`), lalu sisanya
+  (garis waktu musik × drill, bantuan hitungan, pecah/gabung set) selesai
+  4 Okt 2026 lengkap dengan uji murni + peramban.
 - **#6 Rekaman lagu (MP3) telah rampung penuh** (PR #11 + susulan PR #12,
   28 Sep 2026).
-- **#7 dan #8 menunggu** — siap dikerjakan setelah #5 sisa.
+- **#7 dan #8 menunggu** — tidak lagi terhalang; #5 sudah rampung.
 - **#9–#11 usulan baru** (grid/patok yard–meter custom, impor Pyware, partitur
   full score/per instrumen + latihan per bar/frasa) ditambahkan sebagai
   kandidat berikutnya; hanya roadmap/prioritas yang dirapikan, tanpa ubah kode.
@@ -5205,7 +5206,7 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 2 | Terbitkan ke anggota (2 PR) | Sedang–besar | **Selesai (PR #7)** | Tahap 1 terbit materi grup; Tahap 2 kunci AES-256-GCM & data terkunci |
 | 3 | Jadwal: kalender & agenda | Sedang | **Selesai (PR #8 & #9)** | Tahap 1 kalender/agenda/seri/cetak/.ics; Tahap 2 kalender baca-saja anggota |
 | 4 | Tempo latihan | Kecil–sedang | **Selesai (PR #10)** | Persen & BPM per lagu, naik otomatis saat ulang, presenter ikut melambat, hari H asli |
-| 5 | Drill × segmen lagu | Sedang | **Sebagian rampung (PR #14)** — tempo map custom & ramp eksplisit terintegrasi; **sisa:** garis waktu, bantuan hitungan, pecah/gabung | Fondasi `TempoTimeline` selesai 1 Okt 2026; sisa UI drill×musik tetap menunggu |
+| 5 | Drill × segmen lagu | Sedang | **Selesai (PR #14 + susulan 4 Okt 2026)** | Penggaris dua baris + ⚡, bantuan hitungan & Pas ke batas segmen, panjang segmen dalam hitungan, pecah/gabung set ber-riwayat; uji `segmen-drill-logika` 88 + `m1-penggaris-drill` 41 |
 | 6 | Rekaman lagu (MP3) | Sedang–besar | **Selesai (PR #11 + susulan PR #12, 28 Sep 2026)** | Berkas Blob IndexedDB, sidik SHA-256, waveform & titik mulai, jam rekaman sinkron |
 | 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | **Menunggu** | Mengenali ZIP dari #6, memuat langkah pencocokan dari #1; siap setelah #5 sisa |
 | 8 | PIN pelatih tim | Kecil–sedang | **Menunggu** | Pagar mode pelatih via hash ENV; tanpa ketergantungan, bisa disisipkan kapan saja |
@@ -5213,10 +5214,9 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 10 | Impor drill Pyware | Sedang | **Menunggu — jangan mulai pada tahap ini** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo |
 | 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Menunggu — jangan mulai pada tahap ini** | MusicXML offline (OSMD) + PDF fallback, full score & part, highlight sinkron, loop bar/frasa |
 
-> **Urutan prioritas yang disarankan pasca PR #14 + fondasi #9 (3 Okt 2026):**
-> **#5 sisa → #7 → #10 → #11 → #8** (fondasi #9 selesai; sisa polish tidak memblokir).
-> Alasan: selesaikan sisa **#5** yang sudah punya fondasi tempo (PR #14) agar
-> drill×musik benar-benar menyatu; **#7** merapikan 5 jenis berkas + ZIP rekaman
+> **Urutan prioritas yang disarankan pasca #5 rampung (4 Okt 2026):**
+> **#7 → #10 → #11 → #8** (fondasi #9 selesai; sisa polish tidak memblokir).
+> Alasan: **#5** sudah rampung sehingga drill×musik benar-benar menyatu; **#7** merapikan 5 jenis berkas + ZIP rekaman
 > sehingga impor Pyware (#10) dan MusicXML (#11) punya pintu masuk yang jelas;
 > **#9** grid/patok kustom memberi akurasi lapangan sebelum migrasi massal;
 > **#10** Pyware mempercepat migrasi tim yang sudah punya drill; **#11**
@@ -5602,7 +5602,7 @@ pada hitungan 1 dan tepat mencapai 140 pada hitungan 6; drill tanpa
 perubahan tempo durasinya tetap; animasi identik setelah dipecah; garis
 waktu dan ⚡; Pas ke batas segmen; undo.
 
-### Status: Sebagian rampung (1 Okt 2026, PR #14) — fondasi tempo terintegrasi
+### Status: Rampung (4 Okt 2026) — penggaris, bantuan hitungan, pecah/gabung set
 
 **Sudah terintegrasi (PR #14, 1 Okt 2026):**
 - Tempo map kini mendukung posisi **1-based pada birama, ketuk tertulis,
@@ -5618,15 +5618,45 @@ waktu dan ⚡; Pas ke batas segmen; undo.
 - Verifikasi: `tempo-map-logika` 25, `perubahan-tempo-logika` 90,
   `uji-gabung-musik` 51, `uji-setlist` 107 — total 273 lulus.
 
-**Sisa yang masih menunggu (tanpa ubah kode pada pemutakhiran ini):**
-- **(1) Garis waktu musik × drill** — penggaris hitungan dua baris + tanda ⚡.
-- **(2) Bantuan hitungan** — keterangan "mulai di hitungan … / sisa segmen",
-  tombol Pas ke batas segmen, panjang segmen dalam hitungan di editor lagu.
-- **(4) Pecah & gabung set** — pecah di batas segmen/hitungan (interpolasi
-  busur), gabung, keduanya undoable.
+**Sisa #5 selesai (4 Okt 2026):**
+- **(1) Garis waktu musik × drill** — penggaris hitungan **dua baris** di bawah
+  lapangan editor drill, muncul saat drill ditautkan ke lagu: baris **segmen**
+  (nama, tempo, rentang hitungan & birama) dan baris **set** (rentang hitungan
+  & birama). Set yang melewati perubahan tempo/sukat ditandai **⚡** dengan
+  keterangan di bawah penggaris (mis. "melewati perubahan tempo 120 → 150 BPM
+  di hitungan 5, birama 3"). Bloknya bisa diketuk untuk melompat ke set &
+  hitungan itu, dan di HP penggarisnya bisa digeser ke samping.
+  Modul murninya `src/lib/segmenDrill.ts` (`petaPenggaris`).
+- **(2) Bantuan hitungan** — keterangan "Mulai di hitungan 13 (segmen A ·
+  birama 4), sisa segmen A: 6 hitungan" + tombol **Pas ke batas segmen**
+  (mengisi hitungan set supaya berakhir tepat di batas segmen; batas yang jatuh
+  di tengah hitungan dibulatkan dan alasannya ikut ditulis). Di editor lagu,
+  tiap segmen menampilkan panjangnya **dalam hitungan drill**; ketuk per
+  hitungan diambil dari drill yang menautkan lagu itu dan sumbernya ditulis apa
+  adanya supaya tidak dikira angka pasti (`panjangSegmenLagu`, `asumsiHitungan`).
+- **(4) Pecah & gabung set** — pecah di batas segmen atau hitungan mana pun;
+  posisi peralihan **diambil dari jalur yang sudah ada** (lurus, melengkung,
+  busur) memakai fungsi animasi yang sama (`progresPemain`, `titikJalur`,
+  `deltaBusur`) sehingga animasinya identik; tiap bagian menyimpan pengaturan
+  jalurnya sendiri, dan busur hasil pecahan kembali utuh saat digabung
+  (`gabungGerak`). Gabung melebur set berikutnya (hitungannya menjumlah).
+  Keduanya memotret keadaan ke **riwayat formasi** (`sebelum-pecah-set`,
+  `sebelum-gabung-set`), jadi bisa dibatalkan walau halaman sudah ditutup.
+- Verifikasi: `segmen-drill-logika` **88 lulus** (murni; dirakit lewat
+  `qa/bangun-logika.sh` → `rakit src/lib/segmenDrill.ts segmen`) dan
+  `m1-penggaris-drill` **41 lulus** (peramban). Regresi yang menyentuh berkas
+  ini tetap hijau: `uji-gabung-musik` 51, `uji-riwayat` 27, `uji-setlist` 107,
+  `uji-birama` 123, `uji-panjang-lagu` 109, `tempo-map-logika` 25,
+  `perubahan-tempo-logika` 90, `mode-logika` 34, `m1-tempo-lagu-drill` 20,
+  `m1-sukat-segmen` 15, `m1-mode-lagu` 27, `m1-birama` 41,
+  `m5-panjang-lagu-ui` 30, `tempo-latihan` 26, `uji-ulang` 41, `kartu-lipat` 48.
+  Kedua rangkaian baru didaftarkan di `qa/regresi-penuh.sh`.
+- Catatan: dua kelemahan uji lama ikut diperbaiki — `m1-mode-lagu` mengisi
+  kolom lewat **urutan input** (kolom kedua ternyata "ketuk", bukan BPM),
+  dan mengklik tombol di bawah daftar dengan koordinat mouse yang kini bisa
+  jatuh ke latar modal; keduanya diganti testid + klik DOM (27/27).
 
-> Pemutakhiran ini **hanya merapikan roadmap**; tidak ada perubahan kode
-> untuk sisa #5. Fondasi tempo sudah siap dipakai oleh sisa pekerjaan tersebut.
+> Prioritas berikutnya: **#7 → #10 → #11 → #8**.
 
 ---
 

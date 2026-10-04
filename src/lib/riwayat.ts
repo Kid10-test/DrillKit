@@ -244,6 +244,10 @@ export function labelAlasan(s: RiwayatSnapshot): string {
       return 'Sebelum impor show'
     case 'sebelum-kembalikan':
       return 'Sebelum mengembalikan versi lama'
+    case 'sebelum-pecah-set':
+      return 'Sebelum set dipecah'
+    case 'sebelum-gabung-set':
+      return 'Sebelum set digabung'
     default:
       return 'Foto'
   }
