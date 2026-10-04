@@ -94,7 +94,15 @@ try {
   await wait(200)
   cek('tampilan Agenda bisa dipilih', await ada('[data-testid="kalender-anggota-agenda"]'))
   await p.click('[data-testid="anggota-lihat-lewat"]')
-  await wait(200)
+  await wait(600)
+  /*
+   * N19 — di Agenda, sesi lewat tampil sebagai **baris** ringkas; kartu
+   * lengkapnya (beserta lencana kehadiran pribadi) terbuka saat barisnya
+   * diketuk. Dulu uji ini mengharapkan kartunya sudah terbuka sendiri, dan
+   * gagal pada tata letak yang memang sengaja diringkas.
+   */
+  await p.click('[data-testid="baris-anggota-s_lewat"]')
+  await wait(400)
   cek('Agenda juga menampilkan status pribadi', (await p.$eval('[data-testid="kartu-anggota-s_lewat"]', (e) => e.textContent))?.includes('Hadir') === true)
   cek('Agenda anggota tetap baca saja', !(await p.$eval('[data-testid="kalender-anggota-agenda"]', (e) => e.textContent)).includes('Edit'))
   cek('tidak ada galat peramban', errors.length === 0, errors.slice(0, 2).join(' | '))

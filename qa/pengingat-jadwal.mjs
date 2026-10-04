@@ -224,6 +224,19 @@ try {
     b?.click()
   })
   await wait(1200)
+  /*
+   * N19 — kartu sesi anggota (`ics-anggota-…`) hanya ada di tab **Agenda**;
+   * bawaan halaman ini di layar ≥768 px adalah **Bulan**, dan lebar bawaan
+   * peramban 800 px. Dulu rangkaian ini mencari tombolnya di tab Bulan dan
+   * gagal — bukan karena .ics-nya rusak, melainkan karena tidak ada yang
+   * membuka tabnya. Yang diklik di sini adalah tombol yang sama yang dipakai
+   * anggota sungguhan.
+   */
+  const tombolAgenda = await B.$('[data-testid="anggota-tampilan-agenda"]')
+  if (tombolAgenda) {
+    await tombolAgenda.click()
+    await wait(600)
+  }
   const spandukA = await teks(B, 'ingat-anggota-spanduk')
   cek('5: spanduk anggota muncul & memuat Uji Ingat', spandukA.includes('Uji Ingat'), spandukA.slice(0, 120))
   // Notifikasi: hanya sesi dalam jendela 3 jam yang tercatat.
@@ -245,6 +258,19 @@ try {
     const milik = tombol.find((b) => b.closest('li')?.textContent.includes('Uji Ingat'))
     return milik?.getAttribute('data-testid')?.replace('ingat-anggota-ics-', '') ?? ''
   })
+  /*
+   * N19 — di Agenda, hanya kartu sesi berikutnya yang terbuka; sesi lain
+   * menunggu barisnya diketuk. "Uji Ingat" (besok) bukan sesi berikutnya,
+   * jadi barisnya dibuka dulu — persis seperti anggota yang mencari jadwal
+   * besok di daftar.
+   */
+  if (idUjiB && !(await B.$(`[data-testid="ics-anggota-${idUjiB}"]`))) {
+    const baris = await B.$(`[data-testid="baris-anggota-${idUjiB}"]`)
+    if (baris) {
+      await baris.click()
+      await wait(500)
+    }
+  }
   const tombolIcsB = idUjiB ? await B.$(`[data-testid="ics-anggota-${idUjiB}"]`) : null
   cek('5: tombol Kalender anggota diklik', tombolIcsB != null, idUjiB)
   if (tombolIcsB) await tombolIcsB.click()

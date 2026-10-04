@@ -351,13 +351,28 @@ export function ConfirmButton({
 
 /* --------------------------------- Badge --------------------------------- */
 
-export function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
+/**
+ * Lencana kecil. Prop lain (`data-testid`, `title`, …) diteruskan apa adanya.
+ *
+ * N19 — dulu hanya `children` & `className` yang diterima, sehingga
+ * `data-testid` yang dipasang pemanggil **hilang tanpa suara**: lencana
+ * kehadiran di halaman Berbagi sudah lama memintanya, tetapi tidak pernah
+ * muncul di DOM, dan uji yang mencarinya gagal pada hal yang tidak ada
+ * hubungannya dengan yang diuji. Prop yang diabaikan diam-diam seperti itu
+ * lebih buruk daripada prop yang ditolak.
+ */
+export function Badge({
+  children,
+  className,
+  ...rest
+}: { children: React.ReactNode; className?: string } & React.HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
       className={cx(
         'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium',
         className ?? 'border-slate-700 bg-slate-800/60 text-slate-300',
       )}
+      {...rest}
     >
       {children}
     </span>
