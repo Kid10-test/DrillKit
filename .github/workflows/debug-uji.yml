@@ -1,0 +1,74 @@
+# SEMENTARA — debug satu rangkaian dari kotak pasir tanpa Chrome.
+# Dipicu manual: gh workflow run debug-uji.yml -f rangkaian=buka-berkas
+# Keluaran suite dipancarkan sebagai anotasi supaya terbaca via API.
+# HAPUS berkas ini setelah selesai debug.
+name: Debug satu rangkaian
+
+on:
+  workflow_dispatch:
+    inputs:
+      rangkaian:
+        description: 'Nama rangkaian tanpa .mjs (mis. buka-berkas)'
+        required: true
+        type: string
+
+jobs:
+  uji:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            qa/package-lock.json
+
+      - name: Dependensi aplikasi
+        run: npm ci
+
+      - name: Dependensi uji (puppeteer + Chrome)
+        run: npm --prefix qa ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Pustaka sistem Chrome
+        run: |
+          sudo apt-get update
+          for p in libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+            libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 \
+            libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libasound2t64; do
+            sudo apt-get install -y "$p" >/dev/null 2>&1 || echo "  (lewati $p)"
+          done
+
+      - name: Pratinjau build
+        run: |
+          (npm run preview -- --port 4173 --strictPort >/tmp/preview.log 2>&1 &)
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:4173/ >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:4173/ >/dev/null
+
+      - name: Jalankan rangkaian
+        run: |
+          cd qa
+          BASE=http://localhost:4173 node "${{ inputs.rangkaian }}.mjs" >/tmp/hasil.txt 2>&1
+          echo "KODE_KELUAR=$?"
+          tail -c 4000 /tmp/hasil.txt
+
+      - name: Pancarkan keluaran sebagai anotasi
+        if: always()
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const keluar = fs.existsSync('/tmp/hasil.txt') ? fs.readFileSync('/tmp/hasil.txt', 'utf8') : '(tidak ada keluaran)';
+            const ekor = keluar.slice(-6000);
+            const kaya = ekor.replace(/%/g, '%25').replace(/\n/g, '%0A').replace(/\r/g, '%0D');
+            console.log('::error::' + kaya);
+          "
