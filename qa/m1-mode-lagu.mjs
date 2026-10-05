@@ -105,9 +105,18 @@ uji('tombol tambah segmen di bawah ada', await ada('[data-testid="tambah-segmen-
 uji('ada keterangan saat segmen masih kosong', (await p.evaluate(() => document.body.textContent)).includes('Belum ada segmen'))
 
 // Tambah dua segmen lewat tombol BAWAH (bukan yang di atas).
-await p.click('[data-testid="tambah-segmen-bawah"]')
+//
+// N16 — klik lewat DOM, bukan lewat koordinat mouse. Kartu segmen kini
+// memuat catatan panjangnya ("≈ N hitungan drill"), jadi setelah segmen
+// pertama ditambahkan tombol di bawah daftar bisa berada di luar tinggi
+// layar. Klik berkoordinat lalu meminta Chrome menggulirkan wadah modal —
+// dan bila gulirannya meleset, kliknya jatuh ke latar modal dan MENUTUPnya,
+// tanpa satu pun asersi yang menerangkan kenapa. Klik DOM tidak punya
+// masalah itu: yang diklik memang elemennya.
+const klikTombol = (sel) => p.evaluate((q) => document.querySelector(q)?.click(), sel)
+await klikTombol('[data-testid="tambah-segmen-bawah"]')
 await wait(400)
-await p.click('[data-testid="tambah-segmen-bawah"]')
+await klikTombol('[data-testid="tambah-segmen-bawah"]')
 await wait(500)
 
 /*
@@ -132,22 +141,33 @@ sama('tombol bawah menambah 2 segmen', ids.length, 2)
 
 // Isi: segmen 1 = birama 1, 112 BPM, ikuti lagu (4/4)
 //      segmen 2 = birama 5, 132 BPM, 7/8
-await p.evaluate((a) => {
-  const setV = (el, v) => {
-    const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-    s.call(el, String(v))
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-  }
-  a.forEach((id, ix) => {
-    const w = document.querySelector(`[data-testid="${id}"]`)
-    if (!w) return
-    const t = w.querySelector('input')
-    if (t) setV(t, ix === 0 ? 'A — pembuka' : 'B — ganti meter')
-    const n = w.querySelectorAll('input[type="number"]')
-    if (n[0]) setV(n[0], ix === 0 ? 1 : 5)
-    if (n[1]) setV(n[1], ix === 0 ? 112 : 132)
-  })
-}, ids)
+/*
+ * N17 — isi lewat TESTID-nya, bukan urutan input.
+ *
+ * Dulu isian diambil dengan `wadah.querySelectorAll('input[type=number]')`:
+ * `n[0]` = birama, `n[1]` disangka BPM. Padahal kolom kedua adalah **ketuk**,
+ * jadi 112 & 132 masuk ke ketuk, BPM dibiarkan 120, dan tiga asersi di ujung
+ * rangkaian (panel & chip) gagal — bukan karena aplikasinya, melainkan karena
+ * ujinya menulis ke kolom yang salah. Urutan kolom boleh berubah; testid tidak.
+ */
+const setV = (sel, v) =>
+  p.evaluate(
+    (q, nilai) => {
+      const el = document.querySelector(q)
+      if (!el) return
+      const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+      s.call(el, String(nilai))
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    },
+    sel,
+    v,
+  )
+for (const [ix, id] of ids.entries()) {
+  const sid = id.replace('segmen-', '')
+  await setV(`[data-testid="segmen-label-${sid}"]`, ix === 0 ? 'A — pembuka' : 'B — ganti meter')
+  await setV(`[data-testid="segmen-birama-${sid}"]`, ix === 0 ? 1 : 5)
+  await setV(`[data-testid="segmen-bpm-${sid}"]`, ix === 0 ? 112 : 132)
+}
 await wait(400)
 await pilihTeks(`[data-testid="segmen-meter-${ids[1].replace('segmen-', '')}"] select`, '7/8 · 2+2+3')
 await wait(300)

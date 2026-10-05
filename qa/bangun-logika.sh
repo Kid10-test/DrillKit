@@ -40,6 +40,8 @@ rakit src/lib/ulang.ts        ulang
 # (ERR_MODULE_NOT_FOUND) — kegagalan yang tampak seperti "uji ini tidak
 # punya ringkasan", padahal modulnya yang belum dirakit.
 rakit src/lib/gabungMusik.ts  gabung
+# #5 sisa — penggaris hitungan, bantuan, dan pecah/gabung set.
+rakit src/lib/segmenDrill.ts segmen
 rakit src/lib/setlist.ts      setlist
 # N12 — pemeriksa situs: modul murni, diuji tanpa peramban.
 rakit src/lib/situs.ts        situs

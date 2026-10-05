@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import type {
   BiramaPola,
+  Drill,
   HitungMundur,
   SetList,
   LatihTempo,
@@ -36,6 +37,9 @@ import {
   normalisasiBirama,
 } from '../lib/birama'
 import type { SegmenWaktu } from '../lib/birama'
+// #5 sisa — panjang segmen lagu dalam hitungan drill.
+import { fmtAngka, fmtBirama, panjangSegmenLagu } from '../lib/segmenDrill'
+import type { PanjangSegmen } from '../lib/segmenDrill'
 import { hitungSetList, setListBaru } from '../lib/setlist'
 import { ModalRekamanLagu } from '../components/ModalRekamanLagu'
 import { PemutarRekaman, waktuBiramaKeDetikAudio } from '../lib/rekaman'
@@ -67,6 +71,50 @@ import {
 import { IconLoop, IconMusic, IconPause, IconPlay, IconPlus } from '../components/Icons'
 import TunerDrone from '../components/TunerDrone'
 import { cx, uid } from '../lib/utils'
+
+/**
+ * #5 sisa — ketuk per hitungan untuk menampilkan panjang segmen dalam
+ * **hitungan drill**.
+ *
+ * Editor lagu tidak tahu drill mana yang akan memakainya, jadi nilainya
+ * diambil dari drill yang sudah menautkan lagu ini. Kalau belum ada (atau
+ * nilainya berbeda-beda), dipakai asumsi lazim **2 ketuk per hitungan** —
+ * satu hitungan = setengah birama 4/4 — dan sumbernya ditulis apa adanya di
+ * keterangan supaya tidak dikira angka pasti.
+ */
+function asumsiHitungan(drills: Drill[], songId: string): { nilai: number; sumber: string } {
+  const dipakai = drills.filter((d) => d.songId === songId)
+  const nilai = Array.from(new Set(dipakai.map((d) => d.beatsPerCount))).filter(
+    (n) => Number.isFinite(n) && n > 0,
+  )
+  if (nilai.length === 1) return { nilai: nilai[0], sumber: 'dari drill yang memakai lagu ini' }
+  if (nilai.length > 1) {
+    const hitung = new Map<number, number>()
+    dipakai.forEach((d) => hitung.set(d.beatsPerCount, (hitung.get(d.beatsPerCount) ?? 0) + 1))
+    const terbanyak = [...hitung.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0]
+    return {
+      nilai: terbanyak,
+      sumber: `dari drill yang memakai lagu ini (${nilai.length} nilai berbeda — dipakai yang terbanyak)`,
+    }
+  }
+  return { nilai: 2, sumber: 'asumsi 2 ketuk per hitungan; belum ada drill yang memakai lagu ini' }
+}
+
+/** Peta id segmen → panjangnya; urutannya sama dengan urutan musikal. */
+function petaPanjang(segs: TempoSegment[], panjang: PanjangSegmen[]): Map<string, PanjangSegmen> {
+  const urut = [...segs].sort(
+    (a, b) =>
+      a.measure - b.measure ||
+      (a.beat ?? 1) - (b.beat ?? 1) ||
+      (a.subdivision ?? 1) - (b.subdivision ?? 1),
+  )
+  const peta = new Map<string, PanjangSegmen>()
+  urut.forEach((seg, i) => {
+    const p = panjang[i]
+    if (p && Math.abs(p.measure - seg.measure) < 1e-9) peta.set(seg.id, p)
+  })
+  return peta
+}
 
 /* ---------------------------------------------------------------------------
  * E3 — Mesin metronom sudah dipindah ke `src/lib/metronome.ts` supaya bisa
@@ -158,6 +206,29 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
   const [kotor, setKotor] = useState(false)
 
   const song = songs?.find((s) => s.id === selected)
+  /* #5 sisa — panjang tiap segmen lagu terpilih dalam hitungan drill. */
+  const semuaDrill = useLiveQuery(() => db.drills.toArray(), [], [])
+  const asumsiSegmen = useMemo(() => asumsiHitungan(semuaDrill ?? [], song?.id ?? ''), [semuaDrill, song?.id])
+  const panjangSegmenLaguIni = useMemo(
+    () =>
+      song
+        ? panjangSegmenLagu(
+            {
+              bpm: song.bpm,
+              tandaBirama: song.tandaBirama ?? dariBeatsLama(song.beats),
+              tempoMap: song.tempoMap,
+              latih: song.latih ?? null,
+            },
+            asumsiSegmen.nilai,
+            { akhirBirama: song.panjangBirama ?? null },
+          )
+        : [],
+    [song, asumsiSegmen.nilai],
+  )
+  const panjangSegmenById = useMemo(
+    () => (song ? petaPanjang(song.tempoMap, panjangSegmenLaguIni) : new Map<string, PanjangSegmen>()),
+    [song, panjangSegmenLaguIni],
+  )
   const segs = useMemo(() => song?.tempoMap ?? [], [song])
   /* ------------------------ #4 — tempo latihan -------------------------- */
   const tl = useTempoLatihan()
@@ -1591,7 +1662,22 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
                         </span>
                       )}
                     </span>
-                    <span className="text-xs font-semibold tabular-nums text-emerald-400">{t.bpm} BPM</span>
+                    <span className="flex items-center gap-2">
+                      {(() => {
+                        const p = panjangSegmenById.get(t.id)
+                        if (!p) return null
+                        return (
+                          <span
+                            className="text-[10px] tabular-nums text-slate-500"
+                            data-testid={`daftar-segmen-panjang-${t.id}`}
+                            title={`Panjang segmen dalam hitungan drill (${fmtAngka(asumsiSegmen.nilai)} ketuk per hitungan, ${asumsiSegmen.sumber})`}
+                          >
+                            {p.hitungan === null ? 'panjang bebas' : `≈ ${fmtAngka(p.hitungan)} hitungan`}
+                          </span>
+                        )
+                      })()}
+                      <span className="text-xs font-semibold tabular-nums text-emerald-400">{t.bpm} BPM</span>
+                    </span>
                   </div>
                 ))}
               {song.notes && <p className="whitespace-pre-wrap text-[11px] text-slate-500">{song.notes}</p>}
@@ -1798,6 +1884,37 @@ function SongModal({
 }) {
   const [s, setS] = useState<Song | null>(song)
   useEffect(() => setS(song), [song])
+  /*
+   * #5 sisa — panjang tiap segmen dalam **hitungan drill**, supaya musik dan
+   * set drill direncanakan dengan satuan yang sama. Ketuk per hitungannya
+   * diambil dari drill yang memakai lagu ini (lihat `asumsiHitungan`).
+   *
+   * Hook-nya WAJIB di atas `if (!s) return null` di bawah: kalau tidak, jumlah
+   * hook berubah begitu lagunya ada dan React melempar error #310.
+   */
+  const semuaDrill = useLiveQuery(() => db.drills.toArray(), [], [])
+  const asumsi = useMemo(() => asumsiHitungan(semuaDrill ?? [], s?.id ?? ''), [semuaDrill, s?.id])
+  const panjangSegmen = useMemo(
+    () =>
+      s
+        ? panjangSegmenLagu(
+            {
+              bpm: s.bpm,
+              tandaBirama: s.tandaBirama ?? dariBeatsLama(s.beats),
+              tempoMap: s.tempoMap,
+              latih: s.latih ?? null,
+            },
+            asumsi.nilai,
+            { akhirBirama: s.panjangBirama ?? null },
+          )
+        : [],
+    [s, asumsi.nilai],
+  )
+  /** Peta id segmen → panjangnya, memakai urutan yang sama dengan `urutSegmen`. */
+  const panjangById = useMemo(
+    () => (s ? petaPanjang(s.tempoMap, panjangSegmen) : new Map<string, PanjangSegmen>()),
+    [s, panjangSegmen],
+  )
   if (!s) return null
 
   /* N5 — perubahan tempo yang tersimpan di lagu ini. */
@@ -1845,6 +1962,7 @@ function SongModal({
     a.measure - b.measure || (a.beat ?? 1) - (b.beat ?? 1) ||
     (a.subdivision ?? 1) - (b.subdivision ?? 1),
   )
+
   /** N6 — kalau ada segmen berangsur, luncuran menyeluruh dikesampingkan. */
   const adaBerangsurDiLagu = s.tempoMap.some((t) => t.berangsur === 1 || (t.rampCounts ?? 0) > 0)
 
@@ -2003,6 +2121,10 @@ function SongModal({
         <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
           Ketuk dan subdivisi memakai indeks 1-based. Ramp menyimpan jumlah hitungan dan satuannya secara eksplisit;
           perubahan pada hitungan pertama sudah bergerak, dan hitungan terakhir mencapai BPM target.
+        </p>
+        <p className="mb-2 text-[11px] leading-relaxed text-slate-500" data-testid="segmen-asumsi-hitungan">
+          Panjang tiap segmen juga ditulis dalam <b>hitungan drill</b> ({fmtAngka(asumsi.nilai)} ketuk per
+          hitungan, {asumsi.sumber}) — itulah satuan set di editor drill.
         </p>
         <div className="space-y-2">
           {[...s.tempoMap]
@@ -2257,6 +2379,18 @@ function SongModal({
                     </p>
                   )}
                 </div>}
+                {/* #5 sisa — panjang segmen dalam hitungan drill. */}
+                {(() => {
+                  const p = panjangById.get(t.id)
+                  if (!p) return null
+                  return (
+                    <p className="text-[10px] text-slate-500" data-testid={`segmen-panjang-${t.id}`}>
+                      {p.hitungan === null
+                        ? 'Panjangnya belum tertentu — isi “panjang lagu” atau tambah segmen berikutnya'
+                        : `≈ ${fmtAngka(p.hitungan)} hitungan drill · birama ${fmtBirama(p.mulaiBirama)}–${fmtBirama(p.akhirBirama)}`}
+                    </p>
+                  )
+                })()}
                 </>
                   )
                 })()}

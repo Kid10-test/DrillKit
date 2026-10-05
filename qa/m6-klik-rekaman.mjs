@@ -158,7 +158,16 @@ async function tanamDiHalaman(arg) {
 /* --------------------------------- skenario -------------------------------- */
 const CHROME =
   process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME || (fs.existsSync('/tmp/chromium') ? '/tmp/chromium' : undefined)
-const LIB = process.env.CHROME_LIB || '/tmp/br/lib'
+/*
+ * Pustaka Chrome cadangan. Dulu bawaannya `/tmp/br/lib` saja — alamat yang
+ * hanya benar di satu kotak pasir lama; `qa/pulihkan.sh` menyiapkannya di
+ * `/home/user/chrome-lib`. Karena itu `/tmp` juga tidak ikut snapshot,
+ * direktori pertama yang ada dipakai, dan `CHROME_LIB` tetap menang.
+ */
+const LIB =
+  process.env.CHROME_LIB ||
+  ['/home/user/chrome-lib', '/tmp/br/lib'].find((d) => fs.existsSync(d)) ||
+  '/tmp/br/lib'
 const LAMA = Number(process.env.LAMA_UKUR || 12)
 
 async function jalankan(skenario) {

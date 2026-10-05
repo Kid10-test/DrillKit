@@ -360,6 +360,10 @@ export type AlasanRiwayat =
   | 'sebelum-impor'
   /** difoto sesaat sebelum sebuah versi lama dikembalikan */
   | 'sebelum-kembalikan'
+  /** #5 sisa — difoto sesaat sebelum sebuah set dipecah jadi dua */
+  | 'sebelum-pecah-set'
+  /** #5 sisa — difoto sesaat sebelum sebuah set digabung dengan set berikutnya */
+  | 'sebelum-gabung-set'
 
 /** Isi drill yang difoto — tanpa id & cap waktu, karena itu milik snapshot. */
 export type IsiDrill = Omit<Drill, 'id' | 'createdAt' | 'updatedAt'>

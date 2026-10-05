@@ -309,11 +309,16 @@ export function ConfirmButton({
   label = 'Hapus',
   message = 'Yakin ingin menghapus?',
   size = 'sm',
+  disabled = false,
+  testId,
 }: {
   onConfirm: () => void
   label?: string
   message?: string
   size?: 'sm' | 'md'
+  /** #5 sisa — tombol gabung set mati saat tidak ada set berikutnya. */
+  disabled?: boolean
+  testId?: string
 }) {
   const [armed, setArmed] = useState(false)
   useEffect(() => {
@@ -324,7 +329,7 @@ export function ConfirmButton({
 
   if (!armed)
     return (
-      <Button variant="ghost" size={size} onClick={() => setArmed(true)}>
+      <Button variant="ghost" size={size} disabled={disabled} data-testid={testId} onClick={() => setArmed(true)}>
         {label}
       </Button>
     )
@@ -332,6 +337,8 @@ export function ConfirmButton({
     <Button
       variant="danger"
       size={size}
+      disabled={disabled}
+      data-testid={testId ? `${testId}-konfirmasi` : undefined}
       onClick={() => {
         onConfirm()
         setArmed(false)
@@ -344,13 +351,28 @@ export function ConfirmButton({
 
 /* --------------------------------- Badge --------------------------------- */
 
-export function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
+/**
+ * Lencana kecil. Prop lain (`data-testid`, `title`, …) diteruskan apa adanya.
+ *
+ * N19 — dulu hanya `children` & `className` yang diterima, sehingga
+ * `data-testid` yang dipasang pemanggil **hilang tanpa suara**: lencana
+ * kehadiran di halaman Berbagi sudah lama memintanya, tetapi tidak pernah
+ * muncul di DOM, dan uji yang mencarinya gagal pada hal yang tidak ada
+ * hubungannya dengan yang diuji. Prop yang diabaikan diam-diam seperti itu
+ * lebih buruk daripada prop yang ditolak.
+ */
+export function Badge({
+  children,
+  className,
+  ...rest
+}: { children: React.ReactNode; className?: string } & React.HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
       className={cx(
         'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium',
         className ?? 'border-slate-700 bg-slate-800/60 text-slate-300',
       )}
+      {...rest}
     >
       {children}
     </span>

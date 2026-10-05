@@ -4,6 +4,27 @@
 #
 # 2a — bawaannya versi jadi (:4173), sama dengan regresi-penuh.sh. Dulu :5173,
 # server pengembangan yang tidak sanggup memikul regresi (N14).
+#
+# N18 — skrip ini **gagal** kalau ada rangkaian yang gagal.
+#
+# Sebelumnya tidak. Selama ini skrip ini hanya MENCETAK ringkasan; kode
+# keluarnya selalu 0, jadi langkah "Regresi penuh" di CI hijau apa pun yang
+# terjadi — 82 rangkaian boleh semuanya merah, lampunya tetap hijau. Itu
+# persis penyakit yang berkali-kali dicatat di `regresi-penuh.sh` (rangkaian
+# yang mati tanpa ada yang tahu, rangkaian yang "tidak bisa gagal"), hanya
+# satu tingkat lebih tinggi: bukan rangkaiannya yang tidak bisa gagal,
+# melainkan **seluruh regresinya**.
+#
+# Sekarang tiga hal dihitung sebagai kegagalan:
+#   1. ringkasan berbunyi selain "0 gagal";
+#   2. berkas rangkaiannya tidak ada (dulu: `continue` diam-diam — nama yang
+#      salah ketik atau rangkaian yang di-rename membuat barisnya lenyap dari
+#      laporan, dan laporannya tetap tampak rapi);
+#   3. rangkaian mogok — tidak ada ringkasan sama sekali, atau keluarannya
+#      bergaya probe dengan daftar error yang tidak kosong.
+#
+# Di GitHub Actions alasannya juga dicetak sebagai anotasi `::error::`, supaya
+# rangkaian yang gagal terbaca dari API run tanpa harus mengunduh log-nya.
 cd "$(dirname "$0")" || exit 1
 BASE="${1:-http://localhost:4173}"
 shift || true
@@ -15,8 +36,18 @@ if [ ${#DAFTAR[@]} -eq 0 ]; then
     dd9-kompas dd9-scrub-tapak dd10b-kartu dd10b-mode dd10b-override
     dd7-tukar-csv uji-csvkoordinat)
 fi
+
+GAGAL=()
+catat_gagal() {
+  GAGAL+=("$1|$2")
+}
+
 for f in "${DAFTAR[@]}"; do
-  [ -f "$f.mjs" ] || continue
+  if [ ! -f "$f.mjs" ]; then
+    printf "%-24s TIDAK ADA BERKAS %s.mjs\n" "$f" "$f"
+    catat_gagal "$f" "berkas $f.mjs tidak ada"
+    continue
+  fi
   # Jeda antar-rangkaian. Kotak pasir ini bermemori 2 GB; tanpa jeda Chrome
   # dari rangkaian sebelumnya kadang belum selesai melepaskan memorinya, dan
   # rangkaian berikutnya kehabisan sumber daya di tengah jalan — gagalnya
@@ -27,7 +58,11 @@ for f in "${DAFTAR[@]}"; do
   # berturut-turut saat dijalankan sendiri: kegagalannya sesaat, bukan
   # cacat. Jeda yang terlalu pendek membuat regresi berbohong sesekali,
   # dan regresi yang berbohong sesekali lambat laun tidak dipercaya.
-  sleep 10
+  #
+  # `JEDA` hanya untuk menguji skrip ini sendiri (mis. `JEDA=0 bash
+  # regresi.sh … ` saat memeriksa kode keluarnya). Regresi sungguhan —
+  # termasuk di CI — memakai 10 detik.
+  sleep "${JEDA:-10}"
   # BASE dikirim lewat lingkungan, bukan argumen: skrip uji membacanya dari
   # `process.env.BASE`. Pernah dikirim sebagai argumen — diabaikan begitu
   # saja, dan seluruh rangkaian diam-diam berlari ke bawaan :5173.
@@ -49,16 +84,50 @@ for f in "${DAFTAR[@]}"; do
     # jelaskan, sekali jalan, tepat di bawah ringkasannya.
     if ! printf '%s' "$ringkas" | grep -q " 0 gagal"; then
       printf '%s' "$out" | grep -E '✗' | sed 's/^/      ↳ /' | head -20
+      catat_gagal "$f" "$ringkas"
     fi
     continue
   fi
   # Skrip bergaya probe (keluaran JSON): laporkan ada/tidaknya error.
-  err=$(printf '%s' "$out" | grep -oE '"(error|errors)": \[[^]]*\]' | tail -1)
+  #
+  # N18 — jarak setelah titik dua dibuat lentur (`[[:space:]]*`). Bentuk
+  # bakuunya `"errors": []`, tetapi `JSON.stringify` tidak pernah memberi
+  # spasi — jadi pola lama tidak pernah cocok dengan keluaran sungguhan, dan
+  # rangkaian bergaya probe selalu jatuh ke cabang "tanpa ringkasan" yang
+  # (dulu) berarti lolos diam-diam.
+  err=$(printf '%s' "$out" | grep -oE '"(error|errors)":[[:space:]]*\[[^]]*\]' | tail -1)
   x=$(printf '%s' "$out" | grep -c '✗')
   if [ -n "$err" ]; then
     printf "%-24s %s | tanda ✗: %s\n" "$f" "$err" "$x"
-  else
-    printf "%-24s (tanpa ringkasan) baris: %s | tanda ✗: %s\n" \
-      "$f" "$(printf '%s' "$out" | grep -c .)" "$x"
+    isi=$(printf '%s' "$err" | sed -E 's/^"(error|errors)":[[:space:]]*\[//; s/\]$//' | tr -d '[:space:]')
+    if [ -n "$isi" ]; then
+      catat_gagal "$f" "$err"
+    elif [ "$x" != "0" ]; then
+      catat_gagal "$f" "$x tanda ✗ tanpa daftar error"
+    fi
+    continue
   fi
+  # Tidak ada ringkasan & tidak ada JSON: rangkaiannya mogok sebelum
+  # sempat menilai apa pun (layar sambutan, impor modul, alamat salah, …).
+  # Inilah yang dulu tampak sebagai "tanpa ringkasan" lalu dilewatkan.
+  printf "%-24s MOGOK — tanpa ringkasan, %s baris keluaran\n" \
+    "$f" "$(printf '%s' "$out" | grep -c .)"
+  printf '%s' "$out" | tail -12 | sed 's/^/      ↳ /'
+  catat_gagal "$f" "mogok tanpa ringkasan"
 done
+
+echo
+if [ ${#GAGAL[@]} -gt 0 ]; then
+  echo "RANGKAIAN GAGAL (${#GAGAL[@]} dari ${#DAFTAR[@]}):"
+  for g in "${GAGAL[@]}"; do
+    nama="${g%%|*}"
+    alasan="${g#*|}"
+    printf "  ✗ %-22s %s\n" "$nama" "$alasan"
+    # Di CI, jadikan anotasi supaya terbaca dari API tanpa unduh log.
+    if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+      echo "::error title=Rangkaian uji gagal::$nama — $alasan"
+    fi
+  done
+  exit 1
+fi
+echo "Semua ${#DAFTAR[@]} rangkaian lulus."
