@@ -666,7 +666,7 @@ Pengaturan.
   `… DATA PILIHAN …`, `… SHOW <nama> …`, `… LAGU (<n> lagu) …`,
   `… UNTUK ANGGOTA - <Nama> [(Panggilan)] <Kode>.json` & `… semua (grup).json`;
   `paket.json` tetap. **C. Menu Data sebagai pusat** — bagian "Mau apa?".
-- **Temuan saat regresi (diperbaiki di cabang ini):** berkas show/repertoar yang drill-nya tanpa `field` memogokkan halaman Drill (`stepYd` membaca `step` dari `undefined`, lalu seluruh halaman blank sampai dimuat ulang). Kini impor show & repertoar memberi lapangan bawaan bila tidak ada, dan `DrillEditor` pun bertahan bila，本datanya tidak lengkap — fixture show di `buka-berkas` sengaja tanpa `field` sebagai pengunci.
+- **Temuan saat regresi (diperbaiki di cabang ini):** berkas show/repertoar yang drill-nya tanpa `field` memogokkan halaman Drill (`stepYd` membaca `step` dari `undefined`, lalu seluruh halaman blank sampai dimuat ulang). Kini impor show & repertoar memberi lapangan bawaan bila tidak ada, dan `DrillEditor` pun bertahan bila data di DB tidak lengkap — fixture show di `buka-berkas` sengaja tanpa `field` sebagai pengunci.
 - **Uji:** `qa/buka-berkas-logika.mjs` 100 butir (deteksi 5 JSON + format
   asing + 4 CSV + 3 ZIP, aturan mode, pratinjau, 8 nama berkas) dan
   `qa/buka-berkas.mjs` (pintu baru per jenis, tombol lama salah tempat,
