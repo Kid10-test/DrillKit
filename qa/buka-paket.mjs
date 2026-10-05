@@ -101,7 +101,7 @@ const zip = await unduh('[data-testid="unduh-per-anggota"]', '.zip')
 cek('ZIP per anggota terunduh', zip != null)
 execFileSync('unzip', ['-o', '-q', zip, '-d', BUKA])
 
-const berkasAndra = fs.readdirSync(BUKA).find((f) => f.startsWith('DrillKit-Andra'))
+const berkasAndra = fs.readdirSync(BUKA).find((f) => f.startsWith('DrillKit - UNTUK ANGGOTA - Andra'))
 const isiAndra = JSON.parse(fs.readFileSync(path.join(BUKA, berkasAndra), 'utf8'))
 cek('berkas Andra berasal dari ZIP', berkasAndra != null, String(berkasAndra))
 cek('berkas Andra menyebut untuk siapa', isiAndra.forMember != null, String(isiAndra.forMember))

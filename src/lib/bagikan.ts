@@ -25,6 +25,7 @@
  */
 import type { Member, ShareBundle } from '../db/types'
 import { namaDenganPanggilan } from './namaAnggota'
+import { namaPaketAnggota } from './bukaBerkas'
 
 /**
  * Kolom yang **tidak pernah** meninggalkan perangkat pelatih.
@@ -109,22 +110,14 @@ export function paketAnggota(b: ShareBundle, memberId: string): ShareBundle {
 }
 
 /**
- * Nama berkas yang aman untuk anggota ini, mis.
- * `DrillKit-Andra-Pratama-A07.json`.
+ * Nama berkas yang jelas untuk anggota ini, mis.
+ * `DrillKit - UNTUK ANGGOTA - Andra Pratama (Dede) A07.json` (#7 B).
  *
- * Huruf beraksara dibuang (tidak semua sistem berkas menyukainya), spasi
- * menjadi tanda hubung, dan nomor anggota dipakai sebagai pembeda karena
- *  nama bisa saja sama.
+ * Nama ditulis apa adanya (dengan spasi) supaya langsung dikenali di daftar
+ * unduhan, panggilan ditulis dalam kurung, dan kode anggota dipakai sebagai
+ * pembeda karena nama bisa saja sama. Huruf beraksen tetap dibuang (tidak
+ * semua sistem berkas menyukainya) dan karakter terlarang dibersihkan.
  */
 export function namaBerkasAnggota(m: Member): string {
-  const bersih = (s: string) =>
-    s
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // buang tanda aksen (é -> e)
-      .replace(/[^A-Za-z0-9]+/g, '-')  // sisakan alfanumerik saja
-      .replace(/^-+|-+$/g, '')
-  const panggil = bersih(m.panggilan ?? '')
-  const nama = [bersih(m.name ?? ''), panggil].filter(Boolean).join('-') || 'Anggota'
-  const kode = bersih(m.code ?? '') || m.id.replace(/[^A-Za-z0-9]/g, '') || 'tanpa-kode'
-  return `DrillKit-${nama}-${kode}.json`
+  return namaPaketAnggota(m.name ?? '', m.panggilan, m.code || m.id || 'tanpa-kode')
 }

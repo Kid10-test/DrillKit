@@ -306,8 +306,8 @@ const set = (id, drillId, points, langkah) => ({
   cek('paket memuat jadwal', paket.sessions.length === 1 && paket.sessions[0].title === 'Latihan')
   cek('paket memuat posisi drill', paket.sets[0].points.m_andra.x === 2)
   cek('paket menulis Andra Pratama (Dede)', paket.namaPenerima === 'Andra Pratama (Dede)', paket.namaPenerima)
-  cek('nama berkas memuat panggilan', namaBerkasAnggota(andra) === 'DrillKit-Andra-Pratama-Dede-A07.json', namaBerkasAnggota(andra))
-  cek('tanpa panggilan nama berkas seperti semula', namaBerkasAnggota(anggota('m1', 'Andra Pratama', { code: 'A07' })) === 'DrillKit-Andra-Pratama-A07.json')
+  cek('nama berkas memuat panggilan', namaBerkasAnggota(andra) === 'DrillKit - UNTUK ANGGOTA - Andra Pratama (Dede) A07.json', namaBerkasAnggota(andra))
+  cek('tanpa panggilan nama berkas seperti semula', namaBerkasAnggota(anggota('m1', 'Andra Pratama', { code: 'A07' })) === 'DrillKit - UNTUK ANGGOTA - Andra Pratama A07.json')
   cek('telepon tidak ikut paket', paket.members[0].phone == null)
   cek('panggilan ikut paket', paket.members[0].panggilan === 'Dede')
 }

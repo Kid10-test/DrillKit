@@ -21,7 +21,8 @@
 
 import { db } from '../db/db'
 import type { Drill, DrillSet, Member, Song } from '../db/types'
-import { slugify, uid } from './utils'
+import { uid } from './utils'
+import { namaShow } from './bukaBerkas'
 
 /** Penanda format berkas — dipakai untuk menolak berkas yang salah. */
 const FORMAT = 'drillkit-show'
@@ -79,9 +80,9 @@ export async function susunBerkasShow(drillId: string, namaTim: string): Promise
   }
 }
 
-/** Nama berkas yang rapi, mis. `opening-number-show-2026-09-16.json`. */
+/** Nama berkas yang jelas, mis. `DrillKit - SHOW Opening Number - 2026-10-05.json` (#7 B). */
 export function namaBerkasShow(namaDrill: string, tanggal = new Date()) {
-  return `${slugify(namaDrill) || 'show'}-show-${tanggal.toISOString().slice(0, 10)}.json`
+  return namaShow(namaDrill, tanggal)
 }
 
 /** Periksa berkas hasil impor. Mengembalikan pesan galat, atau null kalau sah. */

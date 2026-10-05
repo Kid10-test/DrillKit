@@ -3,7 +3,9 @@
 Dokumen ini **bukan** rencana yang harus dikerjakan semua. Ini kandidat perbaikan,
 diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
 
-**Terakhir diperbarui: 4 Okt 2026 — #5 Drill × segmen lagu rampung (penggaris dua baris + ⚡, bantuan hitungan & Pas ke batas segmen, panjang segmen dalam hitungan, pecah/gabung set ber-riwayat); sebelumnya fondasi #9 grid/patok (41 butir uji) dan roadmap pasca PR #14.**
+**Terakhir diperbarui: 5 Okt 2026 — #7 Pengelolaan berkas rampung (pintu Buka berkas DrillKit, nama jelas, Data pusat); sebelumnya #5 Drill × segmen lagu rampung (penggaris dua baris + ⚡, bantuan hitungan & Pas ke batas segmen, panjang segmen dalam hitungan, pecah/gabung set ber-riwayat); sebelumnya fondasi #9 grid/patok (41 butir uji) dan roadmap pasca PR #14.**
+· **#7 Pengelolaan berkas rampung (5 Okt 2026)** — satu pintu **Buka berkas DrillKit** di menu Data & Dashboard + seret berkas ke jendela; deteksi dari isi (`src/lib/bukaBerkas.ts`: 5 format JSON + 4 CSV + ZIP via `bukaZip`, nilai `drillkit-*` asing dilaporkan); selalu pratinjau (jenis, tanggal, isi, baru/ditimpa) lalu diarahkan ke alurnya; paket anggota ditolak di mode pelatih & pemulihan backup selalu pratinjau (`AlurPulihkanBackup`, dipakai Pengaturan & pintu baru); tombol lama menerima semua jenis dan mengalihkan yang salah tempat; nama berkas jelas (`DrillKit - BACKUP LENGKAP/DATA PILIHAN/SHOW/LAGU/UNTUK ANGGOTA - …`); menu Data sebagai pusat (bagian "Mau apa?"); CSV satu arah (laporan jadwal/absensi/kehadiran) dikenali & dijelaskan. Uji `buka-berkas-logika` 100 (murni) + `buka-berkas` (peramban), terdaftar di regresi penuh; uji lama yang terdampak (`backup-lengkap`, `backup-setlist`, `bagikan-logika`, `nama-anggota-logika`, `buka-paket`, `berbagi-anggota`, `f3`, `f3b`,
+  `tukar-repertoar`) disesuaikan.
 · **N19 — tiga rangkaian yang selama ini merah di balik lampu hijau palsu (4 Okt 2026)** — CI pertama dengan runner yang bisa gagal menunjuk tiga rangkaian di luar #5: (1) `Badge` (ui.tsx) hanya menerima `children` & `className`, sehingga `data-testid` yang dipasang pemanggil hilang tanpa suara — lencana kehadiran di halaman Berbagi sudah lama memintanya, dan uji `kalender-anggota` mencarinya (kini prop lain diteruskan apa adanya; mogok → 13/13); (2) `pengingat-jadwal` (23/2 → 25/25) mencari kartu sesi di tab Bulan — kartunya hanya ada di Agenda, dan di sana pun sesi selain "berikutnya" harus dibuka lewat barisnya dulu; (3) `backup-lengkap` (25/11 → 36/36) menunggu toast pemulihan yang tidak muncul karena sejak #1 pemulihan sengaja bertanya lewat dialog "Cocokkan anggota" — tombol "Pulihkan" di dialog itu kini yang diklik. Sekalian: `m6-klik-rekaman` & `diagnosa-klik-rekaman` memakai pustaka Chrome cadangan di `/tmp/br/lib` (alamat kotak pasir lama) sehingga mogok dengan `libnspr4.so` saat dijalankan mengikuti `qa/pulihkan.sh`; kini mengikuti `CHROME_LIB` → `/home/user/chrome-lib` → `/tmp/br/lib`. **Regresi penuh lokal: 99 rangkaian, 99 lulus**; CI `e9fe582` & `3e39d08` (typecheck + build + regresi penuh) hijau dengan runner yang benar-benar bisa gagal.
 · **N18 — CI kini benar-benar bisa merah (4 Okt 2026)** — `qa/regresi.sh` hanya MENCETAK ringkasan; kode keluarnya selalu 0, jadi langkah "Regresi penuh" di CI hijau apa pun yang terjadi (82 rangkaian boleh merah semua, lampunya tetap hijau). Sekarang rangkaian yang **gagal**, yang **mogok tanpa ringkasan**, yang berkasnya **tidak ada**, dan keluaran bergaya probe dengan **daftar error tidak kosong** dihitung sebagai kegagalan → skrip keluar 1; alasannya juga dicetak sebagai anotasi `::error::` di Actions supaya terbaca dari API run tanpa mengunduh log. Ditemukan saat memeriksa lampu hijau PR #16: pola deteksi probe-nya pun tidak pernah cocok (`"errors": []` tanpa spasi) sehingga rangkaian bergaya probe selalu lolos diam-diam.
 · **#5 Drill × segmen lagu rampung (4 Okt 2026)** — penggaris hitungan **dua baris** (segmen & set) di editor drill dengan tanda **⚡** + keterangan untuk set yang melewati perubahan tempo/sukat, bisa diketuk & digeser di HP; bantuan "mulai di hitungan … / sisa segmen" + tombol **Pas ke batas segmen**; panjang tiap segmen dalam **hitungan drill** di editor lagu; serta **pecah/gabung set** yang mengambil posisi peralihan dari jalur yang ada (termasuk busur, animasi identik) dan bisa dibatalkan lewat riwayat formasi. Modul murni baru `src/lib/segmenDrill.ts`; uji `segmen-drill-logika` 88 (murni) + `m1-penggaris-drill` 41 (peramban); regresi musik/drill sekitarnya tetap hijau.
@@ -48,7 +50,7 @@ diurutkan per kelompok, supaya kamu bisa bilang: *"kerjakan nomor X dulu"*.
   dengan Batalkan, hitung mundur penampilan, cetak bulan (hex), satu `.ics` semua jadwal
   mendatang. Data sesi hanya bertambah `seriId`. Logika di `src/lib/kalender.ts`.
   Uji: `kalender-logika` 67/67, `kalender-jadwal` 31/31; uji lama jadwal tetap lulus.
-· **Rancangan lanjutan (26 Sep 2026, pemutakhiran 4 Okt 2026)** — delapan rancangan awal (#1–#4 rampung PR #6–#10). **Tempo map custom (PR #14, 1 Okt 2026) kini terintegrasi penuh ke #5** (`TempoTimeline` + ramp eksplisit per ketuk/subdivisi), dan **#5 Drill × segmen lagu rampung 4 Okt 2026** (penggaris dua baris + ⚡, bantuan hitungan, pecah/gabung set); **#6 Rekaman tuntas** (PR #11 + susulan PR #12). **Usulan #9 grid/patok yard–meter custom, #10 impor drill Pyware, #11 partitur full score/per instrumen + latihan per bar/frasa** menunggu; urutan prioritas **#7 → #10 → #11 → #8**. Rincian di bagian **Rancangan lanjutan** paling bawah.
+· **Rancangan lanjutan (26 Sep 2026, pemutakhiran 4 Okt 2026)** — delapan rancangan awal (#1–#4 rampung PR #6–#10). **Tempo map custom (PR #14, 1 Okt 2026) kini terintegrasi penuh ke #5** (`TempoTimeline` + ramp eksplisit per ketuk/subdivisi), dan **#5 Drill × segmen lagu rampung 4 Okt 2026** (penggaris dua baris + ⚡, bantuan hitungan, pecah/gabung set); **#6 Rekaman tuntas** (PR #11 + susulan PR #12). **Usulan #9 grid/patok yard–meter custom, #10 impor drill Pyware, #11 partitur full score/per instrumen + latihan per bar/frasa** menunggu; urutan prioritas **#10 → #11 → #8** (#7 selesai 5 Okt 2026). Rincian di bagian **Rancangan lanjutan** paling bawah.
 · **#2 bagian kedua rampung (26 Sep 2026)** — kunci pribadi AES-256-GCM per anggota,
   data pribadi terkunci di berkas terbit, QR kunci, dan tombol Buat kunci baru.
 · **#2 bagian pertama rampung (26 Sep 2026)** — satu tombol menerbitkan materi
@@ -5185,7 +5187,7 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
   4 Okt 2026 lengkap dengan uji murni + peramban.
 - **#6 Rekaman lagu (MP3) telah rampung penuh** (PR #11 + susulan PR #12,
   28 Sep 2026).
-- **#7 dan #8 menunggu** — tidak lagi terhalang; #5 sudah rampung.
+- **#7 selesai (5 Okt 2026)** — satu pintu "Buka berkas DrillKit" (deteksi isi, pratinjau, pengarahan, tolak paket di mode pelatih), nama berkas jelas, Data sebagai pusat; **#8 menunggu**.
 - **#9–#11 usulan baru** (grid/patok yard–meter custom, impor Pyware, partitur
   full score/per instrumen + latihan per bar/frasa) ditambahkan sebagai
   kandidat berikutnya; hanya roadmap/prioritas yang dirapikan, tanpa ubah kode.
@@ -5210,14 +5212,14 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 4 | Tempo latihan | Kecil–sedang | **Selesai (PR #10)** | Persen & BPM per lagu, naik otomatis saat ulang, presenter ikut melambat, hari H asli |
 | 5 | Drill × segmen lagu | Sedang | **Selesai (PR #14 + susulan 4 Okt 2026)** | Penggaris dua baris + ⚡, bantuan hitungan & Pas ke batas segmen, panjang segmen dalam hitungan, pecah/gabung set ber-riwayat; uji `segmen-drill-logika` 88 + `m1-penggaris-drill` 41 |
 | 6 | Rekaman lagu (MP3) | Sedang–besar | **Selesai (PR #11 + susulan PR #12, 28 Sep 2026)** | Berkas Blob IndexedDB, sidik SHA-256, waveform & titik mulai, jam rekaman sinkron |
-| 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | **Menunggu** | Mengenali ZIP dari #6, memuat langkah pencocokan dari #1; siap setelah #5 sisa |
+| 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | **Selesai (5 Okt 2026)** | Pintu Data+Dasbor+seret, deteksi isi (5 JSON+CSV+ZIP), pratinjau selalu, tolak paket di pelatih, Data pusat |
 | 8 | PIN pelatih tim | Kecil–sedang | **Menunggu** | Pagar mode pelatih via hash ENV; tanpa ketergantungan, bisa disisipkan kapan saja |
 | 9 | Grid & patok yard–meter custom | Kecil–sedang | **Fondasi selesai (3 Okt 2026)** | Tipe, geometri & UI terpisah; yard↔meter tanpa geser; batas E/T26; 41 butir uji baru |
 | 10 | Impor drill Pyware | Sedang | **Menunggu — jangan mulai pada tahap ini** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo |
 | 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Menunggu — jangan mulai pada tahap ini** | MusicXML offline (OSMD) + PDF fallback, full score & part, highlight sinkron, loop bar/frasa |
 
 > **Urutan prioritas yang disarankan pasca #5 rampung (4 Okt 2026):**
-> **#7 → #10 → #11 → #8** (fondasi #9 selesai; sisa polish tidak memblokir).
+> **#10 → #11 → #8** (#7 selesai 5 Okt 2026) (fondasi #9 selesai; sisa polish tidak memblokir).
 > Alasan: **#5** sudah rampung sehingga drill×musik benar-benar menyatu; **#7** merapikan 5 jenis berkas + ZIP rekaman
 > sehingga impor Pyware (#10) dan MusicXML (#11) punya pintu masuk yang jelas;
 > **#9** grid/patok kustom memberi akurasi lapangan sebelum migrasi massal;
@@ -5658,7 +5660,7 @@ waktu dan ⚡; Pas ke batas segmen; undo.
   dan mengklik tombol di bawah daftar dengan koordinat mouse yang kini bisa
   jatuh ke latar modal; keduanya diganti testid + klik DOM (27/27).
 
-> Prioritas berikutnya: **#7 → #10 → #11 → #8**.
+> Prioritas berikutnya: **#10 → #11 → #8** (#7 selesai 5 Okt 2026).
 
 ---
 
@@ -5809,6 +5811,37 @@ semua jenis**.
 **Uji:** setiap jenis lewat pintu baru; setiap jenis lewat tombol lama
 yang salah tempat; pratinjau pemulihan backup; paket anggota ditolak di
 Pengaturan.
+### Status: Selesai (5 Okt 2026)
+
+- **A. Satu pintu "Buka berkas DrillKit"** — tombol di menu Data & Dashboard,
+  plus seret berkas ke jendela (laptop). Modul murni `src/lib/bukaBerkas.ts`:
+  JSON dikenali dari field `format` (audit: 5 nilai di kode — backup, data,
+  show, repertoar, share — ditambah varian CSV & ZIP; nilai `drillkit-*` asing
+  dilaporkan, tidak ditelan), CSV dari judul kolomnya, ZIP dari magic bytes
+  lalu dibuka dengan `bukaZip` dan tiap entrinya dikenali lagi.
+- **Selalu pratinjau** — jenis, tanggal, isi, dan baru/ditimpa; tiap jenis
+  diarahkan ke alurnya (backup → pulihkan, data → menu Data, show →
+  timpa/gabung/salinan, lagu → impor repertoar, CSV → halaman tujuannya).
+- **Paket anggota ditolak di mode pelatih** (termasuk ZIP-nya); mode anggota
+  hanya menerima paket. **Pemulihan backup tidak lagi menerima paket** dan
+  tidak lagi menulis langsung — selalu lewat pratinjau (`AlurPulihkanBackup`,
+  dipakai Pengaturan & pintu baru). Ekspor satu arah (laporan jadwal/absensi/
+  kehadiran) dikenali dan dijelaskan, bukan disalahrute-kan.
+- **Tombol lama menerima semua jenis** — berkas yang bukan jenisnya dialihkan
+  ke pratinjau yang benar; impor Anggota & koordinat mempertahankan jalan
+  longgar untuk berkas lama/buatan tangan.
+- **B. Nama berkas jelas** — `DrillKit - BACKUP LENGKAP - ….json`,
+  `… DATA PILIHAN …`, `… SHOW <nama> …`, `… LAGU (<n> lagu) …`,
+  `… UNTUK ANGGOTA - <Nama> [(Panggilan)] <Kode>.json` & `… semua (grup).json`;
+  `paket.json` tetap. **C. Menu Data sebagai pusat** — bagian "Mau apa?".
+- **Uji:** `qa/buka-berkas-logika.mjs` 100 butir (deteksi 5 JSON + format
+  asing + 4 CSV + 3 ZIP, aturan mode, pratinjau, 8 nama berkas) dan
+  `qa/buka-berkas.mjs` (pintu baru per jenis, tombol lama salah tempat,
+  pratinjau-sebelum-tulis, penolakan paket, nama unduhan) — keduanya
+  terdaftar di `qa/regresi-penuh.sh`. Uji lama yang terdampak alur/nama baru
+  disesuaikan (`backup-lengkap`, `backup-setlist`, `bagikan-logika`,
+  `nama-anggota-logika`, `buka-paket`, `berbagi-anggota`, `f3`, `f3b`,
+  `tukar-repertoar`).
 
 ---
 

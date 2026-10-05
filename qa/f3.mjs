@@ -182,17 +182,26 @@ await jalan('tolak', async () => {
     const { db } = await import('/src/db/db.ts')
     return (await db.drills.toArray()).length
   })
-  // berkas bukan show DrillKit
+  // #7 — berkas bukan show dialihkan ke pratinjau "tak dikenali", bukan ditolak.
+  // (Dulu: toast "Bukan berkas show…"; kini: pratinjau menjelaskan + tak ada yang berubah.)
   fs.writeFileSync('/home/user/drillkit/qa/dlf3/bukan.json', JSON.stringify({ format: 'lain', versi: 9 }))
   let input = await p.$('[data-testid="berkas-show"]')
   await input.uploadFile('/home/user/drillkit/qa/dlf3/bukan.json'); await wait(1000)
-  R.tolakFormat = await p.evaluate(() => document.body.innerText.match(/(Bukan berkas show[^\n]*)/)?.[1] ?? 'tidak ada')
+  R.tolakFormat = await p.evaluate(() => ({
+    pratinjau: !!document.querySelector('[data-testid="modal-buka-berkas"]'),
+    takDikenal: !!document.querySelector('[data-testid="buka-tak-dikenal"]'),
+  }))
+  await p.click('[data-testid="buka-tutup"]'); await wait(600)
 
-  // JSON rusak
+  // JSON rusak → pratinjau "tak dikenali" juga (dulu: toast "Berkas tidak bisa dibaca…").
   fs.writeFileSync('/home/user/drillkit/qa/dlf3/rusak.json', '{ ini bukan json')
   input = await p.$('[data-testid="berkas-show"]')
   await input.uploadFile('/home/user/drillkit/qa/dlf3/rusak.json'); await wait(1000)
-  R.tolakRusak = await p.evaluate(() => document.body.innerText.match(/(Berkas tidak bisa dibaca[^\n]*)/)?.[1] ?? 'tidak ada')
+  R.tolakRusak = await p.evaluate(() => ({
+    pratinjau: !!document.querySelector('[data-testid="modal-buka-berkas"]'),
+    takDikenal: !!document.querySelector('[data-testid="buka-tak-dikenal"]'),
+  }))
+  await p.click('[data-testid="buka-tutup"]'); await wait(600)
 
   // format benar tapi isinya rusak
   fs.writeFileSync('/home/user/drillkit/qa/dlf3/kurang.json', JSON.stringify({ format: 'drillkit-show', versi: 1, drill: { id: 'x' }, sets: 'bukan-array' }))

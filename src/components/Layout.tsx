@@ -8,6 +8,7 @@ import { KioskBanner, KioskButton } from './KioskLock'
 import { useMemberMode } from '../hooks/useMemberMode'
 import { RUTE_ANGGOTA, bolehBuka, pernahMemilih } from '../lib/modePerangkat'
 import { PilihMode } from './PilihMode'
+import { LapisanSeretBerkas, PratinjauGlobal } from './BukaBerkas'
 import {
   IconCalendar,
   IconFlag,
@@ -248,6 +249,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </div>
       </nav>
+
+      {/* #7 — pratinjau "Buka berkas DrillKit" + seret berkas ke jendela.
+          Satu-satunya pasangan di seluruh aplikasi: tombol mana pun (baru
+          maupun lama) membuka pratinjau lewat `mintaPratinjau()`. */}
+      <PratinjauGlobal />
+      <LapisanSeretBerkas />
     </div>
   )
 }

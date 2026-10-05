@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '../db/db'
 import type { Drill, DrillSet, Member } from '../db/types'
 import {
@@ -9,6 +9,8 @@ import {
   bacaCsvKoordinat,
 } from '../lib/csvKoordinat'
 import { toCSV } from '../lib/utils'
+import { kenaliBerkas } from '../lib/bukaBerkas'
+import { ambilTitipan, mintaPratinjau } from './BukaBerkas'
 import { namaDenganPanggilan } from '../lib/namaAnggota'
 import { Button, Field, Modal, Select, Textarea, useToast } from './ui'
 
@@ -71,6 +73,20 @@ export default function TukarCsvModal({
   const [target, setTarget] = useState<'baru' | 'timpa'>('baru')
   const [menyimpan, setMenyimpan] = useState(false)
   const berkasRef = useRef<HTMLInputElement>(null)
+
+  // #7 — titipan dari pintu baru: CSV koordinat yang diteruskan ke sini
+  // langsung terisi, tanpa dipilih ulang. Hanya diambil saat modal terbuka;
+  // selagi tertutup titipannya dibiarkan menunggu.
+  useEffect(() => {
+    if (!open) return
+    const cek = () => {
+      const t = ambilTitipan(['csv-koordinat'])
+      if (t) setTeks(t.teks)
+    }
+    cek()
+    window.addEventListener('drillkit:titipan', cek)
+    return () => window.removeEventListener('drillkit:titipan', cek)
+  }, [open])
 
   const hasil: HasilImpor | null = useMemo(() => {
     if (!teks.trim()) return null
@@ -161,9 +177,18 @@ export default function TukarCsvModal({
   /* ------------------------------- Impor --------------------------------- */
 
   function bacaBerkas(f: File) {
-    const r = new FileReader()
-    r.onload = () => setTeks(String(r.result ?? ''))
-    r.readAsText(f, 'utf-8')
+    // #7 — kenali dulu: yang bukan CSV koordinat dialihkan ke pratinjau.
+    void f.arrayBuffer().then((ab) => {
+      const bita = new Uint8Array(ab)
+      const kenal = kenaliBerkas(f.name, bita)
+      if (kenal.jenis === 'csv-koordinat' || kenal.jenis === 'tak-dikenal') {
+        // Tak-dikenal tetap dimasukkan apa adanya: parser koordinat yang
+        // menilai (mis. CSV tanpa judul kolom) — seperti perilaku lama.
+        setTeks(kenal.teks ?? '')
+        return
+      }
+      mintaPratinjau(kenal, bita)
+    })
   }
 
   async function terapkan() {
@@ -273,7 +298,8 @@ export default function TukarCsvModal({
             <input
               ref={berkasRef}
               type="file"
-              accept=".csv,.tsv,.txt,text/csv"
+              accept=".json,.csv,.tsv,.txt,.zip,application/json,text/csv,application/zip"
+              data-testid="berkas-koordinat"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]

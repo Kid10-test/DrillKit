@@ -1,6 +1,7 @@
 import { db, getSettings } from '../db/db'
 import { downloadBlob, downloadFile } from './utils'
 import { bikinZip, type EntriZip } from './zip'
+import { namaBackup, namaBackupZip } from './bukaBerkas'
 
 /**
  * Backup otomatis — pengingat & riwayat backup.
@@ -147,8 +148,7 @@ export async function buildBackupPayload() {
 export async function downloadBackup(): Promise<BackupNote> {
   const payload = await buildBackupPayload()
   const text = JSON.stringify(payload, null, 2)
-  const stamp = new Date(payload.exportedAt).toISOString().slice(0, 10)
-  downloadFile(`drillkit-backup-${stamp}.json`, text)
+  downloadFile(namaBackup(new Date(payload.exportedAt)), text)
   const note: BackupNote = {
     at: payload.exportedAt,
     bytes: new Blob([text]).size,
@@ -167,11 +167,11 @@ export async function downloadBackup(): Promise<BackupNote> {
 export async function downloadBackupZip(): Promise<BackupNote> {
   const payload = await buildBackupPayload()
   const text = JSON.stringify(payload, null, 2)
-  const stamp = new Date(payload.exportedAt).toISOString().slice(0, 10)
+  const tanggal = new Date(payload.exportedAt)
   const audioItems = await db.rekamanAudio.toArray()
 
   const entries: EntriZip[] = [
-    { nama: `drillkit-backup-${stamp}.json`, isi: text },
+    { nama: namaBackup(tanggal), isi: text },
   ]
 
   const manifestAudio: Record<string, { songId: string; namaFile: string; durasi: number; hash: string }> = {}
@@ -200,7 +200,7 @@ export async function downloadBackupZip(): Promise<BackupNote> {
   }
 
   const zipData = bikinZip(entries)
-  downloadBlob(`drillkit-backup-${stamp}.zip`, zipData)
+  downloadBlob(namaBackupZip(tanggal), zipData)
 
   const note: BackupNote = {
     at: payload.exportedAt,
