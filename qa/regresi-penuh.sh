@@ -56,14 +56,14 @@ bash bangun-logika.sh || exit 1
 
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika uji-situs uji-rilis uji-lapangan \
-  evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
+  buka-berkas-logika evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
   sambutan-mode buka-paket tab-absensi formasi-anggota perbarui-materi \
   musik-anggota kuis-anggota pengingat-jadwal lebar-hp luring mikrofon-ditolak tim-besar cap-rilis \
   perubahan-tempo \
   darurat-muat periksa-situs situs-ui \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
-  backup-lengkap latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
+  backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
   kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \

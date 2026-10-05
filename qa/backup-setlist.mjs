@@ -118,10 +118,22 @@ const sebelum = await p.evaluate(async () => {
 })
 cek('set list benar-benar kosong sebelum dipulihkan', sebelum === 0, String(sebelum))
 
-// Unggah berkasnya lewat input sungguhan.
+// Unggah berkasnya lewat input sungguhan. #7: unggah hanya membuka
+// PRATINJAU — pemulihannya berjalan setelah "Lanjut" ditekan.
 const input = await p.$('#restore-input')
 await input.uploadFile(berkas)
-await wait(3000)
+for (let i = 0; i < 12; i += 1) {
+  if (await p.$('[data-testid="modal-pulih-backup"]')) break
+  await wait(250)
+}
+await wait(1200)
+for (let i = 0; i < 2; i += 1) {
+  const t = await p.$('[data-testid="pulih-backup-tombol"]')
+  if (!t) break
+  await t.click()
+  await wait(1500)
+}
+await wait(1000)
 
 const sesudah = await p.evaluate(async () => {
   const r = await new Promise((res) => { const q = indexedDB.open('drillkit'); q.onsuccess = () => res(q.result) })

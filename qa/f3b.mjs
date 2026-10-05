@@ -21,7 +21,7 @@ const bukaModal = async () => {
 }
 const unduhShow = async () => {
   await p.click('[data-testid="tombol-ekspor-show"]'); await wait(1600)
-  return fs.readdirSync(DL).filter((f) => /-show-\d{4}-\d{2}-\d{2}\.json$/.test(f))[0]
+  return fs.readdirSync(DL).filter((f) => /^DrillKit - SHOW .* - \d{4}-\d{2}-\d{2}\.json$/.test(f))[0]
 }
 
 await bukaModal()

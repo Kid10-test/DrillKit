@@ -20,7 +20,8 @@
  *   dikosongkan dan **dilaporkan**. Kehilangan data lebih buruk daripada
  *   rujukan yang putus — asalkan yang putus tidak diam-diam.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import {
@@ -33,6 +34,8 @@ import {
 } from '../components/ui'
 import { IconDownload, IconUpload, IconShare } from '../components/Icons'
 import { downloadFile, uid } from '../lib/utils'
+import { intipTitipan, mintaPratinjau, TombolBukaBerkas, useTitipan } from '../components/BukaBerkas'
+import { kenaliBerkas, kenaliTeks, namaData } from '../lib/bukaBerkas'
 import {
   LABEL_JENIS_DATA,
   URUTAN_JENIS_DATA,
@@ -95,6 +98,19 @@ export default function Data() {
     [anggota, jadwal, absensi, lagu, setlist, drill, set, kemajuan, catatan, evaluasi],
   )
 
+  // #7 — titipan CSV dari pintu baru: bukakan tab CSV-nya sekalian.
+  useEffect(() => {
+    const cek = () => {
+      const t = intipTitipan()
+      if (!t) return
+      if (t.jenis === 'csv-jadwal' || t.jenis === 'csv-absensi') setAlur('csv')
+      else if (t.jenis === 'data') setAlur('pindah')
+    }
+    cek()
+    window.addEventListener('drillkit:titipan', cek)
+    return () => window.removeEventListener('drillkit:titipan', cek)
+  }, [])
+
   /** Id yang sudah ada di perangkat, untuk menghitung bentrokan. */
   const yangAda = useMemo((): YangAda => {
     const kunci = (daftar: unknown[]) =>
@@ -120,6 +136,61 @@ export default function Data() {
       />
 
       <KartuDaftarInduk />
+
+      {/* #7 C — menu Data sebagai pusat: mau apa? */}
+      <Card className="mb-4" data-testid="mau-apa">
+        <h2 className="mb-1 text-sm font-semibold text-slate-200">Mau apa?</h2>
+        <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
+          Semua urusan berkas mulai dari sini. Menerima berkas dari pelatih lain? Tekan{' '}
+          <b>Buka berkas</b> — jenisnya dikenali otomatis.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Link
+            to="/pengaturan"
+            data-testid="mau-semua"
+            className="rounded-lg border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-800/50"
+          >
+            <p className="text-xs font-semibold text-slate-200">Pindahkan semua data</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              Backup lengkap di Pengaturan — untuk ganti perangkat.
+            </p>
+          </Link>
+          <button
+            type="button"
+            data-testid="mau-sebagian"
+            onClick={() => setAlur('pindah')}
+            className="rounded-lg border border-slate-800 bg-slate-950/40 p-3 text-left hover:bg-slate-800/50"
+          >
+            <p className="text-xs font-semibold text-slate-200">Kirim sebagian data</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              Pilih jenisnya di bawah — lagu, jadwal, drill, dan lainnya.
+            </p>
+          </button>
+          <Link
+            to="/drill"
+            data-testid="mau-show"
+            className="rounded-lg border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-800/50"
+          >
+            <p className="text-xs font-semibold text-slate-200">Kirim show ke pelatih lain</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              Buka drill-nya, tekan ⚙, lalu Berbagi show.
+            </p>
+          </Link>
+          <Link
+            to="/berbagi"
+            data-testid="mau-anggota"
+            className="rounded-lg border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-800/50"
+          >
+            <p className="text-xs font-semibold text-slate-200">Kirim ke anggota</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              Berkas grup atau per anggota di halaman Berbagi.
+            </p>
+          </Link>
+        </div>
+        <div className="mt-3 border-t border-slate-800 pt-3">
+          <TombolBukaBerkas testId="buka-berkas-data" />
+        </div>
+      </Card>
 
       <Card className="mb-4">
         <div className="flex flex-wrap gap-2">
@@ -228,13 +299,27 @@ function AlurPindah({
       toast.push('Tidak ada data yang dipilih', 'err')
       return
     }
-    const stamp = new Date().toISOString().slice(0, 10)
-    downloadFile(`drillkit-data-${stamp}.json`, JSON.stringify(berkas, null, 2))
+    downloadFile(namaData(), JSON.stringify(berkas, null, 2))
     toast.push('Berkas data diunduh')
   }
 
+  // #7 — titipan dari pintu "Buka berkas DrillKit": berkas data yang
+  // diteruskan ke sini langsung diproses, tanpa dipilih ulang.
+  useTitipan(['data'], (t) => void terimaTeks(t.nama, t.teks))
+
   async function terima(file: File) {
-    const teks = await file.text()
+    // #7 — tombol lama menerima SEMUA jenis: kenali dari isinya, yang bukan
+    // data dialihkan ke pratinjau yang benar (bukan ditolak mentah-mentah).
+    const bita = new Uint8Array(await file.arrayBuffer())
+    const kenal = kenaliBerkas(file.name, bita)
+    if (kenal.jenis !== 'data') {
+      mintaPratinjau(kenal, bita)
+      return
+    }
+    await terimaTeks(file.name, kenal.teks ?? '')
+  }
+
+  async function terimaTeks(_nama: string, teks: string) {
     const hasil = bacaBerkasPindah(teks)
     if (!hasil.ok) {
       toast.push(hasil.alasan, 'err')
@@ -367,7 +452,7 @@ function AlurPindah({
           <IconUpload size={16} /> Pilih berkas .json
           <input
             type="file"
-            accept="application/json,.json"
+            accept=".json,.csv,.zip,application/json,text/csv,application/zip"
             data-testid="berkas-masuk"
             className="hidden"
             onChange={(e) => {
@@ -480,6 +565,13 @@ function AlurCsv({ sumber }: { sumber: Record<JenisData, unknown[]> }) {
   const [jenis, setJenis] = useState<'jadwal' | 'absensi'>('jadwal')
   const [menunggu, setMenunggu] = useState<{ judul: string; baris: string[][] } | null>(null)
 
+  // #7 — titipan dari pintu baru: jenis tab-nya mengikuti berkasnya.
+  useTitipan(['csv-jadwal', 'csv-absensi'], (t) => {
+    const untuk = t.jenis === 'csv-absensi' ? 'absensi' : 'jadwal'
+    setJenis(untuk)
+    terimaTeksCsv(untuk, t.nama, t.teks)
+  })
+
   const kolom: Record<'jadwal' | 'absensi', string[]> = {
     jadwal: ['id', 'judul', 'jenis', 'tanggal', 'mulai', 'selesai', 'tempat', 'setListId'],
     absensi: ['id', 'sessionId', 'memberId', 'status', 'catatan'],
@@ -520,13 +612,25 @@ function AlurCsv({ sumber }: { sumber: Record<JenisData, unknown[]> }) {
 
   async function terimaCsv(file: File) {
     const teks = await file.text()
+    // #7 — kenali dulu: berkas yang bukan CSV tujuan dialihkan ke pratinjau.
+    const kenal = kenaliTeks(file.name, teks)
+    const untuk = jenis === 'absensi' ? 'csv-absensi' : 'csv-jadwal'
+    if (kenal.jenis !== untuk) {
+      mintaPratinjau(kenal)
+      return
+    }
+    terimaTeksCsv(jenis, file.name, teks)
+  }
+
+  function terimaTeksCsv(untuk: 'jadwal' | 'absensi', namaFile: string, teks: string) {
+    const diproses = untuk
     const barisCsv = parseCsv(teks)
     if (barisCsv.length < 2) {
       toast.push('Berkasnya kosong atau tidak terbaca', 'err')
       return
     }
     const judul = barisCsv[0].map((h) => h.trim().toLowerCase())
-    const wajib = kolom[jenis]
+    const wajib = kolom[diproses]
     // Bandingkan tanpa mempedulikan huruf besar-kecil. Nama kolom baku
     // memakai camelCase (`setListId`), sedangkan Excel dan banyak alat lain
     // menuliskannya `setlistid` — membedakan keduanya akan menolak berkas
@@ -538,7 +642,7 @@ function AlurCsv({ sumber }: { sumber: Record<JenisData, unknown[]> }) {
     }
     // Susun ulang mengikuti urutan kolom baku, supaya urutan di Excel bebas.
     const badan = barisCsv.slice(1).map((r) => wajib.map((k) => r[judul.indexOf(k.toLowerCase())] ?? ''))
-    setMenunggu({ judul: file.name, baris: badan })
+    setMenunggu({ judul: namaFile, baris: badan })
   }
 
   /**
@@ -665,7 +769,7 @@ function AlurCsv({ sumber }: { sumber: Record<JenisData, unknown[]> }) {
             <IconUpload size={16} /> Impor CSV
             <input
               type="file"
-              accept="text/csv,.csv"
+              accept=".json,.csv,.zip,application/json,text/csv,application/zip"
               data-testid="csv-masuk"
               className="hidden"
               onChange={(e) => {

@@ -21,6 +21,7 @@ import {
   IconUsers,
 } from '../components/Icons'
 import { BackupReminder } from '../components/BackupReminder'
+import { TombolBukaBerkas } from '../components/BukaBerkas'
 import { PengingatJadwal } from '../components/PengingatJadwal'
 import { TombolPanduan } from '../components/Panduan'
 import { NamaTampil, useModeNama } from '../components/NamaTampil'
@@ -143,6 +144,20 @@ export default function Dashboard() {
       <div className="mb-4">
         <PengingatJadwal sessions={sessions} prefix="ingat-coach" />
       </div>
+
+      {/* #7 — satu pintu untuk semua berkas DrillKit */}
+      <Card className="mb-4" data-testid="kartu-buka-berkas">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-200">Buka berkas DrillKit</h2>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+              Punya berkas dari pelatih lain atau perangkat lain? Buka di sini — jenisnya dikenali
+              otomatis, isinya diperlihatkan dulu sebelum diterapkan.
+            </p>
+          </div>
+          <TombolBukaBerkas testId="buka-berkas-dasbor" petunjuk={false} />
+        </div>
+      </Card>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile

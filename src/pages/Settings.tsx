@@ -26,7 +26,6 @@ import {
 } from '../components/ui'
 import { IconDownload, IconUpload } from '../components/Icons'
 import { backupNotes, daysSince, downloadBackup, downloadBackupZip, formatBytes, lastBackup } from '../lib/backup'
-import { bukaZip } from '../lib/zip'
 import { KartuSimpanOtomatis } from '../components/SimpanOtomatis'
 import { AMBANG, AMBANG_LANGKAH } from '../lib/analitik'
 import type { AmbangTingkat } from '../db/types'
@@ -37,27 +36,17 @@ import { bacaTampilan, langgananTampilan, ubahTampilan } from '../lib/tampilan'
 import type { Tampilan } from '../lib/tampilan'
 import { PilihModeNama } from '../components/PilihModeNama'
 import { KartuTerbit } from '../components/KartuTerbit'
-import { PanelCocok } from '../components/PanelCocok'
-import {
-  keputusanAwal,
-  perluDitanya,
-  saringBentrokLokal,
-  susunSaran,
-  terapkanCocok,
-  tulisUlangMuatan,
-  type KeputusanCocok,
-  type SaranBaris,
-} from '../lib/namaAnggota'
-import type { Member } from '../db/types'
 import {
   BUILTIN_SECTIONS,
   applySectionConfig,
   formatDateLong,
   readFileAsDataURL,
-  readFileAsText,
   uid,
 } from '../lib/utils'
 import { FieldConfigEditor } from '../components/FieldConfigEditor'
+import { kenaliBerkas } from '../lib/bukaBerkas'
+import { mintaPratinjau } from '../components/BukaBerkas'
+import { AlurPulihkanBackup, ekstrakAudioZip, type AudioPulih } from '../components/PulihkanBackup'
 
 export default function Settings() {
   const toast = useToast()
@@ -109,12 +98,11 @@ export default function Settings() {
   /** B4 — pengaturan kontras tinggi & huruf besar. */
   const [tampilan, setTampilan] = useState<Tampilan>(bacaTampilan)
   useEffect(() => langgananTampilan(setTampilan), [])
-  const [cocokBackup, setCocokBackup] = useState<{
-    data: Record<string, unknown>
-    lokal: Member[]
-    saran: SaranBaris[]
-    keputusan: Record<string, KeputusanCocok>
-    audioEntries?: { songId: string; namaFile: string; blob: Blob; durasi?: number; hash?: string }[]
+  // #7 — berkas yang menunggu dipulihkan (selalu lewat pratinjau dulu).
+  const [pulihBackup, setPulihBackup] = useState<{
+    data: Record<string, any>
+    audio: AudioPulih[]
+    nama: string
   } | null>(null)
 
   /** Riwayat backup — diisi saat halaman dibuka & setelah mengunduh backup. */
@@ -160,155 +148,33 @@ export default function Settings() {
     toast.push('Backup lengkap + rekaman (ZIP) diunduh')
   }
 
-  async function tulisBackup(
-    data: Record<string, any>,
-    anggotaLokal: Member[],
-    kep: Record<string, KeputusanCocok>,
-    audioEntries?: { songId: string; namaFile: string; blob: Blob; durasi?: number; hash?: string }[],
-  ) {
-    const masuk = Array.isArray(data.members) ? (data.members as Member[]) : []
-    const hasil = terapkanCocok({
-      masuk,
-      lokal: anggotaLokal,
-      keputusan: kep,
-      arah: 'lokal',
-      timpaSamaId: true,
-    })
-    const { data: diubah, bentrok } = tulisUlangMuatan(data, hasil.peta)
-    if (masuk.length) diubah.members = hasil.anggotaTulis
-    if (Array.isArray(diubah.attendance)) {
-      const saring = saringBentrokLokal(diubah.attendance, await db.attendance.toArray())
-      diubah.attendance = saring.tulis
-      bentrok.push(...saring.bentrok)
-    }
-    // Setiap tabel yang ditulis di bawah WAJIB tercantum di cakupan ini.
-    // Dexie menolak tabel di luar cakupan (NotFound) dan seluruh pemulihan
-    // batal. `memberNotes` dulu tertinggal, sehingga backup yang memuat
-    // catatan anggota tidak bisa dipulihkan sama sekali (2a).
-    await db.transaction(
-      'rw',
-      [
-        db.members,
-        db.sessions,
-        db.attendance,
-        db.drills,
-        db.sets,
-        db.songs,
-        db.setlists,
-        db.settings,
-        db.memberNotes,
-        db.kemajuan,
-        db.evaluasi,
-      ],
-      async () => {
-        if (diubah.members?.length) await db.members.bulkPut(diubah.members)
-        if (diubah.sessions?.length) await db.sessions.bulkPut(diubah.sessions)
-        if (diubah.attendance?.length) await db.attendance.bulkPut(diubah.attendance)
-        if (diubah.drills?.length) await db.drills.bulkPut(diubah.drills)
-        if (diubah.sets?.length) await db.sets.bulkPut(diubah.sets)
-        if (diubah.songs?.length) await db.songs.bulkPut(diubah.songs)
-        if (diubah.setlists?.length) await db.setlists.bulkPut(diubah.setlists)
-        if (diubah.memberNotes?.length) await db.memberNotes.bulkPut(diubah.memberNotes)
-        if (diubah.kemajuan?.length) await db.kemajuan.bulkPut(diubah.kemajuan)
-        if (diubah.evaluasi?.length) await db.evaluasi.bulkPut(diubah.evaluasi)
-      },
-    )
-    if (diubah.settings) await db.settings.put({ ...diubah.settings, key: 'team' })
-
-    // #6 — Pulihkan rekaman audio biner dari ZIP jika ada
-    let jmlAudio = 0
-    if (audioEntries && audioEntries.length > 0) {
-      for (const a of audioEntries) {
-        await db.rekamanAudio.put({
-          id: a.songId,
-          songId: a.songId,
-          blob: a.blob,
-          namaFile: a.namaFile,
-          tipe: a.blob.type || 'audio/mpeg',
-          ukuran: a.blob.size,
-          durasi: a.durasi || 0,
-          hash: a.hash || '',
-          updatedAt: Date.now(),
-        })
-        jmlAudio++
-      }
-    }
-
-    const infoAudio = jmlAudio > 0 ? ` (+ ${jmlAudio} rekaman audio)` : ''
-    toast.push(bentrok.length ? `Backup dipulihkan · ${bentrok.length} bentrok dilaporkan${infoAudio}` : `Backup dipulihkan${infoAudio}`)
-  }
-
+  /**
+   * #7 — pulihkan backup: kenali dari isi, selalu pratinjau, tolak paket.
+   *
+   * - Backup (JSON/ZIP) → dibuka di pratinjau pemulihan (tidak langsung ditulis).
+   * - Paket anggota → DITOLAK dengan jelas (dulu ikut diterima!).
+   * - Jenis lain → dialihkan ke pratinjau yang benar, bukan ditolak.
+   */
   async function importBackup(file: File) {
     try {
-      let text = ''
-      const audioEntries: { songId: string; namaFile: string; blob: Blob; durasi?: number; hash?: string }[] = []
-
-      if (file.name.endsWith('.zip') || file.type.includes('zip')) {
-        const ab = await file.arrayBuffer()
-        const unzipped = bukaZip(new Uint8Array(ab))
-        const jsonEntry = unzipped.find((z) => z.nama.endsWith('.json') && !z.nama.startsWith('audio/'))
-        if (!jsonEntry) {
-          toast.push('Berkas ZIP tidak memuat berkas JSON backup DrillKit', 'err')
-          return
-        }
-        text = jsonEntry.teks()
-
-        // Baca manifest audio jika ada
-        const manifestEntry = unzipped.find((z) => z.nama === 'audio/manifest.json')
-        let manifest: Record<string, { songId: string; namaFile: string; durasi: number; hash: string }> = {}
-        if (manifestEntry) {
-          try {
-            manifest = JSON.parse(manifestEntry.teks())
-          } catch {
-            // abaikan error parse manifest
-          }
-        }
-
-        for (const z of unzipped) {
-          if (z.nama.startsWith('audio/') && !z.nama.endsWith('.json')) {
-            const m = manifest[z.nama]
-            let songId = m?.songId
-            let namaFile = m?.namaFile
-            if (!songId) {
-              const base = z.nama.replace(/^audio\//, '')
-              const firstUnder = base.indexOf('_')
-              if (firstUnder > 0) {
-                songId = base.substring(0, firstUnder)
-                namaFile = base.substring(firstUnder + 1)
-              }
-            }
-            if (songId && namaFile) {
-              const blob = new Blob([new Uint8Array(z.bita)], { type: 'audio/mpeg' })
-              audioEntries.push({
-                songId,
-                namaFile,
-                blob,
-                durasi: m?.durasi,
-                hash: m?.hash,
-              })
-            }
-          }
-        }
-      } else {
-        text = await readFileAsText(file)
-      }
-
-      const data = JSON.parse(text)
-      if (!['drillkit-backup', 'drillkit-share'].includes(data.format)) {
-        toast.push('Format file tidak dikenali', 'err')
+      const bita = new Uint8Array(await file.arrayBuffer())
+      const hasil = kenaliBerkas(file.name, bita)
+      if (hasil.jenis === 'backup' || hasil.jenis === 'zip-backup') {
+        const audio = hasil.jenis === 'zip-backup' ? ekstrakAudioZip(bita) : []
+        setPulihBackup({ data: (hasil.data ?? {}) as Record<string, any>, audio, nama: file.name })
         return
       }
-      const lokal = await db.members.toArray()
-      const masuk = Array.isArray(data.members) ? (data.members as Member[]) : []
-      const saran = susunSaran(masuk, lokal)
-      const kep = keputusanAwal(saran)
-      if (perluDitanya(saran, lokal.length)) {
-        setCocokBackup({ data, lokal, saran, keputusan: kep, audioEntries })
+      if (hasil.jenis === 'paket' || hasil.jenis === 'zip-anggota') {
+        toast.push(
+          'Ini paket untuk anggota — tidak bisa dipulihkan sebagai backup. ' +
+            'Paket hanya berisi salinan baca-saja; memulihkannya akan mencampur data pelatih.',
+          'err',
+        )
         return
       }
-      await tulisBackup(data, lokal, kep, audioEntries)
-    } catch (e) {
-      toast.push('Gagal memulihkan backup', 'err')
+      mintaPratinjau(hasil, bita)
+    } catch {
+      toast.push('Gagal membaca berkas', 'err')
     }
   }
 
@@ -669,7 +535,7 @@ export default function Settings() {
             <input
               id="restore-input"
               type="file"
-              accept="application/json,.json,.zip,application/zip"
+              accept=".json,.csv,.zip,application/json,text/csv,application/zip"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]
@@ -822,45 +688,24 @@ export default function Settings() {
         <p className="text-sm text-slate-300">Tindakan ini tidak bisa dibatalkan.</p>
       </Modal>
       <Modal
-        open={!!cocokBackup}
-        onClose={() => setCocokBackup(null)}
-        title="Cocokkan anggota"
+        open={!!pulihBackup}
+        onClose={() => setPulihBackup(null)}
+        title="Pulihkan backup"
         wide
-        testId="cocok-backup"
+        testId="modal-pulih-backup"
         footer={
-          <>
-            <Button variant="ghost" onClick={() => setCocokBackup(null)}>
-              Batal
-            </Button>
-            <Button
-              variant="primary"
-              data-testid="pulihkan-setelah-cocok"
-              onClick={() => {
-                if (!cocokBackup) return
-                void tulisBackup(
-                  cocokBackup.data,
-                  cocokBackup.lokal,
-                  cocokBackup.keputusan,
-                  cocokBackup.audioEntries,
-                )
-                  .then(() => setCocokBackup(null))
-                  .catch(() => toast.push('Gagal memulihkan backup', 'err'))
-              }}
-            >
-              Pulihkan
-            </Button>
-          </>
+          <Button variant="ghost" onClick={() => setPulihBackup(null)}>
+            Batal
+          </Button>
         }
       >
-        {cocokBackup && (
-          <PanelCocok
-            saran={cocokBackup.saran}
-            lokal={cocokBackup.lokal}
-            keputusan={cocokBackup.keputusan}
-            onUbah={(id, kep) =>
-              setCocokBackup((s) => (s ? { ...s, keputusan: { ...s.keputusan, [id]: kep } } : s))
-            }
-            pengantar="Backup ini memuat anggota yang belum ada di perangkat ini. Cocokkan dulu, atau biarkan sebagai anggota baru."
+        {pulihBackup && (
+          <AlurPulihkanBackup
+            data={pulihBackup.data}
+            audio={pulihBackup.audio}
+            namaBerkas={pulihBackup.nama}
+            testId="pulih-backup"
+            onSelesai={() => setPulihBackup(null)}
           />
         )}
       </Modal>

@@ -1,5 +1,6 @@
 import { db } from '../db/db'
 import { buildBackupPayload, formatBytes } from './backup'
+import { namaBackup } from './bukaBerkas'
 
 /**
  * 1b — Simpan otomatis ke berkas yang dipilih sekali.
@@ -87,7 +88,7 @@ export async function pasang(): Promise<{ ok: boolean; nama?: string }> {
   const w = window as unknown as JendelaBerkas
   try {
     const pegangan = await w.showSaveFilePicker!({
-      suggestedName: `drillkit-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      suggestedName: namaBackup(),
       types: [
         {
           description: 'Backup DrillKit',

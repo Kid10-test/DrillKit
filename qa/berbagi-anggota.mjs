@@ -238,23 +238,27 @@ for n in nama:
 
   // Nama berkas harus memuat nama anggotanya, supaya mudah dikirim.
   //
-  // 2a — dicocokkan dengan NAMA LENGKAP (spasi → tanda hubung, seperti
-  // `namaBerkasAnggota`), bukan nama depan saja. "Anggota pertama" diambil
-  // dari IndexedDB, yang urutannya mengikuti `id` berakhiran acak; bila yang
-  // terambil Kirana Ayu, kata "kirana" juga cocok dengan Indah-Kirana — dua
-  // berkas, dan uji ini gagal sekali tiap ±18 putaran tanpa ada yang rusak.
-  const namaBerkas = baris.map((b) => b.split(' ')[1])
+  // 2a — dicocokkan dengan NAMA LENGKAP, bukan nama depan saja. "Anggota
+  // pertama" diambil dari IndexedDB, yang urutannya mengikuti `id`
+  // berakhiran acak; bila yang terambil Kirana Ayu, kata "kirana" juga cocok
+  // dengan Indah Kirana — dua berkas, dan uji ini gagal sekali tiap ±18
+  // putaran tanpa ada yang rusak.
+  //
+  // #7 — nama berkas mengandung spasi
+  // (`DrillKit - UNTUK ANGGOTA - Andra Pratama A07.json`), jadi namanya
+  // dipotong dari `BERKAS ... pemilik=` (bukan `split(' ')[1]`), dan kedua
+  // sisi dinormalisasi yang sama (aksen dibuang, non-alfanumerik dibuang).
+  const norm = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '')
+  const namaBerkas = baris.map((b) => b.slice('BERKAS '.length, b.indexOf(' pemilik=')))
   const pertama = DISEM.anggota[0]
-  const namaDiBerkas = pertama.name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  const cocok = namaBerkas.filter((n) => n.toLowerCase().includes(namaDiBerkas))
+  const namaDiBerkas = norm(pertama.name)
+  const cocok = namaBerkas.filter((n) => norm(n).includes(namaDiBerkas))
   cek('nama berkas memuat nama anggotanya', cocok.length === 1,
     JSON.stringify(namaBerkas.slice(0, 3)))
   cek('nama berkas berakhiran .json', namaBerkas.every((n) => n.endsWith('.json')))
+  cek('nama berkas berawalan jelas #7',
+    namaBerkas.every((n) => n.startsWith('DrillKit - UNTUK ANGGOTA - ')),
+    JSON.stringify(namaBerkas.slice(0, 2)))
 }
 fs.rmSync(berkasZip)
 

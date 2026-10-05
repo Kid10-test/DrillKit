@@ -20,7 +20,9 @@ import { db } from '../db/db'
 import type { Drill, Member } from '../db/types'
 import { Button, Field, Modal, Select, useToast } from './ui'
 import { IconDownload, IconUpload } from './Icons'
-import { downloadFile, readFileAsText } from '../lib/utils'
+import { downloadFile } from '../lib/utils'
+import { kenaliBerkas } from '../lib/bukaBerkas'
+import { mintaPratinjau } from './BukaBerkas'
 import {
   LABEL_MODE,
   KETERANGAN_MODE,
@@ -75,13 +77,15 @@ export function KartuBerbagiShow({
 
   async function pilihBerkas(file: File | undefined) {
     if (!file) return
-    let data: unknown
-    try {
-      data = JSON.parse(await readFileAsText(file))
-    } catch {
-      toast.push('Berkas tidak bisa dibaca (bukan JSON)', 'err')
+    // #7 — tombol lama menerima SEMUA jenis: yang bukan show dialihkan ke
+    // pratinjau yang benar, bukan ditolak mentah-mentah.
+    const bita = new Uint8Array(await file.arrayBuffer())
+    const kenal = kenaliBerkas(file.name, bita)
+    if (kenal.jenis !== 'show') {
+      mintaPratinjau(kenal, bita)
       return
     }
+    const data: unknown = kenal.data
     const salah = cekBerkas(data)
     if (salah) {
       toast.push(salah, 'err')
@@ -170,7 +174,7 @@ export function KartuBerbagiShow({
         <input
           ref={inputRef}
           type="file"
-          accept="application/json,.json"
+          accept=".json,.csv,.zip,application/json,text/csv,application/zip"
           data-testid="berkas-show"
           className="hidden"
           onChange={(e) => {

@@ -26,7 +26,6 @@ import {
   sectionLabel,
   downloadFile,
   formatDateLong,
-  readFileAsText,
   toCSV,
   uid,
   visibleSections,
@@ -38,6 +37,8 @@ import {
   JUDUL_CSV_ANGGOTA,
   pecahCsv,
 } from '../lib/namaAnggota'
+import { catatanCsvSatuArah, kenaliBerkas, tampakCsvAnggota } from '../lib/bukaBerkas'
+import { mintaPratinjau, useTitipan } from '../components/BukaBerkas'
 import { NamaTampil, useModeNama } from '../components/NamaTampil'
 import { GabungAnggota } from '../components/GabungAnggota'
 import { PilihModeNama } from '../components/PilihModeNama'
@@ -134,9 +135,34 @@ export default function Members() {
     toast.push('CSV diunduh')
   }
 
+  // #7 — titipan dari pintu "Buka berkas DrillKit": CSV anggota yang
+  // diteruskan ke sini langsung diproses, tanpa dipilih ulang.
+  useTitipan(['csv-anggota'], (t) => void terimaTeksCsv(t.teks))
+
   async function importCSV(file: File) {
+    // #7 — tombol lama menerima SEMUA jenis: yang bukan CSV anggota
+    // dialihkan ke pratinjau yang benar, bukan ditolak mentah-mentah.
+    const bita = new Uint8Array(await file.arrayBuffer())
+    const kenal = kenaliBerkas(file.name, bita)
+    if (kenal.jenis === 'csv-anggota') {
+      await terimaTeksCsv(kenal.teks ?? '')
+      return
+    }
+    if (kenal.jenis === 'tak-dikenal') {
+      const teks = kenal.teks ?? ''
+      // Berkas lama/buatan tangan yang kolomnya tak lengkap: pengimpor lama
+      // menerima kolom apa pun yang ada — pertahankan itu. Kecuali CSV satu
+      // arah (laporan), yang tidak boleh masuk sebagai anggota.
+      if (!catatanCsvSatuArah(teks) && tampakCsvAnggota(teks)) {
+        await terimaTeksCsv(teks)
+        return
+      }
+    }
+    mintaPratinjau(kenal, bita)
+  }
+
+  async function terimaTeksCsv(text: string) {
     try {
-      const text = await readFileAsText(file)
       const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(Boolean)
       const [judulMentah, ...rows] = lines
       const judul = judulMentah ? pecahCsv(judulMentah) : null
@@ -202,7 +228,8 @@ export default function Members() {
       <input
         ref={fileRef}
         type="file"
-        accept=".csv,text/csv"
+        accept=".json,.csv,.zip,application/json,text/csv,application/zip"
+        data-testid="berkas-anggota"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0]

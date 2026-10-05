@@ -21,7 +21,9 @@ import {
   terapkanPaket,
 } from '../lib/repertoar'
 import type { RingkasanImpor } from '../lib/repertoar'
-import { downloadFile, readFileAsText, slugify } from '../lib/utils'
+import { downloadFile } from '../lib/utils'
+import { kenaliBerkas, namaRepertoar } from '../lib/bukaBerkas'
+import { mintaPratinjau } from './BukaBerkas'
 import { Button, Card, Modal, useToast } from './ui'
 
 export function PanelTukarRepertoar({
@@ -88,16 +90,20 @@ export function PanelTukarRepertoar({
       ? await db.sets.where('drillId').anyOf(idDrill).toArray()
       : []
     const paket: PaketRepertoar = { ...paketKini, sets: setsUntuk }
-    const nama = slugify(asal?.teamName ?? 'repertoar')
-    downloadFile(
-      `repertoar-${nama}-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify(paket),
-    )
+    downloadFile(namaRepertoar(paket.songs.length), JSON.stringify(paket))
     setBukaEkspor(false)
   }
 
   async function bukaBerkas(file: File) {
-    const hasil = bacaPaket(await readFileAsText(file))
+    // #7 — tombol lama menerima SEMUA jenis: yang bukan repertoar dialihkan
+    // ke pratinjau yang benar, bukan ditolak mentah-mentah.
+    const bita = new Uint8Array(await file.arrayBuffer())
+    const kenal = kenaliBerkas(file.name, bita)
+    if (kenal.jenis !== 'repertoar') {
+      mintaPratinjau(kenal, bita)
+      return
+    }
+    const hasil = bacaPaket(kenal.teks ?? '')
     if (!hasil.ok) {
       toast.push(hasil.alasan, 'err')
       return
@@ -154,7 +160,7 @@ export function PanelTukarRepertoar({
         ref={berkas}
         data-testid="berkas-repertoar"
         type="file"
-        accept="application/json,.json"
+        accept=".json,.csv,.zip,application/json,text/csv,application/zip"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0]

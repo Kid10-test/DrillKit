@@ -234,6 +234,14 @@ await input3.uploadFile(`${UNDUH}/bukan-repertoar.json`)
 await wait(1500)
 cek('berkas asing tidak membuka modal',
   !(await ada(B, '[data-testid="modal-pratinjau-repertoar"]')))
+// #7 — berkas asing dialihkan ke pratinjau global "tak dikenali"; tutup lagi
+// supaya klik berikutnya tidak terhalang overlay.
+cek('berkas asing dialihkan ke pratinjau global',
+  await ada(B, '[data-testid="modal-buka-berkas"]'))
+cek('pratinjau menyebut tak dikenali',
+  await ada(B, '[data-testid="buka-tak-dikenal"]'))
+await klik(B, '[data-testid="buka-tutup"]')
+await wait(600)
 
 /* ====================== Titik pemasangan kedua ========================== */
 await B.evaluate(() => { location.hash = '#/berbagi' })

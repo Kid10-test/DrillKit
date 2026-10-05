@@ -75,6 +75,26 @@ const tombol = (t) =>
     return true
   }, t)
 
+/*
+ * #7 — pemulihan backup kini selalu lewat PRATINJAU: unggah berkas hanya
+ * membuka modal, belum menulis apa pun. Klik "Lanjut"; bila backup memuat
+ * anggota yang belum dikenal, muncul langkah pencocokan dan tombolnya
+ * diklik sekali lagi ("Pulihkan sekarang").
+ */
+const klikPulih = async () => {
+  for (let i = 0; i < 12; i += 1) {
+    if (await p.$('[data-testid="modal-pulih-backup"]')) break
+    await wait(250)
+  }
+  await wait(1200)
+  for (let i = 0; i < 2; i += 1) {
+    const t = await p.$('[data-testid="pulih-backup-tombol"]')
+    if (!t) break
+    await t.click()
+    await wait(1500)
+  }
+}
+
 await p.goto(BASE, { waitUntil: 'networkidle2' })
 await lewatSambutan(p)
 await wait(1500)
@@ -184,7 +204,8 @@ if (adaEvaluasi) {
   cek('evaluasi benar-benar kosong sebelum dipulihkan', sebelum === 0, String(sebelum))
 
   await (await p.$('#restore-input')).uploadFile(berkas2)
-  await wait(3000)
+  await klikPulih()
+  await wait(1000)
   const sesudah = await p.evaluate(async () => {
     const r = await new Promise((res) => { const q = indexedDB.open('drillkit'); q.onsuccess = () => res(q.result) })
     return await new Promise((res) => {
@@ -298,26 +319,15 @@ cek('baris yang ditandai benar-benar terhapus sebelum dipulihkan', masihAda.leng
 await (await p.$('#restore-input')).uploadFile(berkas3)
 /*
  * N19 — sejak #1 (satu anggota, dua nama) pemulihan **sengaja bertanya** dulu
- * bila backup memuat anggota yang belum ada di perangkat ini: dialog
- * "Cocokkan anggota". Dulu uji ini menunggu toast yang tidak akan pernah
- * muncul, lalu melaporkan 11 kegagalan "baris tidak pulih" — padahal
- * pemulihannya sendiri belum dijalankan. Yang diklik sekarang: tombol
- * "Pulihkan" di dialog itu, yaitu keputusan bawaan yang sama dengan yang
- * diambil pelatih kalau ia tidak mengubah apa pun.
+ * bila backup memuat anggota yang belum ada di perangkat ini (langkah
+ * pencocokan di dalam pratinjau #7). Dulu uji ini menunggu toast yang tidak
+ * akan pernah muncul, lalu melaporkan 11 kegagalan "baris tidak pulih" —
+ * padahal pemulihannya sendiri belum dijalankan. `klikPulih` mengeklik
+ * "Lanjut" lalu "Pulihkan sekarang" bila langkah pencocokan muncul, yaitu
+ * keputusan bawaan yang sama dengan yang diambil pelatih kalau ia tidak
+ * mengubah apa pun.
  */
-for (let i = 0; i < 40; i += 1) {
-  if (await p.$('[data-testid="cocok-backup"]')) break
-  if (await p.$('#restore-input')) {
-    const adaDialog = await p.evaluate(() => !!document.querySelector('[data-testid="cocok-backup"]'))
-    if (adaDialog) break
-  }
-  await wait(150)
-}
-const tombolCocok = await p.$('[data-testid="pulihkan-setelah-cocok"]')
-if (tombolCocok) {
-  await tombolCocok.click()
-  await wait(800)
-}
+await klikPulih()
 // Toast hanya tampil beberapa detik — tangkap selagi ada.
 let pesan = ''
 for (let i = 0; i < 40 && !pesan; i += 1) {

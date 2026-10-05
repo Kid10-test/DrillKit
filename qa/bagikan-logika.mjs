@@ -152,16 +152,16 @@ const bundle = {
 // ------------------------------------------------------- namaBerkasAnggota
 {
   cek('nama berkas memuat nama & kode',
-    namaBerkasAnggota(A) === 'DrillKit-Andra-Pratama-A07.json', namaBerkasAnggota(A))
+    namaBerkasAnggota(A) === 'DrillKit - UNTUK ANGGOTA - Andra Pratama A07.json', namaBerkasAnggota(A))
   cek('nama berkas berakhiran .json', namaBerkasAnggota(B).endsWith('.json'))
   // Aksen dibuang supaya aman di semua sistem berkas.
   const beraksen = { ...A, name: 'José Ángel', code: 'J1' }
   cek('aksen dibuang dari nama berkas',
-    namaBerkasAnggota(beraksen) === 'DrillKit-Jose-Angel-J1.json', namaBerkasAnggota(beraksen))
+    namaBerkasAnggota(beraksen) === 'DrillKit - UNTUK ANGGOTA - Jose Angel J1.json', namaBerkasAnggota(beraksen))
   // Karakter yang dilarang di nama berkas.
   const ngawur = { ...A, name: 'Andra/Putra: 100%?', code: 'A/7' }
   cek('karakter terlarang dibuang',
-    /^DrillKit-Andra-Putra-100-A-7\.json$/.test(namaBerkasAnggota(ngawur)),
+    namaBerkasAnggota(ngawur) === 'DrillKit - UNTUK ANGGOTA - AndraPutra 100% A7.json',
     namaBerkasAnggota(ngawur))
   // Nama yang sama harus tetap beda berkas karena kodenya beda.
   const kembar1 = { ...A, id: 'k1', name: 'Sari', code: 'S1' }
@@ -171,7 +171,7 @@ const bundle = {
   // Nama kosong tidak boleh menghasilkan nama berkas yang rusak.
   const kosong = { ...A, name: '', code: '' }
   cek('nama kosong tidak menghasilkan berkas rusak',
-    namaBerkasAnggota(kosong).startsWith('DrillKit-') && namaBerkasAnggota(kosong).endsWith('.json'),
+    namaBerkasAnggota(kosong).startsWith('DrillKit - UNTUK ANGGOTA - ') && namaBerkasAnggota(kosong).endsWith('.json'),
     namaBerkasAnggota(kosong))
 }
 

@@ -13,7 +13,7 @@
  * Logika penyusunan & pemeriksaan dibuat murni (tanpa Dexie) supaya bisa
  * diuji langsung di node.
  */
-import { db } from '../db/db'
+import { DEFAULT_FIELD, db } from '../db/db'
 import type { Drill, DrillSet, PaketRepertoar, SetList, Song } from '../db/types'
 
 /** Penanda format — dipakai untuk menolak berkas yang bukan paket repertoar. */
@@ -182,7 +182,10 @@ export async function terapkanPaket(paket: PaketRepertoar): Promise<void> {
     async () => {
       if (paket.songs.length) await db.songs.bulkPut(paket.songs)
       if (paket.setlists.length) await db.setlists.bulkPut(paket.setlists)
-      if (paket.drills.length) await db.drills.bulkPut(paket.drills)
+      if (paket.drills.length)
+        await db.drills.bulkPut(
+          paket.drills.map((d) => (d.field ? d : { ...d, field: { ...DEFAULT_FIELD } })),
+        )
       if (paket.sets.length) await db.sets.bulkPut(paket.sets)
     },
   )

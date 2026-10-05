@@ -95,4 +95,6 @@ rakit src/lib/kalender.ts kalender
 rakit src/lib/tempoLatihan.ts tempoLatihan
 # #6 — rekaman lagu: hash, sidik jari, konversi lini masa audio & segmen.
 rakit src/lib/rekaman.ts rekaman
+# #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
+rakit src/lib/bukaBerkas.ts bukaBerkas
 echo "== selesai =="

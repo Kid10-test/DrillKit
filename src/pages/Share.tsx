@@ -20,6 +20,9 @@ import { IconDownload, IconLoop, IconPause, IconPlay, IconShare, IconUpload } fr
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
 import { TombolPanduanAnggota } from '../components/Panduan'
 import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
+import { kenaliBerkas, namaPaketGrup, namaZipAnggota } from '../lib/bukaBerkas'
+import { mintaPratinjau } from '../components/BukaBerkas'
+import { simpanPaketAnggota } from '../lib/paketMasuk'
 import { gabungPembaruan, materiLebihBaru, muatBerkasTerbit, bukaDataPribadi, tanggalIndonesia, type DataTerkunci } from '../lib/terbit'
 import { kunciDariUrl, simpanKunciAnggota, bacaKunciAnggota } from '../lib/kunci'
 import { TerbitkanAnggota } from '../components/TerbitkanAnggota'
@@ -39,12 +42,10 @@ import {
   downloadFile,
   formatDateLong,
   pct,
-  readFileAsText,
   relativeDay,
   sesiMeta,
   todayISO,
   nowTime,
-  slugify,
 } from '../lib/utils'
 import { coordText, facingDeg, stepYd, ukurTitik } from '../lib/field'
 import { acakUrutan, bangunSoal, nilaiTebakan, TOLERANSI_LANGKAH } from '../lib/kuis'
@@ -131,9 +132,8 @@ function CoachExport() {
     }
   }
 
-  function namaBerkas(jenis: string, ekstensi: string) {
-    const tim = slugify(build().team?.teamName ?? 'tim')
-    return `${tim}-${jenis}-${new Date().toISOString().slice(0, 10)}.${ekstensi}`
+  function namaTim(): string {
+    return build().team?.teamName ?? 'tim'
   }
 
   /**
@@ -143,7 +143,7 @@ function CoachExport() {
    */
   function unduhGrup() {
     const bundle = paketGrup(build())
-    downloadFile(namaBerkas('grup', 'json'), JSON.stringify(bundle))
+    downloadFile(namaPaketGrup(), JSON.stringify(bundle))
     toast.push('Berkas grup diunduh — tanpa data pribadi, aman dibagikan ke mana saja')
   }
 
@@ -162,7 +162,7 @@ function CoachExport() {
       nama: namaBerkasAnggota(m),
       isi: JSON.stringify(paketAnggota(dasar, m.id)),
     }))
-    downloadBlob(namaBerkas('per-anggota', 'zip'), bikinZip(entri))
+    downloadBlob(namaZipAnggota(namaTim()), bikinZip(entri))
     toast.push(
       `${entri.length} berkas anggota dibungkus — tiap berkas hanya memuat datanya sendiri, ` +
         `dan begitu dibuka langsung mengenali namanya`,
@@ -524,6 +524,22 @@ function MemberView() {
     if (meId) localStorage.setItem('drillkit.meId', meId)
   }, [meId])
 
+  // #7 — paket yang dibuka lewat pintu "Buka berkas DrillKit" (atau tombol
+  // ini sendiri): kenali namanya + pegang bagian terkuncinya.
+  useEffect(() => {
+    const onPaket = (e: Event) => {
+      const d = (e as CustomEvent).detail as {
+        penerimaId: string | null
+        locked: DataTerkunci
+      }
+      setDataTerkunci(null)
+      setTerbitTerkunci(d?.locked ?? {})
+      if (d?.penerimaId) setMeId(d.penerimaId)
+    }
+    window.addEventListener('drillkit:paket-baru', onPaket)
+    return () => window.removeEventListener('drillkit:paket-baru', onPaket)
+  }, [])
+
   /**
    * Buka ulang data pribadi setiap kali nama dipilih atau paket terbitan
    * berganti. Jangan memakai `bundle.attendance`: pada berkas terbit bagian
@@ -583,26 +599,26 @@ function MemberView() {
    */
   async function openPackage(file: File) {
     try {
-      const text = await readFileAsText(file)
-      const terbit = muatBerkasTerbit(text)
-      const data = terbit?.grup ?? (JSON.parse(text) as ShareBundle)
-      if (data.format !== 'drillkit-share') {
-        toast.push('Bukan berkas paket DrillKit', 'err')
+      // #7 — tombol ini menerima SEMUA jenis: yang bukan paket dialihkan ke
+      // pratinjau (di mode anggota, pratinjau menolak selain paket).
+      const bita = new Uint8Array(await file.arrayBuffer())
+      const kenal = kenaliBerkas(file.name, bita)
+      let data: unknown = null
+      if (kenal.jenis === 'paket') data = kenal.data
+      else if (kenal.jenis === 'zip-anggota' && kenal.daftarZip?.length === 1) {
+        data = kenal.daftarZip[0].data
+      } else {
+        mintaPratinjau(kenal, bita)
         return
       }
-      const penerima = (data.members ?? []).find(
-        (m) => data.forMember != null && m.id === data.forMember,
+      const h = await simpanPaketAnggota(
+        data as Parameters<typeof simpanPaketAnggota>[0],
       )
-      await db.packages.put({ key: 'current', data, importedAt: Date.now() })
-      setDataTerkunci(null)
-      // Berkas terbit menyimpan locked terpisah; berkas lama berarti tidak
-      // punya sumber status pribadi yang bisa dibuka di kalender.
-      setTerbitTerkunci(terbit?.locked ?? {})
-      if (penerima) setMeId(penerima.id)
+      // Nama + bagian terkunci diurus pendengar 'drillkit:paket-baru'.
       toast.push(
-        penerima
-          ? `Paket "${data.team?.teamName ?? 'tim'}" dibuka — hai, ${penerima.name}!`
-          : `Paket "${data.team?.teamName ?? 'tim'}" dibuka`,
+        h.penerima
+          ? `Paket "${h.namaTim}" dibuka — hai, ${h.penerima.nama}!`
+          : `Paket "${h.namaTim}" dibuka`,
       )
     } catch {
       toast.push('Gagal membaca paket', 'err')
@@ -635,7 +651,7 @@ function MemberView() {
               <input
                 id="pkg-input"
                 type="file"
-                accept="application/json,.json"
+                accept=".json,.csv,.zip,application/json,text/csv,application/zip"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0]
