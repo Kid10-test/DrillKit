@@ -6,7 +6,7 @@
 /** Editor formasi — kanvas titik, set, animasi, dan semua modalnya. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../db/db'
+import { DEFAULT_FIELD, db } from '../db/db'
 import type {
   Drill,
   DrillPoint,
@@ -506,7 +506,9 @@ export function Editor({
     const i = sets.findIndex((s) => s.id === nxt[0].setId)
     if (i >= 0) setIdx(i)
   }, [future, sets])
-  const f = drill.field
+  // #7 — drill tanpa `field` (mis. dari berkas show lama) memakai
+  // lapangan bawaan, bukan memogokkan halaman (`stepYd` membaca `step`).
+  const f = drill.field ?? DEFAULT_FIELD
   /**
    * Versi ref dari konfigurasi lapangan.
    * `snapVal` dipanggil dari handler geser yang dipasang sekali di `useEffect`,

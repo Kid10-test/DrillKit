@@ -246,14 +246,12 @@ cek('nama show tampil', /Show BK7/.test(await isiBody()))
 await klik('[data-testid="buka-show-proses"]')
 await wait(2000)
 cek('show masuk', (await bacaDb('drills')).some((d) => d.id === 'dr_bk7_baru'))
-// DIAG-SEMENTARA: lacak layar blank setelah impor show.
-console.log('DIAG url=' + p.url())
-console.log('DIAG body-drill=' + (await isiBody()).slice(0, 250))
-console.log('DIAG errors=' + JSON.stringify(errors.slice(0, 4)).slice(0, 600))
+// Fixture show di atas SENGAJA tanpa `field`: berkas show lama/buatan tangan
+// bisa begitu, dan Drill tidak boleh mogok (regresi: `stepYd` membaca `step`
+// dari `undefined` → seluruh halaman blank sampai dimuat ulang).
+cek('drill tanpa field tidak memogokkan halaman Drill',
+  !(await isiBody()).includes('Terjadi kesalahan pada tampilan ini'))
 await ke('#/data')
-console.log('DIAG url-data=' + p.url())
-console.log('DIAG tombol-data=' + (await ada('[data-testid="buka-berkas-data"]')))
-console.log('DIAG body-data=' + (await isiBody()).slice(0, 250))
 
 // Repertoar: pratinjau -> terapkan.
 await unggah('[data-testid="buka-berkas-data-input"]', fRep)
