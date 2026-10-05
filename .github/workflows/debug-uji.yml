@@ -1,16 +1,11 @@
 # SEMENTARA — debug satu rangkaian dari kotak pasir tanpa Chrome.
-# Dipicu manual: gh workflow run debug-uji.yml -f rangkaian=buka-berkas
-# Keluaran suite dipancarkan sebagai anotasi supaya terbaca via API.
-# HAPUS berkas ini setelah selesai debug.
+# Terpicu tiap push KE CABANG INI SAJA. HAPUS berkas ini setelah selesai.
 name: Debug satu rangkaian
 
 on:
-  workflow_dispatch:
-    inputs:
-      rangkaian:
-        description: 'Nama rangkaian tanpa .mjs (mis. buka-berkas)'
-        required: true
-        type: string
+  push:
+    branches: [arena/01a109cc-drillkit]
+    paths: [qa/buka-berkas*.mjs, .github/workflows/debug-uji.yml]
 
 jobs:
   uji:
@@ -55,12 +50,12 @@ jobs:
           done
           curl -sf http://localhost:4173/ >/dev/null
 
-      - name: Jalankan rangkaian
+      - name: Jalankan buka-berkas
         run: |
           cd qa
-          BASE=http://localhost:4173 node "${{ inputs.rangkaian }}.mjs" >/tmp/hasil.txt 2>&1
+          BASE=http://localhost:4173 timeout 600 node buka-berkas.mjs >/tmp/hasil.txt 2>&1
           echo "KODE_KELUAR=$?"
-          tail -c 4000 /tmp/hasil.txt
+          tail -c 3000 /tmp/hasil.txt
 
       - name: Pancarkan keluaran sebagai anotasi
         if: always()
@@ -68,7 +63,7 @@ jobs:
           node -e "
             const fs = require('node:fs');
             const keluar = fs.existsSync('/tmp/hasil.txt') ? fs.readFileSync('/tmp/hasil.txt', 'utf8') : '(tidak ada keluaran)';
-            const ekor = keluar.slice(-6000);
+            const ekor = keluar.slice(-5000);
             const kaya = ekor.replace(/%/g, '%25').replace(/\n/g, '%0A').replace(/\r/g, '%0D');
             console.log('::error::' + kaya);
           "
