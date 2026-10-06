@@ -110,8 +110,9 @@ const csvPyware = [
   'Set,Count,Code,Name,X (Sidelong),Y (Depth)',
   ...[0, 1, 2].flatMap((s) =>
     anggota.map((m, i) =>
+      // Kode & nama diberi tanda kutip: nama anggota bisa saja memuat koma.
       ['Pyware A', 'Pyware B', 'Pyware C'][s] +
-      `,${[1, 9, 17][s]},${m.code},${m.name},${-12 + i + s * 2},${12 + i}`,
+      `,${[1, 9, 17][s]},"${m.code}","${m.name}",${-12 + i + s * 2},${12 + i}`,
     ),
   ),
 ].join('\n')
