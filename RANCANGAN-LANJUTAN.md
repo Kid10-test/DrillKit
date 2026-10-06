@@ -1,4 +1,4 @@
-# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 5 Okt 2026 — #7 rampung)
+# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 6 Okt 2026 — #10 rampung)
 
 Dokumen ini merangkum delapan rancangan awal yang sudah didiskusikan dan
 diputuskan bersama pelatih, ditambah tiga usulan baru pasca PR #14
@@ -8,7 +8,7 @@ Semuanya siap dikerjakan di sesi baru. Setiap rancangan dijadikan PR
 tersendiri, sesuai kebiasaan proyek (satu ide = satu commit/PR,
 disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 
-**Status per 6 Okt 2026 (pemutakhiran #8 rampung):**
+**Status per 6 Okt 2026 (pemutakhiran #10 rampung):**
 - **#1, #2, #3, dan #4 telah rampung penuh** (PR #6 hingga PR #10).
 - **#5 telah rampung penuh** — fondasi tempo map custom per ketuk/subdivisi
   dan ramp eksplisit terintegrasi lewat **PR #14** (`TempoTimeline`), lalu
@@ -22,8 +22,12 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 - **#8 selesai (6 Okt 2026)** — PIN pelatih tim (`PIN_PELATIH` → hash PBKDF2 saat build), kartu Saya pelatih ber-PIN, diingat per perangkat, perangkat lama ditanya sekali, ganti PIN menanya ulang, Mode pelatih menerima PIN tim atau kios, tanpa env = perilaku lama.
 - **#9 fondasi selesai (3 Okt 2026)** — tipe & geometri grid/patok terpisah,
   toggle yard↔meter tanpa geser, batas huruf/T & satuanJarak; UI + uji 41 butir.
-- **#10–#11 usulan baru** (impor Pyware, partitur) menunggu — tidak disentuh
-  pada tahap fondasi ini, sesuai instruksi.
+- **#10 Impor drill Pyware selesai (6 Okt 2026)** — satu arah Pyware/Excel →
+  DrillKit lewat CSV lembar koordinat: kolom dikenali per peran, satuan &
+  asal Y ditebak lalu bisa diganti, pratinjau + peringatan titik di luar
+  lapangan, pencocokan anggota #1 yang diingat, interpolasi lurus antar set,
+  Gabung/Timpa/Salinan, undo lewat riwayat, dan jenis `csv-pyware` di pintu #7.
+- **#11 usulan baru** (partitur) menunggu — tidak disentuh pada tahap ini.
 
 **Aturan proyek yang tetap berlaku untuk semuanya:**
 
@@ -48,11 +52,12 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | **Selesai (5 Okt 2026)** | Pintu Data+Dasbor+seret, deteksi isi (5 JSON+CSV+ZIP), pratinjau selalu, tolak paket di pelatih, Data pusat |
 | 8 | PIN pelatih tim | Kecil–sedang | **Selesai (6 Okt 2026)** | Pagar mode pelatih via hash ENV; tanpa ketergantungan |
 | 9 | Grid & patok yard–meter custom | Kecil–sedang | **Fondasi selesai (3 Okt 2026)** | Tipe, geometri & UI terpisah; yard↔meter tanpa geser; batas E/T26; 41 butir uji baru |
-| 10 | Impor drill Pyware | Sedang | **Menunggu — jangan mulai pada tahap ini** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo |
+| 10 | Impor drill Pyware | Sedang | **Selesai (6 Okt 2026)** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo; 146 butir uji |
 | 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Menunggu — jangan mulai pada tahap ini** | MusicXML offline (OSMD) + PDF fallback, full score & part, highlight sinkron, loop bar/frasa |
 
 > **Urutan prioritas yang disarankan pasca #5 rampung (4 Okt 2026):**
-> **#10 → #11 → #8** (#7 selesai 5 Okt 2026) (fondasi #9 selesai; sisa polish grid/patok tidak memblokir impor).
+> **#10 → #11 → #8** — ketiganya kini selesai (#7 5 Okt, #8 & #10 6 Okt 2026);
+> yang tersisa **#11 partitur** (fondasi #9 selesai; sisa polish grid/patok tidak memblokir apa pun).
 > Alasan: **#5** sudah rampung sehingga drill×musik benar-benar menyatu; **#7** merapikan 5 jenis berkas + ZIP rekaman
 > sehingga impor Pyware (#10) dan MusicXML (#11) punya pintu masuk yang jelas;
 > **#9** grid/patok kustom memberi akurasi lapangan sebelum migrasi massal;
@@ -803,6 +808,49 @@ koordinat, memakai fondasi yang sudah ada, tanpa server.
 konversi meter↔yard tepat, anggota tak dikenal dipetakan manual dan
 diingat, posisi di luar `fieldBox` diberi peringatan, undo menghapus
 hasil impor.
+
+### Status: Selesai (6 Okt 2026)
+
+Semua butir rencana di atas dikerjakan, plus beberapa hal yang baru ketahuan
+saat dikerjakan:
+
+- **Modul murni `src/lib/pyware.ts`** — pengurai lembar koordinat (kolom
+  dikenali per **peran**: set/subset/count/pemain/instrumen/X/Y/Z/arah/satuan,
+  dari banyak ejaan: `Sidelong`, `Depth`, `Performer`, `Transition Counts`,
+  `Page`, …), konversi satuan (`langkah`/`yard`/`meter`/`kaki` → yard via
+  `M_TO_YD`), tiga asal pengukuran Y (`tengah`, `garis-depan`,
+  `garis-belakang`), arti kolom Count (`mutlak`/`transisi`), interpolasi
+  linear **berbobot hitungan** untuk titik yang bolong, pratinjau
+  (`ringkasPyware`), dan saran asal Y bila pilihan lain jelas lebih sedikit
+  mengeluarkan titik dari lapangan.
+- **`rapikanJudul`** — judul kolom seperti `X (Sidelong, meters)` yang tidak
+  dikutip Excel pecah jadi dua sel dan menggeser semua kolom sesudahnya;
+  sel yang kurungnya belum ditutup disambung lagi.
+- **Baris tanpa koordinat tidak dibuang** — pemainnya tetap terdaftar di set
+  itu (posisi `null`) supaya setnya tidak hilang dari urutan dan celahnya bisa
+  diisi lurus; yang benar-benar dilewati hanya baris tanpa identitas.
+- **Pencocokan #1 dipakai apa adanya** — pemain Pyware dibungkus jadi
+  `Member` ber-id `pyware:<kode>`, lewat `susunSaran`/`PanelCocok`/
+  `terapkanCocok`, dan id itu masuk `alias` sehingga impor berikutnya cocok
+  otomatis tanpa ditanya.
+- **Penulisan di `src/lib/pywareTulis.ts`** — Gabung (set bernama sama
+  diperbarui, facing lama dipertahankan, pemain yang tidak ada di berkas tidak
+  diusir) / Timpa / Salinan (show baru). Gabung & Timpa difoto
+  `sebelum-impor-pyware` (tersemat) → satu langkah undo. `rosterIds` ikut
+  diperbarui, karena drill yang membatasi roster tidak akan menampilkan
+  pemain baru walau titik-titiknya ada.
+- **Pintu #7** — jenis baru `csv-pyware` (dikenali dari penanda Pyware;
+  lembar koordinat ekspor DrillKit sendiri tetap ke pintu DD7), diarahkan ke
+  Drill, dan jendela impor terbuka sudah terisi lewat titipan.
+
+**Uji:** `qa/pyware-logika.mjs` **146 butir** (murni + `fake-indexeddb`) —
+3 set × 20 pemain = 60 titik utuh, meter/yard/kaki tepat, `Count` mutlak
+1-9-25 → 8 & 16 hitungan, interpolasi berbobot (8 langkah, bukan 12), titik
+di luar `fieldBox` terhitung + saran asal Y, alias diingat lintas impor,
+gabung/timpa/salinan + undo, roster diperbarui. `qa/buka-berkas-logika.mjs`
++6 butir untuk jenis baru (106 total). Alur layarnya diperiksa 42 asersi lewat
+harness jsdom sementara (render → pratinjau → pencocokan → tulis → riwayat),
+dan `qa/pyware-impor.mjs` (peramban) didaftarkan ke `qa/regresi-penuh.sh`.
 
 ---
 

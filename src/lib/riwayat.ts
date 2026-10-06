@@ -248,6 +248,8 @@ export function labelAlasan(s: RiwayatSnapshot): string {
       return 'Sebelum set dipecah'
     case 'sebelum-gabung-set':
       return 'Sebelum set digabung'
+    case 'sebelum-impor-pyware':
+      return 'Sebelum impor Pyware'
     default:
       return 'Foto'
   }

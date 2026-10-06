@@ -21,12 +21,13 @@
  *
  * Audit jenis (5 Okt 2026): di kode ada **5** nilai `format` JSON —
  * `drillkit-backup`, `drillkit-data`, `drillkit-show`, `drillkit-repertoar`,
- * `drillkit-share` — ditambah varian CSV (anggota, koordinat, jadwal,
- * absensi) dan ZIP (backup+rekaman, per-anggota). Nilai `drillkit-*` lain
+ * `drillkit-share` — ditambah varian CSV (anggota, koordinat, koordinat
+ * Pyware #10, jadwal, absensi) dan ZIP (backup+rekaman, per-anggota). Nilai `drillkit-*` lain
  * yang muncul kelak tetap dilaporkan apa adanya (tidak ditelan), supaya
  * berkas dari versi baru tidak gagal secara misterius.
  */
 import { bukaZip } from './zip'
+import { deteksiPyware } from './pyware'
 
 /* ------------------------------ Jenis ---------------------------------- */
 
@@ -41,6 +42,7 @@ export type JenisBerkas =
   | 'zip-anggota'
   | 'csv-anggota'
   | 'csv-koordinat'
+  | 'csv-pyware'
   | 'csv-jadwal'
   | 'csv-absensi'
   | 'tak-dikenal'
@@ -56,6 +58,7 @@ export const LABEL_JENIS: Record<JenisBerkas, string> = {
   'zip-anggota': 'Kumpulan paket anggota (ZIP)',
   'csv-anggota': 'CSV anggota',
   'csv-koordinat': 'CSV koordinat formasi',
+  'csv-pyware': 'CSV koordinat Pyware (#10)',
   'csv-jadwal': 'CSV jadwal',
   'csv-absensi': 'CSV absensi',
   'tak-dikenal': 'Tidak dikenal',
@@ -81,6 +84,7 @@ export const TUJUAN_JENIS: Record<JenisBerkas, { rute: string; tempat: string }>
   'zip-anggota': { rute: '/berbagi', tempat: 'mode anggota → Buka paket tim' },
   'csv-anggota': { rute: '/anggota', tempat: 'Anggota → Impor' },
   'csv-koordinat': { rute: '/drill', tempat: 'Drill → Tukar CSV' },
+  'csv-pyware': { rute: '/drill', tempat: 'Drill → Impor Pyware' },
   'csv-jadwal': { rute: '/data', tempat: 'Data → Round-trip CSV' },
   'csv-absensi': { rute: '/data', tempat: 'Data → Round-trip CSV' },
   'tak-dikenal': { rute: '/data', tempat: 'menu Data' },
@@ -195,7 +199,7 @@ const adalahSet = (h: string): boolean => /(^|[^a-z])(set|formasi|formation)([^a
  */
 export function kenaliCsv(
   teks: string,
-): 'csv-anggota' | 'csv-koordinat' | 'csv-jadwal' | 'csv-absensi' | null {
+): 'csv-anggota' | 'csv-koordinat' | 'csv-pyware' | 'csv-jadwal' | 'csv-absensi' | null {
   const barisPertama = teks
     .replace(/^﻿/, '')
     .split(/\r?\n/)
@@ -209,6 +213,13 @@ export function kenaliCsv(
 
   // Absensi round-trip Data: id,sessionId,memberId,status,catatan.
   if (punya.has('sessionid') && punya.has('memberid')) return 'csv-absensi'
+  // #10 — lembar koordinat Pyware dikenali LEBIH DULU dari CSV koordinat
+  // biasa, karena keduanya sama-sama punya kolom X/Y. Pembedanya adalah
+  // penanda khas Pyware (`sidelong`, `depth`, `count`, `performer`, …).
+  // Penanda itu sengaja tidak memuat `set` atau `instrumen`: lembar
+  // koordinat ekspor DrillKit sendiri punya keduanya, dan berkas itu harus
+  // tetap lewat pintu DD7.
+  if (deteksiPyware(teks).ya) return 'csv-pyware'
   // Jadwal round-trip Data: id,judul,jenis,tanggal,mulai,.... `id` wajib
   // ada — tanpa itu ini CSV laporan jadwal (satu arah), bukan round-trip.
   if (punya.has('id') && punya.has('judul') && punya.has('tanggal')) return 'csv-jadwal'

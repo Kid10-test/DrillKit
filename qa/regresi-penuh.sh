@@ -46,6 +46,12 @@ BASE="${1:-http://localhost:4173}"
 
 bash bangun-logika.sh || exit 1
 
+# #10 — `pyware-logika` (impor drill Pyware) menyusul di daftar: pengurai
+# lembar koordinat, konversi satuan, pratinjau titik di luar lapangan,
+# interpolasi antar set, pencocokan anggota yang diingat, dan tulis+undo lewat
+# riwayat. Modulnya dirakit bangun-logika.sh sebagai /tmp/pyware.mjs &
+# /tmp/pywareTulis.mjs. Jangan keluarkan lagi tanpa mencatat alasannya.
+#
 # #6 — dua rangkaian yang menyusul dengan alasan yang sama seperti catatan
 # N14 di atas: `rekaman-lagu-logika` sudah ada sejak #6 tetapi modulnya tidak
 # pernah dirakit ke /tmp, sehingga mogok pada baris impornya; dan
@@ -64,11 +70,11 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill m1-penggaris-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \
