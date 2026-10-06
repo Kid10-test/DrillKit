@@ -29,6 +29,14 @@ const css = {
   lightningcss: { targets: cssTargets },
 }
 import { viteSingleFile } from 'vite-plugin-singlefile'
+import { pbkdf2Sync } from 'node:crypto'
+
+function hashPinPelatihEnv(): string {
+  const pin = process.env.PIN_PELATIH ?? ''
+  if (!pin) return JSON.stringify('')
+  const h = pbkdf2Sync(pin, 'drillkit-pin-pelatih-v1', 10_000, 32, 'sha256').toString('hex')
+  return JSON.stringify(h)
+}
 
 /**
  * Build portabel: seluruh JavaScript & CSS ditanam ke dalam SATU berkas HTML.
@@ -62,6 +70,7 @@ const CAP_BUILD = JSON.stringify(new Date().toISOString())
 export default defineConfig({
   define: {
     __CAP_BUILD__: CAP_BUILD,
+    __PIN_PELATIH_HASH__: hashPinPelatihEnv(),
   },
   base: './',
   css,

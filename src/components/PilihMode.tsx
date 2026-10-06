@@ -39,7 +39,9 @@
  */
 import { useState } from 'react'
 import { simpanMode } from '../lib/modePerangkat'
+import { adaPinTim } from '../lib/pinPelatih'
 import { Button } from './ui'
+import { KolomPinPelatih, cobaPinPelatih } from './PinPelatih'
 import {
   IconCalendar,
   IconGrid,
@@ -81,9 +83,28 @@ const ISI = [
 
 export function PilihMode({ onPilih }: { onPilih: (m: 'coach' | 'member') => void }) {
   const [pilih, setPilih] = useState<'coach' | 'member' | null>(null)
+  const [pin, setPin] = useState('')
+  const [galat, setGalat] = useState('')
+  const [kali, setKali] = useState(0)
+  const [tunggu, setTunggu] = useState(false)
+  const mintaPin = adaPinTim()
 
-  function lanjut() {
+  async function lanjut() {
     if (!pilih) return
+    if (pilih === 'coach' && mintaPin) {
+      if (tunggu) return
+      const r = await cobaPinPelatih(pin, { kaliSalah: kali })
+      setKali(r.kaliSalah)
+      setGalat(r.galat)
+      if (!r.ok) {
+        setPin('')
+        if (r.jeda) {
+          setTunggu(true)
+          setTimeout(() => setTunggu(false), r.jeda)
+        }
+        return
+      }
+    }
     simpanMode(pilih)
     onPilih(pilih)
   }
@@ -189,15 +210,27 @@ export function PilihMode({ onPilih }: { onPilih: (m: 'coach' | 'member') => voi
           })}
         </div>
 
+        {pilih === 'coach' && mintaPin && (
+          <div className="mx-auto mt-4 w-full max-w-sm">
+            <KolomPinPelatih
+              pin={pin}
+              onPin={setPin}
+              galat={galat}
+              disabled={tunggu}
+              onEnter={() => void lanjut()}
+            />
+          </div>
+        )}
+
         <div className="mt-6 flex flex-col items-center gap-3">
           <Button
             variant="primary"
             data-testid="lanjut-pilih-mode"
-            disabled={!pilih}
-            onClick={lanjut}
+            disabled={!pilih || tunggu || (pilih === 'coach' && mintaPin && !pin)}
+            onClick={() => void lanjut()}
             className="min-w-[16rem] justify-center"
           >
-            Masuk
+            {tunggu ? 'Tunggu sebentar…' : 'Masuk'}
           </Button>
           <p className="max-w-md text-center text-[11px] leading-relaxed text-slate-500">
             Hanya ditanyakan sekali. Pilihannya disimpan di perangkat ini dan bisa diubah

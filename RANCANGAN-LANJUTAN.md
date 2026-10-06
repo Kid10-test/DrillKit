@@ -8,7 +8,7 @@ Semuanya siap dikerjakan di sesi baru. Setiap rancangan dijadikan PR
 tersendiri, sesuai kebiasaan proyek (satu ide = satu commit/PR,
 disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 
-**Status per 5 Okt 2026 (pemutakhiran #7 rampung):**
+**Status per 6 Okt 2026 (pemutakhiran #8 rampung):**
 - **#1, #2, #3, dan #4 telah rampung penuh** (PR #6 hingga PR #10).
 - **#5 telah rampung penuh** — fondasi tempo map custom per ketuk/subdivisi
   dan ramp eksplisit terintegrasi lewat **PR #14** (`TempoTimeline`), lalu
@@ -18,7 +18,8 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
   di editor lagu, serta pecah/gabung set ber-riwayat formasi.
 - **#6 Rekaman lagu (MP3) telah rampung penuh** (PR #11 + susulan PR #12,
   28 Sep 2026).
-- **#7 selesai (5 Okt 2026)** — satu pintu "Buka berkas DrillKit" (deteksi isi, pratinjau, pengarahan, tolak paket di mode pelatih), nama berkas jelas, Data sebagai pusat; **#8 menunggu**.
+- **#7 selesai (5 Okt 2026)** — satu pintu "Buka berkas DrillKit" (deteksi isi, pratinjau, pengarahan, tolak paket di mode pelatih), nama berkas jelas, Data sebagai pusat.
+- **#8 selesai (6 Okt 2026)** — PIN pelatih tim (`PIN_PELATIH` → hash PBKDF2 saat build), kartu Saya pelatih ber-PIN, diingat per perangkat, perangkat lama ditanya sekali, ganti PIN menanya ulang, Mode pelatih menerima PIN tim atau kios, tanpa env = perilaku lama.
 - **#9 fondasi selesai (3 Okt 2026)** — tipe & geometri grid/patok terpisah,
   toggle yard↔meter tanpa geser, batas huruf/T & satuanJarak; UI + uji 41 butir.
 - **#10–#11 usulan baru** (impor Pyware, partitur) menunggu — tidak disentuh
@@ -45,7 +46,7 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 5 | Drill × segmen lagu | Sedang | **Selesai (PR #14 + susulan 4 Okt 2026)** | Penggaris dua baris + ⚡, bantuan hitungan & Pas ke batas segmen, panjang segmen dalam hitungan, pecah/gabung set ber-riwayat |
 | 6 | Rekaman lagu (MP3) | Sedang–besar | **Selesai (PR #11 + susulan PR #12, 28 Sep 2026)** | Berkas Blob IndexedDB, sidik SHA-256, waveform & titik mulai, jam rekaman sinkron |
 | 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | **Selesai (5 Okt 2026)** | Pintu Data+Dasbor+seret, deteksi isi (5 JSON+CSV+ZIP), pratinjau selalu, tolak paket di pelatih, Data pusat |
-| 8 | PIN pelatih tim | Kecil–sedang | **Menunggu** | Pagar mode pelatih via hash ENV; tanpa ketergantungan, bisa disisipkan kapan saja |
+| 8 | PIN pelatih tim | Kecil–sedang | **Selesai (6 Okt 2026)** | Pagar mode pelatih via hash ENV; tanpa ketergantungan |
 | 9 | Grid & patok yard–meter custom | Kecil–sedang | **Fondasi selesai (3 Okt 2026)** | Tipe, geometri & UI terpisah; yard↔meter tanpa geser; batas E/T26; 41 butir uji baru |
 | 10 | Impor drill Pyware | Sedang | **Menunggu — jangan mulai pada tahap ini** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo |
 | 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Menunggu — jangan mulai pada tahap ini** | MusicXML offline (OSMD) + PDF fallback, full score & part, highlight sinkron, loop bar/frasa |
@@ -706,9 +707,12 @@ mode pelatih **ditanya sekali**.
 - **Jeda singkat setelah 5 kali salah.** Anjurkan minimal 6 angka.
 - **Langkah bergambar di `DEPLOY.md`.**
 
-**Uji:** tanpa env = perilaku lama; PIN salah ditahan; PIN benar diingat
-setelah dibuka ulang; ganti PIN menyebabkan ditanya lagi; keluar dari
-mode anggota dengan PIN tim.
+**Uji:** `qa/pin-pelatih-logika.mjs` — tanpa env = perilaku lama; PIN salah
+ditahan; PIN benar diingat; ganti PIN ditanya lagi; keluar mode anggota
+dengan PIN tim atau PIN kios; hash PBKDF2 web = `node:crypto`; jeda setelah
+5 salah. Terdaftar di `regresi-penuh.sh`. Langkah bergambar di `DEPLOY.md`.
+
+### Status: Selesai (6 Okt 2026)
 
 ---
 

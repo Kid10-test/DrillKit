@@ -30,7 +30,8 @@
  */
 import { useState } from 'react'
 import { checkPin, getHint, hasPin, setPin } from '../lib/kiosk'
-import { bolehKePelatih, simpanMode, teksKunci, wajibPasangPin } from '../lib/modePerangkat'
+import { simpanMode, teksKunci, wajibPasangPin } from '../lib/modePerangkat'
+import { adaPinTim, ingatPinTim, pinKeluarDiterima, pinTimCocok } from '../lib/pinPelatih'
 import { Button, Input, Modal, useToast } from './ui'
 
 /** Muat ulang diperlukan: mode dibaca saat komponen dipasang, bukan tiap render. */
@@ -153,13 +154,23 @@ export function TombolKeluarModeAnggota({ label = 'Mode pelatih' }: { label?: st
   const [galat, setGalat] = useState('')
   const [petunjuk, setPetunjuk] = useState(getHint)
   const adaPin = hasPin()
+  const adaTim = adaPinTim()
 
-  function coba() {
-    if (!bolehKePelatih(adaPin, checkPin(pin))) {
+  async function coba() {
+    const pinKiosBenar = checkPin(pin)
+    const pinTimBenar = await pinTimCocok(pin)
+    const lewat = pinKeluarDiterima({
+      adaPinKios: adaPin,
+      pinKiosBenar,
+      adaPinTim: adaTim,
+      pinTimBenar,
+    })
+    if (!lewat) {
       setGalat('PIN salah.')
       setPinInput('')
       return
     }
+    if (adaTim && pinTimBenar) ingatPinTim()
     setPinInput('')
     setGalat('')
     simpanMode('coach')
@@ -189,17 +200,21 @@ export function TombolKeluarModeAnggota({ label = 'Mode pelatih' }: { label?: st
         footer={
           <>
             <Button onClick={() => setBuka(false)}>Batal</Button>
-            <Button variant="primary" data-testid="lanjut-keluar-anggota" onClick={coba}>
+            <Button variant="primary" data-testid="lanjut-keluar-anggota" onClick={() => void coba()}>
               Lanjut
             </Button>
           </>
         }
       >
         <p className="text-sm leading-relaxed text-slate-300" data-testid="teks-kunci-mode">
-          {teksKunci(adaPin)}
+          {adaTim && !adaPin
+            ? 'Masukkan PIN pelatih tim untuk keluar dari mode anggota.'
+            : adaTim && adaPin
+              ? 'Masukkan PIN pelatih tim atau PIN kios perangkat ini.'
+              : teksKunci(adaPin)}
         </p>
 
-        {adaPin && (
+        {(adaPin || adaTim) && (
           <div className="mt-3">
             <label className="mb-1 block text-[11px] text-slate-500" htmlFor="pin-mode">
               PIN{petunjuk ? ` (petunjuk: ${petunjuk})` : ''}
@@ -213,7 +228,7 @@ export function TombolKeluarModeAnggota({ label = 'Mode pelatih' }: { label?: st
               value={pin}
               onChange={(e) => setPinInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') coba()
+                if (e.key === 'Enter') void coba()
               }}
               className="w-full"
             />
