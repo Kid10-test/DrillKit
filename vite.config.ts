@@ -29,6 +29,21 @@ const css = {
   lightningcss: { targets: cssTargets },
 }
 import { VitePWA } from 'vite-plugin-pwa'
+import { pbkdf2Sync } from 'node:crypto'
+
+/**
+ * #8 — PIN pelatih tim.
+ * PIN_PELATIH (env Vercel) di-hash PBKDF2 di sini. Bundle hanya berisi hash.
+ */
+function hashPinPelatihEnv(): string {
+  const pin = process.env.PIN_PELATIH ?? ''
+  if (!pin) return JSON.stringify('')
+  if (pin.length < 6) {
+    console.warn('[DrillKit] PIN_PELATIH lebih pendek dari 6 angka (anjuran).')
+  }
+  const h = pbkdf2Sync(pin, 'drillkit-pin-pelatih-v1', 10_000, 32, 'sha256').toString('hex')
+  return JSON.stringify(h)
+}
 
 // DrillKit dikonfigurasi agar bisa diakses dari preview host manapun (0.0.0.0).
 /**
@@ -50,6 +65,7 @@ const CAP_BUILD = JSON.stringify(new Date().toISOString())
 export default defineConfig({
   define: {
     __CAP_BUILD__: CAP_BUILD,
+    __PIN_PELATIH_HASH__: hashPinPelatihEnv(),
   },
   /**
    * base './' membuat hasil build portabel: bisa dibuka langsung dari file

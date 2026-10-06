@@ -141,6 +141,33 @@ memang sudah ditebak Vercel; yang **penting** ada dua:
 Berkas ber-hash di dalam `/assets/` sengaja tidak diatur: namanya berubah
 setiap kali isinya berubah, jadi aman disimpan lama.
 
+### PIN pelatih tim (`PIN_PELATIH`) — langkah bergambar
+
+Ini **pagar**, bukan brankas: HP anggota tetap tidak melihat data pelatih.
+PIN membuat kartu **Saya pelatih** hanya bisa dilalui orang yang diberi
+angkanya. Kalau dikosongkan, perilaku persis seperti sekarang
+(termasuk `DrillKit.html` yang tidak dibuat ulang dengan PIN).
+
+Anjuran: **minimal 6 angka**.
+
+1. Buka proyek di Vercel → **Settings** → **Environment Variables**.
+2. **Key:** `PIN_PELATIH` · **Value:** misalnya `246810` · centang
+   Production (dan Preview bila ingin sama).
+3. **Save**, lalu **Deployments** → menu `⋯` pada deployment terakhir →
+   **Redeploy** (wajib: hash dibuat saat *build*, bukan saat orang membuka
+   situs).
+4. Setelah live: kartu **Saya pelatih** meminta PIN; **Saya anggota** tidak.
+   Perangkat yang sudah lolos mengingatnya (offline pun). Mengganti nilai
+   `PIN_PELATIH` lalu Redeploy membuat **semua** perangkat pelatih ditanya
+   lagi — itu cara menutup akses pelatih yang sudah keluar.
+5. Tombol **Mode pelatih** di mode anggota menerima PIN tim **atau** PIN
+   kios perangkat (yang dipasang di Pengaturan).
+6. Setelah **5 kali salah**, tombol Masuk jeda singkat (~2,5 detik).
+
+Netlify: Site configuration → Environment variables → `PIN_PELATIH`, lalu
+trigger deploy baru. Build lokal: `PIN_PELATIH=246810 npm run build`.
+PIN polos **tidak** masuk bundle — yang disuntikkan hanya hash PBKDF2.
+
 ---
 
 ## 3. GitHub Pages — gratis selamanya lewat repository

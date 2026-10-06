@@ -7,7 +7,9 @@ import { useSettings } from '../hooks/useSettings'
 import { KioskBanner, KioskButton } from './KioskLock'
 import { useMemberMode } from '../hooks/useMemberMode'
 import { RUTE_ANGGOTA, bolehBuka, pernahMemilih } from '../lib/modePerangkat'
+import { adaPinTim, perangkatSudahLolos } from '../lib/pinPelatih'
 import { PilihMode } from './PilihMode'
+import { PinPelatihLama } from './PinPelatih'
 import { LapisanSeretBerkas, PratinjauGlobal } from './BukaBerkas'
 import {
   IconCalendar,
@@ -107,6 +109,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
    */
   if (!sudahPilih) {
     return <PilihMode onPilih={() => window.location.reload()} />
+  }
+
+  /*
+   * Perangkat lama yang sudah di mode pelatih ditanya sekali bila PIN tim
+   * baru dipasang (atau diganti). Mode anggota tidak ditanya di sini —
+   * tombol Mode pelatih yang menerima PIN tim.
+   */
+  if (mode === 'coach' && adaPinTim() && !perangkatSudahLolos()) {
+    return <PinPelatihLama onLolos={() => window.location.reload()} />
   }
 
   return (

@@ -97,4 +97,9 @@ rakit src/lib/tempoLatihan.ts tempoLatihan
 rakit src/lib/rekaman.ts rekaman
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
+# #8 — PIN pelatih tim (PBKDF2). Hash kosong = perilaku lama.
+"$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
+  --outfile=/tmp/pinPelatih.mjs --log-level=warning \
+  --define:__PIN_PELATIH_HASH__='""'
+printf "  %-24s <- %s\n" "pinPelatih.mjs" "src/lib/pinPelatih.ts"
 echo "== selesai =="
