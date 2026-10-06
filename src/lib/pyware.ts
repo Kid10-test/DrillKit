@@ -542,10 +542,9 @@ export function uraiPyware(teks: string, opsi: OpsiPyware): HasilPyware {
       const idx = setList.length
       setKe.set(namaSetCsv, idx)
       urutanSet.push(namaSetCsv)
-      const nomor = angkaPyware(namaSetCsv.match(/\d+/)?.[0])
       setList.push({
         nama: namaSetCsv,
-        nomor: nomor !== null && /^\d+$/.test(namaSetCsv.trim()) ? nomor : nomor,
+        nomor: angkaPyware(namaSetCsv.match(/\d+/)?.[0]),
         count: null,
       })
     }
@@ -766,14 +765,22 @@ export function ringkasPyware(
   const { pemain, interpolasi } = isiCelahLinear(hasil.pemain, hasil.set)
   const rentang = rentangHitungan(hasil.set, hasil.artiCount)
 
+  // Titik yang benar-benar ada di berkas dihitung dari hasil urai, bukan dari
+  // hasil interpolasi — pratinjau harus bisa membedakan keduanya.
+  const jumlahTitik = hasil.pemain.reduce(
+    (n, p) => n + p.pos.filter((t) => t !== null).length,
+    0,
+  )
+
   const diLuar: TitikLuar[] = []
-  let jumlahTitik = 0
+  let diLuarJumlah = 0
   for (const p of pemain) {
     p.pos.forEach((t, i) => {
       if (!t) return
-      if (hasil.pemain.find((asli) => asli.kunci === p.kunci)?.pos[i]) jumlahTitik++
       const sumbu = titikLuarKotak(t, f)
-      if (sumbu && diLuar.length < maksDaftarLuar) {
+      if (!sumbu) return
+      diLuarJumlah++
+      if (diLuar.length < maksDaftarLuar) {
         diLuar.push({
           kode: p.kode,
           nama: p.nama,
@@ -786,14 +793,6 @@ export function ringkasPyware(
       }
     })
   }
-  const diLuarJumlah =
-    diLuar.length < maksDaftarLuar
-      ? diLuar.length
-      : pemain.reduce(
-          (n, p) =>
-            n + p.pos.filter((t) => (t ? titikLuarKotak(t, f) !== null : false)).length,
-          0,
-        )
 
   return {
     jumlahSet: hasil.set.length,
@@ -866,7 +865,6 @@ export function susunSetPyware(
 ): { set: RancanganSetPyware[]; interpolasi: number } {
   const bawaan = opts.countsBawaan ?? 16
   const { pemain, interpolasi } = isiCelahLinear(hasil.pemain, hasil.set)
-  const rentang = rentangHitungan(hasil.set, hasil.artiCount)
 
   // Panjang perpindahan tiap set, dari kolom Count.
   const counts: number[] = hasil.set.map((s, i) => {
@@ -896,7 +894,6 @@ export function susunSetPyware(
     return { nama: s.nama, counts: counts[i], titik, interpolasi: interp }
   })
 
-  void rentang
   return { set, interpolasi }
 }
 
