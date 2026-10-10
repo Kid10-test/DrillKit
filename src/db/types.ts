@@ -364,6 +364,8 @@ export type AlasanRiwayat =
   | 'sebelum-pecah-set'
   /** #5 sisa — difoto sesaat sebelum sebuah set digabung dengan set berikutnya */
   | 'sebelum-gabung-set'
+  /** #10 — difoto sesaat sebelum lembar koordinat Pyware ditulis ke drill ini */
+  | 'sebelum-impor-pyware'
 
 /** Isi drill yang difoto — tanpa id & cap waktu, karena itu milik snapshot. */
 export type IsiDrill = Omit<Drill, 'id' | 'createdAt' | 'updatedAt'>

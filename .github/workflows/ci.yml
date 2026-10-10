@@ -1,15 +1,40 @@
-# CI DrillKit — typecheck + build + regresi penuh (82 rangkaian).
+# CI DrillKit — typecheck + build + regresi penuh (104 rangkaian).
 #
-# Tiap push & pull request menjalankan seluruh rangkaian uji ke versinya
-# yang sudah di-build (`vite preview`), sama persis dengan yang dijalankan
-# lokal via `bash qa/regresi-penuh.sh`. Tidak ada server, tidak ada rahasia:
-# yang dibutuhkan hanya Node, Chrome (diambil puppeteer), dan pustaka
-# sistem Chrome dari apt.
+# Setiap **commit** menjalankan seluruh rangkaian uji ke versinya yang sudah
+# di-build (`vite preview`), sama persis dengan yang dijalankan lokal via
+# `bash qa/regresi-penuh.sh`. Tidak ada server, tidak ada rahasia: yang
+# dibutuhkan hanya Node, Chrome (diambil puppeteer), dan pustaka sistem
+# Chrome dari apt.
 name: CI
 
+# Satu commit = satu run.
+#
+# Dulu `push:` tanpa saringan digabung `pull_request:`, sehingga setiap commit
+# di branch yang sudah punya PR menyalakan DUA run ±60 menit — satu untuk
+# event push, satu untuk pull_request. Terukur 1–7 Okt 2026: **39 run untuk 24
+# commit, 1.990 menit**, padahal repo private paket Free hanya diberi 2.000
+# menit per bulan; job sesudahnya ditolak sebelum mulai ("job was not started
+# … spending limit"). Kini `push` hanya untuk `main`, dan commit di branch
+# diuji lewat PR-nya.
+#
+# Konsekuensinya: commit di branch yang BELUM punya PR tidak diuji sampai
+# PR-nya dibuka. Di proyek ini PR selalu dibuka segera setelah push, jadi
+# jendelanya sempit — dan jauh lebih murah daripada membakar 60 menit dua kali.
 on:
   push:
+    branches: [main]
   pull_request:
+
+# Commit baru di ref yang sama membatalkan run yang masih berjalan.
+#
+# Regresi penuh makan ±60 menit, jadi dua push yang berdekatan membuat run
+# pertama sia-sia: pada 6 Okt ada empat run yang mulai dalam satu menit
+# (±240 menit) padahal hanya commit terakhir yang perlu diuji. Dihitung ulang
+# dari data yang sama, pemakaian Oktober itu cukup ±1.049 menit — hemat 47%
+# tanpa mengurangi satu pun rangkaian yang dijalankan.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   uji:

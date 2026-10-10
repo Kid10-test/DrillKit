@@ -101,6 +101,8 @@ import {
 import { useSettings } from '../hooks/useSettings'
 import CopySetModal from './CopySetModal'
 import TukarCsvModal from './TukarCsv'
+import ImporPywareModal from './ImporPyware'
+import { intipTitipan } from './BukaBerkas'
 import { Jejak, TapakLangkah } from './JejakLangkah'
 import type { BusurGambar } from './JejakLangkah'
 import { PointInspector } from './PointInspector'
@@ -217,6 +219,17 @@ export function Editor({
   const [settingsOpen, setSettingsOpen] = useState(false)
   /** DD7 — jendela tukar formasi lewat CSV. */
   const [tukarCsv, setTukarCsv] = useState(false)
+  /** #10 — jendela impor drill Pyware (CSV lembar koordinat). */
+  const [imporPyware, setImporPyware] = useState(false)
+
+  /**
+   * #7 → #10: pintu "Buka berkas DrillKit" menitipkan CSV Pyware lalu pindah
+   * ke /drill. Kalau titipan itu yang menunggu, jendela impornya dibuka
+   * sendiri — pelatih tidak perlu mencari tombolnya.
+   */
+  useEffect(() => {
+    if (intipTitipan()?.jenis === 'csv-pyware') setImporPyware(true)
+  }, [])
 
   /* ------------------ M1 — tautan lagu (drill mengikuti musik) ------------------ */
   /** Lagu yang ditautkan ke drill ini, kalau ada. */
@@ -2209,6 +2222,15 @@ export function Editor({
               <Button size="sm" variant="ghost" onClick={() => setTukarCsv(true)} title="Tukar formasi lewat CSV">
                 CSV
               </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setImporPyware(true)}
+                title="Impor drill Pyware (CSV lembar koordinat)"
+                data-testid="tombol-pyware"
+              >
+                Pyware
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => setDotSheet(true)} title="Kartu/dot sheet per pemain">
                 <IconPrinter size={14} /> Kartu
               </Button>
@@ -3810,6 +3832,21 @@ export function Editor({
         koordinatTeks={(x, y) => coorTextSafe(x, y, f)}
         onUnduhLembar={exportCoordSheet}
         onSelesai={() => forceRender()}
+      />
+
+      <ImporPywareModal
+        open={imporPyware}
+        onClose={() => setImporPyware(false)}
+        drill={drill}
+        sets={sets}
+        sYd={sYd}
+        koordinatTeks={(x, y) => coorTextSafe(x, y, f)}
+        onSelesai={(id) => {
+          // Hanya mode `salinan` yang menghasilkan drill lain; pindah drill
+          // tanpa perlu akan memuat ulang editor seluruhnya.
+          if (id !== drill.id) onGantiDrill?.(id)
+          forceRender()
+        }}
       />
 
       <DrillSettingsModal

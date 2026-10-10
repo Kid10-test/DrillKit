@@ -101,12 +101,25 @@ const CSV_KOOR_LEBAR = 'Kode,Nama,Set 1 X,Set 1 Y,Set 2 X,Set 2 Y\nC01,Andra,-8,
 const CSV_KOOR_PANJANG = 'Set,Kode,Nama,X (steps),Y (steps)\nSet 1,C01,Andra,-8,12'
 const CSV_JADWAL = 'id,judul,jenis,tanggal,mulai,selesai,tempat,setListId\ns1,Latihan,latihan,2026-10-06,08:00,,,'
 const CSV_ABSENSI = 'id,sessionId,memberId,status,catatan\na1,s1,m1,hadir,'
+// #10 — lembar koordinat Pyware: bentuk panjang dengan penanda khasnya.
+const CSV_PYWARE = 'Set,Count,Performer,Instrument,X (Sidelong),Y (Depth)\n1,1,T1,Trumpet,-12,20'
+// Lembar koordinat ekspor DrillKit sendiri — harus TETAP ke pintu DD7.
+const CSV_KOOR_SENDIRI = 'Set,Kode,Nama,Section,Instrumen,X (steps),Y (steps),Koordinat\n1,T1,Andra,Brass,Trumpet,-8,20,B#4'
 {
   cek('csv anggota', kenaliCsv(CSV_ANGGOTA) === 'csv-anggota', kenaliCsv(CSV_ANGGOTA))
   cek('csv koordinat lebar', kenaliCsv(CSV_KOOR_LEBAR) === 'csv-koordinat')
   cek('csv koordinat panjang', kenaliCsv(CSV_KOOR_PANJANG) === 'csv-koordinat')
   cek('csv jadwal', kenaliCsv(CSV_JADWAL) === 'csv-jadwal')
   cek('csv absensi', kenaliCsv(CSV_ABSENSI) === 'csv-absensi')
+  // #10 — Pyware dikenali dari penanda khasnya, dan lembar ekspor DrillKit
+  // sendiri tidak ikut terbawa ke pintu itu.
+  cek('csv pyware', kenaliCsv(CSV_PYWARE) === 'csv-pyware', kenaliCsv(CSV_PYWARE))
+  cek('lembar ekspor DrillKit tetap csv-koordinat',
+    kenaliCsv(CSV_KOOR_SENDIRI) === 'csv-koordinat', kenaliCsv(CSV_KOOR_SENDIRI))
+  cek('pyware lewat kenaliBerkas',
+    kenaliBerkas('opener.csv', bita(CSV_PYWARE)).jenis === 'csv-pyware')
+  cek('pyware punya isi teks untuk diteruskan',
+    (kenaliBerkas('opener.csv', bita(CSV_PYWARE)).teks ?? '').includes('Sidelong'))
   // Pemisah titik koma (Excel Indonesia).
   cek('csv anggota titik koma',
     kenaliCsv(CSV_ANGGOTA.replace(/,/g, ';')) === 'csv-anggota')
@@ -277,13 +290,15 @@ const showJson = json({ format: 'drillkit-show', versi: 1, dibuat: 444, tim: 'Ge
 // ------------------------------------------------------ label & tujuan
 {
   const semua = ['backup', 'data', 'show', 'repertoar', 'paket', 'zip-backup', 'zip-anggota',
-    'csv-anggota', 'csv-koordinat', 'csv-jadwal', 'csv-absensi', 'tak-dikenal']
+    'csv-anggota', 'csv-koordinat', 'csv-pyware', 'csv-jadwal', 'csv-absensi', 'tak-dikenal']
   cek('semua jenis berlabel Indonesia',
     semua.every((j) => LABEL_JENIS[j] && !/[A-Z][a-z]+ [A-Z]/.test('') && LABEL_JENIS[j].length > 0))
   cek('label paket Indonesia', LABEL_JENIS.paket === 'Paket untuk anggota')
   cek('semua jenis punya tujuan', semua.every((j) => TUJUAN_JENIS[j]?.rute.startsWith('/')))
   cek('show ke drill', TUJUAN_JENIS.show.rute === '/drill')
   cek('csv anggota ke anggota', TUJUAN_JENIS['csv-anggota'].rute === '/anggota')
+  cek('csv pyware ke drill', TUJUAN_JENIS['csv-pyware'].rute === '/drill')
+  cek('csv pyware menyebut tempatnya', /Impor Pyware/.test(TUJUAN_JENIS['csv-pyware'].tempat))
   // kenaliTeks = jalan pintas teks.
   cek('kenaliTeks json', kenaliTeks('a', json({ format: 'drillkit-data' })).jenis === 'data')
   cek('kenaliTeks csv', kenaliTeks('a', CSV_ABSENSI).jenis === 'csv-absensi')

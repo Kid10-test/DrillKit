@@ -97,6 +97,12 @@ rakit src/lib/tempoLatihan.ts tempoLatihan
 rakit src/lib/rekaman.ts rekaman
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
+# #10 — impor drill Pyware. `pyware` murni (pengurai, pratinjau, interpolasi)
+# dan diimpor juga oleh `bukaBerkas.ts`; `pywareTulis` yang menulis ke basis
+# data, dipisah supaya bundel pintu #7 tidak ikut menarik Dexie.
+rakit src/lib/pyware.ts     pyware
+rakit src/lib/pywareTulis.ts pywareTulis
+rakit src/lib/simpanAnggota.ts simpanAnggota
 # #8 — PIN pelatih tim (PBKDF2). Hash kosong = perilaku lama.
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
