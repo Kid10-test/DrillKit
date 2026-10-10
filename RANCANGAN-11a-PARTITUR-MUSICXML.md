@@ -133,7 +133,22 @@ export interface PartiturMeta {
   /** Urutan sesuai <part-list> — bahan part per instrumen di 11c. */
   parts: { id: string; nama: string; singkatan?: string }[]
   sukat?: { beats: number; beatType: number }   // sukat pertama
+  /**
+   * Setiap `<time>` yang berbeda dari sebelumnya, berurutan, dengan nomor
+   * biramanya. Lagu 4/4 murni menghasilkan satu entri; lagu bersukat campur
+   * (7/8 di tengah) beberapa. Inilah "struktur" yang bisa dibaca pelatih
+   * tanpa merender apa pun, sekaligus bahan pemilih rentang frasa di 11d.
+   */
+  perubahanSukat: { birama: number; beats: number; beatType: number }[]
   tempo?: number                                // <sound tempo> pertama (BPM)
+  /**
+   * `false` bila berkasnya XML yang sah tetapi pemindai kita tidak sanggup
+   * meringkasnya (keputusan D4, §4.1). Berkasnya **tetap disimpan** dan ikut
+   * terbawa di ZIP; hanya ringkasannya yang kosong.
+   */
+  terurai: boolean
+  /** Pesan galat parser bila `terurai: false` — ditampilkan apa adanya. */
+  ringkasGagal?: string
   dipasangiAt: number
 }
 ```
@@ -165,7 +180,16 @@ export function ringkasMusicXml(teks: string):
   | { ok: false; galat: string }
 ```
 
-`RingkasanPartitur` = bidang yang sama dengan `PartiturMeta` (tanpa hash/ukuran).
+`RingkasanPartitur` = bidang yang sama dengan `PartiturMeta` (tanpa
+hash/ukuran/`terurai`).
+
+**Galat parser tidak memblokir penyimpanan** (keputusan D4). Bila
+`ringkasMusicXml` mengembalikan `ok: false` sementara `deteksiPartitur` yakin
+ini MusicXML, berkas tetap dipasang dengan `terurai: false` dan `ringkasGagal`
+terisi; UI menampilkan pesan itu apa adanya. Alasannya: OSMD di 11b memakai
+parser XML sungguhan, jadi berkas yang menjegal pemindai kita bisa saja tetap
+terender nanti — menyimpannya lebih berguna daripada menolaknya, dan pelatih
+tidak kehilangan berkas hanya karena keterbatasan parser kita.
 
 ### 4.1 Parser: pemindai tag kecil, bukan parser XML penuh
 
@@ -177,7 +201,8 @@ Yang diambil hanya tag yang dibutuhkan, dengan pemindai `<tag attr="…">`:
 | susunan | akar `<score-partwise>` vs `<score-timewise>` |
 | daftar part | `<part-list><score-part id="P1"><part-name>` + `<part-abbreviation>` |
 | jumlah birama | cacah `<measure number="…">` per part → ambil maksimum |
-| sukat | `<attributes><time><beats>`/`<beat-type>` pertama |
+| sukat pertama | `<attributes><time><beats>`/`<beat-type>` pertama |
+| perubahan sukat | setiap `<time>` yang berbeda dari sebelumnya + nomor biramanya |
 | tempo | `<sound tempo="…">` pertama |
 
 Batas yang **disengaja** dan harus tertulis di komentar modul:
@@ -190,6 +215,10 @@ Batas yang **disengaja** dan harus tertulis di komentar modul:
 - Ukuran maksimum 8 MB dan 5.000 birama; lebih dari itu ditolak dengan pesan
   yang menyebut batasnya, bukan menggantung.
 - XML terpotong → `galat`, bukan ringkasan setengah jadi.
+- Setiap `galat` **menyebut apa yang dilihat**, bukan sekadar "gagal": mis.
+  `"elemen akar <html>, bukan <score-partwise>/<score-timewise>"`,
+  `"entitas &nbsp; tidak dikenal"`, `"8,4 MB melebihi batas 8 MB"`. Pelatih
+  harus bisa memutuskan sendiri langkah berikutnya dari pesan itu.
 
 Alternatif yang **ditolak**: `DOMParser` (hanya ada di peramban → tidak bisa
 diuji di node) dan menambah dependensi XML (melanggar "tanpa biaya, tanpa
@@ -231,8 +260,16 @@ Urutan cabang jadi: ZIP → **partitur** → CSV → tidak dikenal.
   hasil MuseScore dipadatkan deflate. Pesannya: *"Ini MusicXML terkompresi
   (.mxl). Simpan ulang dari MuseScore sebagai 'MusicXML file (*.musicxml)' —
   DrillKit belum membuka yang terkompresi."*
-  (Peluang nanti: `DecompressionStream('deflate-raw')` — **belum diverifikasi**
-  dukungan perambannya, jadi tidak dijanjikan di 11a.)
+  **Keputusan D1: 11a berhenti di pesan itu.** Membaca deflate berarti
+  menambah varian *async* pada `bukaZip`, padahal `zip.ts` dipakai jalur
+  backup & pulihkan — risiko regresi di jalur paling sensitif tidak sebanding
+  dengan satu format yang bisa dihindari dari aplikasi notasinya. Dukungan
+  `DecompressionStream('deflate-raw')` di peramban sasaran juga **belum saya
+  verifikasi**. Dicatat sebagai kandidat 11b: `bukaZipAsync` +
+  `DecompressionStream`, diuji di node (Node ≥ 18 punya global yang sama),
+  dan tidak boleh menyentuh jalur backup. (`DecompressionStream('deflate-raw')`
+  sudah dipastikan tersedia di Node 22 — versi yang sama dipakai CI,
+  `node-version: 22` — jadi varian itu bisa diuji tanpa peramban.)
 
 ### 5.3 Pratinjau & aturan mode
 
@@ -299,7 +336,8 @@ Nama entri dibersihkan dengan pola yang sama (`replace(/[^\w.-]/g, '_')`,
 
 Fixture dibuat tangan (bukan salinan berkas berhak cipta):
 
-- MuseScore 3 & 4, Sibelius-style, `score-timewise`.
+- MuseScore 3, MuseScore 4, Sibelius-style, Finale, keluaran plug-in Dolet,
+  dan satu `score-timewise`.
 - Sukat 4/4, 7/8, dan sukat berubah di tengah lagu.
 - `<part-list>` 6 part dengan `<part-abbreviation>`.
 - `<sound tempo="120">` dan tanpa tempo.
@@ -309,6 +347,10 @@ Fixture dibuat tangan (bukan salinan berkas berhak cipta):
 - `.mxl` (ZIP + `META-INF/container.xml`) → ditolak dengan pesan petunjuk.
 - Round-trip: `bikinZip` → `bukaZip` → bita identik & manifest cocok.
 - Hash stabil untuk bita yang sama, beda untuk 1 bita berbeda.
+- Sukat campur (4/4 → 7/8 di birama 17 → 4/4) → `perubahanSukat` tiga entri
+  dengan nomor birama yang benar.
+- XML sah yang **tidak** sanggup diringkas pemindai (akar tak dikenal) → tetap
+  terpasang dengan `terurai: false` dan `ringkasGagal` terisi (D4).
 
 Target: **≥ 90 asersi**, keluaran berakhiran `N lulus, M gagal`, exit code.
 
@@ -348,17 +390,45 @@ unduh ZIP → di DB bersih, pulihkan → partitur kembali utuh (hash sama).
 
 ---
 
-## 11. Risiko & keputusan yang masih bisa dibatalkan
+## 11. Keputusan (ditetapkan 10 Okt 2026)
 
-1. **Parser tulisan tangan.** Risikonya ekspor yang tidak lazim. Penawarnya:
-   galat eksplisit + fixture dari tiga aplikasi; tidak pernah diam.
-2. **`.mxl` ditolak.** Keputusan sadar (lihat §5.2). Kalau ditolak user,
-   jalurnya `DecompressionStream` di 11b — perlu cek dukungan peramban dulu.
-3. **Nama store `partiturBerkas`.** Mengikuti `rekamanAudio`; kalau lebih suka
-   `partiturScore`, ganti sebelum versi 10 terlanjur dipakai pengguna.
-4. **Tidak ada render di 11a.** Nilai yang terlihat baru "berkas terpasang +
-   ringkasan". Kalau itu dianggap terlalu tipis, 11a bisa digabung 11b — tapi
-   PR-nya jadi tidak teruji sebagian.
+Empat titik yang tadinya terbuka sudah diputuskan; alasannya dicatat supaya
+bisa dibantah dengan alasan juga.
+
+**D1 — `.mxl` ditolak di 11a, dengan pesan petunjuk.** Membaca deflate
+memaksa varian *async* pada `bukaZip` (`zip.ts`), modul yang dipakai jalur
+backup & pulihkan. Risiko regresi di jalur paling sensitif tidak sebanding
+dengan satu format yang bisa dihindari dari aplikasi notasinya, dan dukungan
+`DecompressionStream('deflate-raw')` di peramban sasaran belum terverifikasi.
+→ Kandidat 11b: `bukaZipAsync`, diuji di node, tidak menyentuh jalur backup.
+
+**D2 — nama store `partiturBerkas`.** Mengikuti `rekamanAudio` yang memang
+jadi cetak birunya: kata benda + jenis isinya. Store baru di proyek ini
+bernama Indonesia (`rekamanAudio`, `simpanan`, `riwayat`, `kemajuan`,
+`evaluasi`), dan "berkas" menyebut apa yang ada di dalamnya (bita), bukan
+konsep domainnya. `partiturScore` mencampur Indonesia-Inggris.
+
+**D3 — 11a tetap tanpa render, tapi ringkasannya diperkaya.** Batas "tidak
+merender" dipertahankan supaya seluruh logika teruji di node dan PR-nya bisa
+dihijaukan tanpa peramban. Sebagai gantinya ringkasan tidak berhenti di
+"jumlah birama": `perubahanSukat[]` memberi pelatih struktur lagu (sukat apa
+di birama berapa) — cukup untuk memastikan berkas yang terpasang benar dan
+untuk merencanakan frasa, dan memang data yang dibutuhkan 11d. Murah
+dihitung: pemindai sudah melewati setiap `<measure>`.
+
+**D4 — parser tulisan tangan, dan kegagalannya tidak memblokir apa pun.**
+`DOMParser` tidak tersedia di node dan dependensi XML baru melanggar aturan
+proyek, jadi pemindai tag kecil tetap dipakai. Risikonya ekspor yang tidak
+lazim; penawarnya tiga lapis: (a) fixture dari lima sumber (MuseScore 3 & 4,
+Sibelius, Finale, Dolet), (b) setiap `galat` menyebut apa yang dilihat, dan
+(c) berkas yang gagal diringkas **tetap disimpan** dengan `terurai: false` —
+sebab OSMD di 11b memakai parser XML sungguhan, jadi yang menjegal pemindai
+kita belum tentu menjegal perender.
+
+Sisa risiko yang tidak dihilangkan: ekspor eksotis bisa membuat ringkasan
+kosong (D4c membatasi dampaknya), dan penolakan `.mxl` menambah satu langkah
+bagi pengguna MuseScore yang terbiasa mengekspor terkompresi (pesannya
+menyebut cara memperbaikinya).
 
 ---
 
@@ -372,6 +442,8 @@ unduh ZIP → di DB bersih, pulihkan → partitur kembali utuh (hash sama).
 - [ ] Berkas show/repertoar **tidak membesar** karena notasi (hanya metadata).
 - [ ] Peringatan kuota muncul dan `persist()` bisa diminta.
 - [ ] `qa/partitur-logika.mjs` ≥ 90 asersi, `0 gagal`; terdaftar di `regresi-penuh.sh`.
+- [ ] Sukat campur menghasilkan `perubahanSukat` dengan nomor birama yang benar.
+- [ ] Berkas XML yang gagal diringkas tetap terpasang (`terurai: false`) dan pesannya tampil.
 - [ ] `tsc --noEmit` bersih; tidak ada dependensi baru; tidak ada `oklch()`/`color-mix()`.
 
 ---
