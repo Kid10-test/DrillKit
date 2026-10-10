@@ -856,6 +856,12 @@ dan `qa/pyware-impor.mjs` (peramban) didaftarkan ke `qa/regresi-penuh.sh`.
 
 ## 11. Partitur full score & per instrumen + latihan per bar/frasa
 
+> **Rencana teknis bagian pertama (#11a)** — simpan, kenali, dan bawa
+> MusicXML/PDF tanpa merender apa pun — sudah ditulis terpisah di
+> `RANCANGAN-11a-PARTITUR-MUSICXML.md` (10 Okt 2026). Bagian itu sengaja
+> seluruhnya teruji di node; render OSMD (11b), part per instrumen (11c), dan
+> highlight/loop (11d) menyusul sebagai PR sendiri.
+
 **Masalah.** Halaman Musik sudah punya repertoar, tempo map, metronom,
 rekaman (#6), dan tempo latihan (#4), tetapi **belum ada notasi**.
 Pelatih dan anggota membutuhkan partitur untuk melihat frase, melatih
