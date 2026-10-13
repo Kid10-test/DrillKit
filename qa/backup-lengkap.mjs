@@ -34,6 +34,12 @@
  * - `rekamanAudio` (6) — berkas biner audio MP3/WAV/dll berukuran besar
  *   (bisa puluhan MB), sengaja tidak dimasukkan ke dalam JSON teks sesuai
  *   rancangan #6. Ditangani terpisah via "Backup + rekaman (ZIP)".
+ * - `partiturBerkas` (11a) — bita notasi (MusicXML/PDF) per lagu, puluhan–
+ *   ratusan KB. Alasan yang sama dengan `rekamanAudio`, dan memang begitu
+ *   yang diputuskan rancangan 11a §7 & §11: yang ikut di JSON hanya
+ *   **metadata**-nya (`Song.partitur`), bitanya ditangani lewat ZIP
+ *   (`partitur/…` + `partitur/manifest.json`, pola `audio/` #6). Round-trip
+ *   ZIP-nya diuji rangkaian `partitur-logika`.
  */
 import puppeteer from 'puppeteer'
 import { lewatSambutan } from './sambutan.mjs'
@@ -46,7 +52,7 @@ const UNDUH = path.join(QA, 'unduhan-lengkap')
 fs.rmSync(UNDUH, { recursive: true, force: true })
 fs.mkdirSync(UNDUH, { recursive: true })
 
-const DIKECUALIKAN = new Set(['settings', 'packages', 'simpanan', 'riwayat', 'rekamanAudio'])
+const DIKECUALIKAN = new Set(['settings', 'packages', 'simpanan', 'riwayat', 'rekamanAudio', 'partiturBerkas'])
 
 const browser = await puppeteer.launch({
   args: ['--no-sandbox', '--disable-dev-shm-usage'],
