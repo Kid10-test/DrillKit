@@ -1,4 +1,4 @@
-# CI DrillKit — typecheck + build + regresi penuh (104 rangkaian).
+# CI DrillKit — typecheck + build + regresi penuh (105 rangkaian).
 #
 # Setiap **commit** menjalankan seluruh rangkaian uji ke versinya yang sudah
 # di-build (`vite preview`), sama persis dengan yang dijalankan lokal via

@@ -38,8 +38,12 @@ if [ ${#DAFTAR[@]} -eq 0 ]; then
 fi
 
 GAGAL=()
+# N19 — argumen ketiga (opsional): nama asersi yang gagal. Dulu hanya jumlahnya
+# yang dicatat, sehingga dari anotasi CI terbaca "79 lulus, 2 gagal" tanpa
+# menyebut yang mana — dan satu-satunya cara mengetahuinya adalah mengunduh log
+# mentah. Sekarang nama asersinya ikut, jadi kegagalan bisa dijelaskan dari API.
 catat_gagal() {
-  GAGAL+=("$1|$2")
+  GAGAL+=("$1|$2|${3:-}")
 }
 
 for f in "${DAFTAR[@]}"; do
@@ -84,7 +88,8 @@ for f in "${DAFTAR[@]}"; do
     # jelaskan, sekali jalan, tepat di bawah ringkasannya.
     if ! printf '%s' "$ringkas" | grep -q " 0 gagal"; then
       printf '%s' "$out" | grep -E '✗' | sed 's/^/      ↳ /' | head -20
-      catat_gagal "$f" "$ringkas"
+      rincian=$(printf '%s' "$out" | grep -E '✗' | sed 's/^[[:space:]]*//' | head -5 | paste -sd ';' - | sed 's/;/; /g')
+      catat_gagal "$f" "$ringkas" "$rincian"
     fi
     continue
   fi
@@ -113,7 +118,8 @@ for f in "${DAFTAR[@]}"; do
   printf "%-24s MOGOK — tanpa ringkasan, %s baris keluaran\n" \
     "$f" "$(printf '%s' "$out" | grep -c .)"
   printf '%s' "$out" | tail -12 | sed 's/^/      ↳ /'
-  catat_gagal "$f" "mogok tanpa ringkasan"
+  catat_gagal "$f" "mogok tanpa ringkasan" \
+    "$(printf '%s' "$out" | grep -v '^[[:space:]]*$' | tail -3 | paste -sd ';' - | sed 's/;/; /g')"
 done
 
 echo
@@ -121,11 +127,23 @@ if [ ${#GAGAL[@]} -gt 0 ]; then
   echo "RANGKAIAN GAGAL (${#GAGAL[@]} dari ${#DAFTAR[@]}):"
   for g in "${GAGAL[@]}"; do
     nama="${g%%|*}"
-    alasan="${g#*|}"
+    sisa="${g#*|}"
+    alasan="${sisa%%|*}"
+    rincian="${sisa#*|}"
+    [ "$rincian" = "$sisa" ] && rincian=""
     printf "  ✗ %-22s %s\n" "$nama" "$alasan"
+    if [ -n "$rincian" ]; then
+      printf "      ↳ %s\n" "$rincian"
+    fi
     # Di CI, jadikan anotasi supaya terbaca dari API tanpa unduh log.
+    # Anotasi GitHub hanya satu baris: pemisah '; ' dipakai apa adanya, dan
+    # `%`/`\r`/`\n` tidak muncul karena asersi dicetak di satu baris.
     if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-      echo "::error title=Rangkaian uji gagal::$nama — $alasan"
+      if [ -n "$rincian" ]; then
+        echo "::error title=Rangkaian uji gagal::$nama — $alasan — $rincian"
+      else
+        echo "::error title=Rangkaian uji gagal::$nama — $alasan"
+      fi
     fi
   done
   exit 1
