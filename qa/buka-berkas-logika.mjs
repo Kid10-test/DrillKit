@@ -152,6 +152,73 @@ const CSV_KOOR_SENDIRI = 'Set,Kode,Nama,Section,Instrumen,X (steps),Y (steps),Ko
   cek('teks csv disimpan untuk pratinjau', h.teks === CSV_JADWAL)
 }
 
+// ------------------------------------------------ partitur #11a (MusicXML/PDF)
+const XML_PARTITUR =
+  '<?xml version="1.0" encoding="UTF-8"?>' +
+  '<score-partwise version="3.1">' +
+  '<movement-title>Pembuka</movement-title>' +
+  '<identification><creator type="composer">Budi Santoso</creator></identification>' +
+  '<part-list><score-part id="P1"><part-name>Trumpet 1</part-name>' +
+  '<part-abbreviation>Tpt. 1</part-abbreviation></score-part></part-list>' +
+  '<part id="P1"><measure number="1"><attributes><divisions>2</divisions>' +
+  '<time><beats>4</beats><beat-type>4</beat-type></time></attributes>' +
+  '<direction><sound tempo="120"/></direction>' +
+  '<note><rest measure="yes"/><duration>2</duration></note></measure>' +
+  '<measure number="2"><note><rest/></note></measure></part>' +
+  '</score-partwise>'
+const PDF = '%PDF-1.4\n1 0 obj\n<</Type/Catalog>>\nendobj\ntrailer\n%%EOF'
+{
+  // Nama berkas menipu: yang menentukan isinya (#11a §5.2).
+  const h = kenaliBerkas('foto-liburan.png', bita(XML_PARTITUR))
+  cek('partitur dikenali dari isi, bukan ekstensi', h.jenis === 'partitur', h.jenis)
+  cek('tipe partitur: musicxml', h.partiturTipe === 'musicxml', String(h.partiturTipe))
+  cek('ringkasan partitur tersedia untuk pratinjau', h.partiturRingkas?.judul === 'Pembuka', JSON.stringify(h.partiturRingkas?.judul))
+  cek('ringkasan menyebut birama & part',
+    h.partiturRingkas?.jumlahBirama === 2 && h.partiturRingkas?.jumlahPart === 1,
+    JSON.stringify([h.partiturRingkas?.jumlahBirama, h.partiturRingkas?.jumlahPart]))
+  cek('ringkasan menyebut sukat & tempo',
+    h.partiturRingkas?.sukat?.beats === 4 && h.partiturRingkas?.tempo === 120,
+    JSON.stringify([h.partiturRingkas?.sukat, h.partiturRingkas?.tempo]))
+  cek('ringkasan menyebut nama part', h.partiturRingkas?.parts?.[0]?.nama === 'Trumpet 1')
+  cek('teks partitur disimpan untuk diteruskan', (h.teks ?? '').includes('score-partwise'))
+  cek('tanpa pesan gagal saat ringkasannya berhasil', h.partiturGagal === undefined)
+
+  const p = kenaliBerkas('skor.pdf', bita(PDF))
+  cek('PDF dikenali sebagai partitur', p.jenis === 'partitur' && p.partiturTipe === 'pdf', p.jenis)
+  cek('PDF tanpa ringkasan (memang tidak ada yang bisa diringkas)', p.partiturRingkas === null)
+  cek('bita PDF tidak disimpan sebagai teks', p.teks === undefined)
+
+  // D4 — XML yang sah tetapi pemindainya menyerah: tetap berkas partitur.
+  const aneh = kenaliBerkas(
+    'x.musicxml',
+    bita('<score-partwise version="3.1"><movement-title>A &nbsp; B</movement-title></score-partwise>'),
+  )
+  cek('D4: tetap dikenali sebagai partitur', aneh.jenis === 'partitur', aneh.jenis)
+  cek('D4: pesan pemindai diteruskan apa adanya',
+    /entitas &nbsp; tidak dikenal/.test(aneh.partiturGagal ?? ''), aneh.partiturGagal)
+  cek('D4: ringkasannya kosong, bukan setengah jadi', aneh.partiturRingkas === null)
+
+  // XML terpotong sebelum akar: pesannya menyebut apa yang dilihat.
+  const potong = kenaliBerkas('a.xml', bita('<score-partwise version="3.1"'))
+  cek('XML partitur terpotong dijelaskan, bukan "tidak dikenal"',
+    potong.jenis === 'tak-dikenal' && /score-partwise/.test(potong.catatan ?? ''), potong.catatan)
+
+  // Akan tetapi berkas lain TIDAK boleh ikut dilabeli masalah partitur.
+  const html = kenaliBerkas('halaman.html', bita('<html><body>Halo</body></html>'))
+  cek('HTML tidak dilabeli masalah partitur', !/score-partwise/.test(html.catatan ?? ''), html.catatan)
+  cek('CSV tetap dikenali walau pengurai XML menolaknya',
+    kenaliBerkas('anggota.csv', bita(CSV_ANGGOTA)).jenis === 'csv-anggota')
+
+  // .mxl (MusicXML terkompresi) ditolak dengan pesan petunjuk (D1).
+  const mxl = kenaliBerkas('lagu.mxl', bikinZip([
+    { nama: 'META-INF/container.xml', isi: '<container><rootfiles/></container>' },
+    { nama: 'score.xml', isi: XML_PARTITUR },
+  ]))
+  cek('.mxl ditolak, bukan gagal diam-diam', mxl.jenis === 'tak-dikenal', mxl.jenis)
+  cek('.mxl: pesannya menyebut cara menyimpan ulang', /MuseScore/.test(mxl.catatan ?? ''), mxl.catatan)
+  cek('.mxl: bukan pesan "ZIP tanpa JSON"', !/JSON DrillKit/.test(mxl.catatan ?? ''), mxl.catatan)
+}
+
 // ------------------------------------------------------------------ ZIP
 const backupJson = json({
   format: 'drillkit-backup', version: 1, exportedAt: 222,
@@ -171,6 +238,18 @@ const showJson = json({ format: 'drillkit-show', versi: 1, dibuat: 444, tim: 'Ge
   const h = kenaliBerkas('apapun.bin', zip)
   cek('zip backup dikenali dari magic', h.jenis === 'zip-backup', h.jenis)
   cek('audio dihitung (tanpa manifest)', h.audioZip === 1, String(h.audioZip))
+  cek('zip tanpa partitur: hitungannya 0', h.partiturZip === 0, String(h.partiturZip))
+
+  // #11a — round-trip ZIP: entri `partitur/` dihitung seperti `audio/`.
+  const zipPartitur = bikinZip([
+    { nama: 'DrillKit - BACKUP LENGKAP - 2026-10-05.json', isi: backupJson },
+    { nama: 'partitur/L1_Pembuka.musicxml', isi: XML_PARTITUR },
+    { nama: 'partitur/L1_Pembuka.pdf', isi: new Uint8Array([1, 2, 3]) },
+    { nama: 'partitur/manifest.json', isi: '{}' },
+  ])
+  const zp = kenaliBerkas('backup-partitur.zip', zipPartitur)
+  cek('zip backup + partitur tetap dikenali backup', zp.jenis === 'zip-backup', zp.jenis)
+  cek('entri partitur/ dihitung (tanpa manifest)', zp.partiturZip === 2, String(zp.partiturZip))
   cek('tanggal backup zip terbaca', h.tanggal === 222)
   cek('data backup tersedia', h.data?.format === 'drillkit-backup')
 
@@ -213,6 +292,10 @@ const showJson = json({ format: 'drillkit-show', versi: 1, dibuat: 444, tim: 'Ge
   cek('penolakan backup menyebut jenisnya', /Backup lengkap/.test(tolakBackup.alasan), tolakBackup.alasan)
   cek('zip 1 paket boleh di mode anggota', aturMode('zip-anggota', 'member', 1).boleh === true)
   cek('zip 2 paket ditolak di mode anggota', aturMode('zip-anggota', 'member', 2).boleh === false)
+  // #11a — partitur satu-satunya jenis bukan-paket yang boleh dibuka anggota:
+  // pelatih memasang notasinya, anggota membukanya di perangkatnya sendiri.
+  cek('partitur boleh di mode pelatih', aturMode('partitur', 'coach').boleh === true)
+  cek('partitur boleh di mode anggota', aturMode('partitur', 'member').boleh === true)
   cek('tak-dikenal ditolak di kedua mode',
     aturMode('tak-dikenal', 'coach').boleh === false && aturMode('tak-dikenal', 'member').boleh === false)
 }
@@ -290,7 +373,7 @@ const showJson = json({ format: 'drillkit-show', versi: 1, dibuat: 444, tim: 'Ge
 // ------------------------------------------------------ label & tujuan
 {
   const semua = ['backup', 'data', 'show', 'repertoar', 'paket', 'zip-backup', 'zip-anggota',
-    'csv-anggota', 'csv-koordinat', 'csv-pyware', 'csv-jadwal', 'csv-absensi', 'tak-dikenal']
+    'csv-anggota', 'csv-koordinat', 'csv-pyware', 'csv-jadwal', 'csv-absensi', 'partitur', 'tak-dikenal']
   cek('semua jenis berlabel Indonesia',
     semua.every((j) => LABEL_JENIS[j] && !/[A-Z][a-z]+ [A-Z]/.test('') && LABEL_JENIS[j].length > 0))
   cek('label paket Indonesia', LABEL_JENIS.paket === 'Paket untuk anggota')
@@ -299,6 +382,10 @@ const showJson = json({ format: 'drillkit-show', versi: 1, dibuat: 444, tim: 'Ge
   cek('csv anggota ke anggota', TUJUAN_JENIS['csv-anggota'].rute === '/anggota')
   cek('csv pyware ke drill', TUJUAN_JENIS['csv-pyware'].rute === '/drill')
   cek('csv pyware menyebut tempatnya', /Impor Pyware/.test(TUJUAN_JENIS['csv-pyware'].tempat))
+  // #11a — label & tujuan sesuai rancangan §5.1.
+  cek('label partitur', LABEL_JENIS.partitur === 'Partitur (MusicXML / PDF) (#11a)', LABEL_JENIS.partitur)
+  cek('partitur ke musik', TUJUAN_JENIS.partitur.rute === '/musik', TUJUAN_JENIS.partitur.rute)
+  cek('partitur menyebut tempatnya', /Partitur lagu/.test(TUJUAN_JENIS.partitur.tempat), TUJUAN_JENIS.partitur.tempat)
   // kenaliTeks = jalan pintas teks.
   cek('kenaliTeks json', kenaliTeks('a', json({ format: 'drillkit-data' })).jenis === 'data')
   cek('kenaliTeks csv', kenaliTeks('a', CSV_ABSENSI).jenis === 'csv-absensi')
