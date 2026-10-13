@@ -618,6 +618,10 @@ export interface TempoSegment {
 /* ------------------- M1 — Tanda birama & hitung mundur -------------------- */
 
 import type { HitungMundur, TandaBirama } from '../lib/birama'
+// #11a — sub-bidang ringkasan partitur, supaya metadata (di sini) dan pemindai
+// (`src/lib/partitur.ts`) tidak bisa berbeda diam-diam. Impor tipe: tidak ada
+// kode yang ikut masuk bundel.
+import type { BagianPartitur, PerubahanSukatPartitur, SukatPartitur } from '../lib/partitur'
 
 /** Diteruskan supaya komponen cukup mengimpor dari `db/types`. */
 export type { HitungMundur, TandaBirama }
@@ -735,6 +739,17 @@ export interface Song {
    * Berkas binernya (Blob) disimpan di IndexedDB tabel `rekamanAudio`.
    */
   rekaman?: RekamanAudioMeta | null
+  /**
+   * #11a — Metadata partitur (MusicXML/PDF) untuk lagu ini.
+   * Berkas binernya (Blob) disimpan di IndexedDB tabel `partiturBerkas`.
+   *
+   * Metadata ini kecil dan **selalu ikut terkirim** di berkas show/repertoar;
+   * notasinya tidak pernah ikut — persis alasan pemisahan yang sama dengan
+   * `rekaman` di atas, seperti yang dipegang §11: *"berkas show & repertoar
+   * dapat membawa rujukan partitur (id lagu), bukan notasi penuh, agar ukuran
+   * paket tetap wajar."*
+   */
+  partitur?: PartiturMeta | null
 }
 
 /**
@@ -777,6 +792,85 @@ export interface AudioRekamanItem {
   tipe: string
   ukuran: number
   durasi: number
+  hash: string
+  updatedAt: number
+}
+
+/* ------------------------------ #11a — Partitur --------------------------- */
+
+/**
+ * #11a — Metadata partitur lagu (MusicXML/PDF).
+ *
+ * Isinya = **ringkasan dari `ringkasMusicXml`** (`src/lib/partitur.ts`)
+ * ditambah empat bidang penyimpanan: `namaFile`, `ukuran`, `hash`, dan
+ * `dipasangiAt`. Sub-bidangnya karena itu **diimpor** dari modul itu, bukan
+ * ditulis ulang di sini: pemindai dan metadata harus sepakat, dan dua
+ * definisi yang sama-sama ditulis tangan adalah dua definisi yang akan
+ * berbeda diam-diam.
+ *
+ * Aturan yang dipegang: metadata kecil dan selalu ikut terkirim, bita tidak
+ * pernah ikut. Kalau metadata ada tetapi Blob-nya tidak ada di perangkat ini
+ * (mis. anggota menerima berkas show tanpa ZIP), UI menyebut "partitur
+ * tercatat, berkasnya belum ada di perangkat ini" — bukan error, dan tidak
+ * pernah buntu.
+ */
+export interface PartiturMeta {
+  namaFile: string
+  /** Jenis yang benar-benar terdeteksi dari isinya, bukan tebakan dari ekstensi. */
+  tipe: 'musicxml' | 'pdf'
+  ukuran: number
+  /** SHA-256 hex — untuk tahu apakah Blob lokal masih cocok dengan metadata. */
+  hash: string
+  /** `partwise` (umum) atau `timewise` (measure-major). */
+  susunan?: 'partwise' | 'timewise'
+  /** `<movement-title>` / `<work-title>` / `<identification>`. */
+  judul?: string
+  /** `<creator type="composer">`. */
+  pengarang?: string
+  /** Birama terbanyak di antara semua part. */
+  jumlahBirama: number
+  jumlahPart: number
+  /** Urutan sesuai `<part-list>` — bahan part per instrumen di 11c. */
+  parts: BagianPartitur[]
+  /** Sukat pertama yang ditemukan. */
+  sukat?: SukatPartitur
+  /**
+   * Perubahan sukat, satu birama = paling banyak satu entri. Lagu 4/4 murni
+   * menghasilkan satu entri; lagu bersukat campur (7/8 di tengah) beberapa.
+   */
+  perubahanSukat: PerubahanSukatPartitur[]
+  /** `<sound tempo="…">` pertama (BPM). */
+  tempo?: number
+  /**
+   * `false` bila berkasnya XML yang sah tetapi pemindai kita tidak sanggup
+   * meringkasnya (keputusan D4). Berkasnya **tetap disimpan** dan ikut
+   * terbawa di ZIP; hanya ringkasannya yang kosong — sebab OSMD di 11b
+   * memakai parser XML sungguhan, jadi yang menjegal pemindai kita belum
+   * tentu menjegal perender.
+   */
+  terurai: boolean
+  /** Pesan galat parser bila `terurai: false` — ditampilkan apa adanya. */
+  ringkasGagal?: string
+  dipasangiAt: number
+}
+
+/**
+ * #11a — Berkas partitur yang tersimpan di IndexedDB perangkat ini.
+ *
+ * Cerminan `AudioRekamanItem` (#6) untuk notasi, sesuai keputusan D2: store
+ * baru bernama kata benda + jenis isinya (`rekamanAudio` → `partiturBerkas`),
+ * dan "berkas" menyebut apa yang ada di dalamnya (bita), bukan konsep
+ * domainnya.
+ */
+export interface PartiturBerkasItem {
+  /** Id unik, disamakan dengan songId lagu pemilik (pola #6). */
+  id: string
+  songId: string
+  blob: Blob
+  namaFile: string
+  /** `'musicxml' | 'pdf'` — hasil deteksi, bukan tebakan dari ekstensi. */
+  tipe: 'musicxml' | 'pdf'
+  ukuran: number
   hash: string
   updatedAt: number
 }

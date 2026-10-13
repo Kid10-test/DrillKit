@@ -16,6 +16,7 @@ import type {
   RiwayatSnapshot,
   Simpanan,
   AudioRekamanItem,
+  PartiturBerkasItem,
 } from './types'
 
 /**
@@ -48,6 +49,16 @@ export class DrillKitDB extends Dexie {
   simpanan!: Table<Simpanan, string>
   /** #6 — berkas rekaman audio lagu (Blob). Kuncinya id (songId). */
   rekamanAudio!: Table<AudioRekamanItem, string>
+  /**
+   * #11a — berkas notasi partitur lagu (Blob MusicXML/PDF). Kuncinya id (songId).
+   *
+   * Store terpisah, bukan kolom di `songs`, karena satu partitur 32 birama
+   * berukuran puluhan–ratusan KB sementara `songs` ikut terkirim di **setiap**
+   * berkas show/repertoar/paket. Notasi di dalam `songs` akan membengkakkan
+   * semua berkas pertukaran itu; di sini yang ikut terkirim hanya
+   * `Song.partitur` (metadata kecilnya), bitanya menyusul lewat ZIP.
+   */
+  partiturBerkas!: Table<PartiturBerkasItem, string>
 
   constructor() {
     super('drillkit')
@@ -83,6 +94,13 @@ export class DrillKitDB extends Dexie {
     })
     this.version(9).stores({
       rekamanAudio: 'id, songId, updatedAt',
+    })
+    // #11a — bita partitur (MusicXML/PDF) per lagu. Versi baru di sini **hanya
+    // menambah store**, tidak mengubah yang lama: lagu & rekaman yang sudah ada
+    // tidak disentuh, dan perangkat anggota yang belum pernah memasang partitur
+    // tidak perlu migrasi apa pun.
+    this.version(10).stores({
+      partiturBerkas: 'id, songId, updatedAt',
     })
   }
 }
