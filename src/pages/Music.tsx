@@ -44,12 +44,13 @@ import { hitungSetList, setListBaru } from '../lib/setlist'
 import { ModalRekamanLagu } from '../components/ModalRekamanLagu'
 import { PemutarRekaman, waktuBiramaKeDetikAudio } from '../lib/rekaman'
 import { lajuRekaman } from '../lib/tempoLatihan'
-import type { RekamanAudioMeta } from '../db/types'
+import type { PartiturMeta, RekamanAudioMeta } from '../db/types'
 import { jumlahBirama, rentangValid } from '../lib/ulang'
 import { KartuSetList } from '../components/KartuSetList'
 import { KendaliTempoLatihan, LencanaLatihan } from '../components/KendaliTempoLatihan'
 import { useTempoLatihan } from '../hooks/useTempoLatihan'
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
+import { PanelPartitur } from '../components/PanelPartitur'
 import { IndikatorKetuk, PanelSedangDiputar, StripSegmen } from '../components/PanelLagu'
 import { diam as hentikanUcapan, ucap as ucapkan } from '../lib/ucap'
 import PilihBirama, { PilihBiramaSegmen, RingkasBirama } from '../components/PilihBirama'
@@ -864,6 +865,14 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
 
   async function handleUpdateRekaman(songId: string, meta: RekamanAudioMeta | null) {
     await db.songs.update(songId, { rekaman: meta })
+  }
+
+  /**
+   * #11a — metadata partitur lagu. Blob-nya sudah ditulis `partiturSimpan.ts`
+   * sebelum baris ini dipanggil (berkas dulu, metadata kemudian).
+   */
+  async function handleUpdatePartitur(songId: string, meta: PartiturMeta | null) {
+    await db.songs.update(songId, { partitur: meta })
   }
 
   return (
@@ -1681,6 +1690,19 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
                   </div>
                 ))}
               {song.notes && <p className="whitespace-pre-wrap text-[11px] text-slate-500">{song.notes}</p>}
+              {/*
+                #11a — partitur lagu ini: pasang/lepas, ringkasan, kuota.
+                Diletakkan di sebelah tempo map karena keduanya milik lagu yang
+                sedang dipilih, dan supaya halaman Musik tetap satu tempat untuk
+                "lagu ini isinya apa saja" (rekaman, tempo, partitur).
+              */}
+              <div className="border-t border-slate-800 pt-3">
+                <PanelPartitur
+                  song={song}
+                  onUpdateSong={handleUpdatePartitur}
+                  hanyaPutar={hanyaPutar}
+                />
+              </div>
             </div>
           )}
         </Card>

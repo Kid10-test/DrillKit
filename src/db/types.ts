@@ -842,14 +842,22 @@ export interface PartiturMeta {
   /** `<sound tempo="…">` pertama (BPM). */
   tempo?: number
   /**
-   * `false` bila berkasnya XML yang sah tetapi pemindai kita tidak sanggup
-   * meringkasnya (keputusan D4). Berkasnya **tetap disimpan** dan ikut
-   * terbawa di ZIP; hanya ringkasannya yang kosong — sebab OSMD di 11b
-   * memakai parser XML sungguhan, jadi yang menjegal pemindai kita belum
-   * tentu menjegal perender.
+   * `false` bila tidak ada ringkasan struktur yang bisa dibaca — dua sebab
+   * yang dibedakan pemakainya:
+   *
+   * - `ringkasGagal` terisi → berkasnya XML yang sah tetapi pemindai kita
+   *   tidak sanggup meringkasnya (keputusan D4). Berkasnya **tetap disimpan**
+   *   dan ikut terbawa di ZIP; hanya ringkasannya yang kosong — sebab OSMD di
+   *   11b memakai parser XML sungguhan, jadi yang menjegal pemindai kita belum
+   *   tentu menjegal perender.
+   * - `ringkasGagal` kosong → berkasnya PDF: memang tidak ada yang bisa
+   *   diringkas, dan itu bukan kegagalan.
+   *
+   * Bidang ringkasan (`jumlahBirama`, `parts`, …) bernilai nol/kosong saat
+   * `terurai: false` — bukan angka karangan.
    */
   terurai: boolean
-  /** Pesan galat parser bila `terurai: false` — ditampilkan apa adanya. */
+  /** Pesan galat parser bila `terurai: false` **dan** berkasnya MusicXML. */
   ringkasGagal?: string
   dipasangiAt: number
 }
