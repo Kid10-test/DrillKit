@@ -35,7 +35,7 @@ import { bacaPaket, perluPeringatan, ringkasanImpor, terapkanPaket } from '../li
 import type { PaketRepertoar } from '../db/types'
 import { Button, Modal, useToast } from './ui'
 import { IconUpload } from './Icons'
-import { AlurPulihkanBackup, ekstrakAudioZip } from './PulihkanBackup'
+import { AlurPulihkanBackup, ekstrakAudioZip, ekstrakPartiturZip } from './PulihkanBackup'
 import { AlurImporShow } from './ImporShow'
 
 /* ------------------------- Bus pratinjau global -------------------------- */
@@ -281,6 +281,7 @@ function TubuhPratinjau({ paket, onTutup }: { paket: PaketPratinjau; onTutup: ()
         <AlurPulihkanBackup
           data={(hasil.data ?? {}) as Record<string, any>}
           audio={paket.bita ? ekstrakAudioZip(paket.bita) : []}
+          partitur={paket.bita ? ekstrakPartiturZip(paket.bita) : []}
           namaBerkas={hasil.nama}
           testId="buka-pulih"
           onSelesai={onTutup}

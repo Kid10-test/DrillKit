@@ -103,6 +103,8 @@ rakit src/lib/rekaman.ts rekaman
 rakit src/lib/partitur.ts partitur
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
+# #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.
+rakit src/lib/partiturZip.ts partiturZip
 # #10 — impor drill Pyware. `pyware` murni (pengurai, pratinjau, interpolasi)
 # dan diimpor juga oleh `bukaBerkas.ts`; `pywareTulis` yang menulis ke basis
 # data, dipisah supaya bundel pintu #7 tidak ikut menarik Dexie.

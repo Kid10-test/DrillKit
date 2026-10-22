@@ -161,20 +161,24 @@ export async function downloadBackup(): Promise<BackupNote> {
 }
 
 /**
- * #6 — Unduh berkas backup lengkap berserta rekaman audio (ZIP).
- * Mengemas JSON teks + berkas biner audio MP3/WAV/dll.
+ * #6/#11a — Unduh backup lengkap bersama audio dan partitur (ZIP).
+ * Mengemas JSON teks, biner audio, dan MusicXML/PDF dari IndexedDB.
  */
 export async function downloadBackupZip(): Promise<BackupNote> {
   const payload = await buildBackupPayload()
   const text = JSON.stringify(payload, null, 2)
   const tanggal = new Date(payload.exportedAt)
-  const audioItems = await db.rekamanAudio.toArray()
+  const [audioItems, partiturItems] = await Promise.all([
+    db.rekamanAudio.toArray(),
+    db.partiturBerkas.toArray(),
+  ])
 
   const entries: EntriZip[] = [
     { nama: namaBackup(tanggal), isi: text },
   ]
 
   const manifestAudio: Record<string, { songId: string; namaFile: string; durasi: number; hash: string }> = {}
+  const manifestPartitur: Record<string, { songId: string; namaFile: string; tipe: 'musicxml' | 'pdf'; ukuran: number; hash: string }> = {}
 
   for (const item of audioItems) {
     const ab = await item.blob.arrayBuffer()
@@ -196,6 +200,27 @@ export async function downloadBackupZip(): Promise<BackupNote> {
     entries.push({
       nama: 'audio/manifest.json',
       isi: JSON.stringify(manifestAudio, null, 2),
+    })
+  }
+
+  for (const item of partiturItems) {
+    const ab = await item.blob.arrayBuffer()
+    const safeName = item.namaFile.replace(/[^\w.-]/g, '_')
+    const pathZip = `partitur/${item.songId}_${safeName}`
+    entries.push({ nama: pathZip, isi: new Uint8Array(ab) })
+    manifestPartitur[pathZip] = {
+      songId: item.songId,
+      namaFile: item.namaFile,
+      tipe: item.tipe,
+      ukuran: item.ukuran,
+      hash: item.hash,
+    }
+  }
+
+  if (partiturItems.length > 0) {
+    entries.push({
+      nama: 'partitur/manifest.json',
+      isi: JSON.stringify(manifestPartitur, null, 2),
     })
   }
 

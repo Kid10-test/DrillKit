@@ -362,7 +362,12 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
     // #11a — separuh lain dari round-trip ZIP: entri `partitur/` dihitung
     // supaya pratinjau menyebut "N partitur" tanpa membuka ZIP-nya lagi.
     const partiturZip = entri.filter((e) => e.nama.startsWith('partitur/') && !e.nama.endsWith('.json')).length
-    const json = entri.filter((e) => e.nama.endsWith('.json') && !e.nama.startsWith('audio/'))
+    const json = entri.filter(
+      (e) =>
+        e.nama.endsWith('.json') &&
+        !e.nama.startsWith('audio/') &&
+        e.nama !== 'partitur/manifest.json',
+    )
     const daftar: EntriDikenal[] = []
     let gagal = 0
     for (const e of json) {
@@ -645,6 +650,7 @@ export const TABEL_BACKUP: { kolom: string; label: string }[] = [
   { kolom: 'sessions', label: 'Jadwal' },
   { kolom: 'attendance', label: 'Absensi' },
   { kolom: 'songs', label: 'Lagu' },
+  { kolom: 'partiturBerkas', label: 'Berkas partitur' },
   { kolom: 'setlists', label: 'Set list' },
   { kolom: 'drills', label: 'Drill' },
   { kolom: 'sets', label: 'Set formasi' },
