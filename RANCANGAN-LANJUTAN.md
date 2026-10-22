@@ -1,4 +1,4 @@
-# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 6 Okt 2026 — #10 rampung)
+# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 22 Okt 2026 — #11a rampung)
 
 Dokumen ini merangkum delapan rancangan awal yang sudah didiskusikan dan
 diputuskan bersama pelatih, ditambah tiga usulan baru pasca PR #14
@@ -8,7 +8,7 @@ Semuanya siap dikerjakan di sesi baru. Setiap rancangan dijadikan PR
 tersendiri, sesuai kebiasaan proyek (satu ide = satu commit/PR,
 disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 
-**Status per 6 Okt 2026 (pemutakhiran #10 rampung):**
+**Status per 22 Okt 2026 (pemutakhiran #11a rampung):**
 - **#1, #2, #3, dan #4 telah rampung penuh** (PR #6 hingga PR #10).
 - **#5 telah rampung penuh** — fondasi tempo map custom per ketuk/subdivisi
   dan ramp eksplisit terintegrasi lewat **PR #14** (`TempoTimeline`), lalu
@@ -27,7 +27,13 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
   asal Y ditebak lalu bisa diganti, pratinjau + peringatan titik di luar
   lapangan, pencocokan anggota #1 yang diingat, interpolasi lurus antar set,
   Gabung/Timpa/Salinan, undo lewat riwayat, dan jenis `csv-pyware` di pintu #7.
-- **#11 usulan baru** (partitur) menunggu — tidak disentuh pada tahap ini.
+- **#11a Partitur: simpan, kenali, dan bawa MusicXML/PDF selesai (22 Okt 2026)** —
+  deteksi isi & pemindai ringkasan murni (`partitur.ts`), store Dexie versi 10
+  `partiturBerkas` + metadata `Song.partitur`, jenis `'partitur'` di pintu #7
+  (diizinkan di mode anggota; `.mxl` ditolak berpetunjuk D1; gagal ringkas
+  tetap dipasang D4), `PanelPartitur` + kuota/`persist()` di halaman Musik,
+  dan round-trip ZIP (`partitur/…` + manifest). Render OSMD (**11b**), part per
+  instrumen (**11c**), dan highlight sinkron + loop frasa (**11d**) menyusul.
 
 **Aturan proyek yang tetap berlaku untuk semuanya:**
 
@@ -53,11 +59,11 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 8 | PIN pelatih tim | Kecil–sedang | **Selesai (6 Okt 2026)** | Pagar mode pelatih via hash ENV; tanpa ketergantungan |
 | 9 | Grid & patok yard–meter custom | Kecil–sedang | **Fondasi selesai (3 Okt 2026)** | Tipe, geometri & UI terpisah; yard↔meter tanpa geser; batas E/T26; 41 butir uji baru |
 | 10 | Impor drill Pyware | Sedang | **Selesai (6 Okt 2026)** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo; 146 butir uji |
-| 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Menunggu — jangan mulai pada tahap ini** | MusicXML offline (OSMD) + PDF fallback, full score & part, highlight sinkron, loop bar/frasa |
+| 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **#11a selesai (22 Okt 2026); 11b–11d menyusul** | #11a: Blob IndexedDB, deteksi pintu #7, ringkasan murni, kuota, round-trip ZIP; lanjut 11b OSMD, 11c part/cetak, 11d highlight/loop |
 
 > **Urutan prioritas yang disarankan pasca #5 rampung (4 Okt 2026):**
-> **#10 → #11 → #8** — ketiganya kini selesai (#7 5 Okt, #8 & #10 6 Okt 2026);
-> yang tersisa **#11 partitur** (fondasi #9 selesai; sisa polish grid/patok tidak memblokir apa pun).
+> **#10 → #11 → #8** — #7 (5 Okt), #8 & #10 (6 Okt), serta **#11a** (22 Okt 2026) kini selesai;
+> yang tersisa **#11b → #11c → #11d** untuk perenderan & latihan partitur (fondasi #9 selesai; sisa polish grid/patok tidak memblokir apa pun).
 > Alasan: **#5** sudah rampung sehingga drill×musik benar-benar menyatu; **#7** merapikan 5 jenis berkas + ZIP rekaman
 > sehingga impor Pyware (#10) dan MusicXML (#11) punya pintu masuk yang jelas;
 > **#9** grid/patok kustom memberi akurasi lapangan sebelum migrasi massal;
@@ -857,10 +863,11 @@ dan `qa/pyware-impor.mjs` (peramban) didaftarkan ke `qa/regresi-penuh.sh`.
 ## 11. Partitur full score & per instrumen + latihan per bar/frasa
 
 > **Rencana teknis bagian pertama (#11a)** — simpan, kenali, dan bawa
-> MusicXML/PDF tanpa merender apa pun — sudah ditulis terpisah di
-> `RANCANGAN-11a-PARTITUR-MUSICXML.md` (10 Okt 2026). Bagian itu sengaja
-> seluruhnya teruji di node; render OSMD (11b), part per instrumen (11c), dan
-> highlight/loop (11d) menyusul sebagai PR sendiri.
+> MusicXML/PDF tanpa merender apa pun — ditulis terpisah di
+> `RANCANGAN-11a-PARTITUR-MUSICXML.md` (10 Okt 2026) dan **telah rampung
+> 22 Okt 2026** (lihat status di bawah). Render OSMD (**11b**), part per
+> instrumen + cetak hex (**11c**), dan highlight sinkron + loop frasa
+> (**11d**) menyusul sebagai PR sendiri.
 
 **Masalah.** Halaman Musik sudah punya repertoar, tempo map, metronom,
 rekaman (#6), dan tempo latihan (#4), tetapi **belum ada notasi**.
@@ -912,6 +919,59 @@ notasi. Tetap offline, tanpa server, memakai fondasi `TempoTimeline`
 trumpet), highlight sinkron ±1 birama dengan rekaman & metronom,
 loop Bar 5–8 mengulang tepat 4 birama pada 80% tempo, cetak part
 hex 1 halaman, impor MusicXML round-trip ZIP tidak hilang.
+
+### Status: #11a selesai (22 Okt 2026); 11b–11d menyusul
+
+Bagian **#11a** (fondasi data, pintu masuk, ringkasan murni, kuota, dan
+round-trip ZIP — sengaja tanpa merender notasi, tanpa dependensi baru) telah
+selesai sesuai `RANCANGAN-11a-PARTITUR-MUSICXML.md`:
+
+- **Modul murni `src/lib/partitur.ts`** — deteksi dari isi bita (`%PDF-` →
+  `pdf`, ZIP ber-`META-INF/container.xml` → `.mxl`, akar `<score-partwise>` /
+  `<score-timewise>` → `musicxml`, mendukung UTF-8 & UTF-16 lewat
+  `teksPartitur`), pemindai tag kecil `ringkasMusicXml` (judul, pengarang,
+  daftar part + singkatan, jumlah birama maksimum antar part, sukat awal,
+  **`perubahanSukat` per birama** tanpa duplikasi lintas part, tempo pertama,
+  batas 8 MB / 5.000 birama / 5 entitas XML bawaan), serta `putusanPartitur`
+  yang menegakkan **D1** (`.mxl` ditolak dengan petunjuk simpan ulang dari
+  MuseScore) dan **D4** (MusicXML yang gagal diringkas tetap boleh dipasang
+  dengan `terurai: false` dan `ringkasGagal` terisi apa adanya).
+- **Store Dexie versi 10 `partiturBerkas` & `Song.partitur`** (`src/db/db.ts`,
+  `src/db/types.ts`, `src/lib/partiturSimpan.ts`) — bita Blob disimpan terpisah
+  dari `songs` (berkas dulu → metadata; mengganti menimpa kunci `songId` dalam
+  satu langkah tanpa jendela kosong; melepas mengosongkan metadata dulu baru
+  menghapus Blob). Berkas show & repertoar hanya membawa metadata `PartiturMeta`
+  sehingga ukurannya tetap kecil.
+- **Pintu #7 (`src/lib/bukaBerkas.ts`, `src/components/BukaBerkas.tsx`)** —
+  jenis baru `'partitur'` (`Partitur (MusicXML / PDF) (#11a)` → `Musik →
+  Partitur lagu`), pratinjau `TubuhPartitur`, penghitungan `partiturZip`, dan
+  pengecualian eksplisit di `aturMode` sehingga mode anggota ikut diizinkan.
+- **Panel di halaman Musik (`src/components/PanelPartitur.tsx`)** — pratinjau
+  sebelum tulis, konfirmasi ganti dua langkah yang menyebut nama berkas lama,
+  tampilan jujur *"tercatat, berkasnya belum ada di perangkat ini"* saat
+  metadata datang tanpa Blob, serta kartu kuota penyimpanan (> 50% memberi
+  peringatan + tombol `Minta Persisten` / catatan iOS).
+- **Round-trip ZIP (`src/lib/backup.ts`, `src/lib/partiturZip.ts`,
+  `src/components/PulihkanBackup.tsx`)** — mengemas `partitur/<songId>_<nama>` +
+  `partitur/manifest.json` di samping `audio/`, memisahkan jumlah partitur baru
+  dan yang ditimpa di pratinjau pemulihan, dan mendaftarkan `partiturBerkas`
+  di daftar pengecualian JSON `qa/backup-lengkap.mjs`.
+
+**Uji #11a:** `qa/partitur-logika.mjs` **101 butir** (murni node: fixture lima
+sumber MuseScore 3/4, Sibelius, Finale, Dolet + `score-timewise`, anacrusis,
+sukat campur, batas ukuran/birama/entitas, D1 & D4, round-trip ZIP & SHA-256),
+`qa/partitur-zip-logika.mjs` **9 butir**, `qa/buka-berkas-logika.mjs` **134
+butir** (+21 untuk jenis `'partitur'`, D1/D4, `aturMode`, dan penjagaan agar CSV
+& HTML tidak tertelan cabang mirip-partitur), `qa/buka-berkas.mjs` **61 butir**
+(+6 untuk ekspor/pulihkan ZIP partitur), dan `qa/partitur-impor.mjs` **60 butir**
+(peramban: seret pintu #7 → pasang/ganti/lepas di Musik → reload IndexedDB →
+kuota & `persist()` → ukuran repertoar/show → pulihkan ZIP di DB bersih).
+Seluruh **107 rangkaian** terdaftar di `qa/regresi-penuh.sh` dan `ci.yml`.
+
+**Yang menyusul:** **11b** (render *full score* offline dengan OSMD dalam warna
+hex + kandidat `bukaZipAsync` untuk `.mxl`), **11c** (part per instrumen/section
++ cetak hex), dan **11d** (highlight sinkron `TempoTimeline` + loop frasa +
+tautan frasa↔set).
 
 ---
 
