@@ -1,7 +1,7 @@
 # Rencana teknis #11a — Partitur: simpan, kenali, dan bawa MusicXML
 
 **Induk:** `RANCANGAN-LANJUTAN.md` §11 (baris 857).
-**Status:** rencana, belum dikerjakan. Ditulis 10 Okt 2026 di branch
+**Status:** selesai (22 Okt 2026; tahap 1–5 di PR #20, tahap 6–7 di branch `arena/766239ce-drillkit`). Ditulis 10 Okt 2026 di branch
 `arena/bf8ee716-drillkit` (PR #19) supaya bisa dipindah ke branch #11 sendiri.
 
 ---
@@ -434,17 +434,17 @@ menyebut cara memperbaikinya).
 
 ## 12. Kriteria terima
 
-- [ ] `.musicxml` dan `.pdf` dikenali pintu #7 dengan label & tujuan yang benar.
-- [ ] `.mxl` ditolak dengan pesan yang menyebut cara menyimpan ulang.
-- [ ] Ringkasan (judul, birama, part, sukat, tempo) benar untuk fixture tiga aplikasi.
-- [ ] Blob tersimpan di IndexedDB dan **selamat setelah muat ulang**.
-- [ ] ZIP backup memuat `partitur/…` + manifest; pemulihan di DB bersih mengembalikan bita identik.
-- [ ] Berkas show/repertoar **tidak membesar** karena notasi (hanya metadata).
-- [ ] Peringatan kuota muncul dan `persist()` bisa diminta.
-- [ ] `qa/partitur-logika.mjs` ≥ 90 asersi, `0 gagal`; terdaftar di `regresi-penuh.sh`.
-- [ ] Sukat campur menghasilkan `perubahanSukat` dengan nomor birama yang benar.
-- [ ] Berkas XML yang gagal diringkas tetap terpasang (`terurai: false`) dan pesannya tampil.
-- [ ] `tsc --noEmit` bersih; tidak ada dependensi baru; tidak ada `oklch()`/`color-mix()`.
+- [x] `.musicxml` dan `.pdf` dikenali pintu #7 dengan label & tujuan yang benar.
+- [x] `.mxl` ditolak dengan pesan yang menyebut cara menyimpan ulang.
+- [x] Ringkasan (judul, birama, part, sukat, tempo) benar untuk fixture tiga aplikasi.
+- [x] Blob tersimpan di IndexedDB dan **selamat setelah muat ulang**.
+- [x] ZIP backup memuat `partitur/…` + manifest; pemulihan di DB bersih mengembalikan bita identik.
+- [x] Berkas show/repertoar **tidak membesar** karena notasi (hanya metadata).
+- [x] Peringatan kuota muncul dan `persist()` bisa diminta.
+- [x] `qa/partitur-logika.mjs` ≥ 90 asersi, `0 gagal`; terdaftar di `regresi-penuh.sh`.
+- [x] Sukat campur menghasilkan `perubahanSukat` dengan nomor birama yang benar.
+- [x] Berkas XML yang gagal diringkas tetap terpasang (`terurai: false`) dan pesannya tampil.
+- [x] `tsc --noEmit` bersih; tidak ada dependensi baru; tidak ada `oklch()`/`color-mix()`.
 
 ---
 

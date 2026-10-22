@@ -60,11 +60,11 @@ bash bangun-logika.sh || exit 1
 # dirakit/dijalankan. Jangan keluarkan lagi tanpa mencatat alasannya di
 # IDE-PENGEMBANGAN.md.
 #
-# #11a — `partitur-logika` (partitur MusicXML/PDF: deteksi, ringkasan, D1 &
-# D4). Modulnya direkat oleh bangun-logika.sh sebagai /tmp/partitur.mjs dan
-# ujinya murni node — tidak butuh peramban, sama seperti #10. Rangkaian
-# perambannya (`partitur-impor`) menyusul di tahap 6 #11a. Jangan keluarkan
-# lagi tanpa mencatat alasannya.
+# #11a — `partitur-logika`, `partitur-zip-logika`, dan `partitur-impor`
+# (partitur MusicXML/PDF: deteksi, ringkasan, D1 & D4, ekstraksi ZIP, serta
+# alur peramban seret pintu #7 → pasang → muat ulang → ZIP di DB bersih).
+# Modulnya dirakit bangun-logika.sh sebagai /tmp/partitur.mjs dan
+# /tmp/partiturZip.mjs. Jangan keluarkan lagi tanpa mencatat alasannya.
 
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika uji-situs uji-rilis uji-lapangan \
@@ -76,7 +76,7 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
