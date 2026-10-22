@@ -94,9 +94,17 @@ rakit src/lib/kalender.ts kalender
 # #4 — tempo latihan: persen/BPM, naik otomatis, simpanan per lagu.
 rakit src/lib/tempoLatihan.ts tempoLatihan
 # #6 — rekaman lagu: hash, sidik jari, konversi lini masa audio & segmen.
+# Dipakai juga oleh uji #11a: hash partitur memakai ulang `hitungHashAudio`
+# (SHA-256 atas bita apa pun), jadi tidak ada salinan kedua di aplikasi.
 rakit src/lib/rekaman.ts rekaman
+# #11a — partitur: deteksi dari bita, ringkasan MusicXML tanpa render, dan
+# keputusan pasang (D1 `.mxl` ditolak, D4 gagal ringkas tetap dipasang).
+# Modulnya murni tanpa impor, jadi berkas ini yang merakitnya sendirian.
+rakit src/lib/partitur.ts partitur
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
+# #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.
+rakit src/lib/partiturZip.ts partiturZip
 # #10 — impor drill Pyware. `pyware` murni (pengurai, pratinjau, interpolasi)
 # dan diimpor juga oleh `bukaBerkas.ts`; `pywareTulis` yang menulis ke basis
 # data, dipisah supaya bundel pintu #7 tidak ikut menarik Dexie.

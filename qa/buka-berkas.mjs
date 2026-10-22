@@ -17,6 +17,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { QA } from './lokasi.mjs'
+import { bikinZip, bukaZip } from '/tmp/zip.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:5173'
 const UNDUH = path.join(QA, 'unduhan-buka')
@@ -71,6 +72,15 @@ const bacaDb = (tabel) =>
       q.onsuccess = () => res(q.result)
     })
   }, tabel)
+const bacaBinerPartitur = (songId) => p.evaluate(async (id) => {
+  const r = await new Promise((res) => { const q = indexedDB.open('drillkit'); q.onsuccess = () => res(q.result) })
+  const item = await new Promise((res) => {
+    const tx = r.transaction(['partiturBerkas'], 'readonly')
+    const q = tx.objectStore('partiturBerkas').get(id)
+    q.onsuccess = () => res(q.result)
+  })
+  return item ? { ...item, bytes: Array.from(new Uint8Array(await item.blob.arrayBuffer())) } : null
+}, songId)
 const kosongUnduh = () => {
   for (const f of fs.readdirSync(UNDUH)) fs.rmSync(path.join(UNDUH, f), { recursive: true, force: true })
 }
@@ -117,6 +127,24 @@ const fBackup = tulis('backup.json', JSON.stringify({
   members: [],
   evaluasi: [{ id: 'ev_bk7_1', memberId: 'tak-ada', tanggal: '2026-10-05', nilai: { teknik: 4 }, createdAt: 1 }],
 }))
+const bytesPartiturUji = new Uint8Array([0x3c, 0x78, 0x6d, 0x6c, 0x3e, 0x5a, 0x3c, 0x2f, 0x78, 0x6d, 0x6c, 0x3e])
+const namaZipPartitur = 'partitur/lagu_zip_11a_Lagu.musicxml'
+const manifestZipPartitur = {
+  [namaZipPartitur]: {
+    songId: 'lagu_zip_11a', namaFile: 'Lagu.musicxml', tipe: 'musicxml',
+    ukuran: bytesPartiturUji.length, hash: 'hash-uji-partitur',
+  },
+}
+const fBackupPartitur = path.join(BERKAS, 'backup-partitur.zip')
+fs.writeFileSync(fBackupPartitur, bikinZip([
+  { nama: 'backup.json', isi: JSON.stringify({
+    format: 'drillkit-backup', version: 1, exportedAt: Date.UTC(2026, 9, 6), members: [],
+    songs: [{ id: 'lagu_zip_11a', title: 'Lagu ZIP', bpm: 120, beats: 4, tempoMap: [],
+      partitur: { namaFile: 'Lagu.musicxml', tipe: 'musicxml', ukuran: bytesPartiturUji.length, hash: 'hash-uji-partitur', jumlahBirama: 1, jumlahPart: 1, parts: [], perubahanSukat: [], terurai: false, dipasangiAt: 1 } }],
+  }) },
+  { nama: namaZipPartitur, isi: bytesPartiturUji },
+  { nama: 'partitur/manifest.json', isi: JSON.stringify(manifestZipPartitur) },
+]))
 const fPaket = tulis('paket-anggota.json', JSON.stringify({
   format: 'drillkit-share', version: 1, exportedAt: Date.UTC(2026, 9, 5),
   team: { teamName: 'Tim BK7' }, members: [], sessions: [], drills: [], sets: [],
@@ -148,11 +176,36 @@ await p.evaluate(() => {
 cek('nama backup jelas', (await tungguUnduh(/^DrillKit - BACKUP LENGKAP - /)) === `DrillKit - BACKUP LENGKAP - ${HARI_INI}.json`,
   JSON.stringify(fs.readdirSync(UNDUH)))
 kosongUnduh()
+const bytesPartiturEkspor = [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]
+await p.evaluate(async (bytes) => {
+  const db = await new Promise((res, rej) => {
+    const q = indexedDB.open('drillkit')
+    q.onsuccess = () => res(q.result)
+    q.onerror = () => rej(q.error)
+  })
+  const tx = db.transaction(['songs', 'partiturBerkas'], 'readwrite')
+  tx.objectStore('songs').put({ id: 'song_export_11a', title: 'Lagu Ekspor ZIP', bpm: 120, beats: 4,
+    tempoMap: [], partitur: { namaFile: 'Partitur Uji.pdf', tipe: 'pdf', ukuran: bytes.length,
+      hash: 'hash-ekspor-uji', jumlahBirama: 0, jumlahPart: 0, parts: [], perubahanSukat: [], terurai: false, dipasangiAt: 1 } })
+  tx.objectStore('partiturBerkas').put({ id: 'song_export_11a', songId: 'song_export_11a',
+    blob: new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), namaFile: 'Partitur Uji.pdf',
+    tipe: 'pdf', ukuran: bytes.length, hash: 'hash-ekspor-uji', updatedAt: 1 })
+  await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error) })
+}, bytesPartiturEkspor)
 await p.evaluate(() => {
   [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Backup + rekaman (ZIP)'))?.click()
 })
-cek('nama backup zip jelas', (await tungguUnduh(/^DrillKit - BACKUP LENGKAP \+ REKAMAN - /)) === `DrillKit - BACKUP LENGKAP + REKAMAN - ${HARI_INI}.zip`,
+const namaBackupZipUnduhan = await tungguUnduh(/^DrillKit - BACKUP LENGKAP \+ REKAMAN - /)
+cek('nama backup zip jelas', namaBackupZipUnduhan === `DrillKit - BACKUP LENGKAP + REKAMAN - ${HARI_INI}.zip`,
   JSON.stringify(fs.readdirSync(UNDUH)))
+if (namaBackupZipUnduhan) {
+  const zipEkspor = bukaZip(new Uint8Array(fs.readFileSync(path.join(UNDUH, namaBackupZipUnduhan))))
+  const entriSkorEkspor = zipEkspor.find((e) => e.nama === 'partitur/song_export_11a_Partitur_Uji.pdf')
+  const manifestEkspor = zipEkspor.find((e) => e.nama === 'partitur/manifest.json')
+  cek('backup ZIP menyertakan berkas partitur dan manifest', !!entriSkorEkspor && !!manifestEkspor)
+  cek('manifest ekspor membawa songId, tipe, dan hash', manifestEkspor?.teks().includes('song_export_11a') && manifestEkspor?.teks().includes('hash-ekspor-uji') && manifestEkspor?.teks().includes('pdf'))
+  cek('berkas partitur ZIP ekspor byte-per-byte', JSON.stringify(Array.from(entriSkorEkspor?.bita ?? [])) === JSON.stringify(bytesPartiturEkspor))
+}
 
 await ke('#/data')
 await klik('[data-testid="centang-jenis-lagu"]')
@@ -270,6 +323,20 @@ cek('belum menulis sebelum Lanjut', !(await bacaDb('evaluasi')).some((e) => e.id
 await klik('[data-testid="buka-pulih-tombol"]')
 await wait(2500)
 cek('backup dipulihkan setelah Lanjut', (await bacaDb('evaluasi')).some((e) => e.id === 'ev_bk7_1'))
+
+// #11a step 5 — ZIP partitur dipratinjau lalu metadata + Blob dipulihkan.
+await unggah('[data-testid="buka-berkas-data-input"]', fBackupPartitur)
+await bukaModal()
+cek('ZIP backup menyebut berkas partitur dalam pratinjau', /Termasuk 1 berkas partitur/.test(await isiBody()))
+cek('pratinjau memisahkan berkas partitur baru', /Berkas partitur/.test(await isiBody()))
+cek('ZIP belum menulis lagu sebelum Lanjut', !(await bacaDb('songs')).some((s) => s.id === 'lagu_zip_11a'))
+await klik('[data-testid="buka-pulih-tombol"]')
+await wait(1500)
+const laguPulihZip = (await bacaDb('songs')).find((s) => s.id === 'lagu_zip_11a')
+const partiturPulihZip = await bacaBinerPartitur('lagu_zip_11a')
+cek('pemulihan ZIP mempertahankan metadata partitur lagu', laguPulihZip?.partitur?.namaFile === 'Lagu.musicxml')
+cek('pemulihan ZIP menyimpan Blob partitur ke IndexedDB', partiturPulihZip?.namaFile === 'Lagu.musicxml' && partiturPulihZip?.tipe === 'musicxml')
+cek('Blob partitur hasil pulih identik byte-per-byte', JSON.stringify(partiturPulihZip?.bytes) === JSON.stringify(Array.from(bytesPartiturUji)))
 
 // CSV jadwal: pratinjau -> diteruskan ke tab CSV.
 await unggah('[data-testid="buka-berkas-data-input"]', fJadwal)

@@ -17,6 +17,9 @@ import { db } from '../db/db'
 import type { Member } from '../db/types'
 import { ringkasBackup } from '../lib/bukaBerkas'
 import { bukaZip } from '../lib/zip'
+import type { PartiturPulih } from '../lib/partiturZip'
+export { ekstrakPartiturZip } from '../lib/partiturZip'
+export type { PartiturPulih } from '../lib/partiturZip'
 import {
   keputusanAwal,
   perluDitanya,
@@ -100,7 +103,8 @@ export async function tulisMuatanBackup(
   anggotaLokal: Member[],
   kep: Record<string, KeputusanCocok>,
   audio?: AudioPulih[],
-): Promise<{ bentrok: number; audio: number }> {
+  partitur: PartiturPulih[] = [],
+): Promise<{ bentrok: number; audio: number; partitur: number }> {
   const masuk = Array.isArray(data.members) ? (data.members as Member[]) : []
   const hasil = terapkanCocok({
     masuk,
@@ -168,7 +172,22 @@ export async function tulisMuatanBackup(
       jmlAudio += 1
     }
   }
-  return { bentrok: bentrok.length, audio: jmlAudio }
+
+  let jmlPartitur = 0
+  for (const p of partitur) {
+    await db.partiturBerkas.put({
+      id: p.songId,
+      songId: p.songId,
+      blob: p.blob,
+      namaFile: p.namaFile,
+      tipe: p.tipe,
+      ukuran: p.ukuran,
+      hash: p.hash,
+      updatedAt: Date.now(),
+    })
+    jmlPartitur += 1
+  }
+  return { bentrok: bentrok.length, audio: jmlAudio, partitur: jmlPartitur }
 }
 
 /**
@@ -181,12 +200,14 @@ export async function tulisMuatanBackup(
 export function AlurPulihkanBackup({
   data,
   audio = [],
+  partitur = [],
   namaBerkas,
   onSelesai,
   testId = 'pulih-backup',
 }: {
   data: Record<string, any>
   audio?: AudioPulih[]
+  partitur?: PartiturPulih[]
   namaBerkas?: string
   onSelesai?: () => void
   testId?: string
@@ -204,7 +225,7 @@ export function AlurPulihkanBackup({
     ;(async () => {
       const kunci = (daftar: { id?: string; key?: string }[]) =>
         daftar.map((e) => e?.id ?? e?.key ?? '').filter(Boolean)
-      const [members, sessions, attendance, songs, setlists, drills, sets, memberNotes, kemajuan, evaluasi] =
+      const [members, sessions, attendance, songs, setlists, drills, sets, memberNotes, kemajuan, evaluasi, partiturBerkas] =
         await Promise.all([
           db.members.toArray(),
           db.sessions.toArray(),
@@ -216,6 +237,7 @@ export function AlurPulihkanBackup({
           db.memberNotes.toArray(),
           db.kemajuan.toArray(),
           db.evaluasi.toArray(),
+          db.partiturBerkas.toArray(),
         ])
       if (!hidup) return
       setLokal(members)
@@ -230,6 +252,7 @@ export function AlurPulihkanBackup({
         memberNotes: kunci(memberNotes),
         kemajuan: kunci(kemajuan),
         evaluasi: kunci(evaluasi),
+        partiturBerkas: kunci(partiturBerkas),
       })
       const baris = susunSaran(Array.isArray(data.members) ? data.members : [], members)
       setSaran(baris)
@@ -241,7 +264,10 @@ export function AlurPulihkanBackup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const ringkas = useMemo(() => ringkasBackup(data, idLokal ?? {}), [data, idLokal])
+  const ringkas = useMemo(
+    () => ringkasBackup({ ...data, partiturBerkas: partitur.map((p) => ({ id: p.songId })) }, idLokal ?? {}),
+    [data, idLokal, partitur],
+  )
   const tim = (data.settings as { teamName?: unknown } | undefined)?.teamName
   const tanggal =
     typeof data.exportedAt === 'number'
@@ -259,12 +285,13 @@ export function AlurPulihkanBackup({
     }
     setSedang(true)
     try {
-      const h = await tulisMuatanBackup(data, lokal, keputusan, audio)
+      const h = await tulisMuatanBackup(data, lokal, keputusan, audio, partitur)
       const infoAudio = h.audio > 0 ? ` (+ ${h.audio} rekaman audio)` : ''
+      const infoPartitur = h.partitur > 0 ? ` (+ ${h.partitur} partitur)` : ''
       toast.push(
         h.bentrok
-          ? `Backup dipulihkan · ${h.bentrok} bentrok dilaporkan${infoAudio}`
-          : `Backup dipulihkan${infoAudio}`,
+          ? `Backup dipulihkan · ${h.bentrok} bentrok dilaporkan${infoAudio}${infoPartitur}`
+          : `Backup dipulihkan${infoAudio}${infoPartitur}`,
       )
       onSelesai?.()
     } catch {
@@ -290,6 +317,11 @@ export function AlurPulihkanBackup({
         {audio.length > 0 && (
           <>
             {' '}Termasuk <b>{audio.length} rekaman audio</b> dari ZIP.
+          </>
+        )}
+        {partitur.length > 0 && (
+          <>
+            {' '}Termasuk <b>{partitur.length} berkas partitur</b> dari ZIP.
           </>
         )}
       </p>

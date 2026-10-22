@@ -14,7 +14,7 @@
  * dipilih/diseret, tetapi paket anggota ditolak di mode pelatih dan mode
  * anggota hanya menerima paket — selalu dengan penjelasan, bukan diam-diam.
  */
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../db/db'
 import { useMemberMode } from '../hooks/useMemberMode'
@@ -35,7 +35,7 @@ import { bacaPaket, perluPeringatan, ringkasanImpor, terapkanPaket } from '../li
 import type { PaketRepertoar } from '../db/types'
 import { Button, Modal, useToast } from './ui'
 import { IconUpload } from './Icons'
-import { AlurPulihkanBackup, ekstrakAudioZip } from './PulihkanBackup'
+import { AlurPulihkanBackup, ekstrakAudioZip, ekstrakPartiturZip } from './PulihkanBackup'
 import { AlurImporShow } from './ImporShow'
 
 /* ------------------------- Bus pratinjau global -------------------------- */
@@ -162,12 +162,12 @@ export function TombolBukaBerkas({
               ? { border: '1px solid #475569', color: '#e2e8f0' }
               : { color: '#e2e8f0' }
         }
-        title="Buka berkas apa pun — backup, data, show, lagu, paket, CSV, ZIP. Jenisnya dikenali otomatis."
+        title="Buka berkas apa pun — backup, data, show, lagu, paket, CSV, ZIP, partitur (MusicXML/PDF). Jenisnya dikenali otomatis."
       >
         <IconUpload size={16} /> {label}
         <input
           type="file"
-          accept=".json,.csv,.zip,application/json,text/csv,application/zip"
+          accept=".json,.csv,.zip,.musicxml,.xml,.pdf,application/json,text/csv,application/zip,application/pdf"
           data-testid={`${testId}-input`}
           className="hidden"
           onChange={(e) => {
@@ -182,7 +182,7 @@ export function TombolBukaBerkas({
       </label>
       {petunjuk && (
         <span className="text-[11px] text-slate-500">
-          Backup, data, show, lagu, paket, CSV, ZIP — jenisnya dikenali otomatis.
+          Backup, data, show, lagu, paket, CSV, ZIP, partitur — jenisnya dikenali otomatis.
         </span>
       )}
     </span>
@@ -281,6 +281,7 @@ function TubuhPratinjau({ paket, onTutup }: { paket: PaketPratinjau; onTutup: ()
         <AlurPulihkanBackup
           data={(hasil.data ?? {}) as Record<string, any>}
           audio={paket.bita ? ekstrakAudioZip(paket.bita) : []}
+          partitur={paket.bita ? ekstrakPartiturZip(paket.bita) : []}
           namaBerkas={hasil.nama}
           testId="buka-pulih"
           onSelesai={onTutup}
@@ -297,6 +298,7 @@ function TubuhPratinjau({ paket, onTutup }: { paket: PaketPratinjau; onTutup: ()
         />
       )}
       {hasil.jenis.startsWith('csv-') && <TubuhCsv hasil={hasil} onTutup={onTutup} />}
+      {hasil.jenis === 'partitur' && <TubuhPartitur hasil={hasil} />}
     </>
   )
 }
@@ -715,6 +717,70 @@ function TubuhCsv({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => voi
   )
 }
 
+/**
+ * #11a — pratinjau partitur: hanya membaca ringkasan yang sudah dihitung
+ * `kenaliBerkas`, tanpa merender satu not pun (batas 11a).
+ *
+ * Tombol "pasang ke lagu" TIDAK ada di sini, dan itu disengaja: memasang
+ * partitur butuh bita berkasnya (Blob), sedangkan titipan antar-halaman
+ * (`titipBerkas`) hanya membawa teks — bentuk yang tidak bisa memuat PDF.
+ * Pemasangan dikerjakan panel di halaman Musik (§6 rancangan 11a, tahap 4),
+ * yang punya pemilih berkasnya sendiri. Di sini yang penting pelatih melihat
+ * berkasnya memang dikenali, berisi apa, dan ke mana harus pergi.
+ */
+function TubuhPartitur({ hasil }: { hasil: BerkasDikenal }) {
+  const tujuan = TUJUAN_JENIS.partitur
+  const r = hasil.partiturRingkas
+  const baris: { label: string; nilai: string }[] = []
+  if (r) {
+    if (r.judul) baris.push({ label: 'Judul', nilai: r.judul })
+    if (r.pengarang) baris.push({ label: 'Pengarang', nilai: r.pengarang })
+    baris.push({ label: 'Birama', nilai: String(r.jumlahBirama) })
+    baris.push({ label: 'Part', nilai: r.parts.map((p) => p.nama).join(', ') })
+    if (r.sukat) {
+      const perubahan = r.perubahanSukat
+      const awal = `${r.sukat.beats}/${r.sukat.beatType}`
+      baris.push({
+        label: 'Sukat',
+        nilai: perubahan.length > 1 ? `${awal} (berubah ${perubahan.length - 1}×)` : awal,
+      })
+    }
+    if (r.tempo != null) baris.push({ label: 'Tempo', nilai: `${r.tempo} BPM` })
+  }
+
+  return (
+    <div data-testid="buka-partitur">
+      {r ? (
+        <dl className="grid grid-cols-[6.5rem_1fr] gap-x-2 gap-y-1 text-[12px]">
+          {baris.map((b) => (
+            <Fragment key={b.label}>
+              <dt className="text-slate-500">{b.label}</dt>
+              <dd className="break-words text-slate-200">{b.nilai || '—'}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      ) : (
+        <p data-testid="buka-partitur-gagal" className="text-[12px] leading-relaxed text-amber-100/90">
+          {hasil.partiturTipe === 'pdf' ? (
+            <>Berkas PDF — isinya tidak bisa diringkas DrillKit, tetapi tetap bisa disimpan sebagai partitur lagu.</>
+          ) : (
+            <>
+              Pemindai DrillKit tidak sanggup meringkas berkas ini, jadi judul &amp; biramanya belum terbaca.
+              Berkasnya <b>tetap</b> bisa disimpan apa adanya.
+              {hasil.partiturGagal && (
+                <span className="mt-1 block text-slate-400">Sebabnya: {hasil.partiturGagal}</span>
+              )}
+            </>
+          )}
+        </p>
+      )}
+      <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+        Dipasang ke sebuah lagu di <b>{tujuan.tempat}</b> — di sana partitur bisa dipilih lagunya, lalu dibaca anggota.
+      </p>
+    </div>
+  )
+}
+
 /* ------------------------- Seret & letakkan (laptop) ---------------------- */
 
 /**
@@ -777,7 +843,7 @@ export function LapisanSeretBerkas() {
       <div className="rounded-2xl border-2 border-dashed border-emerald-500/60 bg-slate-900/90 px-10 py-14 text-center">
         <p className="text-base font-semibold text-slate-100">Lepaskan berkasnya di sini</p>
         <p className="mt-1 text-xs text-slate-400">
-          Backup, data, show, lagu, paket, CSV, ZIP — jenisnya dikenali otomatis.
+          Backup, data, show, lagu, paket, CSV, ZIP, partitur — jenisnya dikenali otomatis.
         </p>
       </div>
     </div>

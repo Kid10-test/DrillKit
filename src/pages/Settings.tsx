@@ -46,7 +46,13 @@ import {
 import { FieldConfigEditor } from '../components/FieldConfigEditor'
 import { kenaliBerkas } from '../lib/bukaBerkas'
 import { mintaPratinjau } from '../components/BukaBerkas'
-import { AlurPulihkanBackup, ekstrakAudioZip, type AudioPulih } from '../components/PulihkanBackup'
+import {
+  AlurPulihkanBackup,
+  ekstrakAudioZip,
+  ekstrakPartiturZip,
+  type AudioPulih,
+  type PartiturPulih,
+} from '../components/PulihkanBackup'
 
 export default function Settings() {
   const toast = useToast()
@@ -102,6 +108,7 @@ export default function Settings() {
   const [pulihBackup, setPulihBackup] = useState<{
     data: Record<string, any>
     audio: AudioPulih[]
+    partitur: PartiturPulih[]
     nama: string
   } | null>(null)
 
@@ -141,11 +148,11 @@ export default function Settings() {
     toast.push('Backup diunduh — simpan di tempat aman')
   }
 
-  /** #6 — Unduh backup ZIP menyertakan seluruh rekaman audio biner. */
+  /** #6/#11a — Unduh ZIP bersama data, audio, dan berkas partitur biner. */
   async function exportBackupZip() {
     await downloadBackupZip()
     setCatatanBackup(backupNotes())
-    toast.push('Backup lengkap + rekaman (ZIP) diunduh')
+    toast.push('Backup lengkap + rekaman dan partitur (ZIP) diunduh')
   }
 
   /**
@@ -161,7 +168,8 @@ export default function Settings() {
       const hasil = kenaliBerkas(file.name, bita)
       if (hasil.jenis === 'backup' || hasil.jenis === 'zip-backup') {
         const audio = hasil.jenis === 'zip-backup' ? ekstrakAudioZip(bita) : []
-        setPulihBackup({ data: (hasil.data ?? {}) as Record<string, any>, audio, nama: file.name })
+        const partitur = hasil.jenis === 'zip-backup' ? ekstrakPartiturZip(bita) : []
+        setPulihBackup({ data: (hasil.data ?? {}) as Record<string, any>, audio, partitur, nama: file.name })
         return
       }
       if (hasil.jenis === 'paket' || hasil.jenis === 'zip-anggota') {
@@ -524,7 +532,7 @@ export default function Settings() {
             <Button onClick={exportBackup}>
               <IconDownload size={16} /> Ekspor backup (JSON)
             </Button>
-            <Button onClick={exportBackupZip} variant="outline" title="Ekspor data tim berserta seluruh rekaman audio MP3">
+            <Button onClick={exportBackupZip} variant="outline" title="Ekspor data tim beserta rekaman audio dan berkas partitur MusicXML/PDF">
               <IconDownload size={16} /> Backup + rekaman (ZIP)
             </Button>
             <Button
@@ -703,6 +711,7 @@ export default function Settings() {
           <AlurPulihkanBackup
             data={pulihBackup.data}
             audio={pulihBackup.audio}
+            partitur={pulihBackup.partitur}
             namaBerkas={pulihBackup.nama}
             testId="pulih-backup"
             onSelesai={() => setPulihBackup(null)}

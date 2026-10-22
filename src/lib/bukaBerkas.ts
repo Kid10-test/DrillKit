@@ -25,9 +25,17 @@
  * Pyware #10, jadwal, absensi) dan ZIP (backup+rekaman, per-anggota). Nilai `drillkit-*` lain
  * yang muncul kelak tetap dilaporkan apa adanya (tidak ditelan), supaya
  * berkas dari versi baru tidak gagal secara misterius.
+ *
+ * #11a (13 Okt 2026) menambah satu jenis **bukan-JSON**: `partitur`. Berkas
+ * MusicXML/PDF memang bukan berkas DrillKit, tapi pelatih memilihnya di pintu
+ * yang sama — dan tanpa pengenalan ini ia jatuh ke "tidak dikenal" bersama
+ * foto liburan. Deteksinya dari isi (`deteksiPartitur` di `partitur.ts`), dan
+ * `.mxl` (MusicXML terkompresi) sengaja **ditolak dengan pesan petunjuk**
+ * (keputusan D1 rancangan 11a), bukan gagal diam-diam.
  */
 import { bukaZip } from './zip'
 import { deteksiPyware } from './pyware'
+import { PESAN_MXL, deteksiPartitur, ringkasMusicXml, teksPartitur, type RingkasanPartitur } from './partitur'
 
 /* ------------------------------ Jenis ---------------------------------- */
 
@@ -45,6 +53,8 @@ export type JenisBerkas =
   | 'csv-pyware'
   | 'csv-jadwal'
   | 'csv-absensi'
+  /** #11a — notasi partitur lagu (MusicXML/PDF). Bukan berkas DrillKit. */
+  | 'partitur'
   | 'tak-dikenal'
 
 /** Label manusiawi tiap jenis — yang tampil di pratinjau. */
@@ -61,6 +71,7 @@ export const LABEL_JENIS: Record<JenisBerkas, string> = {
   'csv-pyware': 'CSV koordinat Pyware (#10)',
   'csv-jadwal': 'CSV jadwal',
   'csv-absensi': 'CSV absensi',
+  partitur: 'Partitur (MusicXML / PDF) (#11a)',
   'tak-dikenal': 'Tidak dikenal',
 }
 
@@ -87,6 +98,7 @@ export const TUJUAN_JENIS: Record<JenisBerkas, { rute: string; tempat: string }>
   'csv-pyware': { rute: '/drill', tempat: 'Drill → Impor Pyware' },
   'csv-jadwal': { rute: '/data', tempat: 'Data → Round-trip CSV' },
   'csv-absensi': { rute: '/data', tempat: 'Data → Round-trip CSV' },
+  partitur: { rute: '/musik', tempat: 'Musik → Partitur lagu' },
   'tak-dikenal': { rute: '/data', tempat: 'menu Data' },
 }
 
@@ -115,6 +127,26 @@ export interface BerkasDikenal {
   daftarZip?: EntriDikenal[]
   /** Jumlah entri `audio/*` di dalam ZIP (rekaman biner). */
   audioZip?: number
+  /**
+   * #11a — jumlah entri `partitur/*` di dalam ZIP (notasi biner).
+   * Meniru `audioZip` supaya pratinjau ZIP bisa menyebut "N partitur" di
+   * samping "N rekaman" tanpa membuka ZIP-nya dua kali.
+   */
+  partiturZip?: number
+  /**
+   * #11a — jenis partitur hasil **deteksi isi**, bukan tebakan dari ekstensi.
+   * `'mxl'` tidak pernah muncul di sini: `.mxl` ditolak sebagai `tak-dikenal`
+   * dengan pesan petunjuk (D1).
+   */
+  partiturTipe?: 'musicxml' | 'pdf'
+  /**
+   * #11a — ringkasan MusicXML untuk pratinjau. `null` bila berkasnya PDF
+   * (memang tidak ada yang bisa diringkas) **atau** bila pemindainya menyerah
+   * (D4) — dalam hal itu `partiturGagal` yang berisi sebabnya.
+   */
+  partiturRingkas?: RingkasanPartitur | null
+  /** #11a — pesan pemindai bila ringkasannya kosong pada MusicXML (D4). */
+  partiturGagal?: string
   /** Catatan tambahan untuk pratinjau, mis. "dari dalam ZIP …". */
   catatan?: string
 }
@@ -317,8 +349,25 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
     } catch {
       return { jenis: 'tak-dikenal', nama, catatan: 'Berkas ZIP-nya rusak, tidak bisa dibuka.' }
     }
+    // #11a — .mxl (MusicXML terkompresi) juga ZIP, dan `META-INF/container.xml`
+    // adalah penanda bakunya. Diperiksa SEBELUM mencari JSON di dalamnya:
+    // ekspor MuseScore nyata tidak memuat JSON sama sekali, jadi tanpa cabang
+    // ini pelatih menerima "ZIP ini tidak memuat berkas JSON DrillKit" —
+    // jawaban yang benar tetapi tidak menolong siapa pun. Pesannya satu
+    // sumber dengan modul partitur (D1).
+    if (entri.some((e) => e.nama === 'META-INF/container.xml')) {
+      return { jenis: 'tak-dikenal', nama, catatan: PESAN_MXL }
+    }
     const audioZip = entri.filter((e) => e.nama.startsWith('audio/') && !e.nama.endsWith('.json')).length
-    const json = entri.filter((e) => e.nama.endsWith('.json') && !e.nama.startsWith('audio/'))
+    // #11a — separuh lain dari round-trip ZIP: entri `partitur/` dihitung
+    // supaya pratinjau menyebut "N partitur" tanpa membuka ZIP-nya lagi.
+    const partiturZip = entri.filter((e) => e.nama.startsWith('partitur/') && !e.nama.endsWith('.json')).length
+    const json = entri.filter(
+      (e) =>
+        e.nama.endsWith('.json') &&
+        !e.nama.startsWith('audio/') &&
+        e.nama !== 'partitur/manifest.json',
+    )
     const daftar: EntriDikenal[] = []
     let gagal = 0
     for (const e of json) {
@@ -334,6 +383,7 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
         jenis: 'tak-dikenal',
         nama,
         audioZip,
+        partiturZip,
         catatan:
           gagal > 0
             ? `ZIP ini memuat ${gagal} berkas JSON yang rusak.`
@@ -356,6 +406,7 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
           data: satu.data,
           daftarZip: daftar,
           audioZip,
+          partiturZip,
         }
       }
       return {
@@ -365,12 +416,13 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
         data: satu.data,
         daftarZip: daftar,
         audioZip,
+        partiturZip,
         catatan: `Dari dalam ZIP ${nama} (berkas ${satu.nama}).`,
       }
     }
     // Kumpulan paket anggota (hasil "Unduh per anggota").
     if (paket.length === daftar.length && paket.length > 0) {
-      return { jenis: 'zip-anggota', nama, daftarZip: daftar, audioZip }
+      return { jenis: 'zip-anggota', nama, daftarZip: daftar, audioZip, partiturZip }
     }
     if (backup.length === 1 && daftar.length > 1) {
       return {
@@ -381,6 +433,7 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
         data: backup[0].data,
         daftarZip: daftar,
         audioZip,
+        partiturZip,
         catatan: `ZIP ini juga memuat ${daftar.length - 1} berkas lain yang akan diabaikan.`,
       }
     }
@@ -389,6 +442,7 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
       nama,
       daftarZip: daftar,
       audioZip,
+      partiturZip,
       catatan: `ZIP ini memuat ${daftar.length} berkas JSON campuran yang tidak saling berkaitan.`,
     }
   }
@@ -425,8 +479,62 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
     }
     return { jenis, nama, format, tanggal: tanggalMuatan(data), teks, data }
   } catch {
-    // Bukan JSON — mungkin CSV.
+    // Bukan JSON — mungkin partitur, lalu mungkin CSV.
   }
+  // #11a — partitur diperiksa SEBELUM CSV (§5.2 rancangan 11a). XML tidak
+  // mungkin CSV, tetapi urutan tetap membuat cabang ini tidak bisa tertutup
+  // oleh pengenalan CSV yang longgar — dan PDF pun tidak pernah sampai ke
+  // pengurai CSV.
+  const det = deteksiPartitur(bita)
+  if (det.ya) {
+    if (det.tipe === 'pdf') {
+      // Tidak ada yang bisa diringkas dari PDF; bitanya juga tidak dijadikan
+      // `teks` (isinya biner — menaruhnya di pratinjau hanya membuang memori).
+      return { jenis: 'partitur', nama, partiturTipe: 'pdf', partiturRingkas: null }
+    }
+    // `teksPartitur`, bukan `teks` di atas: ekspor lama ada yang UTF-16, dan
+    // hasilnya sama untuk UTF-8 biasa.
+    const isi = teksPartitur(bita)
+    const ringkas = ringkasMusicXml(isi)
+    // D4 — gagal meringkas TIDAK membatalkan pengenalan. Berkasnya tetap
+    // berkas partitur; pesannya diteruskan apa adanya untuk ditampilkan.
+    return ringkas.ok
+      ? {
+          jenis: 'partitur',
+          nama,
+          teks: isi,
+          partiturTipe: 'musicxml',
+          partiturRingkas: ringkas.ringkas,
+        }
+      : {
+          jenis: 'partitur',
+          nama,
+          teks: isi,
+          partiturTipe: 'musicxml',
+          partiturRingkas: null,
+          partiturGagal: ringkas.galat,
+        }
+  }
+  // Partitur yang dikenali *hampir*: XML yang menyebut `<score-…>` tetapi
+  // pemindainya tidak sanggup memastikan — terpotong sebelum akar, atau akar
+  // ber-prefix namespace (`<mx:score-partwise>`). Pesannya diteruskan mentah;
+  // jauh lebih menolong daripada "Bukan JSON, CSV, atau ZIP yang dikenal."
+  //
+  // Dua penjagaan, keduanya perlu, dan keduanya ketemu dari uji:
+  //   1. `score-` harus muncul di pesannya. Tanpa ini, CSV apa pun ikut
+  //      tertangkap — pengurai XML menolaknya dengan "bukan XML: teks
+  //      "Kode,Nama" sebelum elemen akar", dan cabang ini akan menelannya
+  //      sebelum `kenaliCsv` sempat jalan.
+  //   2. Kalau pesannya berbentuk "elemen akar <x>…", `<x>` harus berawalan
+  //      `score-`. Tanpa ini, setiap HTML/teks dilabeli masalah partitur,
+  //      sebab pesan itu selalu menyebut `<score-partwise>` sebagai akar
+  //      yang diharapkan.
+  const akarAsing = /^elemen akar <([^>]*)>/.exec(det.alasan ?? '')
+  const miripPartitur =
+    det.alasan != null &&
+    /score-/.test(det.alasan) &&
+    (!akarAsing || /^([\w.-]+:)?score-/.test(akarAsing[1]))
+  if (miripPartitur) return { jenis: 'tak-dikenal', nama, catatan: det.alasan }
   const jenisCsv = kenaliCsv(teks)
   if (jenisCsv) return { jenis: jenisCsv, nama, teks }
   const satuArah = catatanCsvSatuArah(teks)
@@ -468,7 +576,8 @@ export function aturMode(
       boleh: false,
       alasan:
         'Berkas ini tidak dikenali sebagai berkas DrillKit. ' +
-        'Yang bisa dibuka: backup, data pilihan, show, lagu, paket anggota, CSV, dan ZIP.',
+        'Yang bisa dibuka: backup, data pilihan, show, lagu, paket anggota, CSV, ' +
+        'partitur (MusicXML/PDF), dan ZIP.',
     }
   }
   if (mode === 'coach' && (jenis === 'paket' || jenis === 'zip-anggota')) {
@@ -481,6 +590,14 @@ export function aturMode(
     }
   }
   if (mode === 'member' && jenis === 'zip-anggota' && jumlahPaketZip === 1) {
+    return { boleh: true, alasan: '' }
+  }
+  // #11a — partitur boleh di KEDUA mode, dan pengecualian ini harus ditulis
+  // eksplisit SEBELUM penolakan umum di bawah. Anggota justru yang paling
+  // butuh membaca part-nya: pelatih memasang notasi, anggota membukanya di
+  // perangkatnya sendiri. Yang ditolak mode anggota adalah berkas *pelatih*
+  // (backup/data/show), bukan notasi.
+  if (jenis === 'partitur') {
     return { boleh: true, alasan: '' }
   }
   if (mode === 'member' && jenis !== 'paket') {
@@ -533,6 +650,7 @@ export const TABEL_BACKUP: { kolom: string; label: string }[] = [
   { kolom: 'sessions', label: 'Jadwal' },
   { kolom: 'attendance', label: 'Absensi' },
   { kolom: 'songs', label: 'Lagu' },
+  { kolom: 'partiturBerkas', label: 'Berkas partitur' },
   { kolom: 'setlists', label: 'Set list' },
   { kolom: 'drills', label: 'Drill' },
   { kolom: 'sets', label: 'Set formasi' },
