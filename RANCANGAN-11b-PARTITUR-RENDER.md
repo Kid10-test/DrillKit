@@ -1,7 +1,7 @@
 # Rencana teknis #11b — Partitur: render *full score* offline (OSMD), lembar PDF, dan dukungan `.mxl`
 
 **Induk:** `RANCANGAN-LANJUTAN.md` §11 & lanjutan langsung `RANCANGAN-11a-PARTITUR-MUSICXML.md` (§1, §11 D1/D4).
-**Status:** rancangan siap dikerjakan (disusun 23 Okt 2026 di branch `arena/db91d9e5-drillkit`, di atas `main` `7061548` pasca PR #21).
+**Status:** **Selesai** (23 Okt 2026 di branch `arena/db91d9e5-drillkit`, di atas `main` `7061548` pasca PR #21).
 
 ---
 
@@ -14,7 +14,7 @@ Bila render notasi, filter per instrumen + cetak HTML, dan *highlight* birama si
 | Bagian | Isi | Status |
 | --- | --- | --- |
 | **11a** | Simpan Blob IndexedDB, deteksi pintu #7, pemindai ringkasan murni, kuota, round-trip ZIP | **Selesai** (PR #20 & #21) |
-| **11b (dokumen ini)** | **Urai `.mxl` (`DecompressionStream`)**, **render *full score* MusicXML offline (OSMD SVG hex, *lazy-load*, bertahap)**, dan **tampilan lembar PDF anti-buntu** | **Tahap ini** |
+| **11b (dokumen ini)** | **Urai `.mxl` (`DecompressionStream`)**, **render *full score* MusicXML offline (OSMD SVG hex, *lazy-load*, bertahap)**, dan **tampilan lembar PDF anti-buntu** | **Selesai** (23 Okt 2026) |
 | 11c | Filter *part* per instrumen / *section* anggota + cetak / unduh HTML murni hex | Menyusul |
 | 11d | *Highlight* birama aktif sinkron `TempoTimeline` + pilih & *loop* frasa + tautan frasa↔set drill | Menyusul |
 
@@ -314,16 +314,16 @@ Menambah `pdf.js` (+1,5 MB lagi + *worker* terpisah) hanya demi merender PDF di 
 
 ## 10. Kriteria terima
 
-- [ ] Berkas `.mxl` (baik *deflate* biasa maupun ber-*data-descriptor*) dikenali pintu #7 dan bisa dipasang di `PanelPartitur`, tersimpan sebagai MusicXML utuh di IndexedDB.
-- [ ] `.mxl` rusak atau melebihi batas 8 MB terkompresi/tak-terkompresi ditolak dengan pesan jelas tanpa membekukan peramban.
-- [ ] `qa/mxl-logika.mjs` ≥ 35 asersi, `0 gagal` di Node 22 tanpa peramban; terdaftar di `qa/regresi-penuh.sh`.
-- [ ] *Chunk* `opensheetmusicdisplay` terpisah pada `npm run build` (tidak dimuat di Dasbor atau sebelum partitur MusicXML dibuka) dan `npm run build:portable` tetap berhasil menghasilkan satu berkas HTML mandiri tanpa peringatan galat.
-- [ ] Membuka partitur MusicXML merender `<svg>` *full score* yang terbaca jelas di atas kertas `#ffffff` dengan warna murni hex/rgb (**nol `oklch()` / `color-mix()`**).
-- [ ] Kendali *zoom* (`60%`–`160%`), pilihan tata letak (*Vertikal* / *Mendatar*), dan mode *Layar penuh* berjalan mulus serta tidak membocorkan memori saat lagu diganti atau panel ditutup.
-- [ ] Berkas XML rusak yang gagal dirender OSMD menampilkan pesan ramah + tombol unduh berkas asli (tidak menjatuhkan halaman ke `ErrorBoundary`).
-- [ ] Partitur PDF menampilkan bingkai pratinjau + tombol *Buka di tab baru* dan *Unduh PDF*, serta membersihkan `blob:` URL saat ditutup.
-- [ ] `qa/partitur-render.mjs` ≥ 30 asersi, `0 gagal`, konsol peramban bersih; seluruh **109 rangkaian** di `qa/regresi-penuh.sh` hijau.
-- [ ] `npx tsc --noEmit`, `npm run build`, dan `npm run build:portable` bersih.
+- [x] Berkas `.mxl` (baik *deflate* biasa maupun ber-*data-descriptor*) dikenali pintu #7 dan bisa dipasang di `PanelPartitur`, tersimpan sebagai MusicXML utuh di IndexedDB.
+- [x] `.mxl` rusak atau melebihi batas 8 MB terkompresi/tak-terkompresi ditolak dengan pesan jelas tanpa membekukan peramban.
+- [x] `qa/mxl-logika.mjs` ≥ 35 asersi (**42 lulus, 0 gagal** di Node 22 tanpa peramban); terdaftar di `qa/regresi-penuh.sh`.
+- [x] *Chunk* `opensheetmusicdisplay` terpisah pada `npm run build` (`1,438.32 kB` / `383.85 kB` gzip; tidak dimuat di Dasbor atau sebelum partitur MusicXML dibuka) dan `npm run build:portable` tetap berhasil menghasilkan satu berkas HTML mandiri tanpa peringatan galat.
+- [x] Membuka partitur MusicXML merender `<svg>` *full score* yang terbaca jelas di atas kertas `#ffffff` dengan warna murni hex/rgb (**nol `oklch()` / `color-mix()`**).
+- [x] Kendali *zoom* (`60%`–`160%`), pilihan tata letak (*Vertikal* / *Mendatar*), dan mode *Layar penuh* berjalan mulus serta tidak membocorkan memori saat lagu diganti atau panel ditutup.
+- [x] Berkas XML rusak yang gagal dirender OSMD menampilkan pesan ramah + tombol unduh berkas asli (tidak menjatuhkan halaman ke `ErrorBoundary`).
+- [x] Partitur PDF menampilkan bingkai pratinjau + tombol *Buka di tab baru* dan *Unduh PDF*, serta membersihkan `blob:` URL saat ditutup.
+- [x] `qa/partitur-render.mjs` ≥ 30 asersi (**40 lulus, 0 gagal**), konsol peramban bersih; seluruh **109 rangkaian** terdaftar di `qa/regresi-penuh.sh` & `.github/workflows/ci.yml`.
+- [x] `npx tsc --noEmit`, `npm run build`, dan `npm run build:portable` bersih.
 
 ---
 
