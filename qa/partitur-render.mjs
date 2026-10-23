@@ -303,6 +303,15 @@ const ke = async (hal, rute) => {
   await wait(1400)
 }
 
+const adalahUrlLokalAtauInternalPeramban = (u) =>
+  u.startsWith(ORIGIN_LOKAL) ||
+  u.startsWith('blob:') ||
+  u.startsWith('data:') ||
+  u.startsWith('about:') ||
+  u.startsWith('chrome:') ||
+  u.startsWith('chrome-extension:') ||
+  u.startsWith('devtools:')
+
 const sudahMuatOsmd = (hal) =>
   hal.evaluate(() =>
     performance.getEntriesByType('resource').some((r) => /opensheetmusicdisplay/i.test(r.name)),
@@ -430,7 +439,7 @@ try {
   p.on('pageerror', (e) => errors.push(String(e)))
   p.on('request', (req) => {
     const u = req.url()
-    if (!u.startsWith(ORIGIN_LOKAL) && !u.startsWith('blob:') && !u.startsWith('data:')) {
+    if (!adalahUrlLokalAtauInternalPeramban(u)) {
       permintaanLuar.push(u)
     }
   })
@@ -809,7 +818,7 @@ try {
   pPdf.on('pageerror', (e) => errorsPdf.push(String(e)))
   pPdf.on('request', (req) => {
     const u = req.url()
-    if (!u.startsWith(ORIGIN_LOKAL) && !u.startsWith('blob:') && !u.startsWith('data:')) {
+    if (!adalahUrlLokalAtauInternalPeramban(u)) {
       permintaanLuar.push(u)
     }
   })
