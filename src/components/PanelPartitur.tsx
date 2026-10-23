@@ -18,8 +18,9 @@
  *
  * **Pratinjau dulu, tulis kemudian** (prinsip yang sama dengan impor #10):
  * berkas yang dipilih diperiksa dan diringkas di memori, ditampilkan, dan
- * baru ditulis setelah pelatih menekan Pasang. `.mxl` berhenti di sini dengan
- * pesan petunjuk D1 — tanpa satu baris pun ditulis.
+ * baru ditulis setelah pelatih menekan Pasang. Di #11b, arsip `.mxl` yang sah
+ * diurai otomatis menjadi `.musicxml` tak terkompresi di pratinjau, sementara
+ * berkas yang rusak berhenti di sini tanpa satu baris pun ditulis.
  *
  * **Urutan yang menjaga data (§8).** Melepas = metadata lagu dikosongkan
  * **dulu**, Blob dihapus **kemudian**. Mengganti tidak menghapus apa pun
@@ -29,7 +30,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PartiturMeta, Song } from '../db/types'
 import { cekPenyimpanan, mintaPenyimpananPersisten, type InfoPenyimpanan } from '../lib/rekaman'
-import { PESAN_MXL } from '../lib/partitur'
 import {
   hapusPartiturBerkas,
   metaDariPutusan,
@@ -39,17 +39,19 @@ import {
 } from '../lib/partiturSimpan'
 import { formatBytes } from '../lib/backup'
 import { Button, ConfirmButton, useToast } from './ui'
-import { IconUpload } from './Icons'
+import { IconEye, IconUpload } from './Icons'
 
 /** Pratinjau berkas yang baru dipilih, sebelum apa pun ditulis. */
 interface PilihanPartitur {
   namaFile: string
+  /** Nama berkas asli bila dikonversi dari `.mxl` (mis. `pembuka.mxl`). */
+  namaAsli?: string
   ukuran: number
   hash: string
   /** Metadata yang AKAN disimpan — sekaligus bahan ringkasannya. */
   meta: PartiturMeta
-  /** Berkasnya sendiri; belum masuk IndexedDB sampai ditekan Pasang. */
-  blob: File
+  /** Berkas siap simpan; belum masuk IndexedDB sampai ditekan Pasang. */
+  blob: Blob
 }
 
 /** Sukat sebagai "7/8". */
@@ -61,11 +63,17 @@ export function PanelPartitur({
   song,
   onUpdateSong,
   hanyaPutar = false,
+  terbuka = false,
+  onToggleBuka,
 }: {
   song: Song
   /** Tulis `Song.partitur` — bentuk yang sama dengan `onUpdateSong` #6. */
   onUpdateSong: (songId: string, meta: PartiturMeta | null) => Promise<void>
   hanyaPutar?: boolean
+  /** #11b — apakah panel baca `LayarPartitur` sedang ditampilkan untuk lagu ini. */
+  terbuka?: boolean
+  /** #11b — buka/sembunyikan panel baca `LayarPartitur`. */
+  onToggleBuka?: () => void
 }) {
   const toast = useToast()
   const [pilihan, setPilihan] = useState<PilihanPartitur | null>(null)
@@ -105,19 +113,20 @@ export function PanelPartitur({
     setSibuk(true)
     setTolak(null)
     try {
-      const { putusan, hash, ukuran } = await periksaPartitur(f)
+      const { putusan, hash, ukuran, blobSiap, namaSimpan, dariMxl } = await periksaPartitur(f, f.name)
       if (!putusan.boleh) {
-        // D1 — `.mxl` berhenti di sini; tidak ada yang ditulis.
+        // Berkas tidak sah / .mxl rusak berhenti di sini; tidak ada yang ditulis.
         setPilihan(null)
         setTolak(putusan.alasan ?? 'Berkas ini tidak bisa dipasang sebagai partitur.')
         return
       }
       setPilihan({
-        namaFile: f.name,
+        namaFile: namaSimpan,
+        namaAsli: dariMxl && namaSimpan !== f.name ? f.name : undefined,
         ukuran,
         hash,
-        meta: metaDariPutusan(f.name, ukuran, hash, putusan, Date.now()),
-        blob: f,
+        meta: metaDariPutusan(namaSimpan, ukuran, hash, putusan, Date.now()),
+        blob: blobSiap,
       })
     } catch {
       setTolak('Berkasnya tidak bisa dibaca dari perangkat ini.')
@@ -147,6 +156,7 @@ export function PanelPartitur({
     setSibuk(true)
     try {
       // §8 — metadata dulu, Blob kemudian.
+      if (terbuka) onToggleBuka?.()
       await onUpdateSong(song.id, null)
       await hapusPartiturBerkas(song.id)
       setAdaBerkas(false)
@@ -180,7 +190,7 @@ export function PanelPartitur({
         <div>
           <p className="text-xs font-semibold text-slate-300">Partitur — {song.title}</p>
           <p className="mt-0.5 text-[11px] text-slate-500">
-            MusicXML (.musicxml) atau PDF dari MuseScore/Sibelius/Finale. Disimpan offline di perangkat ini.
+            MusicXML (.musicxml / .mxl) atau PDF dari MuseScore/Sibelius/Finale. Disimpan offline di perangkat ini.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -193,7 +203,7 @@ export function PanelPartitur({
             ref={inputRef}
             id="partitur-input"
             type="file"
-            accept=".musicxml,.xml,.pdf"
+            accept=".musicxml,.mxl,.xml,.pdf"
             className="hidden"
             data-testid="partitur-pilih"
             onChange={(e) => {
@@ -202,6 +212,18 @@ export function PanelPartitur({
               if (f) void pilihBerkas(f)
             }}
           />
+          {meta && adaBerkas === true && !pilihan && onToggleBuka && (
+            <Button
+              variant={terbuka ? 'soft' : 'primary'}
+              size="sm"
+              disabled={sibuk}
+              data-testid="partitur-buka"
+              data-kiosk-allow
+              onClick={onToggleBuka}
+            >
+              <IconEye size={14} /> {terbuka ? 'Sembunyikan partitur' : 'Buka partitur'}
+            </Button>
+          )}
           {meta && !hanyaPutar && (
             // Mengganti menyentuh apa yang dibaca seluruh tim, jadi dua
             // langkah — dan pesannya menyebut berkas lama (§8).
@@ -247,14 +269,14 @@ export function PanelPartitur({
         </div>
       </div>
 
-      {/* D1 ditolak — pesannya apa adanya, tanpa diparafrase. */}
+      {/* Berkas ditolak — pesannya apa adanya, tanpa diparafrase. */}
       {tolak && (
         <div
           data-testid="partitur-tolak"
           className="rounded-lg border border-amber-600/40 bg-amber-950/20 p-2.5 text-[11px] leading-relaxed text-amber-100/90"
         >
           {tolak}
-          {tolak === PESAN_MXL && <span className="mt-1 block text-slate-400">Berkasnya belum disimpan.</span>}
+          <span className="mt-1 block text-slate-400">Berkasnya belum disimpan.</span>
         </div>
       )}
 
@@ -273,7 +295,8 @@ export function PanelPartitur({
             Belum disimpan — periksa dulu ringkasannya
           </p>
           <p className="mt-0.5 break-all text-[11px] text-slate-400">
-            {pilihan.namaFile} · {formatBytes(pilihan.ukuran)} · SHA: {pilihan.hash.slice(0, 10)}…
+            {pilihan.namaAsli ? `${pilihan.namaAsli} → ${pilihan.namaFile}` : pilihan.namaFile} ·{' '}
+            {formatBytes(pilihan.ukuran)} · SHA: {pilihan.hash.slice(0, 10)}…
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button variant="primary" size="sm" disabled={sibuk} data-testid="partitur-simpan" onClick={() => void pasang()}>

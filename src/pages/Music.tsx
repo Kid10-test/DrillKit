@@ -51,6 +51,7 @@ import { KendaliTempoLatihan, LencanaLatihan } from '../components/KendaliTempoL
 import { useTempoLatihan } from '../hooks/useTempoLatihan'
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
 import { PanelPartitur } from '../components/PanelPartitur'
+import { LayarPartitur } from '../components/LayarPartitur'
 import { IndikatorKetuk, PanelSedangDiputar, StripSegmen } from '../components/PanelLagu'
 import { diam as hentikanUcapan, ucap as ucapkan } from '../lib/ucap'
 import PilihBirama, { PilihBiramaSegmen, RingkasBirama } from '../components/PilihBirama'
@@ -180,6 +181,7 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
   const setlistAktif: SetList | null = daftarSetList?.find((x) => x.id === setlistId) ?? null
   const hitunganSet = useMemo(() => hitungSetList(setlistAktif, songs ?? []), [setlistAktif, songs])
   const [selected, setSelected] = useState<string>('')
+  const [partiturTerbuka, setPartiturTerbuka] = useState(false)
   const [useMap, setUseMap] = useState(false)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Song | null>(null)
@@ -207,6 +209,9 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
   const [kotor, setKotor] = useState(false)
 
   const song = songs?.find((s) => s.id === selected)
+  useEffect(() => {
+    if (!song?.partitur) setPartiturTerbuka(false)
+  }, [song?.id, song?.partitur])
   /* #5 sisa — panjang tiap segmen lagu terpilih dalam hitungan drill. */
   const semuaDrill = useLiveQuery(() => db.drills.toArray(), [], [])
   const asumsiSegmen = useMemo(() => asumsiHitungan(semuaDrill ?? [], song?.id ?? ''), [semuaDrill, song?.id])
@@ -1701,11 +1706,21 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
                   song={song}
                   onUpdateSong={handleUpdatePartitur}
                   hanyaPutar={hanyaPutar}
+                  terbuka={partiturTerbuka && !!song.partitur}
+                  onToggleBuka={() => setPartiturTerbuka((v) => !v)}
                 />
               </div>
             </div>
           )}
         </Card>
+
+        {/* #11b — lembar baca partitur full score (MusicXML OSMD / PDF) */}
+        {song && song.partitur && partiturTerbuka && (
+          <LayarPartitur
+            song={song}
+            onTutup={() => setPartiturTerbuka(false)}
+          />
+        )}
       </div>
 
       {/* M3 — set list: urutan lagu untuk satu penampilan */}
