@@ -26,16 +26,16 @@
  * yang muncul kelak tetap dilaporkan apa adanya (tidak ditelan), supaya
  * berkas dari versi baru tidak gagal secara misterius.
  *
- * #11a (13 Okt 2026) menambah satu jenis **bukan-JSON**: `partitur`. Berkas
- * MusicXML/PDF memang bukan berkas DrillKit, tapi pelatih memilihnya di pintu
- * yang sama — dan tanpa pengenalan ini ia jatuh ke "tidak dikenal" bersama
- * foto liburan. Deteksinya dari isi (`deteksiPartitur` di `partitur.ts`), dan
- * `.mxl` (MusicXML terkompresi) sengaja **ditolak dengan pesan petunjuk**
- * (keputusan D1 rancangan 11a), bukan gagal diam-diam.
+ * #11a (13 Okt 2026) menambah satu jenis **bukan-JSON**: `partitur` (MusicXML/PDF).
+ * #11b (23 Okt 2026) melengkapinya dengan `kenaliBerkasAsync` sehingga arsip
+ * `.mxl` (MusicXML terkompresi) diurai langsung lewat `mxl.ts` dan menghasilkan
+ * ringkasan partitur penuh di pintu #7, sementara `kenaliBerkas` sinkron tetap
+ * mempertahankan pesan petunjuk simpan ulang untuk pemanggil sinkron murni.
  */
 import { bukaZip } from './zip'
 import { deteksiPyware } from './pyware'
 import { PESAN_MXL, deteksiPartitur, ringkasMusicXml, teksPartitur, type RingkasanPartitur } from './partitur'
+import { apakahMxl, uraiMxl } from './mxl'
 
 /* ------------------------------ Jenis ---------------------------------- */
 
@@ -355,7 +355,7 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
     // ini pelatih menerima "ZIP ini tidak memuat berkas JSON DrillKit" —
     // jawaban yang benar tetapi tidak menolong siapa pun. Pesannya satu
     // sumber dengan modul partitur (D1).
-    if (entri.some((e) => e.nama === 'META-INF/container.xml')) {
+    if (entri.some((e) => e.nama === 'META-INF/container.xml') || apakahMxl(bita)) {
       return { jenis: 'tak-dikenal', nama, catatan: PESAN_MXL }
     }
     const audioZip = entri.filter((e) => e.nama.startsWith('audio/') && !e.nama.endsWith('.json')).length
@@ -550,6 +550,28 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
 /** Varian teks (untuk pemanggil yang sudah membaca berkas sebagai teks). */
 export function kenaliTeks(nama: string, teks: string): BerkasDikenal {
   return kenaliBerkas(nama, new TextEncoder().encode(teks))
+}
+
+/**
+ * #11b — varian asinkron `kenaliBerkas` yang mengurai arsip `.mxl`
+ * (MusicXML terkompresi deflate/stored) menjadi ringkasan partitur penuh.
+ *
+ * Untuk semua berkas lain (JSON, CSV, PDF, `.musicxml`, ZIP backup/anggota),
+ * hasilnya identik dengan `kenaliBerkas(nama, bita)`.
+ */
+export async function kenaliBerkasAsync(nama: string, bita: Uint8Array): Promise<BerkasDikenal> {
+  if (apakahMxl(bita)) {
+    const urai = await uraiMxl(bita)
+    if (!urai.ok) {
+      return { jenis: 'tak-dikenal', nama, catatan: urai.alasan }
+    }
+    const kenal = kenaliBerkas(nama, urai.bitaXml)
+    return {
+      ...kenal,
+      catatan: `Dari MusicXML terkompresi (.mxl, berkas utama ${urai.jalurUtama}).`,
+    }
+  }
+  return kenaliBerkas(nama, bita)
 }
 
 /* ------------------------- Aturan mode perangkat ------------------------ */
