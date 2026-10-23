@@ -22,13 +22,14 @@ import {
   LABEL_JENIS,
   TUJUAN_JENIS,
   aturMode,
-  kenaliBerkas,
+  kenaliBerkasAsync,
   ringkasCsv,
   ringkasDataPindah,
   ringkasPaket,
   type BerkasDikenal,
   type JenisBerkas,
 } from '../lib/bukaBerkas'
+import { PESAN_MXL } from '../lib/partitur'
 import { simpanPaketAnggota } from '../lib/paketMasuk'
 import { cekBerkas, type BerkasShow } from '../lib/show'
 import { bacaPaket, perluPeringatan, ringkasanImpor, terapkanPaket } from '../lib/repertoar'
@@ -56,6 +57,15 @@ const pendengar = new Set<Pendengar>()
  * ("mengalihkan ke pratinjau yang benar").
  */
 export function mintaPratinjau(hasil: BerkasDikenal, bita?: Uint8Array): void {
+  // #11b — tombol lama memanggil `kenaliBerkas` sinkron (yang menandai .mxl
+  // dengan PESAN_MXL). Urai secara asinkron di sini supaya semua tombol lama
+  // ikut mengenali .mxl tanpa mengubah satu per satu pemanggilnya.
+  if (bita && hasil.jenis === 'tak-dikenal' && hasil.catatan === PESAN_MXL) {
+    void kenaliBerkasAsync(hasil.nama, bita).then((baru) => {
+      for (const fn of pendengar) fn({ hasil: baru, bita })
+    })
+    return
+  }
   for (const fn of pendengar) fn({ hasil, bita })
 }
 
@@ -128,10 +138,10 @@ export function useTitipan(boleh: JenisBerkas[], cb: (t: TitipanBerkas) => void)
 
 /* ------------------------------ Kenali ----------------------------------- */
 
-/** Baca `File` dari pemilih/seretan lalu kenali dari isinya. */
+/** Baca `File` dari pemilih/seretan lalu kenali dari isinya (termasuk .mxl terkompresi #11b). */
 export async function kenaliFile(file: File): Promise<{ hasil: BerkasDikenal; bita: Uint8Array }> {
   const bita = new Uint8Array(await file.arrayBuffer())
-  return { hasil: kenaliBerkas(file.name, bita), bita }
+  return { hasil: await kenaliBerkasAsync(file.name, bita), bita }
 }
 
 /* --------------------------- Tombol pintu baru --------------------------- */
@@ -167,7 +177,7 @@ export function TombolBukaBerkas({
         <IconUpload size={16} /> {label}
         <input
           type="file"
-          accept=".json,.csv,.zip,.musicxml,.xml,.pdf,application/json,text/csv,application/zip,application/pdf"
+          accept=".json,.csv,.zip,.musicxml,.mxl,.xml,.pdf,application/json,text/csv,application/zip,application/pdf,application/vnd.recordare.musicxml"
           data-testid={`${testId}-input`}
           className="hidden"
           onChange={(e) => {

@@ -30,9 +30,10 @@
 import puppeteer from 'puppeteer'
 import fs from 'node:fs'
 import path from 'node:path'
+import { deflateRawSync } from 'node:zlib'
 import { lewatSambutan } from './sambutan.mjs'
 import { QA } from './lokasi.mjs'
-import { bikinZip, bukaZip } from '/tmp/zip.mjs'
+import { bikinZip, bukaZip, crc32 } from '/tmp/zip.mjs'
 import { hitungHashAudio } from '/tmp/rekaman.mjs'
 
 const BASE = process.env.BASE || process.argv[2] || 'http://localhost:4173'
@@ -147,18 +148,89 @@ const bitaPdf = new TextEncoder().encode('%PDF-1.7\n1 0 obj<<>>endobj\ntrailer<<
 const fPdf = path.join(BERKAS, 'lembar-cadangan.pdf')
 fs.writeFileSync(fPdf, bitaPdf)
 
-// `.mxl` (ZIP dengan `META-INF/container.xml`) → keputusan D1: ditolak jelas.
-const bitaMxl = bikinZip([
+// #11b — `.mxl` terkompresi deflate sungguhan (gaya MuseScore) kini diurai
+// otomatis di pintu #7 dan PanelPartitur; ditambah satu `.mxl` rusak untuk
+// memastikan penolakan pratinjau tetap tidak menulis apa pun ke IndexedDB.
+function bikinMxlDeflate(daftar) {
+  const enc = new TextEncoder()
+  const potongan = []
+  const pusat = []
+  let pos = 0
+  for (const e of daftar) {
+    const namaBita = enc.encode(e.nama)
+    const mentah = typeof e.isi === 'string' ? enc.encode(e.isi) : e.isi
+    const padat = new Uint8Array(deflateRawSync(mentah))
+    const c = crc32(mentah)
+    const hLokal = new Uint8Array(30 + namaBita.length)
+    const dvL = new DataView(hLokal.buffer)
+    dvL.setUint32(0, 0x04034b50, true)
+    dvL.setUint16(4, 20, true)
+    dvL.setUint16(6, 0x0800, true)
+    dvL.setUint16(8, 8, true)
+    dvL.setUint32(14, c, true)
+    dvL.setUint32(18, padat.length, true)
+    dvL.setUint32(22, mentah.length, true)
+    dvL.setUint16(26, namaBita.length, true)
+    hLokal.set(namaBita, 30)
+    const offsetLokal = pos
+    potongan.push(hLokal, padat)
+    pos += hLokal.length + padat.length
+
+    const hPusat = new Uint8Array(46 + namaBita.length)
+    const dvP = new DataView(hPusat.buffer)
+    dvP.setUint32(0, 0x02014b50, true)
+    dvP.setUint16(4, 20, true)
+    dvP.setUint16(6, 20, true)
+    dvP.setUint16(8, 0x0800, true)
+    dvP.setUint16(10, 8, true)
+    dvP.setUint32(16, c, true)
+    dvP.setUint32(20, padat.length, true)
+    dvP.setUint32(24, mentah.length, true)
+    dvP.setUint16(28, namaBita.length, true)
+    dvP.setUint32(42, offsetLokal, true)
+    hPusat.set(namaBita, 46)
+    pusat.push(hPusat)
+  }
+  const awalPusat = pos
+  let ukuranPusat = 0
+  for (const p of pusat) {
+    potongan.push(p)
+    ukuranPusat += p.length
+  }
+  const eocd = new Uint8Array(22)
+  const dvE = new DataView(eocd.buffer)
+  dvE.setUint32(0, 0x06054b50, true)
+  dvE.setUint16(8, daftar.length, true)
+  dvE.setUint16(10, daftar.length, true)
+  dvE.setUint32(12, ukuranPusat, true)
+  dvE.setUint32(16, awalPusat, true)
+  potongan.push(eocd)
+  const out = new Uint8Array(pos + ukuranPusat + 22)
+  let k = 0
+  for (const pot of potongan) {
+    out.set(pot, k)
+    k += pot.length
+  }
+  return out
+}
+
+const bitaMxl = bikinMxlDeflate([
   {
     nama: 'META-INF/container.xml',
     isi:
       '<?xml version="1.0" encoding="UTF-8"?>' +
       '<container><rootfiles><rootfile full-path="score.xml"/></rootfiles></container>',
   },
-  { nama: 'score.xml', isi: '<score-partwise version="3.1"/>' },
+  { nama: 'score.xml', isi: bitaXml },
 ])
 const fMxl = path.join(BERKAS, 'terkompresi.mxl')
 fs.writeFileSync(fMxl, bitaMxl)
+
+const bitaMxlRusak = bikinZip([
+  { nama: 'META-INF/container.xml', isi: '<container><rootfiles/></container>' },
+])
+const fMxlRusak = path.join(BERKAS, 'rusak.mxl')
+fs.writeFileSync(fMxlRusak, bitaMxlRusak)
 
 cek('fixture MusicXML cukup besar (> 20 KB) untuk uji ukuran paket', bitaXml.length > 20_000, String(bitaXml.length))
 
@@ -377,21 +449,21 @@ cek(
 await klik(p, '[data-testid="buka-tutup"]')
 await wait(400)
 
-// `.mxl` di pintu #7 (D1): ditolak dengan petunjuk menyimpan ulang, bukan mogok.
+// #11b — `.mxl` deflate di pintu #7 dikenali sebagai Partitur & diringkas penuh.
 await unggah(p, '[data-testid="buka-berkas-dasbor-input"]', fMxl)
 await p.waitForSelector('[data-testid="modal-buka-berkas"]', { timeout: 10000 })
-await wait(400)
+await wait(500)
 const catatanMxlPintu = await teks(p, '[data-testid="modal-buka-berkas"]')
 cek(
-  'pintu #7 menolak .mxl dengan petunjuk MuseScore (*.musicxml)',
-  catatanMxlPintu.includes('.mxl') && catatanMxlPintu.includes('*.musicxml'),
+  'pintu #7 mengenali .mxl deflate sebagai Partitur beserta judulnya (#11b)',
+  catatanMxlPintu.includes('Gema Nusantara') && catatanMxlPintu.includes('.mxl'),
   catatanMxlPintu.slice(0, 180),
 )
 await klik(p, '[data-testid="buka-tutup"]')
 await wait(400)
-cek('modal pintu #7 bisa ditutup sesudah menolak .mxl', !(await ada(p, '[data-testid="modal-buka-berkas"]')))
+cek('modal pintu #7 bisa ditutup sesudah pratinjau .mxl', !(await ada(p, '[data-testid="modal-buka-berkas"]')))
 
-/* ------- 2. PanelPartitur di halaman Musik: D1, D4, pasang, ganti -------- */
+/* ------- 2. PanelPartitur di halaman Musik: .mxl, D4, pasang, ganti ------ */
 
 await ke(p, '#/musik')
 await klik(p, `[data-testid="pilih-lagu-${laguUji.id}"]`)
@@ -402,19 +474,32 @@ cek(
   /Belum ada partitur/.test(await teks(p, '[data-testid="partitur-tak-ada"]')),
 )
 
-// D1 di PanelPartitur: `.mxl` ditolak di memori tanpa menyentuh IndexedDB.
-await unggah(p, '#partitur-input', fMxl)
+// `.mxl` rusak di PanelPartitur: berhenti di pratinjau tanpa menyentuh IndexedDB.
+await unggah(p, '#partitur-input', fMxlRusak)
 await p.waitForSelector('[data-testid="partitur-tolak"]', { timeout: 10000 })
 const teksTolakPanel = await teks(p, '[data-testid="partitur-tolak"]')
 cek(
-  'PanelPartitur menolak .mxl dengan pesan simpan ulang',
-  teksTolakPanel.includes('.mxl') && teksTolakPanel.includes('*.musicxml'),
+  'PanelPartitur menolak .mxl rusak dengan alasan jelas',
+  /rootfile/.test(teksTolakPanel),
   teksTolakPanel,
 )
 cek(
-  'penolakan .mxl tidak menulis apa pun ke partiturBerkas',
+  'penolakan berkas rusak tidak menulis apa pun ke partiturBerkas',
   (await bacaTabel(p, 'partiturBerkas')).length === 0,
 )
+
+// #11b — `.mxl` deflate sah di PanelPartitur: diurai ke .musicxml di pratinjau, dan bisa dibatalkan.
+await unggah(p, '#partitur-input', fMxl)
+await p.waitForSelector('[data-testid="partitur-simpan"]', { timeout: 10000 })
+const teksPanelSaatMxl = await teks(p, '[data-testid="panel-partitur"]')
+cek(
+  'PanelPartitur mengurai .mxl deflate ke pratinjau terkompresi.musicxml (#11b)',
+  teksPanelSaatMxl.includes('terkompresi.mxl → terkompresi.musicxml') &&
+    teksPanelSaatMxl.includes('Gema Nusantara'),
+  teksPanelSaatMxl.slice(0, 220),
+)
+await klik(p, '[data-testid="partitur-batal"]')
+await wait(300)
 
 // D4 di PanelPartitur: XML yang menjegal pemindai tetap dipasang (`terurai: false`).
 await unggah(p, '#partitur-input', fXmlD4)

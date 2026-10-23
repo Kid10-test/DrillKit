@@ -11,6 +11,7 @@
  * 3. **Aturan mode.** Paket anggota di mode pelatih DITOLAK (dulu ikut
  *    diterima pemulihan backup!), dan mode anggota HANYA menerima paket.
  */
+import { deflateRawSync } from 'node:zlib'
 import {
   catatanCsvSatuArah,
   tampakCsvAnggota,
@@ -19,6 +20,7 @@ import {
   aturMode,
   hitungBaruTimpa,
   kenaliBerkas,
+  kenaliBerkasAsync,
   kenaliCsv,
   kenaliJson,
   kenaliTeks,
@@ -37,7 +39,7 @@ import {
   ringkasShow,
   tanggalMuatan,
 } from '/tmp/bukaBerkas.mjs'
-import { bikinZip } from '/tmp/zip.mjs'
+import { bikinZip, crc32 } from '/tmp/zip.mjs'
 
 let lulus = 0
 const gagal = []
@@ -209,14 +211,97 @@ const PDF = '%PDF-1.4\n1 0 obj\n<</Type/Catalog>>\nendobj\ntrailer\n%%EOF'
   cek('CSV tetap dikenali walau pengurai XML menolaknya',
     kenaliBerkas('anggota.csv', bita(CSV_ANGGOTA)).jenis === 'csv-anggota')
 
-  // .mxl (MusicXML terkompresi) ditolak dengan pesan petunjuk (D1).
-  const mxl = kenaliBerkas('lagu.mxl', bikinZip([
+  // .mxl (MusicXML terkompresi) di jalur sinkron tetap mengembalikan pesan petunjuk (D1),
+  // sementara di jalur asinkron (#11b `kenaliBerkasAsync`) diurai penuh menjadi partitur.
+  const bitaMxlTanpaRoot = bikinZip([
     { nama: 'META-INF/container.xml', isi: '<container><rootfiles/></container>' },
     { nama: 'score.xml', isi: XML_PARTITUR },
-  ]))
-  cek('.mxl ditolak, bukan gagal diam-diam', mxl.jenis === 'tak-dikenal', mxl.jenis)
-  cek('.mxl: pesannya menyebut cara menyimpan ulang', /MuseScore/.test(mxl.catatan ?? ''), mxl.catatan)
-  cek('.mxl: bukan pesan "ZIP tanpa JSON"', !/JSON DrillKit/.test(mxl.catatan ?? ''), mxl.catatan)
+  ])
+  const mxl = kenaliBerkas('lagu.mxl', bitaMxlTanpaRoot)
+  cek('.mxl sinkron ditolak, bukan gagal diam-diam', mxl.jenis === 'tak-dikenal', mxl.jenis)
+  cek('.mxl sinkron: pesannya menyebut cara menyimpan ulang', /MuseScore/.test(mxl.catatan ?? ''), mxl.catatan)
+  cek('.mxl sinkron: bukan pesan "ZIP tanpa JSON"', !/JSON DrillKit/.test(mxl.catatan ?? ''), mxl.catatan)
+
+  // #11b — kenaliBerkasAsync mengurai .mxl deflate menjadi ringkasan partitur penuh.
+  const bikinMxlDeflate = (entri) => {
+    const kepingan = []
+    const pusat = []
+    let pos = 0
+    for (const e of entri) {
+      const namaBita = bita(e.nama)
+      const mentah = bita(e.isi)
+      const padat = new Uint8Array(deflateRawSync(mentah))
+      const c = crc32(mentah)
+      const hLokal = new Uint8Array(30 + namaBita.length)
+      const dvL = new DataView(hLokal.buffer)
+      dvL.setUint32(0, 0x04034b50, true)
+      dvL.setUint16(4, 20, true)
+      dvL.setUint16(6, 0x0800, true)
+      dvL.setUint16(8, 8, true)
+      dvL.setUint32(14, c, true)
+      dvL.setUint32(18, padat.length, true)
+      dvL.setUint32(22, mentah.length, true)
+      dvL.setUint16(26, namaBita.length, true)
+      hLokal.set(namaBita, 30)
+      const offsetLokal = pos
+      kepingan.push(hLokal, padat)
+      pos += hLokal.length + padat.length
+
+      const hPusat = new Uint8Array(46 + namaBita.length)
+      const dvP = new DataView(hPusat.buffer)
+      dvP.setUint32(0, 0x02014b50, true)
+      dvP.setUint16(4, 20, true)
+      dvP.setUint16(6, 20, true)
+      dvP.setUint16(8, 0x0800, true)
+      dvP.setUint16(10, 8, true)
+      dvP.setUint32(16, c, true)
+      dvP.setUint32(20, padat.length, true)
+      dvP.setUint32(24, mentah.length, true)
+      dvP.setUint16(28, namaBita.length, true)
+      dvP.setUint32(42, offsetLokal, true)
+      hPusat.set(namaBita, 46)
+      pusat.push(hPusat)
+    }
+    const awalPusat = pos
+    let ukuranPusat = 0
+    for (const p of pusat) {
+      kepingan.push(p)
+      ukuranPusat += p.length
+    }
+    const eocd = new Uint8Array(22)
+    const dvE = new DataView(eocd.buffer)
+    dvE.setUint32(0, 0x06054b50, true)
+    dvE.setUint16(8, entri.length, true)
+    dvE.setUint16(10, entri.length, true)
+    dvE.setUint32(12, ukuranPusat, true)
+    dvE.setUint32(16, awalPusat, true)
+    kepingan.push(eocd)
+    const total = pos + ukuranPusat + 22
+    const out = new Uint8Array(total)
+    let k = 0
+    for (const pot of kepingan) {
+      out.set(pot, k)
+      k += pot.length
+    }
+    return out
+  }
+
+  const mxlDeflateSah = bikinMxlDeflate([
+    {
+      nama: 'META-INF/container.xml',
+      isi: '<?xml version="1.0"?><container><rootfiles><rootfile full-path="score.xml"/></rootfiles></container>',
+    },
+    { nama: 'score.xml', isi: XML_PARTITUR },
+  ])
+  const mxlAsync = await kenaliBerkasAsync('lagu.mxl', mxlDeflateSah)
+  cek('#11b: kenaliBerkasAsync mengenali .mxl deflate sebagai partitur', mxlAsync.jenis === 'partitur' && mxlAsync.partiturTipe === 'musicxml', mxlAsync.jenis)
+  cek('#11b: kenaliBerkasAsync meringkas judul & birama dari dalam .mxl', mxlAsync.partiturRingkas?.judul === 'Pembuka' && mxlAsync.partiturRingkas?.jumlahBirama === 2)
+  cek('#11b: kenaliBerkasAsync mencatat asal .mxl dan berkas utamanya', /\.mxl/.test(mxlAsync.catatan ?? '') && /score\.xml/.test(mxlAsync.catatan ?? ''), mxlAsync.catatan)
+  cek('#11b: hasil .mxl diizinkan di mode anggota oleh aturMode', aturMode(mxlAsync.jenis, 'member').boleh === true)
+
+  const mxlAsyncRusak = await kenaliBerkasAsync('rusak.mxl', bitaMxlTanpaRoot)
+  cek('#11b: .mxl tanpa <rootfile> ditolak jelas oleh kenaliBerkasAsync', mxlAsyncRusak.jenis === 'tak-dikenal' && /rootfile/.test(mxlAsyncRusak.catatan ?? ''), mxlAsyncRusak.catatan)
+  cek('#11b: berkas biasa (CSV) lewat kenaliBerkasAsync tetap identik', (await kenaliBerkasAsync('anggota.csv', bita(CSV_ANGGOTA))).jenis === 'csv-anggota')
 }
 
 // ------------------------------------------------------------------ ZIP

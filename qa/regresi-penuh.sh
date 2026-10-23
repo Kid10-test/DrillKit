@@ -65,6 +65,13 @@ bash bangun-logika.sh || exit 1
 # alur peramban seret pintu #7 → pasang → muat ulang → ZIP di DB bersih).
 # Modulnya dirakit bangun-logika.sh sebagai /tmp/partitur.mjs dan
 # /tmp/partiturZip.mjs. Jangan keluarkan lagi tanpa mencatat alasannya.
+#
+# #11b — `mxl-logika` (pengurai arsip .mxl via Central Directory ZIP +
+# DecompressionStream deflate-raw, anti-zip-bomb 8 MB, verifikasi CRC-32;
+# dirakit bangun-logika.sh sebagai /tmp/mxl.mjs) dan `partitur-render`
+# (uji peramban lazy-load OSMD, render SVG hex full score, kendali zoom &
+# tata letak, skor D4 <score-timewise>+&nbsp;, XML rusak, dan lembar PDF).
+# Jangan keluarkan lagi tanpa mencatat alasannya di IDE-PENGEMBANGAN.md.
 
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika uji-situs uji-rilis uji-lapangan \
@@ -76,11 +83,11 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill m1-penggaris-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \
