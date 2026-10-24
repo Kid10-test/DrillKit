@@ -495,9 +495,15 @@ function kumpulkanInfoSesi(
     indeksUrut: typeof sm.measureListIndex === 'number' ? sm.measureListIndex : idx,
   }))
 
+  const daftarBarisGrafis = osmd.GraphicSheet?.MeasureList ?? []
+  const jumlahBiramaGrafis =
+    daftarBarisGrafis.length > 0
+      ? daftarBarisGrafis.filter((baris) => Array.isArray(baris) && baris.some(Boolean)).length
+      : birama.length
+
   return {
     jumlahHalaman: osmd.GraphicSheet?.MusicPages?.length ?? 0,
-    jumlahBiramaGrafis: osmd.GraphicSheet?.MeasureList?.length ?? birama.length,
+    jumlahBiramaGrafis,
     tataLetak,
     zoom,
     instrumen,
