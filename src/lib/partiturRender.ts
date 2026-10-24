@@ -23,6 +23,13 @@
  *      berkas D4 dari `#11a` tetap berhasil dirender notasinya.
  */
 import { teksPartitur } from './partitur'
+import {
+  SPESIFIKASI_KERTAS_PARTITUR,
+  siapkanSvgHalamanCetak,
+  zoomUntukSkalaCetak,
+  type SkalaCetakPartitur,
+  type UkuranKertasPartitur,
+} from './partiturCetak'
 
 /* ------------------------------- Konstanta ------------------------------ */
 
@@ -95,11 +102,44 @@ export interface OpsiRenderPartitur {
   zoom?: number
   /** `'vertikal'` (lembar bertumpuk ke bawah) atau `'mendatar'` (satu baris panjang). */
   tataLetak?: ModeTataLetakPartitur
+  /**
+   * Daftar ID `<score-part>` (`idXml`) yang ingin ditampilkan (#11c).
+   * Bila `null` / `undefined` / kosong, seluruh instrumen digambar (*Full score*).
+   */
+  filterIdXml?: string[] | null
   /** Sinyal pembatalan saat lagu berganti, zoom diubah, atau panel ditutup. */
   sinyal?: AbortSignal
   /** Dipanggil setiap gelombang sistem selesai digambar. */
   onProgres?: (progres: ProgresRenderPartitur) => void
 }
+
+export interface OpsiRenderCetakPartitur {
+  /** Isi MusicXML sebagai `Blob`, `Uint8Array`, atau teks. */
+  sumber: Blob | Uint8Array | string
+  /** Judul cadangan bila di dalam XML belum tertulis judul. */
+  judulCadangan?: string
+  /** Daftar ID `<score-part>` yang ingin dicetak (`null`/kosong = *Full score*). */
+  filterIdXml?: string[] | null
+  /** Ukuran halaman cetak (`A4_P`, `A4_L`, atau `A5_L` buku saku / *lyre*). */
+  ukuranKertas: UkuranKertasPartitur
+  /** Kerapatan ukuran notasi pada lembaran cetak (bawaan `'normal'`). */
+  skala?: SkalaCetakPartitur
+  /** Sinyal pembatalan saat pengguna menutup modal atau mengganti pengaturan. */
+  sinyal?: AbortSignal
+}
+
+export type HasilRenderCetakPartitur =
+  | {
+      ok: true
+      halamanSvg: string[]
+      jumlahPartTampil: number
+      jumlahBirama: number
+    }
+  | {
+      ok: false
+      dibatalkan?: boolean
+      galat: string
+    }
 
 /* ----------------------------- Utilitas Zoom ---------------------------- */
 
@@ -388,6 +428,51 @@ function jedaBingkaiBerikutnya(): Promise<void> {
   })
 }
 
+/* ------------------------ Penyaringan Instrumen ------------------------- */
+
+function terapkanFilterInstrumenOsmd(
+  osmd: InstanceType<ModulOsmd['OpenSheetMusicDisplay']>,
+  filterIdXml?: string[] | null,
+): { ok: true; jumlahTampil: number } | { ok: false; galat: string } {
+  const daftarInst = osmd.Sheet?.Instruments ?? []
+  if (!filterIdXml || filterIdXml.length === 0) {
+    return { ok: true, jumlahTampil: daftarInst.length }
+  }
+
+  const setDipilih = new Set(filterIdXml)
+  let jumlahTampil = 0
+  for (let idx = 0; idx < daftarInst.length; idx += 1) {
+    const inst = daftarInst[idx]
+    const idInst = inst.IdString ?? String(idx + 1)
+    const dipilih = setDipilih.has(idInst)
+    inst.Visible = dipilih
+    for (const st of inst.Staves ?? []) {
+      st.Visible = dipilih
+    }
+    if (dipilih) jumlahTampil += 1
+  }
+
+  if (jumlahTampil === 0) {
+    return {
+      ok: false,
+      galat: 'Part yang dipilih tidak ditemukan di dalam partitur ini.',
+    }
+  }
+
+  // Bila tepat 1 instrumen tampil, matikan label kiri paranada yang berulang
+  // di setiap baris agar paranada memperoleh lebar penuh (terutama di layar HP
+  // dan ukuran buku saku A5); nama part sudah jelas di tajuk/bilah filter.
+  if (jumlahTampil === 1) {
+    osmd.setOptions({ drawPartNames: false, drawPartAbbreviations: false })
+  }
+
+  // Wajib: `osmd.load()` sudah menjalankan `updateGraphic()` saat semua part
+  // masih Visible = true; merakit ulang lembar grafis sekarang juga memicu
+  // penggabungan istirahat multi-birama otomatis khusus part yang tampil.
+  osmd.updateGraphic()
+  return { ok: true, jumlahTampil }
+}
+
 /* ------------------------ Ekstraksi Info Sesi --------------------------- */
 
 function kumpulkanInfoSesi(
@@ -401,7 +486,7 @@ function kumpulkanInfoSesi(
     idXml: inst.IdString ?? String(indeks + 1),
     nama: inst.NameLabel?.text || inst.Name || `Part ${indeks + 1}`,
     singkatan: inst.PartAbbreviation || '',
-    tampil: inst.Visible !== false,
+    tampil: typeof inst.isVisible === 'function' ? inst.isVisible() : inst.Visible !== false,
   }))
 
   const sumberBirama = osmd.Sheet?.SourceMeasures ?? []
@@ -423,8 +508,8 @@ function kumpulkanInfoSesi(
 /* ----------------------------- Fungsi Utama ----------------------------- */
 
 /**
- * Muat OSMD secara malas dan gambar *full score* ke dalam `wadah` secara
- * bertahap dengan warna hex murni (`#ffffff` / `#0f172a`).
+ * Muat OSMD secara malas dan gambar *full score* atau subset *part* ke dalam
+ * `wadah` secara bertahap dengan warna hex murni (`#ffffff` / `#0f172a`).
  */
 export async function renderPartiturMusicXml(
   opsi: OpsiRenderPartitur,
@@ -435,6 +520,7 @@ export async function renderPartiturMusicXml(
     judulCadangan,
     zoom = ZOOM_BAWAAN,
     tataLetak = 'vertikal',
+    filterIdXml,
     sinyal,
     onProgres,
   } = opsi
@@ -493,6 +579,13 @@ export async function renderPartiturMusicXml(
       return { ok: false, dibatalkan: true, galat: 'Dibatalkan' }
     }
 
+    const saring = terapkanFilterInstrumenOsmd(osmd, filterIdXml)
+    if (!saring.ok) {
+      osmd.clear()
+      wadah.innerHTML = ''
+      return { ok: false, galat: saring.galat }
+    }
+
     osmd.Zoom = jepitZoom(zoom)
 
     // Render bertahap: 2 sistem per bingkai pada mode vertikal, atau 12 birama
@@ -542,5 +635,164 @@ export async function renderPartiturMusicXml(
       ok: false,
       galat: `Partitur tidak dapat digambar perender notasi: ${rincian}`,
     }
+  }
+}
+
+/* --------------------- Render Paginasi Halaman Cetak -------------------- */
+
+/**
+ * Gambar halaman-halaman `<svg>` terpaginasi (`A4_P`, `A4_L`, atau `A5_L`) di
+ * dalam wadah lepas-layar berukuran baku dengan warna hex murni (`#ffffff` /
+ * `#0f172a`), lengkap dengan `viewBox` responsif siap bungkus HTML cetak (#11c).
+ */
+export async function renderHalamanCetakPartitur(
+  opsi: OpsiRenderCetakPartitur,
+): Promise<HasilRenderCetakPartitur> {
+  const {
+    sumber,
+    judulCadangan,
+    filterIdXml,
+    ukuranKertas,
+    skala = 'normal',
+    sinyal,
+  } = opsi
+
+  if (sinyal?.aborted) {
+    return { ok: false, dibatalkan: true, galat: 'Dibatalkan' }
+  }
+
+  const siap = await siapkanXmlUntukOsmd(sumber)
+  if (!siap.ok) {
+    return { ok: false, galat: siap.galat }
+  }
+  if (sinyal?.aborted) {
+    return { ok: false, dibatalkan: true, galat: 'Dibatalkan' }
+  }
+
+  let modulOsmd: ModulOsmd
+  try {
+    modulOsmd = await muatModulOsmd()
+  } catch (e) {
+    const rincian = e instanceof Error ? e.message : String(e)
+    return { ok: false, galat: `Gagal memuat mesin perender partitur: ${rincian}` }
+  }
+  if (sinyal?.aborted) {
+    return { ok: false, dibatalkan: true, galat: 'Dibatalkan' }
+  }
+
+  const OpenSheetMusicDisplay = ambilKelasOsmd(modulOsmd)
+  const spekKertas = SPESIFIKASI_KERTAS_PARTITUR[ukuranKertas]
+
+  // Wadah sementara di luar tampilan dengan lebar piksel baku agar paginasi A4/A5
+  // identik baik saat dicetak dari layar HP 360 px maupun monitor desktop lebar.
+  const wadah = document.createElement('div')
+  wadah.setAttribute('aria-hidden', 'true')
+  wadah.style.cssText = [
+    'position:fixed',
+    'left:-10000px',
+    'top:0',
+    `width:${spekKertas.lebarRenderPx}px`,
+    'visibility:hidden',
+    'pointer-events:none',
+    'overflow:hidden',
+    `background:${WARNA_PARTITUR_HEX.kertas}`,
+    `color:${WARNA_PARTITUR_HEX.tinta}`,
+  ].join(';')
+  document.body.appendChild(wadah)
+
+  let osmd: InstanceType<ModulOsmd['OpenSheetMusicDisplay']> | null = null
+  try {
+    osmd = new OpenSheetMusicDisplay(wadah, {
+      backend: 'svg',
+      autoResize: false,
+      disableCursor: true,
+      drawingParameters: ukuranKertas === 'A5_L' ? 'compacttight' : 'default',
+      pageFormat: ukuranKertas,
+      renderSingleHorizontalStaffline: false,
+      // Tajuk judul, pengarang, dan nama bagian digambar rapi oleh kop HTML
+      // cetak (`htmlCetakPartitur`), sehingga ruang vertikal kertas (terutama
+      // buku saku A5) sepenuhnya dipakai untuk paranada tanpa judul ganda.
+      drawCredits: false,
+      drawTitle: false,
+      drawSubtitle: false,
+      drawComposer: false,
+      drawLyricist: false,
+      drawPartNames: true,
+      drawPartAbbreviations: true,
+      drawMeasureNumbers: true,
+      defaultColorMusic: WARNA_PARTITUR_HEX.tinta,
+      defaultColorNotehead: WARNA_PARTITUR_HEX.tinta,
+      defaultColorStem: WARNA_PARTITUR_HEX.tinta,
+      defaultColorRest: WARNA_PARTITUR_HEX.tinta,
+      defaultColorLabel: WARNA_PARTITUR_HEX.tinta,
+      defaultColorTitle: WARNA_PARTITUR_HEX.tinta,
+      pageBackgroundColor: WARNA_PARTITUR_HEX.kertas,
+    })
+
+    osmd.setLogLevel('silent')
+    osmd.EngravingRules.PageBackgroundColor = WARNA_PARTITUR_HEX.kertas
+
+    await osmd.load(siap.dok, judulCadangan)
+    if (sinyal?.aborted) {
+      return { ok: false, dibatalkan: true, galat: 'Dibatalkan' }
+    }
+
+    const saring = terapkanFilterInstrumenOsmd(osmd, filterIdXml)
+    if (!saring.ok) {
+      return { ok: false, galat: saring.galat }
+    }
+
+    osmd.Zoom = jepitZoom(zoomUntukSkalaCetak(skala, ukuranKertas))
+
+    if (typeof osmd.renderNext === 'function') {
+      for (;;) {
+        if (sinyal?.aborted) {
+          return { ok: false, dibatalkan: true, galat: 'Dibatalkan' }
+        }
+        const langkah = osmd.renderNext({ systems: 3 })
+        if (langkah.done) break
+        await jedaBingkaiBerikutnya()
+      }
+    } else {
+      osmd.render()
+    }
+
+    if (sinyal?.aborted) {
+      return { ok: false, dibatalkan: true, galat: 'Dibatalkan' }
+    }
+
+    const halamanSvg = Array.from(wadah.querySelectorAll('svg'))
+      .map((el) => siapkanSvgHalamanCetak(el.outerHTML))
+      .filter((s) => s.length > 0)
+
+    if (halamanSvg.length === 0) {
+      return {
+        ok: false,
+        galat: 'Tidak ada halaman notasi SVG yang berhasil disusun untuk dicetak.',
+      }
+    }
+
+    return {
+      ok: true,
+      halamanSvg,
+      jumlahPartTampil: saring.jumlahTampil,
+      jumlahBirama: osmd.Sheet?.SourceMeasures?.length ?? 0,
+    }
+  } catch (e) {
+    if (sinyal?.aborted) {
+      return { ok: false, dibatalkan: true, galat: 'Dibatalkan' }
+    }
+    const rincian = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      galat: `Partitur gagal disusun untuk cetak: ${rincian}`,
+    }
+  } finally {
+    try {
+      osmd?.clear()
+    } catch {
+      // abaikan
+    }
+    wadah.remove()
   }
 }
