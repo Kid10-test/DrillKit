@@ -5,6 +5,8 @@ import type {
   BiramaPola,
   Drill,
   HitungMundur,
+  Member,
+  SectionDef,
   SetList,
   LatihTempo,
   PolaRitme,
@@ -72,7 +74,8 @@ import {
 } from '../components/ui'
 import { IconLoop, IconMusic, IconPause, IconPlay, IconPlus } from '../components/Icons'
 import TunerDrone from '../components/TunerDrone'
-import { cx, uid } from '../lib/utils'
+import { useSettings } from '../hooks/useSettings'
+import { DEFAULT_SECTIONS, cx, uid } from '../lib/utils'
 
 /**
  * #5 sisa — ketuk per hitungan untuk menampilkan panjang segmen dalam
@@ -136,8 +139,19 @@ function petaPanjang(segs: TempoSegment[], panjang: PanjangSegmen[]): Map<string
  * mengubahnya, setiap kali mereka menekan Perbarui perubahannya lenyap
  * begitu saja, dan mereka tidak akan mengerti mengapa.
  */
-export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } = {}) {
+export default function Music({
+  hanyaPutar = false,
+  anggotaAktif = null,
+  sectionsPaket,
+  namaTimPaket,
+}: {
+  hanyaPutar?: boolean
+  anggotaAktif?: Member | null
+  sectionsPaket?: SectionDef[]
+  namaTimPaket?: string
+} = {}) {
   const toast = useToast()
+  const settings = useSettings()
   const songs = useLiveQuery(() => db.songs.orderBy('title').toArray(), [], [])
   const [bpm, setBpm] = useState(120)
   const [beats, setBeats] = useState(4)
@@ -1714,11 +1728,19 @@ export default function Music({ hanyaPutar = false }: { hanyaPutar?: boolean } =
           )}
         </Card>
 
-        {/* #11b — lembar baca partitur full score (MusicXML OSMD / PDF) */}
+        {/* #11b & #11c — lembar baca partitur, filter part/section, & cetak HTML */}
         {song && song.partitur && partiturTerbuka && (
           <LayarPartitur
             song={song}
             onTutup={() => setPartiturTerbuka(false)}
+            anggotaAktif={anggotaAktif}
+            sectionsTim={
+              sectionsPaket && sectionsPaket.length > 0
+                ? sectionsPaket
+                : (settings.sections ?? DEFAULT_SECTIONS)
+            }
+            namaTim={namaTimPaket || settings.teamName}
+            hanyaPutar={hanyaPutar}
           />
         )}
       </div>
