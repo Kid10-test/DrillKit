@@ -372,14 +372,14 @@ Sama seperti laporan kehadiran dan panduan 1 halaman, pengguna selalu melihat pr
 
 ## 10. Kriteria terima
 
-- [ ] Bilah filter di `LayarPartitur` menampilkan pilihan *Full score*, chip kelompok *section* yang ada di skor, dan pemilih per *part* individu, serta merender ulang SVG dengan benar (termasuk istirahat multi-birama pada *part* tunggal dan penghilangan label kiri berulang saat 1 *part* tampil).
-- [ ] Pilihan filter diingat per lagu di `localStorage` dan pulih aman walau berkas partitur lagu diganti.
-- [ ] Di mode anggota (`Share.tsx` → tab `musik`), membuka partitur tanpa memilih nama tetap menampilkan *Full score*; setelah memilih nama anggota berinstrumen cocok (mis. *Trumpet* / *Snare*), partitur otomatis tersaring ke *part* yang sesuai disertai keterangan jelas, sedangkan anggota *Color Guard* tetap mendapat *Full score* tanpa galat.
-- [ ] `qa/partitur-bagian-logika.mjs` ≥ 45 asersi, `0 gagal` di Node 22 (mencakup kamus dwibahasa, kasus ambigu *Bari Sax* / *Tenor Sax* / *Bass Clarinet*, `SectionDef` dinamis, pilihan awal anggota, injeksi `viewBox` SVG, dan ketiadaan `oklch()`/`color-mix()` di `htmlCetakPartitur`); terdaftar di `qa/regresi-penuh.sh`.
-- [ ] Modal **Pratinjau Cetak Partitur** mendukung ukuran `A4 Tegak`, `A4 Mendatar` (otomatis terpilih untuk ≥ 4 *part*), dan `Buku Saku / Lyre (A5 Mendatar)` serta skala notasi, menampilkan halaman `<svg>` terpaginasi utuh di `<iframe srcDoc>`, menyediakan **Unduh HTML** mandiri berpalet hex murni, dan otomatis jatuh ke unduh HTML bila dialog cetak diblokir.
-- [ ] Seluruh kendali baru tetap bisa diklik saat Kunci Kios (`html[data-kiosk="1"]`) aktif (`data-kiosk-allow`).
-- [ ] `qa/partitur-cetak.mjs` ≥ 35 asersi, `0 gagal`, konsol peramban bersih & `0` permintaan jaringan luar; seluruh **111 rangkaian** terdaftar di `qa/regresi-penuh.sh` & `.github/workflows/ci.yml` (termasuk `musik-anggota`, `partitur-impor`, dan `partitur-render` tetap hijau).
-- [ ] `npx tsc --noEmit`, `npm run build`, dan `npm run build:portable` bersih tanpa dependensi baru.
+- [x] Bilah filter di `LayarPartitur` menampilkan pilihan *Full score*, chip kelompok *section* yang ada di skor, dan pemilih per *part* individu, serta merender ulang SVG dengan benar (termasuk istirahat multi-birama pada *part* tunggal dan penghilangan label kiri berulang saat 1 *part* tampil).
+- [x] Pilihan filter diingat per lagu di `localStorage` dan pulih aman walau berkas partitur lagu diganti.
+- [x] Di mode anggota (`Share.tsx` → tab `musik`), membuka partitur tanpa memilih nama tetap menampilkan *Full score*; setelah memilih nama anggota berinstrumen cocok (mis. *Trumpet* / *Snare*), partitur otomatis tersaring ke *part* yang sesuai disertai keterangan jelas, sedangkan anggota *Color Guard* tetap mendapat *Full score* tanpa galat.
+- [x] `qa/partitur-bagian-logika.mjs` ≥ 45 asersi (**87 lulus, 0 gagal** di Node 22 — mencakup kamus dwibahasa, kasus ambigu *Bari Sax* / *Tenor Sax* / *Bass Clarinet*, `SectionDef` dinamis, pilihan awal anggota, injeksi `viewBox` SVG, dan ketiadaan `oklch()`/`color-mix()` di `htmlCetakPartitur`); terdaftar di `qa/regresi-penuh.sh`.
+- [x] Modal **Pratinjau Cetak Partitur** mendukung ukuran `A4 Tegak`, `A4 Mendatar` (otomatis terpilih untuk ≥ 4 *part*), dan `Buku Saku / Lyre (A5 Mendatar)` serta skala notasi, menampilkan halaman `<svg>` terpaginasi utuh di `<iframe srcDoc>`, menyediakan **Unduh HTML** mandiri berpalet hex murni, dan otomatis jatuh ke unduh HTML bila dialog cetak diblokir.
+- [x] Seluruh kendali baru tetap bisa diklik saat Kunci Kios (`html[data-kiosk="1"]`) aktif (`data-kiosk-allow`).
+- [x] `qa/partitur-cetak.mjs` ≥ 35 asersi (**39 lulus, 0 gagal**), konsol peramban bersih & `0` permintaan jaringan luar; seluruh **111 rangkaian** terdaftar di `qa/regresi-penuh.sh` & `.github/workflows/ci.yml` (termasuk `musik-anggota`, `partitur-impor`, dan `partitur-render` tetap hijau).
+- [x] `npx tsc --noEmit`, `npm run build`, dan `npm run build:portable` bersih tanpa dependensi baru.
 
 ---
 
