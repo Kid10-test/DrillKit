@@ -72,6 +72,14 @@ bash bangun-logika.sh || exit 1
 # (uji peramban lazy-load OSMD, render SVG hex full score, kendali zoom &
 # tata letak, skor D4 <score-timewise>+&nbsp;, XML rusak, dan lembar PDF).
 # Jangan keluarkan lagi tanpa mencatat alasannya di IDE-PENGEMBANGAN.md.
+#
+# #11c — `partitur-bagian-logika` (kamus instrumen dwibahasa, pemetaan
+# SectionDef, pilihan awal anggota, dan pembangkit HTML cetak murni hex;
+# dirakit bangun-logika.sh sebagai /tmp/partiturBagian.mjs &
+# /tmp/partiturCetak.mjs) serta `partitur-cetak` (uji peramban penyaringan
+# part/section, multi-rest part tunggal, mode anggota, dan cetak/unduh HTML
+# A4 Tegak / A4 Mendatar / Buku Saku Lyre A5). Jangan keluarkan lagi tanpa
+# mencatat alasannya di IDE-PENGEMBANGAN.md.
 
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika uji-situs uji-rilis uji-lapangan \
@@ -83,11 +91,11 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill m1-penggaris-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \

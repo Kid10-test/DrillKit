@@ -869,7 +869,12 @@ function MemberView() {
          * memilih nama dulu hanya untuk berlatih tempo adalah rintangan
          * yang tidak memberi apa pun.
          */
-        <Music hanyaPutar />
+        <Music
+          hanyaPutar
+          anggotaAktif={me}
+          sectionsPaket={bundle.team?.sections}
+          namaTimPaket={bundle.team?.teamName}
+        />
       ) : !me ? (
         <EmptyState title="Pilih nama di atas" desc="Supaya DrillKit tahu formasi dan absensi siapa yang ditampilkan." />
       ) : tab === 'jadwal' ? (

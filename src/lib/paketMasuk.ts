@@ -36,6 +36,12 @@ export async function simpanPaketAnggota(
   const { locked: _buang, ...grup } = data
   const paket = grup as ShareBundle
   await db.packages.put({ key: 'current', data: paket, importedAt: Date.now() })
+  // Selaraskan dengan `perbarui()` di `Share.tsx`: lagu & set list di dalam paket
+  // juga ditulis ke `db.songs` dan `db.setlists` supaya tab Musik mode anggota
+  // memperoleh repertoar (termasuk metadata `song.partitur`) saat paket dibuka
+  // dari berkas lokal/WhatsApp, bukan hanya saat diambil lewat URL `paket.json`.
+  if (paket.songs?.length) await db.songs.bulkPut(paket.songs)
+  if (paket.setlists?.length) await db.setlists.bulkPut(paket.setlists)
   const penerima = (paket.members ?? []).find(
     (m) => paket.forMember != null && m.id === paket.forMember,
   )

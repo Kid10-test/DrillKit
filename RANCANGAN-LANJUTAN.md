@@ -1,4 +1,4 @@
-# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 23 Okt 2026 — #11b rampung)
+# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 24 Okt 2026 — #11c rampung)
 
 Dokumen ini merangkum delapan rancangan awal yang sudah didiskusikan dan
 diputuskan bersama pelatih, ditambah tiga usulan baru pasca PR #14
@@ -8,7 +8,7 @@ Semuanya siap dikerjakan di sesi baru. Setiap rancangan dijadikan PR
 tersendiri, sesuai kebiasaan proyek (satu ide = satu commit/PR,
 disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 
-**Status per 23 Okt 2026 (pemutakhiran #11b rampung):**
+**Status per 24 Okt 2026 (pemutakhiran #11c rampung):**
 - **#1, #2, #3, dan #4 telah rampung penuh** (PR #6 hingga PR #10).
 - **#5 telah rampung penuh** — fondasi tempo map custom per ketuk/subdivisi
   dan ramp eksplisit terintegrasi lewat **PR #14** (`TempoTimeline`), lalu
@@ -43,8 +43,19 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
   transposisi `<score-timewise>` → `<score-partwise>` sehingga berkas D4 tetap
   terender), serta komponen `LayarPartitur` (zoom `60%`–`160%`, tata letak halaman /
   mendatar, layar penuh, penanganan galat ramah + unduh asli, dan penampil PDF
-  anti-buntu tanpa memuat OSMD). Part per instrumen + cetak hex (**11c**) dan
-  highlight sinkron + loop frasa (**11d**) menyusul.
+  anti-buntu tanpa memuat OSMD).
+- **#11c Partitur: filter *part* per instrumen/section, pencocokan cerdas anggota, & cetak/unduh HTML murni hex selesai (24 Okt 2026)** —
+  kamus klasifikasi instrumen dwibahasa + pemetaan ke `SectionDef` tim + pilihan
+  awal cerdas anggota + simpanan per lagu (`partiturBagian.ts`), penyaringan
+  `Instrument.Visible` + `Staff.Visible` + `osmd.updateGraphic()` (termasuk
+  penggabungan istirahat multi-birama otomatis & lebar penuh 1-*part*) serta
+  perender paginasi lepas-layar `A4_P` / `A4_L` / `A5_L` Lyre (`partiturRender.ts`),
+  penyusun dokumen HTML cetak mandiri berpalet hex murni dengan injeksi `viewBox`
+  SVG dan bilah `.no-print` (`partiturCetak.ts`), modal `PratinjauCetakPartitur`
+  anti-buntu (`Unduh HTML` + `cetakAtauUnduh`), serta perbaikan `simpanPaketAnggota`
+  agar lagu & set list dalam paket berkas lokal anggota langsung masuk ke
+  `db.songs`/`db.setlists`. Tinggal **11d** (highlight sinkron `TempoTimeline` +
+  loop frasa + tautan frasa↔set) yang menyusul.
 
 **Aturan proyek yang tetap berlaku untuk semuanya:**
 
@@ -70,11 +81,11 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 8 | PIN pelatih tim | Kecil–sedang | **Selesai (6 Okt 2026)** | Pagar mode pelatih via hash ENV; tanpa ketergantungan |
 | 9 | Grid & patok yard–meter custom | Kecil–sedang | **Fondasi selesai (3 Okt 2026)** | Tipe, geometri & UI terpisah; yard↔meter tanpa geser; batas E/T26; 41 butir uji baru |
 | 10 | Impor drill Pyware | Sedang | **Selesai (6 Okt 2026)** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo; 146 butir uji |
-| 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **#11a & #11b selesai (23 Okt 2026); 11c–11d menyusul** | #11a: Blob IndexedDB, pintu #7, ringkasan, kuota, ZIP; #11b: `.mxl` + render OSMD hex lazy-load + PDF; lanjut 11c part/cetak, 11d highlight/loop |
+| 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **#11a, #11b & #11c selesai (24 Okt 2026); tinggal 11d** | #11a: Blob IndexedDB, pintu #7, ringkasan, kuota, ZIP; #11b: `.mxl` + render OSMD hex lazy-load + PDF; #11c: filter part/section + anggota + cetak HTML hex; lanjut 11d highlight/loop |
 
 > **Urutan prioritas yang disarankan pasca #5 rampung (4 Okt 2026):**
-> **#10 → #11 → #8** — #7 (5 Okt), #8 & #10 (6 Okt), **#11a** (22 Okt 2026), serta **#11b** (23 Okt 2026) kini selesai;
-> yang tersisa **#11c → #11d** untuk part per instrumen/cetak & latihan frasa partitur (fondasi #9 selesai; sisa polish grid/patok tidak memblokir apa pun).
+> **#10 → #11 → #8** — #7 (5 Okt), #8 & #10 (6 Okt), **#11a** (22 Okt 2026), **#11b** (23 Okt 2026), serta **#11c** (24 Okt 2026) kini selesai;
+> yang tersisa tinggal **#11d** untuk highlight sinkron `TempoTimeline` & latihan frasa partitur (fondasi #9 selesai; sisa polish grid/patok tidak memblokir apa pun).
 > Alasan: **#5** sudah rampung sehingga drill×musik benar-benar menyatu; **#7** merapikan 5 jenis berkas + ZIP rekaman
 > sehingga impor Pyware (#10) dan MusicXML (#11) punya pintu masuk yang jelas;
 > **#9** grid/patok kustom memberi akurasi lapangan sebelum migrasi massal;
@@ -931,7 +942,7 @@ trumpet), highlight sinkron ±1 birama dengan rekaman & metronom,
 loop Bar 5–8 mengulang tepat 4 birama pada 80% tempo, cetak part
 hex 1 halaman, impor MusicXML round-trip ZIP tidak hilang.
 
-### Status: #11a (22 Okt 2026) & #11b (23 Okt 2026) selesai; 11c–11d menyusul
+### Status: #11a (22 Okt 2026), #11b (23 Okt 2026) & #11c (24 Okt 2026) selesai; tinggal 11d menyusul
 
 Bagian **#11a** (fondasi data, pintu masuk, ringkasan murni, kuota, dan
 round-trip ZIP — sengaja tanpa merender notasi, tanpa dependensi baru) telah
@@ -1019,11 +1030,51 @@ anti-*zip-bomb*, tanpa `DecompressionStream`), `qa/buka-berkas-logika.mjs`
 seret/pasang `.mxl` bit 3, render `<svg>` hex `#ffffff`/`#0f172a`, *zoom* lintas
 `reload`, tata letak halaman/mendatar, layar penuh + `Escape`, Kunci Kios,
 janji D4 `<score-timewise>`+`&nbsp;`, XML rusak, serta PDF di konteks bersih
-tanpa memuat OSMD). Seluruh **109 rangkaian** terdaftar di `qa/regresi-penuh.sh`
-dan `.github/workflows/ci.yml`.
+tanpa memuat OSMD).
 
-**Yang menyusul:** **11c** (part per instrumen/section + cetak HTML murni hex)
-dan **11d** (highlight sinkron `TempoTimeline` + loop frasa + tautan frasa↔set).
+Bagian **#11c** (penyaringan *part* per instrumen/seksi, pilihan awal cerdas di
+mode anggota, serta cetak & unduh HTML mandiri berpalet hex murni) juga telah
+selesai sesuai `RANCANGAN-11c-PARTITUR-PART-CETAK.md`:
+
+- **Klasifikasi instrumen & pilihan awal anggota (`src/lib/partiturBagian.ts`)** —
+  kamus dwibahasa (Inggris + Indonesia + singkatan MuseScore/Sibelius/Finale)
+  yang mengurutkan frasa majemuk terpanjang lebih dulu (*Baritone Sax* / *Tenor Sax*
+  / *Bass Clarinet* tidak salah masuk ke *Brass* / *Battery*), memetakan `<score-part>`
+  ke `SectionDef[]` dinamis tim tanpa menyembunyikan *Woodwind* yang nyata ada di skor
+  (D3), mencocokkan profil `instrument` lalu `section` anggota secara otomatis tanpa
+  pernah mengunci atau menghalangi pemakaian tanpa nama (D4), serta menyimpan
+  pilihan manual per lagu di `localStorage` (50 lagu FIFO).
+- **Penyaringan OSMD & perender halaman cetak (`src/lib/partiturRender.ts`)** —
+  menyaring `Instrument.Visible` + `Staff.Visible` + `osmd.updateGraphic()` langsung
+  di objek OSMD (D1: menjaga tanda tempo global pada `<part>` teratas sekaligus
+  menggabungkan istirahat multi-birama otomatis pada *part* tunggal), mematikan
+  label kiri berulang saat 1 *part* tampil agar paranada selebar penuh, serta
+  menambahkan `renderHalamanCetakPartitur` di wadah lepas-layar berukuran baku
+  (`794 px` / `1122 px`) dengan `PageFormatStandards` (`A4_P`, `A4_L`, `A5_L` Lyre).
+- **Dokumen HTML cetak murni hex & modal pratinjau anti-buntu (`src/lib/partiturCetak.ts`,
+  `src/components/PratinjauCetakPartitur.tsx`, `src/components/LayarPartitur.tsx`,
+  `src/pages/Music.tsx`, `src/pages/Share.tsx`)** — menyuntikkan `viewBox` pada setiap
+  `<svg>` VexFlow agar tidak terpotong di margin printer (D2), merakit berkas `.html`
+  mandiri berpalet hex murni (`#ffffff` / `#0f172a`, `0` `oklch()` / `color-mix()`)
+  lengkap dengan bilah `.no-print`, menampilkan `<iframe srcDoc>` dengan pilihan
+  bagian/kertas/skala, serta menyediakan **Unduh HTML** dan **Cetak** via
+  `cetakAtauUnduh` (D5). Juga menambal `simpanPaketAnggota` (`src/lib/paketMasuk.ts`)
+  agar pembukaan berkas paket lokal `.json` di mode anggota ikut menyalin `songs` dan
+  `setlists` ke `db.songs` / `db.setlists`.
+
+**Uji #11c:** `qa/partitur-bagian-logika.mjs` **87 butir** (murni node: kamus
+dwibahasa, kasus ambigu *Bari Sax* / *Tenor Sax* / *Bass Clarinet*, `SectionDef`
+kustom & tersembunyi, pencocokan anggota + *Color Guard*, FIFO `localStorage`,
+injeksi `viewBox` SVG, `@page` `A4_P`/`A4_L`/`A5_L`, serta `0` `oklch`/`color-mix`)
+dan `qa/partitur-cetak.mjs` **39 butir** (peramban: skor 6 *part* lintas 4 seksi,
+penyaringan *Brass* & *Marimba* ber-multi-rest 4 birama, persistensi lintas
+`reload`, ganti ke skor solo 1-*part* & PDF, pratinjau/unduh/fallback cetak HTML
+`A4_L`/`A4_P`/`A5_L` Lyre, Kunci Kios, serta alur penuh mode anggota tanpa nama →
+*Trumpet* → *Ke part saya* → *Trombone* → *Color Guard* → *Marimba*). Seluruh
+**111 rangkaian** terdaftar di `qa/regresi-penuh.sh` dan `.github/workflows/ci.yml`.
+
+**Yang menyusul:** tinggal **11d** (highlight sinkron `TempoTimeline` + loop frasa
++ tautan frasa↔set).
 
 ---
 

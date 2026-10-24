@@ -103,6 +103,9 @@ rakit src/lib/rekaman.ts rekaman
 rakit src/lib/partitur.ts partitur
 # #11b — pengurai arsip .mxl (Central Directory ZIP + DecompressionStream deflate-raw).
 rakit src/lib/mxl.ts      mxl
+# #11c — klasifikasi part/section & penyusun HTML cetak murni hex.
+rakit src/lib/partiturBagian.ts partiturBagian
+rakit src/lib/partiturCetak.ts  partiturCetak
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.
