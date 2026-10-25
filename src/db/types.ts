@@ -884,6 +884,25 @@ export interface PartiturBerkasItem {
 }
 
 /**
+ * #11d — Tautan frasa birama partitur ke rentang set drill pada baris set list
+ * (mis. `Set 4–6 = Bar 9–16`).
+ */
+export interface TautanFrasaSetList {
+  /** Id drill sumber pemetaan bila ditautkan dari drill tertentu. */
+  drillId?: string
+  /** Nomor urut set awal 1-based inklusif (mis. 4 untuk "Set 4–6"). */
+  setAwal: number
+  /** Nomor urut set akhir 1-based inklusif (mis. 6 untuk "Set 4–6"). */
+  setAkhir: number
+  /** Birama awal 1-based inklusif (mis. 9 untuk "Bar 9–16"). */
+  biramaDari: number
+  /** Birama akhir 1-based inklusif (mis. 16 untuk "Bar 9–16"). */
+  biramaSampai: number
+  /** Catatan/label opsional (mis. "Transisi Reff"). */
+  label?: string
+}
+
+/**
  * M3 — set list (urutan lagu untuk satu penampilan).
  *
  * Isinya hanya **id lagu**, bukan salinan lagu: jadi mengubah judul, tempo,
@@ -898,6 +917,12 @@ export interface SetList {
   songIds: string[]
   /** catatan bebas: tempat, waktu, kostum, dll. */
   catatan?: string
+  /**
+   * #11d — tautan opsional antara baris lagu di set list dan rentang set drill
+   * / birama partitur (mis. `Set 4–6 = Bar 9–16`). Kuncinya `${indeks}:${songId}`
+   * (dengan cadangan `songId`).
+   */
+  tautanFrasa?: Record<string, TautanFrasaSetList>
   createdAt: number
   updatedAt: number
 }
