@@ -9,7 +9,7 @@
  * set drill ↔ birama) diuji cepat di Node melalui `qa/partitur-frasa-logika.mjs`.
  */
 import type { TautanFrasaSetList, UlangBagian } from '../db/types'
-import { petaPenggaris, type LaguUntukSegmen } from './segmenDrill'
+import { petaPenggaris, type LaguSegmen } from './segmenDrill'
 import { latihanAktif, rapikanTempo, type TempoLatihan } from './tempoLatihan'
 import { createTempoTimeline } from './tempoTimeline'
 import { rentangValid } from './ulang'
@@ -531,11 +531,14 @@ export function hitungRentangFrasaSegmen(
  */
 export function hitungPetaSetKeBirama(
   sets: readonly { counts: number; name?: string }[],
-  lagu: LaguUntukSegmen,
+  lagu: LaguSegmen,
   opsi?: { beatsPerCount?: number; latihan?: TempoLatihan | null },
 ): InfoSetBirama[] {
   if (!sets || sets.length === 0) return []
-  const penggaris = petaPenggaris(sets, lagu, opsi)
+  const penggaris = petaPenggaris([...sets], lagu, {
+    beatsPerCount: opsi?.beatsPerCount ?? 1,
+    latihan: opsi?.latihan,
+  })
   return penggaris.set.map((blok) => {
     const biramaDari = Math.max(1, Math.floor(blok.mulaiBirama + 1e-9))
     const biramaSampai = Math.max(biramaDari, Math.ceil(blok.akhirBirama - 1e-9) - 1)
@@ -615,7 +618,7 @@ export function bacaTautanFrasaBaris(
  */
 export function biramaPadaProgresSet(
   sets: readonly { counts: number }[],
-  lagu: LaguUntukSegmen,
+  lagu: LaguSegmen,
   indeksSet: number,
   progres01: number,
   opsi?: { beatsPerCount?: number },
@@ -646,7 +649,7 @@ export function biramaPadaProgresSet(
  */
 export function hitunganPadaBirama(
   sets: readonly { counts: number; name?: string }[],
-  lagu: LaguUntukSegmen,
+  lagu: LaguSegmen,
   biramaTujuan: number,
   opsi?: { beatsPerCount?: number },
 ): number {
