@@ -1,19 +1,24 @@
 /**
- * #11b & #11c — Layar baca partitur (MusicXML via OSMD SVG hex & lembar PDF),
+ * #11b, #11c & #11d — Layar baca partitur (MusicXML via OSMD SVG hex & lembar PDF),
  * lengkap dengan penyaringan per seksi / per *part* instrumen, pencocokan
- * otomatis anggota, serta pratinjau cetak & unduh HTML mandiri murni hex.
+ * otomatis anggota, pratinjau cetak & unduh HTML mandiri murni hex, serta
+ * sorot birama aktif sinkron `TempoTimeline`, pilih/*loop* frasa, dan keping
+ * tautan set drill.
  *
  * **Jaminan utama:**
  * - Menggambar *full score*, kelompok seksi, maupun *part* tunggal secara
  *   *offline* dengan warna hex murni (`#ffffff` kertas / `#0f172a` tinta, nol
  *   `oklch()` / `color-mix()`), dimuat malas lewat `partiturRender.ts` dan
  *   dirender bertahap (`renderNext`) agar metronom tidak tersendat.
+ * - Sorot birama aktif & rentang frasa dirender sebagai lapisan absolut murni
+ *   hex/rgba di atas kanvas SVG tanpa merender ulang OSMD di tiap ketukan,
+ *   lengkap dengan gulir otomatis (*auto-scroll*) pintar dan pemetaan *multi-rest*.
  * - Mode anggota memberi pilihan awal cerdas sesuai `instrument` / `section`
  *   tanpa pernah mengunci atau menghalangi pemakaian tanpa nama (D4 `#11c`).
- * - Untuk berkas PDF, menampilkan bingkai pratinjau ditambah tombol selalu-ada
- *   **Buka di tab baru** & **Unduh PDF** (tanpa membundel `pdf.js`, D5 `#11b`).
+ * - Untuk berkas PDF, menampilkan bingkai pratinjau ditambah bilah latihan frasa
+ *   serta tombol selalu-ada **Buka di tab baru** & **Unduh PDF** (D5 `#11b`).
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { Member, PartiturBerkasItem, SectionDef, Song } from '../db/types'
 import type { BagianPartitur } from '../lib/partitur'
 import {
@@ -26,6 +31,21 @@ import {
   simpanFilterPartitur,
   type FilterPartitur,
 } from '../lib/partiturBagian'
+import {
+  WARNA_SOROT_PARTITUR_HEX,
+  cariBiramaDariTitikKlik,
+  cariKotakBiramaAktif,
+  formatLencanaFrasa,
+  formatTautanSetBirama,
+  frasaAktifSah,
+  gabungKotakFrasaPerBaris,
+  gabungRentangSetKeBirama,
+  hitungRentangFrasaSegmen,
+  hitungTargetGulirBirama,
+  susunFrasaTerurut,
+  type FrasaLatihan,
+  type InfoSetBirama,
+} from '../lib/partiturFrasa'
 import {
   WARNA_PARTITUR_HEX,
   ZOOM_BAWAAN,
@@ -41,10 +61,13 @@ import {
   type ProgresRenderPartitur,
 } from '../lib/partiturRender'
 import { muatPartiturBerkas } from '../lib/partiturSimpan'
+import type { TempoLatihan } from '../lib/tempoLatihan'
 import { DEFAULT_SECTIONS, cx } from '../lib/utils'
-import { IconDownload, IconPrinter } from './Icons'
+import { IconDownload, IconLoop, IconPause, IconPlay, IconPrinter } from './Icons'
 import { PratinjauCetakPartitur } from './PratinjauCetakPartitur'
 import { Button } from './ui'
+
+const PILIHAN_PERSEN_CEPAT = [70, 80, 90, 100] as const
 
 function tentukanFilterAwalLagu(
   kunciSimpan: string,
@@ -71,6 +94,20 @@ export function LayarPartitur({
   sectionsTim = DEFAULT_SECTIONS,
   namaTim,
   hanyaPutar = false,
+  biramaAktif = 1,
+  sedangMain = false,
+  tahapKetuk = null,
+  ketukAktif = null,
+  onToggleMain,
+  onLoncatBirama,
+  frasa = null,
+  panjangBiramaLagu,
+  onUbahFrasa,
+  onHapusFrasa,
+  tempoLatihan = null,
+  onAturPersenTempo,
+  daftarSetDrill = [],
+  labelKonteksPutar,
 }: {
   song: Song
   onTutup: () => void
@@ -78,6 +115,34 @@ export function LayarPartitur({
   sectionsTim?: SectionDef[]
   namaTim?: string
   hanyaPutar?: boolean
+  /** #11d — birama 1-based yang sedang disorot mengikuti `TempoTimeline`. */
+  biramaAktif?: number
+  /** #11d — apakah metronom / rekaman / animasi drill sedang berjalan. */
+  sedangMain?: boolean
+  /** #11d — `'hitung'` saat count-off M1 sedang berbunyi. */
+  tahapKetuk?: 'hitung' | 'main' | null
+  /** #11d — ketuk 0-based di dalam birama saat ini (opsional). */
+  ketukAktif?: number | null
+  /** #11d — nyalakan/hentikan pemutaran langsung dari bilah partitur. */
+  onToggleMain?: () => void
+  /** #11d — lompat ke birama tertentu saat diklik di partitur. */
+  onLoncatBirama?: (birama: number) => void
+  /** #11d — rentang frasa latihan lagu ini (per perangkat / M2). */
+  frasa?: FrasaLatihan | null
+  /** #11d — batas birama maksimum lagu bila diketahui. */
+  panjangBiramaLagu?: number
+  /** #11d — ubah rentang atau status aktif loop frasa. */
+  onUbahFrasa?: (patch: Partial<FrasaLatihan>) => void
+  /** #11d — hapus frasa latihan lagu ini. */
+  onHapusFrasa?: () => void
+  /** #11d — tempo latihan lagu ini (#4). */
+  tempoLatihan?: TempoLatihan | null
+  /** #11d — ubah cepat persen tempo latihan (mis. 70/80/90/100%). */
+  onAturPersenTempo?: (persen: number) => void
+  /** #11d — daftar pemetaan set drill ↔ birama bila lagu ditautkan ke drill. */
+  daftarSetDrill?: InfoSetBirama[]
+  /** #11d — label ringkas pemutar pendamping (mis. "Animasi Drill"). */
+  labelKonteksPutar?: string
 }) {
   const meta = song.partitur ?? null
   const [itemBerkas, setItemBerkas] = useState<PartiturBerkasItem | null>(null)
@@ -95,8 +160,14 @@ export function LayarPartitur({
   const [infoSesi, setInfoSesi] = useState<HasilSesiPartitur | null>(null)
   const [galatRender, setGalatRender] = useState<string | null>(null)
 
+  // #11d — auto-scroll mengikuti birama aktif + mode 2-ketuk pilih frasa di kanvas
+  const [ikutiBirama, setIkutiBirama] = useState(true)
+  const [modePilihFrasa, setModePilihFrasa] = useState(false)
+  const [calonAwalFrasa, setCalonAwalFrasa] = useState<number | null>(null)
+  const [setAwalTerpilih, setSetAwalTerpilih] = useState<number | null>(null)
+
   // Cadangan daftar part dari OSMD untuk berkas D4 (`terurai: false`, mis. `<score-timewise>`)
-  // yang pada saat dipindai `#11a` belum memiliki `meta.bagian`.
+  // yang pada saat dipindai `#11a` belum memiliki `meta.parts`.
   const [partCadanganOsmd, setPartCadanganOsmd] = useState<BagianPartitur[]>([])
 
   const daftarPartSkor = useMemo<BagianPartitur[]>(() => {
@@ -109,8 +180,6 @@ export function LayarPartitur({
     [daftarPartSkor],
   )
 
-  // Kunci penyimpanan dipisah per identitas anggota bila di mode anggota,
-  // supaya berganti profil anggota di HP bersama tidak mewarisi filter orang lain.
   const kunciSimpanFilter = anggotaAktif?.id
     ? `${song.id}::${anggotaAktif.id}`
     : hanyaPutar
@@ -131,6 +200,12 @@ export function LayarPartitur({
     )
   }, [kunciSimpanFilter, tandaPartSkor, daftarPartSkor, anggotaAktif, sectionsTim])
 
+  useEffect(() => {
+    setModePilihFrasa(false)
+    setCalonAwalFrasa(null)
+    setSetAwalTerpilih(null)
+  }, [song.id])
+
   const daftarKelompok = useMemo(
     () => kelompokkanPartSkor(daftarPartSkor, sectionsTim),
     [daftarPartSkor, sectionsTim],
@@ -148,6 +223,7 @@ export function LayarPartitur({
   const tandaFilterId = filterIdAktif ? filterIdAktif.join('\u0001') : '__SEMUA__'
 
   const kertasRef = useRef<HTMLDivElement | null>(null)
+  const pembungkusKanvasRef = useRef<HTMLDivElement | null>(null)
   const wadahSvgRef = useRef<HTMLDivElement | null>(null)
   const lebarTerakhirRef = useRef<number>(0)
 
@@ -196,8 +272,7 @@ export function LayarPartitur({
     }
   }, [itemBerkas])
 
-  // 3. Tutup mode layar penuh dengan tombol Escape & kunci gulir latar belakang
-  //    (kecuali bila modal cetak sedang terbuka, biarkan Escape menutup modal dulu).
+  // 3. Tutup mode layar penuh dengan tombol Escape & kunci gulir latar belakang.
   useEffect(() => {
     if (!layarPenuh) return
     const gayaOverflowAsli = document.body.style.overflow
@@ -212,8 +287,7 @@ export function LayarPartitur({
     }
   }, [layarPenuh, cetakTerbuka])
 
-  // 4. Pantau perubahan lebar nyata wadah kertas (>= 24 px, mengabaikan munculnya
-  //    scrollbar vertikal ~15 px agar tidak memicu loop render ulang).
+  // 4. Pantau perubahan lebar nyata wadah kertas (>= 24 px).
   useEffect(() => {
     const el = kertasRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
@@ -238,8 +312,7 @@ export function LayarPartitur({
     }
   }, [itemBerkas?.tipe, layarPenuh])
 
-  // 5. Render MusicXML secara malas & bertahap lewat OSMD; PDF tidak pernah
-  //    masuk ke efek ini sehingga bundel OSMD sama sekali tidak diunduh.
+  // 5. Render MusicXML secara malas & bertahap lewat OSMD.
   useEffect(() => {
     const wadah = wadahSvgRef.current
     if (!itemBerkas || itemBerkas.tipe !== 'musicxml' || !wadah) {
@@ -306,6 +379,94 @@ export function LayarPartitur({
     song.title,
   ])
 
+  const tipe = itemBerkas?.tipe ?? meta?.tipe ?? 'musicxml'
+  const namaUnduh = itemBerkas?.namaFile ?? meta?.namaFile ?? `${song.title}.musicxml`
+  const persenZoom = Math.round(zoom * 100)
+
+  const batasMaksBirama = useMemo(() => {
+    if (panjangBiramaLagu && panjangBiramaLagu > 0) return panjangBiramaLagu
+    if (song.panjangBirama && song.panjangBirama > 0) return song.panjangBirama
+    if (infoSesi?.birama.length) {
+      const maksSesi = infoSesi.birama[infoSesi.birama.length - 1]?.birama ?? 0
+      if (maksSesi > 0) return maksSesi
+    }
+    if (meta?.jumlahBirama && meta.jumlahBirama > 0) return meta.jumlahBirama
+    return undefined
+  }, [panjangBiramaLagu, song.panjangBirama, infoSesi?.birama, meta?.jumlahBirama])
+
+  const daftarKotakBirama = infoSesi?.birama ?? []
+
+  const kotakBiramaAktif = useMemo(
+    () => cariKotakBiramaAktif(daftarKotakBirama, biramaAktif),
+    [daftarKotakBirama, biramaAktif],
+  )
+
+  const kotakCalonAwal = useMemo(
+    () => (calonAwalFrasa != null ? cariKotakBiramaAktif(daftarKotakBirama, calonAwalFrasa) : null),
+    [daftarKotakBirama, calonAwalFrasa],
+  )
+
+  const frasaSahUntukSorot = useMemo(
+    () => Boolean(frasa && frasa.dari >= 1 && frasa.sampai >= frasa.dari),
+    [frasa],
+  )
+
+  const pitaSorotFrasa = useMemo(() => {
+    if (!frasa || !frasaSahUntukSorot) return []
+    return gabungKotakFrasaPerBaris(daftarKotakBirama, frasa.dari, frasa.sampai)
+  }, [daftarKotakBirama, frasa, frasaSahUntukSorot])
+
+  const lencanaFrasa = useMemo(
+    () => formatLencanaFrasa(frasa, tempoLatihan, panjangBiramaLagu ?? song.panjangBirama),
+    [frasa, tempoLatihan, panjangBiramaLagu, song.panjangBirama],
+  )
+
+  const frasaMenyala = frasaAktifSah(frasa, panjangBiramaLagu ?? song.panjangBirama)
+
+  const daftarFrasaSegmen = useMemo(
+    () => hitungRentangFrasaSegmen(song.tempoMap ?? [], batasMaksBirama ?? null),
+    [song.tempoMap, batasMaksBirama],
+  )
+
+  // 6. Auto-scroll pintar saat birama aktif berpindah keluar zona nyaman baca.
+  useEffect(() => {
+    if (
+      !ikutiBirama ||
+      sedangRender ||
+      !kotakBiramaAktif ||
+      kotakBiramaAktif.lebar <= 0
+    ) {
+      return
+    }
+    const kertas = kertasRef.current
+    const pembungkus = pembungkusKanvasRef.current
+    if (!kertas) return
+
+    const geserX = pembungkus?.offsetLeft ?? 0
+    const geserY = pembungkus?.offsetTop ?? 0
+    const target = hitungTargetGulirBirama(
+      {
+        x: kotakBiramaAktif.x + geserX,
+        y: kotakBiramaAktif.y + geserY,
+        lebar: kotakBiramaAktif.lebar,
+        tinggi: kotakBiramaAktif.tinggi,
+      },
+      {
+        scrollTop: kertas.scrollTop,
+        scrollLeft: kertas.scrollLeft,
+        clientHeight: kertas.clientHeight,
+        clientWidth: kertas.clientWidth,
+      },
+      tataLetak,
+    )
+    if (!target) return
+    kertas.scrollTo({
+      ...(typeof target.top === 'number' ? { top: target.top } : {}),
+      ...(typeof target.left === 'number' ? { left: target.left } : {}),
+      behavior: sedangMain ? 'smooth' : 'auto',
+    })
+  }, [biramaAktif, ikutiBirama, sedangRender, kotakBiramaAktif, tataLetak, sedangMain])
+
   function ubahZoom(nilaiBaru: number) {
     const jepit = jepitZoom(nilaiBaru)
     setZoom(jepit)
@@ -317,9 +478,78 @@ export function LayarPartitur({
     simpanFilterPartitur(kunciSimpanFilter, baru)
   }
 
-  const tipe = itemBerkas?.tipe ?? meta?.tipe ?? 'musicxml'
-  const namaUnduh = itemBerkas?.namaFile ?? meta?.namaFile ?? `${song.title}.musicxml`
-  const persenZoom = Math.round(zoom * 100)
+  function terapkanRentangFrasa(dari: number, sampai: number, label?: string) {
+    const rapi = susunFrasaTerurut(dari, sampai, 1, label)
+    onUbahFrasa?.(rapi)
+    onLoncatBirama?.(rapi.dari)
+    setModePilihFrasa(false)
+    setCalonAwalFrasa(null)
+  }
+
+  function tanganiKlikKanvas(e: MouseEvent<HTMLDivElement>) {
+    if (sedangRender || daftarKotakBirama.length === 0) return
+    const wadah = wadahSvgRef.current
+    if (!wadah) return
+    const rect = wadah.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const kena = cariBiramaDariTitikKlik(daftarKotakBirama, x, y)
+    if (!kena) return
+
+    const biramaAwalKotak = Math.max(1, kena.birama)
+    const biramaAkhirKotak = kena.rentangMultiRest
+      ? Math.max(biramaAwalKotak, kena.rentangMultiRest[1])
+      : biramaAwalKotak
+
+    if (onUbahFrasa && (modePilihFrasa || e.shiftKey)) {
+      if (e.shiftKey && calonAwalFrasa == null) {
+        const patokan = Math.max(1, frasa?.dari ?? biramaAktif ?? 1)
+        const ujungKedua = biramaAwalKotak >= patokan ? biramaAkhirKotak : biramaAwalKotak
+        terapkanRentangFrasa(patokan, ujungKedua)
+        return
+      }
+      if (calonAwalFrasa == null) {
+        setCalonAwalFrasa(biramaAwalKotak)
+        onLoncatBirama?.(biramaAwalKotak)
+        return
+      }
+      const ujungKedua = biramaAwalKotak >= calonAwalFrasa ? biramaAkhirKotak : biramaAwalKotak
+      terapkanRentangFrasa(calonAwalFrasa, ujungKedua)
+      return
+    }
+
+    onLoncatBirama?.(biramaAwalKotak)
+  }
+
+  function tanganiKlikSetDrill(s: InfoSetBirama, pakaiShift: boolean) {
+    if (!onUbahFrasa) {
+      onLoncatBirama?.(s.biramaDari)
+      return
+    }
+    if (pakaiShift && setAwalTerpilih != null) {
+      const gabung = gabungRentangSetKeBirama(daftarSetDrill, setAwalTerpilih, s.nomorSet)
+      if (gabung) {
+        terapkanRentangFrasa(
+          gabung.biramaDari,
+          gabung.biramaSampai,
+          formatTautanSetBirama(gabung),
+        )
+        setSetAwalTerpilih(null)
+        return
+      }
+    }
+    setSetAwalTerpilih(s.nomorSet)
+    terapkanRentangFrasa(
+      s.biramaDari,
+      s.biramaSampai,
+      formatTautanSetBirama({
+        setAwal: s.nomorSet,
+        setAkhir: s.nomorSet,
+        biramaDari: s.biramaDari,
+        biramaSampai: s.biramaSampai,
+      }),
+    )
+  }
 
   const teksInfoSesi = useMemo(() => {
     if (!infoSesi) return ''
@@ -335,6 +565,13 @@ export function LayarPartitur({
   const sedangDiPartAnggota = samaFilterPartitur(filterAktif, pilihanAnggotaAwal.filter)
   const punyaPartAnggotaKhusus =
     Boolean(anggotaAktif) && pilihanAnggotaAwal.filter.jenis !== 'semua'
+
+  const persenAktif =
+    tempoLatihan?.mode === 'bpm' ? null : (tempoLatihan?.persen ?? 100)
+
+  const tampilkanBilahLatihan =
+    Boolean(onToggleMain || onUbahFrasa || onLoncatBirama || daftarSetDrill.length > 0) &&
+    Boolean(itemBerkas || meta)
 
   return (
     <>
@@ -494,7 +731,7 @@ export function LayarPartitur({
               backgroundColor: '#020617',
               color: '#cbd5e1',
             }}
-            className="mb-3 space-y-2 rounded-xl border p-2.5 text-xs"
+            className="mb-2.5 space-y-2 rounded-xl border p-2.5 text-xs"
           >
             {daftarPartSkor.length === 1 ? (
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -650,6 +887,385 @@ export function LayarPartitur({
           </div>
         )}
 
+        {/* #11d — Bilah putar langsung, sorot birama aktif, pilih/loop frasa, & tautan set drill (murni hex) */}
+        {tampilkanBilahLatihan && (
+          <div
+            data-testid="partitur-bilah-frasa"
+            data-kiosk-allow
+            style={{
+              borderColor: '#1e293b',
+              backgroundColor: '#020617',
+              color: '#cbd5e1',
+            }}
+            className="mb-3 space-y-2 rounded-xl border p-2.5 text-xs"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {onToggleMain && (
+                  <button
+                    type="button"
+                    data-testid="partitur-tombol-putar"
+                    onClick={onToggleMain}
+                    style={
+                      sedangMain
+                        ? {
+                            backgroundColor: '#be123c',
+                            borderColor: '#e11d48',
+                            color: '#ffffff',
+                          }
+                        : {
+                            backgroundColor: '#059669',
+                            borderColor: '#10b981',
+                            color: '#ffffff',
+                          }
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold"
+                  >
+                    {sedangMain ? <IconPause size={12} /> : <IconPlay size={12} />}
+                    {sedangMain ? 'Berhenti' : labelKonteksPutar ? `Putar ${labelKonteksPutar}` : 'Putar'}
+                  </button>
+                )}
+
+                <span
+                  data-testid="partitur-indikator-birama"
+                  style={
+                    sedangMain && tahapKetuk === 'hitung'
+                      ? {
+                          borderColor: '#b45309',
+                          backgroundColor: '#451a03',
+                          color: '#fde68a',
+                        }
+                      : sedangMain
+                        ? {
+                            borderColor: '#059669',
+                            backgroundColor: '#022c22',
+                            color: '#a7f3d0',
+                          }
+                        : {
+                            borderColor: '#334155',
+                            backgroundColor: '#0f172a',
+                            color: '#e2e8f0',
+                          }
+                  }
+                  className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold tabular-nums"
+                >
+                  {sedangMain && tahapKetuk === 'hitung'
+                    ? `Hitung mundur → Bar ${biramaAktif}`
+                    : `Bar ${biramaAktif}${
+                        sedangMain && ketukAktif != null ? ` · Ketuk ${ketukAktif + 1}` : ''
+                      }${
+                        kotakBiramaAktif?.rentangMultiRest
+                          ? ` (istirahat ${kotakBiramaAktif.rentangMultiRest[0]}–${kotakBiramaAktif.rentangMultiRest[1]})`
+                          : ''
+                      }`}
+                </span>
+
+                {lencanaFrasa && (
+                  <span
+                    data-testid="partitur-lencana-frasa"
+                    style={{
+                      borderColor: '#d97706',
+                      backgroundColor: '#451a03',
+                      color: '#fde68a',
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tabular-nums"
+                  >
+                    <IconLoop size={11} />
+                    {lencanaFrasa}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {tipe === 'musicxml' && itemBerkas && onUbahFrasa && (
+                  <button
+                    type="button"
+                    data-testid="partitur-mode-pilih-frasa"
+                    onClick={() => {
+                      setModePilihFrasa((v) => !v)
+                      setCalonAwalFrasa(null)
+                    }}
+                    title="Ketuk birama awal lalu birama akhir pada partitur (atau tahan Shift + Klik)"
+                    style={
+                      modePilihFrasa
+                        ? {
+                            backgroundColor: '#0284c7',
+                            borderColor: '#38bdf8',
+                            color: '#ffffff',
+                          }
+                        : {
+                            backgroundColor: '#0f172a',
+                            borderColor: '#334155',
+                            color: '#cbd5e1',
+                          }
+                    }
+                    className="rounded-lg border px-2 py-1 text-[11px] font-medium"
+                  >
+                    {modePilihFrasa
+                      ? calonAwalFrasa != null
+                        ? `Pilih akhir (awal: Bar ${calonAwalFrasa})…`
+                        : 'Ketuk birama awal…'
+                      : 'Pilih frasa di partitur'}
+                  </button>
+                )}
+
+                {onUbahFrasa && (
+                  <div
+                    className="inline-flex items-center gap-1 rounded-lg border px-2 py-0.5"
+                    style={{ borderColor: '#334155', backgroundColor: '#0f172a' }}
+                  >
+                    <span className="text-[11px]" style={{ color: '#94a3b8' }}>
+                      Bar
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={batasMaksBirama}
+                      aria-label="Frasa dari birama"
+                      data-testid="partitur-frasa-dari"
+                      value={frasa?.dari ?? ''}
+                      placeholder="1"
+                      onChange={(e) =>
+                        onUbahFrasa({
+                          dari: Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                        })
+                      }
+                      style={{
+                        borderColor: '#334155',
+                        backgroundColor: '#020617',
+                        color: '#f1f5f9',
+                      }}
+                      className="w-12 rounded border px-1.5 py-0.5 text-center text-[11px] tabular-nums"
+                    />
+                    <span style={{ color: '#64748b' }}>–</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={batasMaksBirama}
+                      aria-label="Frasa sampai birama"
+                      data-testid="partitur-frasa-sampai"
+                      value={frasa?.sampai ?? ''}
+                      placeholder="4"
+                      onChange={(e) =>
+                        onUbahFrasa({
+                          sampai: Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                        })
+                      }
+                      style={{
+                        borderColor: '#334155',
+                        backgroundColor: '#020617',
+                        color: '#f1f5f9',
+                      }}
+                      className="w-12 rounded border px-1.5 py-0.5 text-center text-[11px] tabular-nums"
+                    />
+                    <button
+                      type="button"
+                      data-testid="partitur-toggle-ulang"
+                      onClick={() =>
+                        onUbahFrasa({
+                          dari: frasa?.dari ?? 1,
+                          sampai: frasa?.sampai ?? Math.min(4, batasMaksBirama ?? 4),
+                          aktif: frasaMenyala ? 0 : 1,
+                        })
+                      }
+                      style={
+                        frasaMenyala
+                          ? {
+                              backgroundColor: '#d97706',
+                              borderColor: '#f59e0b',
+                              color: '#ffffff',
+                            }
+                          : {
+                              backgroundColor: '#1e293b',
+                              borderColor: '#475569',
+                              color: '#cbd5e1',
+                            }
+                      }
+                      className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-medium"
+                    >
+                      <IconLoop size={11} />
+                      {frasaMenyala ? 'Mengulang' : 'Ulang frasa'}
+                    </button>
+                    {frasa && onHapusFrasa && (
+                      <button
+                        type="button"
+                        data-testid="partitur-hapus-frasa"
+                        onClick={() => {
+                          setModePilihFrasa(false)
+                          setCalonAwalFrasa(null)
+                          onHapusFrasa()
+                        }}
+                        title="Hapus pilihan frasa pada perangkat ini"
+                        style={{ color: '#94a3b8' }}
+                        className="px-1 text-[11px] font-medium"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {onAturPersenTempo && (
+                  <div
+                    className="inline-flex items-center gap-0.5 rounded-lg border px-1 py-0.5"
+                    style={{ borderColor: '#334155', backgroundColor: '#0f172a' }}
+                  >
+                    {PILIHAN_PERSEN_CEPAT.map((p) => {
+                      const dipilih = persenAktif === p
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          data-testid={`partitur-tempo-${p}`}
+                          onClick={() => onAturPersenTempo(p)}
+                          style={
+                            dipilih
+                              ? {
+                                  backgroundColor: p === 100 ? '#334155' : '#b45309',
+                                  color: '#ffffff',
+                                }
+                              : {
+                                  backgroundColor: 'transparent',
+                                  color: '#94a3b8',
+                                }
+                          }
+                          className="rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums"
+                        >
+                          {p}%
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {tipe === 'musicxml' && itemBerkas && (
+                  <button
+                    type="button"
+                    data-testid="partitur-ikuti-birama"
+                    onClick={() => setIkutiBirama((v) => !v)}
+                    title="Gulir halaman otomatis mengikuti birama yang sedang berbunyi"
+                    style={
+                      ikutiBirama
+                        ? {
+                            backgroundColor: '#022c22',
+                            borderColor: '#059669',
+                            color: '#a7f3d0',
+                          }
+                        : {
+                            backgroundColor: '#0f172a',
+                            borderColor: '#334155',
+                            color: '#94a3b8',
+                          }
+                    }
+                    className="rounded-lg border px-2 py-1 text-[11px] font-medium"
+                  >
+                    {ikutiBirama ? 'Ikuti birama: Hidup' : 'Ikuti birama: Mati'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Keping segmen lagu & keping set drill (Set A–B = Bar X–Y) */}
+            {(daftarFrasaSegmen.length > 0 || daftarSetDrill.length > 0) && (
+              <div
+                style={{ borderColor: '#1e293b' }}
+                className="flex flex-wrap items-center gap-1.5 border-t pt-2"
+              >
+                {daftarFrasaSegmen.length > 0 && onUbahFrasa && (
+                  <>
+                    <span className="text-[10px] font-medium" style={{ color: '#64748b' }}>
+                      Segmen:
+                    </span>
+                    {daftarFrasaSegmen.map((seg) => {
+                      const cocok =
+                        frasaMenyala && frasa?.dari === seg.dari && frasa?.sampai === seg.sampai
+                      return (
+                        <button
+                          key={seg.id}
+                          type="button"
+                          data-testid={`partitur-chip-segmen-${seg.id}`}
+                          onClick={() => terapkanRentangFrasa(seg.dari, seg.sampai, seg.label)}
+                          style={
+                            cocok
+                              ? {
+                                  backgroundColor: '#b45309',
+                                  borderColor: '#f59e0b',
+                                  color: '#ffffff',
+                                }
+                              : {
+                                  backgroundColor: '#0f172a',
+                                  borderColor: '#334155',
+                                  color: '#cbd5e1',
+                                }
+                          }
+                          className="rounded-md border px-2 py-0.5 text-[10px] font-medium tabular-nums"
+                        >
+                          {seg.label} (Bar {seg.dari}–{seg.sampai})
+                        </button>
+                      )
+                    })}
+                  </>
+                )}
+
+                {daftarSetDrill.length > 0 && (
+                  <>
+                    <span
+                      className="ml-1 text-[10px] font-medium"
+                      style={{ color: '#64748b' }}
+                      title="Klik satu set untuk melatih biramanya, atau tahan Shift + Klik set kedua untuk merangkai rentang set"
+                    >
+                      Set drill:
+                    </span>
+                    {daftarSetDrill.map((s) => {
+                      const diDalamBiramaAktif =
+                        biramaAktif >= s.biramaDari && biramaAktif <= s.biramaSampai
+                      const cocokFrasa =
+                        frasaMenyala &&
+                        frasa != null &&
+                        s.biramaDari >= frasa.dari &&
+                        s.biramaSampai <= frasa.sampai
+                      return (
+                        <button
+                          key={s.index}
+                          type="button"
+                          data-testid={`partitur-chip-set-${s.nomorSet}`}
+                          onClick={(e) => tanganiKlikSetDrill(s, e.shiftKey)}
+                          title={`${s.nama} (${s.counts} hitungan) — Shift+Klik untuk merangkai rentang set`}
+                          style={
+                            cocokFrasa
+                              ? {
+                                  backgroundColor: '#b45309',
+                                  borderColor: '#f59e0b',
+                                  color: '#ffffff',
+                                }
+                              : diDalamBiramaAktif
+                                ? {
+                                    backgroundColor: '#022c22',
+                                    borderColor: '#059669',
+                                    color: '#a7f3d0',
+                                  }
+                                : {
+                                    backgroundColor: '#0f172a',
+                                    borderColor: '#334155',
+                                    color: '#cbd5e1',
+                                  }
+                          }
+                          className="rounded-md border px-2 py-0.5 text-[10px] font-medium tabular-nums"
+                        >
+                          Set {s.nomorSet} · Bar{' '}
+                          {s.biramaDari === s.biramaSampai
+                            ? s.biramaDari
+                            : `${s.biramaDari}–${s.biramaSampai}`}
+                        </button>
+                      )
+                    })}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Isi utama berdasarkan ketersediaan & jenis berkas */}
         {!memuatBerkas && !itemBerkas && (
           <div
@@ -658,7 +1274,7 @@ export function LayarPartitur({
             className="rounded-xl border p-4 text-xs leading-relaxed"
           >
             Berkas partitur untuk lagu ini belum tersimpan di perangkat ini. Pasang berkasnya lewat panel Partitur di
-            kartu Repertoar terlebih dahulu.
+            kartu Repertoar terlebih dahulu (latihan frasa di atas tetap dapat dipakai mengikuti peta tempo lagu).
           </div>
         )}
 
@@ -694,10 +1310,95 @@ export function LayarPartitur({
               )}
             >
               <div
-                ref={wadahSvgRef}
-                data-testid="partitur-kanvas-svg"
-                className={cx(tataLetak === 'mendatar' ? 'min-w-max' : 'w-full min-w-[300px]')}
-              />
+                ref={pembungkusKanvasRef}
+                data-testid="partitur-pembungkus-kanvas"
+                onClick={tanganiKlikKanvas}
+                className={cx(
+                  'relative',
+                  tataLetak === 'mendatar' ? 'min-w-max' : 'w-full min-w-[300px]',
+                  (onLoncatBirama || onUbahFrasa) && 'cursor-pointer',
+                )}
+              >
+                <div
+                  ref={wadahSvgRef}
+                  data-testid="partitur-kanvas-svg"
+                  className={cx(tataLetak === 'mendatar' ? 'min-w-max' : 'w-full min-w-[300px]')}
+                />
+
+                {/* Pita sorot rentang frasa terpilih (murni hex/rgba, nol oklch/color-mix) */}
+                {!sedangRender &&
+                  pitaSorotFrasa.map((pita, idx) => (
+                    <div
+                      key={`sorot-frasa-${idx}`}
+                      data-testid="partitur-sorot-frasa"
+                      data-frasa-rentang={frasa ? `${frasa.dari}-${frasa.sampai}` : ''}
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        left: `${pita.x}px`,
+                        top: `${pita.y}px`,
+                        width: `${pita.lebar}px`,
+                        height: `${pita.tinggi}px`,
+                        backgroundColor: WARNA_SOROT_PARTITUR_HEX.frasaLatar,
+                        border: `1.5px dashed ${WARNA_SOROT_PARTITUR_HEX.frasaTepi}`,
+                        borderRadius: '6px',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  ))}
+
+                {/* Sorot birama awal saat pengguna sedang memilih frasa 2-ketuk */}
+                {!sedangRender && kotakCalonAwal && kotakCalonAwal.lebar > 0 && (
+                  <div
+                    data-testid="partitur-sorot-calon-awal"
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      left: `${kotakCalonAwal.x}px`,
+                      top: `${kotakCalonAwal.y}px`,
+                      width: `${kotakCalonAwal.lebar}px`,
+                      height: `${kotakCalonAwal.tinggi}px`,
+                      backgroundColor: WARNA_SOROT_PARTITUR_HEX.calonAwalLatar,
+                      border: `2px dashed ${WARNA_SOROT_PARTITUR_HEX.calonAwalTepi}`,
+                      borderRadius: '6px',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                )}
+
+                {/* Sorot birama aktif sinkron TempoTimeline (metronom / rekaman / drill) */}
+                {!sedangRender && kotakBiramaAktif && kotakBiramaAktif.lebar > 0 && (
+                  <div
+                    data-testid="partitur-sorot-aktif"
+                    data-birama-aktif={String(biramaAktif)}
+                    data-birama-kotak={String(kotakBiramaAktif.birama)}
+                    data-multirest={
+                      kotakBiramaAktif.rentangMultiRest
+                        ? `${kotakBiramaAktif.rentangMultiRest[0]}-${kotakBiramaAktif.rentangMultiRest[1]}`
+                        : undefined
+                    }
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      left: `${kotakBiramaAktif.x}px`,
+                      top: `${kotakBiramaAktif.y}px`,
+                      width: `${kotakBiramaAktif.lebar}px`,
+                      height: `${kotakBiramaAktif.tinggi}px`,
+                      backgroundColor:
+                        tahapKetuk === 'hitung'
+                          ? WARNA_SOROT_PARTITUR_HEX.hitungLatar
+                          : WARNA_SOROT_PARTITUR_HEX.aktifLatar,
+                      border: `2px solid ${
+                        tahapKetuk === 'hitung'
+                          ? WARNA_SOROT_PARTITUR_HEX.hitungTepi
+                          : WARNA_SOROT_PARTITUR_HEX.aktifTepi
+                      }`,
+                      borderRadius: '6px',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -709,8 +1410,9 @@ export function LayarPartitur({
               className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-2.5 text-[11px]"
             >
               <span>
-                Berkas PDF berupa lembaran tetap (penyaringan per instrumen khusus MusicXML/MXL). Di peramban HP yang
-                tidak menampilkan bingkai di bawah, gunakan tombol di samping untuk membuka atau mencetak PDF.
+                Berkas PDF berupa lembaran tetap (penyaringan per instrumen & sorot notasi khusus MusicXML/MXL, namun
+                pengulangan frasa di bilah atas tetap berjalan penuh). Di peramban HP yang tidak menampilkan bingkai di
+                bawah, gunakan tombol di samping untuk membuka atau mencetak PDF.
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 <a

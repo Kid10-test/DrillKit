@@ -4,6 +4,7 @@ import { db } from '../db/db'
 import type {
   BiramaPola,
   Drill,
+  DrillSet,
   HitungMundur,
   Member,
   SectionDef,
@@ -48,9 +49,21 @@ import { PemutarRekaman, waktuBiramaKeDetikAudio } from '../lib/rekaman'
 import { lajuRekaman } from '../lib/tempoLatihan'
 import type { PartiturMeta, RekamanAudioMeta } from '../db/types'
 import { jumlahBirama, rentangValid } from '../lib/ulang'
-import { KartuSetList } from '../components/KartuSetList'
+import { KartuSetList, type InfoDrillLaguSetList } from '../components/KartuSetList'
 import { KendaliTempoLatihan, LencanaLatihan } from '../components/KendaliTempoLatihan'
 import { useTempoLatihan } from '../hooks/useTempoLatihan'
+import { useFrasaLatihan } from '../hooks/useFrasaLatihan'
+import {
+  bacaSemuaFrasa,
+  formatLencanaFrasa,
+  formatTautanSetBirama,
+  frasaEfektifUntukLagu,
+  hitungPetaSetKeBirama,
+  keUlangBagian,
+  kunciTautanSetList,
+  susunFrasaTerurut,
+  type FrasaLatihan,
+} from '../lib/partiturFrasa'
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
 import { PanelPartitur } from '../components/PanelPartitur'
 import { LayarPartitur } from '../components/LayarPartitur'
@@ -144,11 +157,15 @@ export default function Music({
   anggotaAktif = null,
   sectionsPaket,
   namaTimPaket,
+  drillsPaket,
+  setsPaket,
 }: {
   hanyaPutar?: boolean
   anggotaAktif?: Member | null
   sectionsPaket?: SectionDef[]
   namaTimPaket?: string
+  drillsPaket?: Drill[]
+  setsPaket?: DrillSet[]
 } = {}) {
   const toast = useToast()
   const settings = useSettings()
@@ -226,8 +243,42 @@ export default function Music({
   useEffect(() => {
     if (!song?.partitur) setPartiturTerbuka(false)
   }, [song?.id, song?.partitur])
-  /* #5 sisa — panjang tiap segmen lagu terpilih dalam hitungan drill. */
-  const semuaDrill = useLiveQuery(() => db.drills.toArray(), [], [])
+  /* #5 sisa & #11d — panjang tiap segmen lagu & pemetaan set drill ↔ birama. */
+  const semuaDrillDb = useLiveQuery(() => db.drills.toArray(), [], [])
+  const semuaSetDb = useLiveQuery(() => db.sets.orderBy('order').toArray(), [], [])
+  const semuaDrill = drillsPaket && drillsPaket.length > 0 ? drillsPaket : semuaDrillDb
+  const semuaSetDrill = setsPaket && setsPaket.length > 0 ? setsPaket : semuaSetDb
+
+  const petaDrillPerLagu = useMemo(() => {
+    const hasil = new Map<string, InfoDrillLaguSetList>()
+    const daftarLagu = songs ?? []
+    const daftarDrill = [...(semuaDrill ?? [])].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+    const daftarSet = semuaSetDrill ?? []
+    for (const s of daftarLagu) {
+      const drillCocok = daftarDrill.find((d) => d.songId === s.id)
+      if (!drillCocok) continue
+      const setMilik = daftarSet
+        .filter((st) => st.drillId === drillCocok.id)
+        .sort((a, b) => a.order - b.order)
+      if (setMilik.length === 0) continue
+      const terpetakan = hitungPetaSetKeBirama(
+        setMilik.map((st) => ({ counts: st.counts, name: st.name })),
+        {
+          bpm: s.bpm,
+          tandaBirama: s.tandaBirama ?? dariBeatsLama(s.beats),
+          tempoMap: s.tempoMap,
+          latih: s.latih ?? null,
+        },
+        { beatsPerCount: drillCocok.beatsPerCount },
+      )
+      hasil.set(s.id, {
+        drillId: drillCocok.id,
+        namaDrill: drillCocok.name,
+        sets: terpetakan,
+      })
+    }
+    return hasil
+  }, [songs, semuaDrill, semuaSetDrill])
   const asumsiSegmen = useMemo(() => asumsiHitungan(semuaDrill ?? [], song?.id ?? ''), [semuaDrill, song?.id])
   const panjangSegmenLaguIni = useMemo(
     () =>
@@ -367,12 +418,18 @@ export default function Music({
   /** Ulang hanya berarti kalau lagu punya panjang. */
   const ulangAktif = adaPanjang && song?.ulang === 1
 
-  /* --------------------- M2 — ulang bagian (satu rentang) --------------------- */
-  const ub = song?.ulangBagian ?? null
+  /* ----------- M2 & #11d — ulang bagian / frasa per perangkat ----------- */
+  const fl = useFrasaLatihan()
+  const frasaLagu = fl.frasaUntuk(song?.id, song?.ulangBagian)
+  const ub = keUlangBagian(frasaLagu)
   /** Rentangnya sah secara angka (belum peduli dinyalakan atau tidak). */
   const ubSah = rentangValid(ub, panjangBirama)
   /** Pengulangan bagian benar-benar hidup: ada rentangnya, sah, dan dinyalakan. */
   const ulangBagianAktif = !!ub && ub.aktif === 1 && ubSah
+  const lencanaFrasaAktif = useMemo(
+    () => formatLencanaFrasa(frasaLagu, latihan, panjangBirama),
+    [frasaLagu, latihan, panjangBirama],
+  )
   /** Durasi satu putaran rentang. */
   const detikPutaran = useMemo(
     () => ub
@@ -381,11 +438,32 @@ export default function Music({
       : 0,
     [ub, tempoTimeline, latihan],
   )
-  /** Tulis rentang ke lagu. */
-  const setUlangBagian = (patch: Partial<UlangBagian>) => {
+  /**
+   * Tulis rentang frasa ke penyimpanan perangkat (`localStorage` #11d) dan —
+   * selama mode pelatih — selaraskan pula `song.ulangBagian` (M2).
+   */
+  const setUlangBagian = (patch: Partial<FrasaLatihan>, targetSong?: Song | null) => {
+    const s = targetSong === undefined ? song : targetSong
+    if (!s) return
+    const dasar =
+      fl.frasaUntuk(s.id, s.ulangBagian) ?? { dari: 1, sampai: 4, aktif: 0 as const }
+    const gabung = { ...dasar, ...patch }
+    fl.aturFrasa(s.id, patch, s.ulangBagian)
+    if (!hanyaPutar) {
+      const ubBaru: UlangBagian = {
+        dari: Math.max(1, Math.floor(gabung.dari)),
+        sampai: Math.max(1, Math.floor(gabung.sampai)),
+        aktif: gabung.aktif === 1 ? 1 : 0,
+      }
+      void db.songs.update(s.id, { ulangBagian: ubBaru })
+    }
+  }
+  const hapusFrasaLagu = () => {
     if (!song) return
-    const lama: UlangBagian = song.ulangBagian ?? { dari: 1, sampai: 4, aktif: 0 }
-    db.songs.update(song.id, { ulangBagian: { ...lama, ...patch } })
+    fl.hapusFrasa(song.id)
+    if (!hanyaPutar) {
+      void db.songs.update(song.id, { ulangBagian: undefined })
+    }
   }
   const setUlang = (v: boolean) => {
     if (!song) return
@@ -556,12 +634,18 @@ export default function Music({
     // berjalan (kalau ada), supaya tombol Berhenti tidak membingungkan.
     mainkanSetRef.current = false
     setIndeksMain(null)
+    // #11d — baca langsung simpanan frasa terbaru dari localStorage supaya
+    // klik pemilihan frasa di partitur/segmen langsung terbaca walau dipanggil
+    // pada putaran event yang sama sebelum React sempat merender ulang.
+    const frasaSegar = frasaEfektifUntukLagu(bacaSemuaFrasa(), song?.id, song?.ulangBagian)
+    const ubSegar = keUlangBagian(frasaSegar)
+    const ubSegarAktif = !!ubSegar && ubSegar.aktif === 1 && rentangValid(ubSegar, panjangBirama)
     /**
      * M2 — kalau ulang bagian menyala, pemutaran langsung mulai di **awal
      * rentang**. Maksudnya berlatih bagian itu, jadi tidak ada gunanya
      * mendengar birama sebelumnya dulu tiap kali menekan Mulai.
      */
-    const mulai = ulangBagianAktif && ub ? ub.dari : m
+    const mulai = ubSegarAktif && ubSegar ? ubSegar.dari : m
     const idLagu = song?.id
     setPutaran(null)
 
@@ -593,19 +677,30 @@ export default function Music({
         biramaAkhir: panjangBirama,
         ulang: ulangAktif,
         // M2 — rentang ulang. Kalau hidup, ini menang atas akhir lagu.
-        ulangBagian: ulangBagianAktif && ub ? { dari: ub.dari, sampai: ub.sampai } : null,
+        ulangBagian: ubSegarAktif && ubSegar ? { dari: ubSegar.dari, sampai: ubSegar.sampai } : null,
         // #4 — tempo latihan & naik otomatis tiap putaran bagian.
         latihan,
-        naikOtomatis: ulangBagianAktif ? naikOtomatis : null,
+        naikOtomatis: ubSegarAktif ? naikOtomatis : null,
         onPutaran: (info) => {
           setPutaran(info.putaran)
           // Tempo terakhir yang dicapai diingat.
           tl.aturTempo(idLagu, info.tempo)
-          if (song?.id && song.rekaman && ub) {
-            // Tempo putaran baru juga berlaku untuk rekamannya: klik yang
-            // naik sementara rekaman tetap akan berpisah makin jauh.
-            pemutarAudio.current.setKecepatan(lajuRekaman(bpm, info.tempo))
-            const offsetUlang = waktuBiramaKeDetikAudio(ub.dari, song.rekaman, segmenWaktu, birama, bpm, undefined, latih)
+        },
+        onUlangBagian: (info) => {
+          if (song?.id && song.rekaman) {
+            // #11d & #6 — lompatkan rekaman audio kembali ke awal frasa baik
+            // saat `naikOtomatis` menyala maupun saat tempo latihan tetap.
+            const tempoPutaranIni = info.tempo ?? latihan
+            pemutarAudio.current.setKecepatan(lajuRekaman(bpm, tempoPutaranIni))
+            const offsetUlang = waktuBiramaKeDetikAudio(
+              info.dari,
+              song.rekaman,
+              segmenWaktu,
+              birama,
+              bpm,
+              undefined,
+              latih,
+            )
             pemutarAudio.current.putar(offsetUlang)
           }
         },
@@ -969,6 +1064,7 @@ export default function Music({
                   : null}
                 waktuBiramaUntuk={(bir) => tempoTimeline.secondsAtPosition({ measure: bir, beat: 1 }, latihan)}
                 durasiBiramaUntuk={(bir) => tempoTimeline.barDurationSeconds(bir, latihan)}
+                lencanaFrasa={lencanaFrasaAktif}
               />
               {segmenLengkap.length > 0 && (
                 <StripSegmen
@@ -976,6 +1072,13 @@ export default function Music({
                   biramaSekarang={measure}
                   warisan={birama}
                   onLoncat={loncatKeSegmen}
+                  panjangBirama={panjangBirama > 0 ? panjangBirama : song.partitur?.jumlahBirama}
+                  frasaAktif={frasaLagu}
+                  onPilihFrasaSegmen={(dari, sampai, label) => {
+                    const f = susunFrasaTerurut(dari, sampai, 1, label)
+                    setUlangBagian(f)
+                    loncatKeSegmen(f.dari)
+                  }}
                 />
               )}
 
@@ -1728,7 +1831,7 @@ export default function Music({
           )}
         </Card>
 
-        {/* #11b & #11c — lembar baca partitur, filter part/section, & cetak HTML */}
+        {/* #11b, #11c & #11d — lembar baca partitur, filter part/section, cetak HTML, & sorot/frasa */}
         {song && song.partitur && partiturTerbuka && (
           <LayarPartitur
             song={song}
@@ -1741,11 +1844,35 @@ export default function Music({
             }
             namaTim={namaTimPaket || settings.teamName}
             hanyaPutar={hanyaPutar}
+            biramaAktif={measure}
+            sedangMain={running}
+            tahapKetuk={aktif?.tahap ?? null}
+            ketukAktif={aktif && aktif.tahap !== 'hitung' ? aktif.beat : null}
+            onToggleMain={toggle}
+            onLoncatBirama={loncatKeSegmen}
+            frasa={frasaLagu}
+            panjangBiramaLagu={panjangBirama > 0 ? panjangBirama : undefined}
+            onUbahFrasa={(patch) => {
+              setUlangBagian(patch)
+              if (running && indeksMain === null && typeof patch.aktif === 'number') {
+                const targetMulai = patch.aktif === 1 ? (patch.dari ?? frasaLagu?.dari ?? measure) : measure
+                loncatKeSegmen(targetMulai)
+              }
+            }}
+            onHapusFrasa={() => {
+              hapusFrasaLagu()
+              if (running && indeksMain === null) loncatKeSegmen(measure)
+            }}
+            tempoLatihan={latihan}
+            onAturPersenTempo={(persen) =>
+              tl.aturTempo(song.id, { mode: 'persen', persen, geser: 0 })
+            }
+            daftarSetDrill={petaDrillPerLagu.get(song.id)?.sets ?? []}
           />
         )}
       </div>
 
-      {/* M3 — set list: urutan lagu untuk satu penampilan */}
+      {/* M3 & #11d — set list: urutan lagu, lencana frasa, & tautan frasa ↔ set drill */}
       <KartuSetList
         daftar={daftarSetList ?? []}
         aktif={setlistAktif}
@@ -1754,6 +1881,44 @@ export default function Music({
         sedangMain={running}
         latihanUntuk={(id) => tl.tempoUntuk(id)}
         onSemuaAsli={(ids) => tl.keAsli(ids)}
+        frasaUntuk={(id) => {
+          const s = (songs ?? []).find((x) => x.id === id)
+          return fl.frasaUntuk(id, s?.ulangBagian)
+        }}
+        petaSetUntukLagu={(id) => petaDrillPerLagu.get(id) ?? null}
+        onSimpanTautanSet={async (indeksBaris, songId, tautan) => {
+          if (!setlistAktif || hanyaPutar) return
+          const salinan = { ...(setlistAktif.tautanFrasa ?? {}) }
+          const kunciBaris = kunciTautanSetList(indeksBaris, songId)
+          if (tautan) {
+            salinan[kunciBaris] = tautan
+          } else {
+            delete salinan[kunciBaris]
+            delete salinan[songId]
+          }
+          await db.setlists.update(setlistAktif.id, {
+            tautanFrasa: Object.keys(salinan).length > 0 ? salinan : undefined,
+            updatedAt: Date.now(),
+          })
+        }}
+        onAktifkanTautanSet={(songId, tautan) => {
+          const targetLagu = (songs ?? []).find((x) => x.id === songId) ?? null
+          mainkanSetRef.current = false
+          setIndeksMain(null)
+          setSelected(songId)
+          setUseMap(true)
+          const f = susunFrasaTerurut(
+            tautan.biramaDari,
+            tautan.biramaSampai,
+            1,
+            formatTautanSetBirama(tautan),
+          )
+          setUlangBagian(f, targetLagu)
+          setMulaiDari(f.dari)
+          setMeasure(f.dari)
+          setHabis(false)
+          if (targetLagu?.partitur) setPartiturTerbuka(true)
+        }}
         indeksMain={indeksMain}
         onPilih={(id) => {
           mainkanSetRef.current = false

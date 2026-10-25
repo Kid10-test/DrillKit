@@ -87,6 +87,10 @@ import { dariBeatsLama, formatWaktu, labelBirama } from '../lib/birama'
 import { daftarTempo, petakanSetKeMusik, tempoSet } from '../lib/gabungMusik'
 // #5 sisa — penggaris drill × segmen lagu, bantuan hitungan, pecah/gabung set.
 import { bantuanSet, fmtAngka, fmtBirama, gabungGerak, petaPenggaris, pecahSet } from '../lib/segmenDrill'
+// #11d — sorot birama partitur pendamping sinkron animasi/scrubber drill.
+import { biramaPadaProgresSet, hitungPetaSetKeBirama, hitunganPadaBirama } from '../lib/partiturFrasa'
+import { useFrasaLatihan } from '../hooks/useFrasaLatihan'
+import { LayarPartitur } from './LayarPartitur'
 import { hapusTandaSet } from '../lib/kemajuan'
 import {
   cx,
@@ -310,6 +314,51 @@ export function Editor({
     if (drill.songId) tl.keAsli([drill.songId])
     ubah('cepat', 1)
   }
+  const flDrill = useFrasaLatihan()
+  const [partiturDrillTerbuka, setPartiturDrillTerbuka] = useState(false)
+  const [biramaDrill, setBiramaDrill] = useState(1)
+  const biramaDrillRef = useRef(1)
+  const daftarSetBiramaDrill = useMemo(
+    () =>
+      lagu
+        ? hitungPetaSetKeBirama(
+            sets.map((s) => ({ counts: s.counts, name: s.name })),
+            {
+              bpm: lagu.bpm,
+              tandaBirama: lagu.tandaBirama ?? dariBeatsLama(lagu.beats),
+              tempoMap: lagu.tempoMap,
+              latih: lagu.latih ?? null,
+            },
+            { beatsPerCount: drill.beatsPerCount, latihan: latihanDrill },
+          )
+        : [],
+    [lagu, sets, drill.beatsPerCount, latihanDrill],
+  )
+  const segarkanBiramaDrill = useCallback(
+    (indeksSet: number, progres01: number) => {
+      if (!lagu || sets.length === 0) return
+      const b = biramaPadaProgresSet(
+        sets.map((s) => ({ counts: s.counts })),
+        {
+          bpm: lagu.bpm,
+          tandaBirama: lagu.tandaBirama ?? dariBeatsLama(lagu.beats),
+          tempoMap: lagu.tempoMap,
+          latih: lagu.latih ?? null,
+        },
+        indeksSet,
+        progres01,
+        { beatsPerCount: drill.beatsPerCount },
+      )
+      if (b !== biramaDrillRef.current) {
+        biramaDrillRef.current = b
+        setBiramaDrill(b)
+      }
+    },
+    [lagu, sets, drill.beatsPerCount],
+  )
+  useEffect(() => {
+    if (!lagu?.partitur) setPartiturDrillTerbuka(false)
+  }, [lagu?.id, lagu?.partitur])
   const [dotSheet, setDotSheet] = useState(false)
   /** DD4 — sudut putar blok (derajat). */
   const [sudutPutar, setSudutPutar] = useState(45)
@@ -1677,6 +1726,7 @@ export function Editor({
         }
       }
       tulisCount(p)
+      segarkanBiramaDrill(idx, p)
 
       // #6 — sinkronkan posisi scrubber ke audio bila lagu memiliki rekaman
       if (lagu?.rekaman && petaSet?.[idx]) {
@@ -1692,7 +1742,7 @@ export function Editor({
         PemutarRekaman.get().lompat(posAudio)
       }
     },
-    [playing, vektorGerak, seksiAnimasi, seksiMember, tulisCount, lagu?.rekaman, petaSet, idx, set?.counts, drill.beatsPerCount, tempoUntuk],
+    [playing, vektorGerak, seksiAnimasi, seksiMember, tulisCount, segarkanBiramaDrill, lagu?.rekaman, petaSet, idx, set?.counts, drill.beatsPerCount, tempoUntuk],
   )
 
   /**
@@ -1720,6 +1770,10 @@ export function Editor({
     setGeserPending(null)
   }, [geserPending, idx, geserKe])
 
+  useEffect(() => {
+    if (!playing) segarkanBiramaDrill(idx, posisiRef.current)
+  }, [idx, playing, segarkanBiramaDrill])
+
   /** B2 — kembalikan semua titik ke posisi awal set ini. */
   const resetAnimasi = useCallback(() => {
     setPlaying(false)
@@ -1730,7 +1784,8 @@ export function Editor({
       if (g.hasAttribute('transform')) g.removeAttribute('transform')
     })
     tulisCount(0)
-  }, [tulisCount])
+    segarkanBiramaDrill(idx, 0)
+  }, [tulisCount, segarkanBiramaDrill, idx])
 
   useEffect(() => {
     if (!playing) return
@@ -1810,6 +1865,7 @@ export function Editor({
         g.setAttribute('transform', `translate(${tx} ${ty})`)
       }
       tulisCount(p)
+      segarkanBiramaDrill(idx, p)
       posisiRef.current = p
       if (sliderRef.current)
         sliderRef.current.value = perHitunganRef.current ? String(Math.round(p * counts)) : String(p)
@@ -2625,9 +2681,27 @@ export function Editor({
                   Garis waktu <b className="text-emerald-300">{lagu.title}</b>
                   <span className="ml-1 text-slate-500">— segmen lagu × set drill, dalam hitungan</span>
                 </span>
-                <span className="text-[10px] tabular-nums text-slate-500" data-testid="penggaris-ringkas">
-                  {penggaris.totalHitungan} hitungan · {formatWaktu(penggaris.totalDetik)}
-                </span>
+                <div className="flex items-center gap-2">
+                  {lagu.partitur && (
+                    <button
+                      type="button"
+                      data-kiosk-allow
+                      data-testid="drill-tombol-partitur"
+                      onClick={() => setPartiturDrillTerbuka((v) => !v)}
+                      className={cx(
+                        'rounded-md border px-2 py-0.5 text-[10px] font-semibold transition',
+                        partiturDrillTerbuka
+                          ? 'border-emerald-500/60 bg-emerald-600/20 text-emerald-200'
+                          : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800',
+                      )}
+                    >
+                      {partiturDrillTerbuka ? 'Tutup partitur' : 'Buka partitur'}
+                    </button>
+                  )}
+                  <span className="text-[10px] tabular-nums text-slate-500" data-testid="penggaris-ringkas">
+                    {penggaris.totalHitungan} hitungan · {formatWaktu(penggaris.totalDetik)}
+                  </span>
+                </div>
               </div>
               <div className="scroll-thin overflow-x-auto pb-1" data-testid="penggaris-gulir">
                 <div className="min-w-max space-y-1">
@@ -2710,6 +2784,58 @@ export function Editor({
                   ))}
                 </ul>
               )}
+            </div>
+          )}
+
+          {/* #11d — Partitur pendamping lapangan: sorot birama aktif sinkron saat drill berjalan / digeser */}
+          {lagu && lagu.partitur && partiturDrillTerbuka && (
+            <div className="border-t border-slate-800 p-3" data-testid="drill-panel-partitur">
+              <LayarPartitur
+                song={lagu}
+                onTutup={() => setPartiturDrillTerbuka(false)}
+                sectionsTim={settings.sections}
+                namaTim={settings.teamName}
+                biramaAktif={biramaDrill}
+                sedangMain={playing}
+                labelKonteksPutar="Drill"
+                onToggleMain={() => {
+                  if (playing) {
+                    setUrutan(false)
+                    setPlaying(false)
+                  } else if (nextSet) {
+                    setPlaying(true)
+                  } else {
+                    mulaiUrutan()
+                  }
+                }}
+                onLoncatBirama={(bir) => {
+                  const h = hitunganPadaBirama(
+                    sets.map((s) => ({ counts: s.counts, name: s.name })),
+                    {
+                      bpm: lagu.bpm,
+                      tandaBirama: lagu.tandaBirama ?? dariBeatsLama(lagu.beats),
+                      tempoMap: lagu.tempoMap,
+                      latih: lagu.latih ?? null,
+                    },
+                    bir,
+                    { beatsPerCount: drill.beatsPerCount },
+                  )
+                  keHitungan(h)
+                }}
+                frasa={flDrill.frasaUntuk(lagu.id, lagu.ulangBagian)}
+                panjangBiramaLagu={lagu.panjangBirama}
+                onUbahFrasa={(patch) => {
+                  flDrill.aturFrasa(lagu.id, patch, lagu.ulangBagian)
+                }}
+                onHapusFrasa={() => {
+                  flDrill.hapusFrasa(lagu.id)
+                }}
+                tempoLatihan={latihanDrill}
+                onAturPersenTempo={(persen) =>
+                  tl.aturTempo(lagu.id, { mode: 'persen', persen, geser: 0 })
+                }
+                daftarSetDrill={daftarSetBiramaDrill}
+              />
             </div>
           )}
 
