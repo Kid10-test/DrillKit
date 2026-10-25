@@ -80,6 +80,15 @@ bash bangun-logika.sh || exit 1
 # part/section, multi-rest part tunggal, mode anggota, dan cetak/unduh HTML
 # A4 Tegak / A4 Mendatar / Buku Saku Lyre A5). Jangan keluarkan lagi tanpa
 # mencatat alasannya di IDE-PENGEMBANGAN.md.
+#
+# #11d — `partitur-frasa-logika` (pemetaan kotak birama multi-rest, sorot
+# aktif, pemilihan & ingatan frasa per perangkat, lencana frasa+tempo, serta
+# tautan rentang set drill <-> birama; dirakit bangun-logika.sh sebagai
+# /tmp/partiturFrasa.mjs) dan `partitur-frasa` (uji peramban skor 32 birama,
+# sorot & auto-scroll sinkron rekaman WAV #6 + metronom, loop Bar 5-8 di 80%
+# tempo, fallback tanpa MusicXML, tautan Set 4-6 = Bar 9-16, serta sorot
+# partitur pendamping di DrillEditor). Jangan keluarkan lagi tanpa mencatat
+# alasannya di IDE-PENGEMBANGAN.md.
 
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika uji-situs uji-rilis uji-lapangan \
@@ -91,11 +100,11 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill m1-penggaris-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \

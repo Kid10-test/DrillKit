@@ -166,7 +166,8 @@ export function StripSegmen({
             {onPilihFrasaSegmen && (
               <button
                 type="button"
-                data-testid={`chip-segmen-ulang-${i}`}
+                data-kiosk-allow
+                data-testid={`ulang-segmen-${i}`}
                 onClick={() => onPilihFrasaSegmen(mulai, selesai, s.label)}
                 title={`Ulang frasa ${s.label} (birama ${mulai}–${selesai})`}
                 className={cx(
