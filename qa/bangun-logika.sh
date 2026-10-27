@@ -106,6 +106,8 @@ rakit src/lib/mxl.ts      mxl
 # #11c — klasifikasi part/section & penyusun HTML cetak murni hex.
 rakit src/lib/partiturBagian.ts partiturBagian
 rakit src/lib/partiturCetak.ts  partiturCetak
+# #11d — frasa latihan per perangkat, geometri sorot birama, & tautan frasa↔set drill.
+rakit src/lib/partiturFrasa.ts  partiturFrasa
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.

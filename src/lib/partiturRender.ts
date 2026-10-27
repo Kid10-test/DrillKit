@@ -30,6 +30,12 @@ import {
   type SkalaCetakPartitur,
   type UkuranKertasPartitur,
 } from './partiturCetak'
+import {
+  petakanKotakBiramaSumber,
+  type BiramaSumberMentah,
+  type KotakBiramaPiksel,
+  type KotakPikselMentah,
+} from './partiturFrasa'
 
 /* ------------------------------- Konstanta ------------------------------ */
 
@@ -63,11 +69,9 @@ export interface InfoInstrumenRender {
   tampil: boolean
 }
 
-export interface KotakBiramaRender {
-  /** Nomor birama sumber di MusicXML (mis. 0 untuk anacrusis, 1..N). */
+export interface KotakBiramaRender extends KotakBiramaPiksel {
+  /** Nomor birama sumber di MusicXML (mis. 0 untuk anacrusis, 1..N) — nama bidang kompatibel #11b. */
   nomorBirama: number
-  /** Indeks urut 0-based di daftar birama OSMD (`measureListIndex`). */
-  indeksUrut: number
 }
 
 export interface HasilSesiPartitur {
@@ -475,8 +479,45 @@ function terapkanFilterInstrumenOsmd(
 
 /* ------------------------ Ekstraksi Info Sesi --------------------------- */
 
+function ukurPetaKotakGrafisSvg(wadah: HTMLElement): Map<string, KotakPikselMentah> {
+  const peta = new Map<string, KotakPikselMentah>()
+  const rectWadah = wadah.getBoundingClientRect()
+  const elemenBirama = wadah.querySelectorAll('g.vf-measure')
+
+  for (let i = 0; i < elemenBirama.length; i += 1) {
+    const el = elemenBirama[i]
+    const id = el.getAttribute('id')
+    if (!id) continue
+    const r = el.getBoundingClientRect()
+    if (r.width <= 0 && r.height <= 0) continue
+
+    const x = r.left - rectWadah.left
+    const y = r.top - rectWadah.top
+    const kanan = x + r.width
+    const bawah = y + r.height
+    const lama = peta.get(id)
+    if (!lama) {
+      peta.set(id, { x, y, lebar: r.width, tinggi: r.height })
+    } else {
+      const xMin = Math.min(lama.x, x)
+      const yMin = Math.min(lama.y, y)
+      const xMaks = Math.max(lama.x + lama.lebar, kanan)
+      const yMaks = Math.max(lama.y + lama.tinggi, bawah)
+      peta.set(id, {
+        x: xMin,
+        y: yMin,
+        lebar: xMaks - xMin,
+        tinggi: yMaks - yMin,
+      })
+    }
+  }
+
+  return peta
+}
+
 function kumpulkanInfoSesi(
   osmd: InstanceType<ModulOsmd['OpenSheetMusicDisplay']>,
+  wadah: HTMLElement,
   tataLetak: ModeTataLetakPartitur,
   zoom: number,
 ): HasilSesiPartitur {
@@ -490,12 +531,51 @@ function kumpulkanInfoSesi(
   }))
 
   const sumberBirama = osmd.Sheet?.SourceMeasures ?? []
-  const birama: KotakBiramaRender[] = sumberBirama.map((sm, idx) => ({
-    nomorBirama: typeof sm.MeasureNumberXML === 'number' ? sm.MeasureNumberXML : sm.MeasureNumber,
-    indeksUrut: typeof sm.measureListIndex === 'number' ? sm.measureListIndex : idx,
-  }))
-
   const daftarBarisGrafis = osmd.GraphicSheet?.MeasureList ?? []
+  const petaKotakGrafis = ukurPetaKotakGrafisSvg(wadah)
+
+  const daftarSumberMentah: BiramaSumberMentah[] = sumberBirama.map((sm, idx) => {
+    const nomorBiramaXml =
+      typeof sm.MeasureNumberXML === 'number' ? sm.MeasureNumberXML : sm.MeasureNumber
+    const indeksUrut = typeof sm.measureListIndex === 'number' ? sm.measureListIndex : idx
+    const barisGrafis = daftarBarisGrafis[idx]
+    const gmPertama = Array.isArray(barisGrafis)
+      ? barisGrafis.find(
+          (gm) =>
+            gm &&
+            !gm.IsExtraGraphicalMeasure &&
+            typeof gm.MeasureNumber === 'number' &&
+            gm.MeasureNumber >= 0,
+        )
+      : undefined
+    const idGrafis = gmPertama ? String(gmPertama.MeasureNumber) : null
+    const multiRest = (sm as unknown as { multipleRestMeasures?: number }).multipleRestMeasures
+    return {
+      indeksUrut,
+      nomorBiramaXml,
+      idGrafis,
+      ...(typeof multiRest === 'number' && multiRest > 1 ? { jumlahMultiRest: multiRest } : {}),
+    }
+  })
+
+  const kotakTerpeta = petakanKotakBiramaSumber(daftarSumberMentah, petaKotakGrafis)
+  const birama: KotakBiramaRender[] =
+    kotakTerpeta.length > 0
+      ? kotakTerpeta.map((k) => ({
+          ...k,
+          nomorBirama: k.nomorBiramaXml,
+        }))
+      : daftarSumberMentah.map((sm, idx) => ({
+          nomorBirama: sm.nomorBiramaXml,
+          nomorBiramaXml: sm.nomorBiramaXml,
+          birama: idx + 1,
+          indeksUrut: sm.indeksUrut,
+          x: 0,
+          y: 0,
+          lebar: 0,
+          tinggi: 0,
+        }))
+
   const jumlahBiramaGrafis =
     daftarBarisGrafis.length > 0
       ? daftarBarisGrafis.filter((baris) => Array.isArray(baris) && baris.some(Boolean)).length
@@ -620,7 +700,7 @@ export async function renderPartiturMusicXml(
       onProgres?.({ selesai: true, biramaTerender: total, totalBirama: total })
     }
 
-    const sesi = kumpulkanInfoSesi(osmd, tataLetak, osmd.Zoom)
+    const sesi = kumpulkanInfoSesi(osmd, wadah, tataLetak, osmd.Zoom)
     const bersihkan = () => {
       try {
         osmd.clear()

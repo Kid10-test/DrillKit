@@ -874,6 +874,8 @@ function MemberView() {
           anggotaAktif={me}
           sectionsPaket={bundle.team?.sections}
           namaTimPaket={bundle.team?.teamName}
+          drillsPaket={bundle.drills}
+          setsPaket={bundle.sets}
         />
       ) : !me ? (
         <EmptyState title="Pilih nama di atas" desc="Supaya DrillKit tahu formasi dan absensi siapa yang ditampilkan." />

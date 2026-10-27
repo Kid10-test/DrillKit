@@ -416,6 +416,12 @@ export interface OpsiMetronom {
   /** #4 — dipanggil tiap kali putaran ulang bagian dimulai (termasuk putaran 1). */
   onPutaran?: (i: { putaran: number; tempo: TempoLatihan; tujuan: boolean }) => void
   /**
+   * #11d — dipanggil tiap kali batas akhir `ulangBagian` tercapai dan mesin
+   * melompat kembali ke `dari` (baik dengan maupun tanpa `naikOtomatis`),
+   * dipakai untuk menyelaraskan lompatan balik `PemutarRekaman` (#6).
+   */
+  onUlangBagian?: (i: { dari: number; sampai: number; tempo: TempoLatihan | null }) => void
+  /**
    * #6 — kalau diisi, klik mengikuti jam rekaman: ia baru mulai berbunyi
    * setelah rekamannya benar-benar berjalan, dan tiap ketukan ditempatkan
    * menurut posisi rekaman — bukan menurut hitungan mesin sendiri.
@@ -551,6 +557,8 @@ export class Metronom {
   private naik: NaikOtomatis | null = null
   private putaran = 1
   private onPutaran: OpsiMetronom['onPutaran'] | null = null
+  private onUlangBagian: OpsiMetronom['onUlangBagian'] | null = null
+  private tungguLompatUlangSampai = 0
   /**
    * #6 — jam lagu (rekaman) yang menjadi patokan waktu, kalau ada.
    * Selama jam ini terpasang, mesin tidak memakai hitungan waktunya sendiri.
@@ -658,6 +666,8 @@ export class Metronom {
     // #4 — tempo latihan & naik otomatis.
     this.latihan = opsi.latihan ?? null
     this.onPutaran = opsi.onPutaran ?? null
+    this.onUlangBagian = opsi.onUlangBagian ?? null
+    this.tungguLompatUlangSampai = 0
     this.naik = opsi.naikOtomatis && opsi.naikOtomatis.on && rentangSah ? rapikanNaik(opsi.naikOtomatis) : null
     this.putaran = 1
     if (this.naik) {
@@ -705,6 +715,8 @@ export class Metronom {
     this.ulangSampai = 0
     this.naik = null
     this.onPutaran = null
+    this.onUlangBagian = null
+    this.tungguLompatUlangSampai = 0
     this.timeline = null
     this.jadwalKlik = null
     this.indeksJadwalKlik = 0
@@ -992,10 +1004,42 @@ export class Metronom {
       this.waktuBirama = ctx.currentTime + 0.08
     }
     const jam = this.jam
-    if (jam) this.selaraskanKeJam()
+    let baruMelompatUlang = false
+    if (jam && this.ulangSampai > 0 && ctx.currentTime >= this.tungguLompatUlangSampai) {
+      const batasAkhirUlang = this.detikPadaBirama(this.ulangSampai + 1)
+      if (jam.posisi() >= batasAkhirUlang - 0.015) {
+        baruMelompatUlang = true
+        this.tungguLompatUlangSampai = ctx.currentTime + 0.12
+        for (const t of this.terjadwal) t.batalkan()
+        this.terjadwal = []
+        this.antrean = []
+        if (this.naik) {
+          if (tujuanTercapai(this.naik, this.putaran) && this.naik.akhir === 'berhenti') {
+            this.selesai = true
+            this.onSelesai?.()
+            return
+          }
+          this.putaran++
+          this.latihan = tempoPutaran(this.naik, this.putaran)
+          this.onPutaran?.({
+            putaran: this.putaran,
+            tempo: this.latihan,
+            tujuan: tujuanTercapai(this.naik, this.putaran),
+          })
+        }
+        this.pos = this.ulangDari - 1
+        this.detikLagu = this.detikPadaBirama(this.ulangDari)
+        this.onUlangBagian?.({
+          dari: this.ulangDari,
+          sampai: this.ulangSampai,
+          tempo: this.latihan,
+        })
+      }
+    }
+    if (jam && !baruMelompatUlang) this.selaraskanKeJam()
 
     const laju = jam ? Math.max(0.1, jam.laju()) : 1
-    const posLagu = jam ? jam.posisi() : 0
+    const posLagu = jam ? (baruMelompatUlang ? this.detikLagu : jam.posisi()) : 0
     /*
      * Jalur jam boleh melihat lebih jauh ke depan, karena acuannya posisi
      * rekaman — bukan akumulasi mesin sendiri. Jadi satu hiccup utas utama
@@ -1049,6 +1093,10 @@ export class Metronom {
       // awal rentang. Ini **menang** atas akhir lagu maupun `ulang`, karena
       // berlatih satu bagian berarti lagu memang tidak boleh berhenti.
       if (this.ulangSampai > 0 && biramaAbsolut > this.ulangSampai) {
+        // #11d — pada jalur jam rekaman (#6), tahan lookahead di ujung rentang
+        // sampai rekaman benar-benar mencapai `batasAkhirUlang` di atas agar
+        // 0,6 dtk terakhir dari birama penutup tidak terpotong lompatan dini.
+        if (jam) break
         // #4 — naik otomatis: tiap putaran baru, tempo latihan naik.
         if (this.naik) {
           if (tujuanTercapai(this.naik, this.putaran) && this.naik.akhir === 'berhenti') {
@@ -1065,6 +1113,11 @@ export class Metronom {
         }
         this.pos = this.ulangDari - 1
         this.detikLagu = this.detikPadaBirama(this.ulangDari)
+        this.onUlangBagian?.({
+          dari: this.ulangDari,
+          sampai: this.ulangSampai,
+          tempo: this.latihan,
+        })
         continue
       }
 

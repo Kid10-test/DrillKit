@@ -21,9 +21,11 @@ import {
 import { jepitTempo, luncuranPada, tempoBerlaku } from '../lib/metronome'
 import type { SegmenTempo } from '../lib/metronome'
 import type { LatihTempo, TandaBirama } from '../db/types'
+import type { FrasaLatihan } from '../lib/partiturFrasa'
 import { labelLatihan, latihanAktif, terapkanLatihan } from '../lib/tempoLatihan'
 import type { TempoLatihan } from '../lib/tempoLatihan'
 import { cx } from '../lib/utils'
+import { IconLoop } from './Icons'
 
 /* --------------------------- Indikator ketuk ------------------------------ */
 
@@ -108,11 +110,17 @@ export function StripSegmen({
   biramaSekarang,
   warisan,
   onLoncat,
+  panjangBirama,
+  frasaAktif = null,
+  onPilihFrasaSegmen,
 }: {
   segmen: (SegmenWaktu & { id: string; label: string })[]
   biramaSekarang: number
   warisan: TandaBirama
   onLoncat: (measure: number) => void
+  panjangBirama?: number
+  frasaAktif?: FrasaLatihan | null
+  onPilihFrasaSegmen?: (dari: number, sampai: number, label: string) => void
 }) {
   if (segmen.length === 0) return null
   const aktif = indexSegmen(segmen, biramaSekarang)
@@ -123,26 +131,56 @@ export function StripSegmen({
         const r = rentangSegmen(segmen, i)
         const meter = s.birama ?? warisan
         const aktifDiSini = i === aktif
+        const mulai = r?.mulai ?? s.measure
+        const selesai =
+          r?.selesai ??
+          (panjangBirama && panjangBirama >= mulai ? panjangBirama : mulai + 3)
+        const sedangDiulang =
+          frasaAktif?.aktif === 1 &&
+          frasaAktif.dari === mulai &&
+          frasaAktif.sampai === selesai
         return (
-          <button
+          <div
             key={s.id}
-            data-testid={`chip-segmen-${i}`}
-            data-aktif={aktifDiSini ? '1' : '0'}
-            onClick={() => onLoncat(s.measure)}
-            title={`Loncat ke birama ${s.measure}`}
             className={cx(
-              'shrink-0 rounded-lg border px-3 py-2 text-left text-xs transition',
+              'flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-left text-xs transition',
               aktifDiSini
                 ? 'border-emerald-600/50 bg-emerald-600/10 text-emerald-200'
                 : 'border-slate-800 text-slate-400 hover:bg-slate-800/60',
             )}
           >
-            <p className="font-medium">{s.label}</p>
-            <p className="text-[10px] opacity-70">
-              birama {r?.mulai}
-              {r?.selesai ? `–${r.selesai}` : '+'} · {s.bpm} BPM · {labelBirama(meter)}
-            </p>
-          </button>
+            <button
+              type="button"
+              data-testid={`chip-segmen-${i}`}
+              data-aktif={aktifDiSini ? '1' : '0'}
+              onClick={() => onLoncat(s.measure)}
+              title={`Loncat ke birama ${s.measure}`}
+              className="text-left"
+            >
+              <p className="font-medium">{s.label}</p>
+              <p className="text-[10px] opacity-70">
+                birama {r?.mulai}
+                {r?.selesai ? `–${r.selesai}` : panjangBirama && panjangBirama >= mulai ? `–${panjangBirama}` : '+'} · {s.bpm} BPM · {labelBirama(meter)}
+              </p>
+            </button>
+            {onPilihFrasaSegmen && (
+              <button
+                type="button"
+                data-kiosk-allow
+                data-testid={`ulang-segmen-${i}`}
+                onClick={() => onPilihFrasaSegmen(mulai, selesai, s.label)}
+                title={`Ulang frasa ${s.label} (birama ${mulai}–${selesai})`}
+                className={cx(
+                  'rounded border px-1.5 py-1 text-[10px] font-medium transition',
+                  sedangDiulang
+                    ? 'border-amber-500/60 bg-amber-500/20 text-amber-200'
+                    : 'border-slate-700/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+                )}
+              >
+                <IconLoop size={11} />
+              </button>
+            )}
+          </div>
         )
       })}
     </div>
@@ -171,6 +209,7 @@ export function PanelSedangDiputar({
   tempoKetuk,
   waktuBiramaUntuk,
   durasiBiramaUntuk,
+  lencanaFrasa = null,
 }: {
   judul: string
   /** birama absolut yang sedang berjalan (1-based) */
@@ -200,6 +239,8 @@ export function PanelSedangDiputar({
   waktuBiramaUntuk?: (birama: number) => number
   /** Exact integrated measure duration from TempoTimeline. */
   durasiBiramaUntuk?: (birama: number) => number
+  /** #11d — lencana frasa aktif, mis. "Frasa 5–8 · 80%". */
+  lencanaFrasa?: string | null
 }) {
   const idx = indexSegmen(segmen, measure)
   const seg = idx >= 0 ? segmen[idx] : null
@@ -262,9 +303,20 @@ export function PanelSedangDiputar({
       data-testid="panel-lagu"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <p className="text-sm font-semibold text-emerald-100" data-testid="panel-judul">
-          {judul}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-emerald-100" data-testid="panel-judul">
+            {judul}
+          </p>
+          {lencanaFrasa && (
+            <span
+              data-testid="panel-lagu-lencana-frasa"
+              className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-amber-200"
+            >
+              <IconLoop size={11} />
+              {lencanaFrasa}
+            </span>
+          )}
+        </div>
         <p className="text-[11px] text-emerald-300/70" data-testid="panel-waktu">
           {formatWaktu(detik)} · birama ke-
           <span className="font-semibold text-emerald-200" data-testid="panel-birama">

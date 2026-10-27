@@ -1,18 +1,34 @@
 /**
- * M3 — kartu set list: urutan lagu untuk satu penampilan.
+ * M3 & #11d — Kartu set list: urutan lagu untuk satu penampilan, lencana frasa
+ * latihan (`"Frasa 5–8 · 80%"`), serta tautan frasa partitur ↔ set drill
+ * (`"Set 4–6 = Bar 9–16"`).
  *
  * Sengaja dipisah dari `Music.tsx` supaya berkas halamannya tidak makin
  * membengkak. Komponen ini **tidak** memutar apa pun sendiri: ia hanya
  * menampilkan keadaan dan memanggil balik ke halaman.
  */
 import { useState } from 'react'
-import type { SetList, Song } from '../db/types'
-import type { TempoLatihan } from '../lib/tempoLatihan'
-import { hitungSetList, naik, turun } from '../lib/setlist'
+import type { SetList, Song, TautanFrasaSetList } from '../db/types'
 import { formatWaktu, labelBirama } from '../lib/birama'
-import { Button, Card, Field, Input, Select } from './ui'
-import { IconMusic, IconPlay, IconPlus, IconTrash } from './Icons'
+import {
+  bacaTautanFrasaBaris,
+  formatLencanaFrasa,
+  formatTautanSetBirama,
+  gabungRentangSetKeBirama,
+  type FrasaLatihan,
+  type InfoSetBirama,
+} from '../lib/partiturFrasa'
+import { hitungSetList, naik, turun } from '../lib/setlist'
+import type { TempoLatihan } from '../lib/tempoLatihan'
 import { cx } from '../lib/utils'
+import { IconLoop, IconMusic, IconPlay, IconPlus, IconTrash } from './Icons'
+import { Button, Card, Field, Input, Select } from './ui'
+
+export interface InfoDrillLaguSetList {
+  drillId: string
+  namaDrill: string
+  sets: InfoSetBirama[]
+}
 
 export function KartuSetList({
   daftar,
@@ -29,15 +45,13 @@ export function KartuSetList({
   onMainkan,
   onPilihLagu,
   onTambah,
-  /**
-   * N4 — dipakai mode anggota: susunan lagu bisa DILIHAT dan DIPUTAR,
-   * tetapi tidak bisa diubah. Set list milik pelatih; kalau anggota bisa
-   * mengurutkannya, satu orang tidak sengaja bisa mengacaukan urutan
-   * penampilan untuk dirinya sendiri tanpa pelatih tahu.
-   */
   hanyaPutar = false,
   latihanUntuk,
   onSemuaAsli,
+  frasaUntuk,
+  petaSetUntukLagu,
+  onSimpanTautanSet,
+  onAktifkanTautanSet,
 }: {
   daftar: SetList[]
   aktif: SetList | null
@@ -61,13 +75,73 @@ export function KartuSetList({
   latihanUntuk?: (songId: string) => TempoLatihan | null
   /** #4 — kembalikan semua lagu di set list ini ke tempo asli. */
   onSemuaAsli?: (songIds: string[]) => void
+  /** #11d — frasa latihan tiap lagu (per perangkat / M2). */
+  frasaUntuk?: (songId: string) => FrasaLatihan | null
+  /** #11d — pemetaan set drill lagu bila lagu ditautkan ke sebuah drill. */
+  petaSetUntukLagu?: (songId: string) => InfoDrillLaguSetList | null
+  /** #11d — simpan atau hapus tautan `Set A–B = Bar X–Y` pada baris set list. */
+  onSimpanTautanSet?: (
+    indeksBaris: number,
+    songId: string,
+    tautan: TautanFrasaSetList | null,
+  ) => void
+  /** #11d — aktifkan latihan frasa dari keping tautan `Set A–B = Bar X–Y`. */
+  onAktifkanTautanSet?: (songId: string, tautan: TautanFrasaSetList) => void
 }) {
   const [tambahId, setTambahId] = useState('')
+  const [barisEditTautan, setBarisEditTautan] = useState<number | null>(null)
+  const [drafSetAwal, setDrafSetAwal] = useState(1)
+  const [drafSetAkhir, setDrafSetAkhir] = useState(1)
+  const [drafBarDari, setDrafBarDari] = useState(1)
+  const [drafBarSampai, setDrafBarSampai] = useState(4)
 
   const h = hitungSetList(aktif, songs, latihanUntuk)
   const adaLatihan = h.baris.some((b) => b.latihan)
   /** Lagu yang belum masuk set list ini — untuk pilihan "tambah". */
   const bisaDitambah = songs.filter((s) => !(aktif?.songIds ?? []).includes(s.id))
+  const petaLagu = new Map(songs.map((s) => [s.id, s]))
+
+  function bukaEditorTautan(indeks: number, songId: string) {
+    if (barisEditTautan === indeks) {
+      setBarisEditTautan(null)
+      return
+    }
+    const sudahAda = bacaTautanFrasaBaris(aktif?.tautanFrasa, indeks, songId)
+    const infoDrill = petaSetUntukLagu?.(songId) ?? null
+    if (sudahAda) {
+      setDrafSetAwal(sudahAda.setAwal)
+      setDrafSetAkhir(sudahAda.setAkhir)
+      setDrafBarDari(sudahAda.biramaDari)
+      setDrafBarSampai(sudahAda.biramaSampai)
+    } else if (infoDrill && infoDrill.sets.length > 0) {
+      const pertama = infoDrill.sets[0]
+      setDrafSetAwal(pertama.nomorSet)
+      setDrafSetAkhir(pertama.nomorSet)
+      setDrafBarDari(pertama.biramaDari)
+      setDrafBarSampai(pertama.biramaSampai)
+    } else {
+      const frasaKini = frasaUntuk?.(songId)
+      setDrafSetAwal(1)
+      setDrafSetAkhir(1)
+      setDrafBarDari(frasaKini?.dari ?? 1)
+      setDrafBarSampai(frasaKini?.sampai ?? 4)
+    }
+    setBarisEditTautan(indeks)
+  }
+
+  function pilihRentangSetDariDrill(
+    sets: InfoSetBirama[],
+    awalBaru: number,
+    akhirBaru: number,
+  ) {
+    setDrafSetAwal(awalBaru)
+    setDrafSetAkhir(akhirBaru)
+    const gabung = gabungRentangSetKeBirama(sets, awalBaru, akhirBaru)
+    if (gabung) {
+      setDrafBarDari(gabung.biramaDari)
+      setDrafBarSampai(gabung.biramaSampai)
+    }
+  }
 
   return (
     <Card className="mt-4" data-testid="kartu-setlist">
@@ -79,7 +153,10 @@ export function KartuSetList({
         <div className="flex flex-wrap items-center gap-2">
           <Select
             value={aktif?.id ?? ''}
-            onChange={(e) => onPilih(e.target.value)}
+            onChange={(e) => {
+              setBarisEditTautan(null)
+              onPilih(e.target.value)
+            }}
             data-testid="pilih-setlist"
             className="min-w-[12rem]"
           >
@@ -172,118 +249,328 @@ export function KartuSetList({
             )}
             {h.baris.map((b, i) => {
               const sedangIni = indeksMain === i
-              /** Lagu ini yang sedang dimuat di metronom (belum tentu diputar). */
               const dimuat = b.id === laguDipilih
+              const objekLagu = petaLagu.get(b.id)
+              const lencanaFrasa = formatLencanaFrasa(
+                frasaUntuk?.(b.id),
+                latihanUntuk?.(b.id),
+                objekLagu?.panjangBirama,
+              )
+              const tautanSet = bacaTautanFrasaBaris(aktif.tautanFrasa, i, b.id)
+              const infoDrill = petaSetUntukLagu?.(b.id) ?? null
+              const sedangEditTautan = !hanyaPutar && barisEditTautan === i
+
               return (
                 <li
-                  key={b.id}
+                  key={`${i}-${b.id}`}
                   data-testid={`setlist-baris-${i}`}
                   className={cx(
-                    'flex items-center gap-2 rounded-lg border px-2.5 py-2 transition',
+                    'rounded-lg border px-2.5 py-2 transition',
                     sedangIni
                       ? 'border-emerald-600/50 bg-emerald-600/10'
                       : 'border-slate-800 hover:bg-slate-800/40',
                   )}
                 >
-                  <span className="w-5 shrink-0 text-center text-[11px] tabular-nums text-slate-500">
-                    {i + 1}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 shrink-0 text-center text-[11px] tabular-nums text-slate-500">
+                      {i + 1}
+                    </span>
 
-                  {/* Klik baris = pilih lagu itu di metronom */}
-                  <button
-                    type="button"
-                    onClick={() => onPilihLagu(b.id)}
-                    className="min-w-0 flex-1 text-left"
-                    data-testid={`setlist-pilih-${i}`}
-                  >
-                    <p className="truncate text-sm font-medium text-slate-100">
-                      {b.judul}
-                      {b.adaRekaman && (
-                        <span
-                          className="ml-1.5 inline-flex items-center text-[10px] text-emerald-400"
-                          title="Lagu ini memiliki rekaman audio"
-                          data-testid={`setlist-rekaman-${i}`}
-                        >
-                          🎵
-                        </span>
-                      )}
-                      {dimuat && (
-                        <span
-                          className="ml-1.5 rounded-full bg-slate-700/70 px-1.5 py-0.5 text-[9px] font-medium text-slate-300"
-                          data-testid={`setlist-dimuat-${i}`}
-                        >
-                          dimuat
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-[10px] text-slate-500">
-                      {b.latihan ? (
-                        <span className="text-amber-200" data-testid={`setlist-latihan-${i}`}>
-                          {b.bpmLatihan} BPM (asli {b.bpm}) · {b.latihan}
-                        </span>
-                      ) : (
-                        `${b.bpm} BPM`
-                      )}{' '}
-                      · {labelBirama(b.sukat)} ·{' '}
-                      {b.detik === null ? (
-                        <span className="text-amber-300/80">tanpa akhir</span>
-                      ) : (
-                        formatWaktu(b.detik)
-                      )}
-                    </p>
-                  </button>
+                    {/* Klik baris = pilih lagu itu di metronom */}
+                    <button
+                      type="button"
+                      onClick={() => onPilihLagu(b.id)}
+                      className="min-w-0 flex-1 text-left"
+                      data-testid={`setlist-pilih-${i}`}
+                    >
+                      <p className="truncate text-sm font-medium text-slate-100">
+                        {b.judul}
+                        {b.adaRekaman && (
+                          <span
+                            className="ml-1.5 inline-flex items-center text-[10px] text-emerald-400"
+                            title="Lagu ini memiliki rekaman audio"
+                            data-testid={`setlist-rekaman-${i}`}
+                          >
+                            🎵
+                          </span>
+                        )}
+                        {dimuat && (
+                          <span
+                            className="ml-1.5 rounded-full bg-slate-700/70 px-1.5 py-0.5 text-[9px] font-medium text-slate-300"
+                            data-testid={`setlist-dimuat-${i}`}
+                          >
+                            dimuat
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        {b.latihan ? (
+                          <span className="text-amber-200" data-testid={`setlist-latihan-${i}`}>
+                            {b.bpmLatihan} BPM (asli {b.bpm}) · {b.latihan}
+                          </span>
+                        ) : (
+                          `${b.bpm} BPM`
+                        )}{' '}
+                        · {labelBirama(b.sukat)} ·{' '}
+                        {b.detik === null ? (
+                          <span className="text-amber-300/80">tanpa akhir</span>
+                        ) : (
+                          formatWaktu(b.detik)
+                        )}
+                      </p>
+                    </button>
 
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => onMainkan(i)}
-                      title="Mainkan set list mulai dari lagu ini"
-                      data-testid={`setlist-mainkan-${i}`}
-                      className={cx(
-                        'rounded-lg border px-2 py-1.5 transition',
-                        sedangIni
-                          ? 'border-emerald-600/50 bg-emerald-600/15 text-emerald-200'
-                          : 'border-slate-700 text-slate-300 hover:bg-slate-800',
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                      {lencanaFrasa && (
+                        <span
+                          data-testid={`setlist-lencana-frasa-${i}`}
+                          className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-amber-200"
+                        >
+                          <IconLoop size={10} />
+                          {lencanaFrasa}
+                        </span>
                       )}
-                    >
-                      <IconPlay size={13} />
-                    </button>
-                    {!hanyaPutar && (
-                    <button
-                      type="button"
-                      onClick={() => onUrut?.(naik(aktif.songIds, i))}
-                      disabled={i === 0}
-                      title="Naikkan"
-                      data-testid={`setlist-naik-${i}`}
-                      className="rounded-lg border border-slate-700 px-1.5 py-1 text-slate-400 hover:bg-slate-800 disabled:opacity-30"
-                    >
-                      ↑
-                    </button>
-                    )}
-                    {!hanyaPutar && (
-                    <button
-                      type="button"
-                      onClick={() => onUrut?.(turun(aktif.songIds, i))}
-                      disabled={i === h.baris.length - 1}
-                      title="Turunkan"
-                      data-testid={`setlist-turun-${i}`}
-                      className="rounded-lg border border-slate-700 px-1.5 py-1 text-slate-400 hover:bg-slate-800 disabled:opacity-30"
-                    >
-                      ↓
-                    </button>
-                    )}
-                    {!hanyaPutar && (
-                    <button
-                      type="button"
-                      onClick={() => onUrut?.(aktif.songIds.filter((_, k) => k !== i))}
-                      title="Keluarkan dari set list"
-                      data-testid={`setlist-buang-${i}`}
-                      className="rounded-lg border border-slate-700 px-1.5 py-1 text-slate-400 hover:bg-slate-800"
-                    >
-                      ✕
-                    </button>
-                    )}
+
+                      {tautanSet && (
+                        <button
+                          type="button"
+                          data-testid={`setlist-tautan-set-${i}`}
+                          onClick={() => onAktifkanTautanSet?.(b.id, tautanSet)}
+                          title="Klik untuk memuat lagu ini dan melatih rentang birama set drill tersebut"
+                          className="inline-flex items-center gap-1 rounded-full border border-sky-500/50 bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-sky-200 transition hover:bg-sky-500/25"
+                        >
+                          {formatTautanSetBirama(tautanSet)}
+                        </button>
+                      )}
+
+                      {!hanyaPutar && onSimpanTautanSet && (
+                        <button
+                          type="button"
+                          data-testid={`setlist-atur-tautan-${i}`}
+                          onClick={() => bukaEditorTautan(i, b.id)}
+                          title="Tautkan frasa birama lagu ini ke rentang set drill (mis. Set 4–6 = Bar 9–16)"
+                          className={cx(
+                            'rounded-lg border px-2 py-1 text-[10px] font-medium transition',
+                            sedangEditTautan
+                              ? 'border-sky-500/60 bg-sky-500/15 text-sky-200'
+                              : 'border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+                          )}
+                        >
+                          {tautanSet ? 'Ubah set' : 'Tautkan set'}
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => onMainkan(i)}
+                        title="Mainkan set list mulai dari lagu ini"
+                        data-testid={`setlist-mainkan-${i}`}
+                        className={cx(
+                          'rounded-lg border px-2 py-1.5 transition',
+                          sedangIni
+                            ? 'border-emerald-600/50 bg-emerald-600/15 text-emerald-200'
+                            : 'border-slate-700 text-slate-300 hover:bg-slate-800',
+                        )}
+                      >
+                        <IconPlay size={13} />
+                      </button>
+                      {!hanyaPutar && (
+                        <button
+                          type="button"
+                          onClick={() => onUrut?.(naik(aktif.songIds, i))}
+                          disabled={i === 0}
+                          title="Naikkan"
+                          data-testid={`setlist-naik-${i}`}
+                          className="rounded-lg border border-slate-700 px-1.5 py-1 text-slate-400 hover:bg-slate-800 disabled:opacity-30"
+                        >
+                          ↑
+                        </button>
+                      )}
+                      {!hanyaPutar && (
+                        <button
+                          type="button"
+                          onClick={() => onUrut?.(turun(aktif.songIds, i))}
+                          disabled={i === h.baris.length - 1}
+                          title="Turunkan"
+                          data-testid={`setlist-turun-${i}`}
+                          className="rounded-lg border border-slate-700 px-1.5 py-1 text-slate-400 hover:bg-slate-800 disabled:opacity-30"
+                        >
+                          ↓
+                        </button>
+                      )}
+                      {!hanyaPutar && (
+                        <button
+                          type="button"
+                          onClick={() => onUrut?.(aktif.songIds.filter((_, k) => k !== i))}
+                          title="Keluarkan dari set list"
+                          data-testid={`setlist-buang-${i}`}
+                          className="rounded-lg border border-slate-700 px-1.5 py-1 text-slate-400 hover:bg-slate-800"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* #11d — Penyunting ringkas tautan Set A–B = Bar X–Y */}
+                  {sedangEditTautan && (
+                    <div
+                      data-testid={`setlist-panel-tautan-${i}`}
+                      className="mt-2 space-y-2 rounded-lg border border-slate-800 bg-slate-950/70 p-2.5 text-[11px]"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-slate-300">
+                          {infoDrill
+                            ? `Tautkan ke drill "${infoDrill.namaDrill}" (${infoDrill.sets.length} set)`
+                            : 'Tautkan rentang set & birama (belum ada drill tertaut otomatis)'}
+                        </span>
+                        <span
+                          data-testid={`setlist-pratinjau-tautan-${i}`}
+                          className="font-semibold tabular-nums text-sky-300"
+                        >
+                          {formatTautanSetBirama({
+                            setAwal: drafSetAwal,
+                            setAkhir: drafSetAkhir,
+                            biramaDari: drafBarDari,
+                            biramaSampai: drafBarSampai,
+                          })}
+                        </span>
+                      </div>
+
+                      {infoDrill && infoDrill.sets.length > 0 ? (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <Field label="Dari set">
+                            <Select
+                              value={String(drafSetAwal)}
+                              data-testid={`setlist-tautan-set-awal-${i}`}
+                              onChange={(e) => {
+                                const awal = Math.max(1, Number(e.target.value) || 1)
+                                pilihRentangSetDariDrill(
+                                  infoDrill.sets,
+                                  awal,
+                                  Math.max(awal, drafSetAkhir),
+                                )
+                              }}
+                            >
+                              {infoDrill.sets.map((s) => (
+                                <option key={s.index} value={s.nomorSet}>
+                                  Set {s.nomorSet} ({s.nama}) — Bar {s.biramaDari}–{s.biramaSampai}
+                                </option>
+                              ))}
+                            </Select>
+                          </Field>
+                          <Field label="Sampai set">
+                            <Select
+                              value={String(drafSetAkhir)}
+                              data-testid={`setlist-tautan-set-akhir-${i}`}
+                              onChange={(e) => {
+                                const akhir = Math.max(1, Number(e.target.value) || 1)
+                                pilihRentangSetDariDrill(
+                                  infoDrill.sets,
+                                  Math.min(drafSetAwal, akhir),
+                                  akhir,
+                                )
+                              }}
+                            >
+                              {infoDrill.sets.map((s) => (
+                                <option key={s.index} value={s.nomorSet}>
+                                  Set {s.nomorSet} ({s.nama}) — Bar {s.biramaDari}–{s.biramaSampai}
+                                </option>
+                              ))}
+                            </Select>
+                          </Field>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          <Field label="Dari set">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={drafSetAwal}
+                              data-testid={`setlist-tautan-set-awal-${i}`}
+                              onChange={(e) =>
+                                setDrafSetAwal(Math.max(1, Math.floor(Number(e.target.value) || 1)))
+                              }
+                            />
+                          </Field>
+                          <Field label="Sampai set">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={drafSetAkhir}
+                              data-testid={`setlist-tautan-set-akhir-${i}`}
+                              onChange={(e) =>
+                                setDrafSetAkhir(Math.max(1, Math.floor(Number(e.target.value) || 1)))
+                              }
+                            />
+                          </Field>
+                          <Field label="Dari birama">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={drafBarDari}
+                              data-testid={`setlist-tautan-bar-dari-${i}`}
+                              onChange={(e) =>
+                                setDrafBarDari(Math.max(1, Math.floor(Number(e.target.value) || 1)))
+                              }
+                            />
+                          </Field>
+                          <Field label="Sampai birama">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={drafBarSampai}
+                              data-testid={`setlist-tautan-bar-sampai-${i}`}
+                              onChange={(e) =>
+                                setDrafBarSampai(
+                                  Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                                )
+                              }
+                            />
+                          </Field>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {tautanSet && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            data-testid={`setlist-tautan-hapus-${i}`}
+                            onClick={() => {
+                              onSimpanTautanSet?.(i, b.id, null)
+                              setBarisEditTautan(null)
+                            }}
+                          >
+                            Hapus tautan
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          data-testid={`setlist-tautan-simpan-${i}`}
+                          onClick={() => {
+                            const setAwal = Math.min(drafSetAwal, drafSetAkhir)
+                            const setAkhir = Math.max(drafSetAwal, drafSetAkhir)
+                            const biramaDari = Math.min(drafBarDari, drafBarSampai)
+                            const biramaSampai = Math.max(drafBarDari, drafBarSampai)
+                            const baru: TautanFrasaSetList = {
+                              ...(infoDrill ? { drillId: infoDrill.drillId } : {}),
+                              setAwal,
+                              setAkhir,
+                              biramaDari,
+                              biramaSampai,
+                            }
+                            onSimpanTautanSet?.(i, b.id, baru)
+                            onAktifkanTautanSet?.(b.id, baru)
+                            setBarisEditTautan(null)
+                          }}
+                        >
+                          Simpan & latih frasa
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </li>
               )
             })}

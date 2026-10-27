@@ -1,4 +1,4 @@
-# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 24 Okt 2026 — #11c rampung)
+# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 25 Okt 2026 — #11 rampung penuh)
 
 Dokumen ini merangkum delapan rancangan awal yang sudah didiskusikan dan
 diputuskan bersama pelatih, ditambah tiga usulan baru pasca PR #14
@@ -8,7 +8,7 @@ Semuanya siap dikerjakan di sesi baru. Setiap rancangan dijadikan PR
 tersendiri, sesuai kebiasaan proyek (satu ide = satu commit/PR,
 disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 
-**Status per 24 Okt 2026 (pemutakhiran #11c rampung):**
+**Status per 25 Okt 2026 (pemutakhiran #11d rampung — seluruh #11 selesai):**
 - **#1, #2, #3, dan #4 telah rampung penuh** (PR #6 hingga PR #10).
 - **#5 telah rampung penuh** — fondasi tempo map custom per ketuk/subdivisi
   dan ramp eksplisit terintegrasi lewat **PR #14** (`TempoTimeline`), lalu
@@ -54,8 +54,18 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
   SVG dan bilah `.no-print` (`partiturCetak.ts`), modal `PratinjauCetakPartitur`
   anti-buntu (`Unduh HTML` + `cetakAtauUnduh`), serta perbaikan `simpanPaketAnggota`
   agar lagu & set list dalam paket berkas lokal anggota langsung masuk ke
-  `db.songs`/`db.setlists`. Tinggal **11d** (highlight sinkron `TempoTimeline` +
-  loop frasa + tautan frasa↔set) yang menyusul.
+  `db.songs`/`db.setlists`.
+- **#11d Partitur: highlight birama sinkron `TempoTimeline`, pilih/loop frasa, & tautan frasa ↔ set drill selesai (25 Okt 2026)** —
+  pemetaan kotak piksel `<g.vf-measure>` OSMD termasuk istirahat multi-birama
+  (`partiturRender.ts`, `partiturFrasa.ts`), lapisan sorot aktif + pita frasa
+  berpalet hex/rgba murni tanpa `oklch()`/`color-mix()` beserta auto-scroll
+  cerdas dan bilah putar/frasa/tempo di `LayarPartitur`, pemilihan frasa 2-ketuk
+  / `Shift+klik` langsung di SVG yang diingat per lagu per perangkat
+  (`useFrasaLatihan.ts`), pembungkusan batas loop tepat pada birama terakhir di
+  `Metronom` + rekaman WAV `#6` (`onUlangBagian`), lencana `"Frasa 5–8 · 80%"` di
+  `LayarPartitur`, `PanelLagu`, dan `KartuSetList` (termasuk fallback tanpa
+  MusicXML), serta tautan `"Set 4–6 = Bar 9–16"` di `KartuSetList` dan partitur
+  pendamping sinkron di `DrillEditor`.
 
 **Aturan proyek yang tetap berlaku untuk semuanya:**
 
@@ -942,7 +952,7 @@ trumpet), highlight sinkron ±1 birama dengan rekaman & metronom,
 loop Bar 5–8 mengulang tepat 4 birama pada 80% tempo, cetak part
 hex 1 halaman, impor MusicXML round-trip ZIP tidak hilang.
 
-### Status: #11a (22 Okt 2026), #11b (23 Okt 2026) & #11c (24 Okt 2026) selesai; tinggal 11d menyusul
+### Status: Rampung penuh (#11a 22 Okt 2026, #11b 23 Okt 2026, #11c 24 Okt 2026, #11d 25 Okt 2026)
 
 Bagian **#11a** (fondasi data, pintu masuk, ringkasan murni, kuota, dan
 round-trip ZIP — sengaja tanpa merender notasi, tanpa dependensi baru) telah
@@ -1070,11 +1080,58 @@ dan `qa/partitur-cetak.mjs` **39 butir** (peramban: skor 6 *part* lintas 4 seksi
 penyaringan *Brass* & *Marimba* ber-multi-rest 4 birama, persistensi lintas
 `reload`, ganti ke skor solo 1-*part* & PDF, pratinjau/unduh/fallback cetak HTML
 `A4_L`/`A4_P`/`A5_L` Lyre, Kunci Kios, serta alur penuh mode anggota tanpa nama →
-*Trumpet* → *Ke part saya* → *Trombone* → *Color Guard* → *Marimba*). Seluruh
-**111 rangkaian** terdaftar di `qa/regresi-penuh.sh` dan `.github/workflows/ci.yml`.
+*Trumpet* → *Ke part saya* → *Trombone* → *Color Guard* → *Marimba*).
 
-**Yang menyusul:** tinggal **11d** (highlight sinkron `TempoTimeline` + loop frasa
-+ tautan frasa↔set).
+Bagian **#11d** (sorot birama aktif sinkron `TempoTimeline`, pilih & loop frasa
+per birama, serta tautan frasa partitur ↔ set drill) telah menuntaskan seluruh
+cakupan **#11** sesuai `RANCANGAN-11d-PARTITUR-FRASA.md`:
+
+- **Pemetaan birama SVG & multi-rest (`src/lib/partiturRender.ts`,
+  `src/lib/partiturFrasa.ts`)** — membaca kotak piksel setiap `<g.vf-measure>`
+  dari DOM OSMD dan memetakan rentang birama sumber termasuk penggabungan
+  istirahat multi-birama pada *part* tunggal (`biramaDari..biramaSampai`),
+  sehingga birama yang terlipat (mis. `Bar 9–12` pada *Trumpet 1*) tetap tersorot
+  dan dapat diklik tanpa melompat atau hilang.
+- **Lapisan sorot murni hex, auto-scroll cerdas, & kendali putar non-blocking
+  (`src/components/LayarPartitur.tsx`)** — menyorot birama aktif dan pita frasa
+  di atas kanvas OSMD memakai warna inline hex/rgba (`WARNA_SOROT_PARTITUR_HEX`,
+  `0` `oklch()` / `color-mix()`), menggulir otomatis hanya saat sistem paranada
+  mendekati tepi wadah dengan jeda otomatis 4 detik seusai gulir manual pengguna,
+  serta menyediakan tombol **Putar/Berhenti**, mode **Pilih frasa di partitur**
+  (2-ketuk atau `Shift+klik` langsung pada birama SVG), input `Dari..Sampai`,
+  preset tempo latihan (`70%`–`100%`), keping segmen lagu, dan keping set drill.
+- **Ingatan frasa per perangkat, loop presisi WAV + Metronom, & fallback tanpa
+  MusicXML (`src/hooks/useFrasaLatihan.ts`, `src/lib/metronome.ts`,
+  `src/components/PanelLagu.tsx`, `src/pages/Music.tsx`, `src/pages/Share.tsx`)** —
+  menyimpan pilihan frasa per lagu per perangkat di `localStorage`
+  (`drillkit_frasa_latihan_v1`, 80 lagu FIFO) yang menyatu dengan M2 `ulangBagian`,
+  `#4` tempo latihan, dan M1 hitung mundur; membungkus batas akhir birama tepat
+  kembali ke `dari` pada `Metronom` sekaligus menyinkronkan seek `PemutarRekaman`
+  (`#6`) via callback `onUlangBagian`; menampilkan lencana `"Frasa 5–8 · 80%"`
+  di `LayarPartitur`, `PanelLagu`, dan `KartuSetList`; serta menjaga latihan frasa
+  tetap berjalan via `TempoTimeline` dan keping segmen saat lagu belum memiliki
+  MusicXML atau hanya berpartitur PDF.
+- **Tautan frasa ↔ set drill & partitur pendamping di `DrillEditor`
+  (`src/db/types.ts`, `src/components/KartuSetList.tsx`,
+  `src/components/DrillEditor.tsx`)** — menghitung petunjuk rentang birama tiap
+  set dari `petaPenggaris` (`hitungPetaSetKeBirama`, mis. `Set 4–6 = Bar 9–16`),
+  menyimpan `SetList.tautanFrasa` agar terbawa ke paket anggota, dan menambahkan
+  panel **Buka partitur** di penggaris `DrillEditor` yang menyorot birama aktif
+  secara langsung seiring scrubber/animasi formasi berjalan.
+
+**Uji #11d:** `qa/partitur-frasa-logika.mjs` **42 butir** (murni node: pemetaan
+kotak multi-rest & pickup `0`, sorot aktif, `langkahPilihFrasa`, FIFO `localStorage`
++ prioritas di atas `Song.ulangBagian`, format lencana `"Frasa 5–8 · 80%"`,
+`hitungPetaSetKeBirama` `Set 4–6 = Bar 9–16`, konversi progres set ↔ birama,
+auto-scroll, serta audit palet hex murni) dan `qa/partitur-frasa.mjs` **30 butir**
+(peramban: MusicXML 32 birama *Full score* & *Trumpet 1* ber-multi-rest 4 birama,
+sinkronisasi sorot ±1 birama dengan rekaman WAV `#6` & metronom + auto-scroll,
+klik SVG & `Shift+klik` `Bar 5–8` di `80%` tempo yang mengulang tepat 4 birama
+`5..8 → 5` tanpa bocor ke `9` + persistensi `reload`, Kunci Kios, fallback tanpa
+MusicXML + hitung mundur M1, tautan `"Set 4–6 = Bar 9–16"` di `KartuSetList` &
+paket mode anggota, serta sorot partitur pendamping langsung di `DrillEditor`).
+Seluruh **113 rangkaian** terdaftar di `qa/regresi-penuh.sh` dan
+`.github/workflows/ci.yml`.
 
 ---
 
