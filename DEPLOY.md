@@ -12,8 +12,8 @@ dan bisa **install ke layar utama HP** (PWA) — tetap jalan offline.
 
 ## Opsi cepat: **mode portabel**, tanpa hosting sama sekali
 
-Kalau cuma mau mencoba atau memakai sendiri di HP, pakai **`drillkit-portable.zip`**.
-Berkasnya berisi **satu file `DrillKit.html`** (~870 KB) — semua kode sudah ditanam di
+Kalau cuma mau mencoba atau memakai sendiri di HP/laptop lama, pakai **`drillkit-portable.zip`**.
+Berkasnya berisi **satu file `DrillKit.html`** (~2,8 MB, sudah menyertakan mesin partitur MusicXML offline) — semua kode ditanam di
 dalamnya, jadi tidak butuh server.
 
 Cara pakai di HP Android:
@@ -76,16 +76,19 @@ npm run build     # hasilnya ada di folder dist/
 Isi folder `dist/` (mis. `index.html`, `assets/`, `sw.js`, `manifest.webmanifest`,
 `icon-192.png`, `icon-512.png`) itulah yang di-upload.
 
-Dua bundel sudah disiapkan, jadi tidak perlu build ulang:
+Tiga bundel sudah disiapkan di folder proyek, jadi tidak perlu build ulang:
 
-- **`drillkit-release.zip`** → untuk di-hosting (isi = folder `release/`).
-- **`drillkit-portable.zip`** → satu file HTML, bisa dibuka langsung (lihat “Opsi cepat” di atas).
+- **`drillkit-release.zip`** → untuk di-hosting (isi = folder `dist/`).
+- **`drillkit-siap-unggah.zip`** → folder `DrillKit/` siap seret ke Netlify Drop beserta pengingat `paket.json`.
+- **`drillkit-portable.zip`** → satu file `portable/DrillKit.html`, bisa dibuka langsung (lihat “Opsi cepat” di atas).
 
-Kalau ingin build ulang sendiri:
+Kalau ingin merakit ulang sendiri (termasuk memasang PIN pelatih tim opsional `#8`):
 
 ```bash
-npm run build            # versi untuk hosting  → dist/
-npm run build:portable   # satu file HTML       → dist-standalone/index.html
+npm run build                    # versi untuk hosting  → dist/
+npm run build:portable           # satu file HTML       → dist-standalone/index.html
+PIN_PELATIH=1234 npm run build   # opsional: tanam pagar PIN pelatih tim saat build
+bash scripts/siapkan-rilis.sh    # rakit ulang ketiga bundel .zip sekaligus
 ```
 
 ---

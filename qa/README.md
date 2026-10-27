@@ -19,7 +19,7 @@ bash qa/pulihkan.sh
 ./node_modules/.bin/vite preview --port 4173 --host 0.0.0.0
 cd qa && BASE=http://localhost:4173 node <nama-uji>.mjs
 
-# Atau jalankan semuanya sekaligus (86 rangkaian, hampir satu jam).
+# Atau jalankan semuanya sekaligus (115 rangkaian, hampir satu jam).
 bash qa/regresi-penuh.sh http://localhost:4173
 ```
 
@@ -99,10 +99,10 @@ sini supaya tidak perlu ditemukan ulang.
 |---|---|
 | `pulihkan.sh` | Memasang ulang `node_modules` di kedua folder dan pustaka Chrome. Tanpa yang terakhir, Puppeteer gagal dengan `Code: 127` tentang `libnspr4`. |
 | `bangun-logika.sh` | Merakit `src/lib/*.ts` murni menjadi `/tmp/*.mjs` untuk uji logika. Impor gagal, bukan asersi. |
-| `regresi-penuh.sh` | Menjalankan ke-86 rangkaian lawan satu `BASE`. |
+| `regresi-penuh.sh` | Menjalankan ke-115 rangkaian lawan satu `BASE`. |
 | `jalankan-semua.sh` | Daftar yang sama, dipecah per blok, hasilnya ke `hasil-regresi.txt` — untuk dipantau selagi berjalan. |
 | `sambutan.mjs` | `lewatSambutan(halaman)` — melewati layar sambutan seperti pemakai sungguhan. |
 | `db-mentah.mjs` | Menanam & membaca IndexedDB langsung, tanpa modul aplikasinya. |
 | `alat-buku-saku.mjs` | Alat bersama enam rangkaian buku saku (`dd8` … `dd10b-override`): membaca kartu di pratinjau, panel Detail, dan selalu mencetak `N lulus, M gagal`. Bukan rangkaian — jangan didaftarkan. |
-| `*.mjs` (180) | Kebanyakan satu berkas per rangkaian (sisanya alat bantu dan skrip tangkapan layar); yang masuk `regresi-penuh.sh` ada 82. |
+| `*.mjs` | Satu berkas per rangkaian uji (sisanya alat bantu dan skrip tangkapan layar); yang masuk `regresi-penuh.sh` ada 115. |
 | `nada-*.wav` | Berkas bunyi untuk uji penala & nada dengung. |

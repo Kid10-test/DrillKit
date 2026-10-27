@@ -91,19 +91,11 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 8 | PIN pelatih tim | Kecil–sedang | **Selesai (6 Okt 2026)** | Pagar mode pelatih via hash ENV; tanpa ketergantungan |
 | 9 | Grid & patok yard–meter custom | Kecil–sedang | **Fondasi selesai (3 Okt 2026)** | Tipe, geometri & UI terpisah; yard↔meter tanpa geser; batas E/T26; 41 butir uji baru |
 | 10 | Impor drill Pyware | Sedang | **Selesai (6 Okt 2026)** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo; 146 butir uji |
-| 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **#11a, #11b & #11c selesai (24 Okt 2026); tinggal 11d** | #11a: Blob IndexedDB, pintu #7, ringkasan, kuota, ZIP; #11b: `.mxl` + render OSMD hex lazy-load + PDF; #11c: filter part/section + anggota + cetak HTML hex; lanjut 11d highlight/loop |
+| 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Selesai penuh (#11a–#11d, 22–25 Okt 2026)** | #11a: Blob IndexedDB, pintu #7, ringkasan, kuota, ZIP; #11b: `.mxl` + render OSMD hex lazy-load + PDF; #11c: filter part/section + anggota + cetak HTML hex; #11d: sorot sinkron `TempoTimeline`, loop frasa, & tautan frasa↔set drill |
 
-> **Urutan prioritas yang disarankan pasca #5 rampung (4 Okt 2026):**
-> **#10 → #11 → #8** — #7 (5 Okt), #8 & #10 (6 Okt), **#11a** (22 Okt 2026), **#11b** (23 Okt 2026), serta **#11c** (24 Okt 2026) kini selesai;
-> yang tersisa tinggal **#11d** untuk highlight sinkron `TempoTimeline` & latihan frasa partitur (fondasi #9 selesai; sisa polish grid/patok tidak memblokir apa pun).
-> Alasan: **#5** sudah rampung sehingga drill×musik benar-benar menyatu; **#7** merapikan 5 jenis berkas + ZIP rekaman
-> sehingga impor Pyware (#10) dan MusicXML (#11) punya pintu masuk yang jelas;
-> **#9** grid/patok kustom memberi akurasi lapangan sebelum migrasi massal;
-> **#10** Pyware mempercepat migrasi tim yang sudah punya drill; **#11**
-> partitur adalah fitur terbesar yang bertumpu pada TempoTimeline + rekaman +
-> tempo latihan, sehingga wajar di akhir; **#8** PIN bersifat pagar dan dapat
-> disisipkan kapan saja tanpa memblokir fitur musik/drill. **I1** (log perubahan
-> show) tetap ditunda.
+> **Status pelaksanaan keseluruhan (27 Okt 2026):**
+> **Seluruh 11 rancangan (`#1` s.d. `#11d`) telah tuntas** (fondasi `#9` grid/patok kustom sudah teruji penuh di `grid-patok-logika`).
+> Panduan 1 halaman pelatih & anggota (`src/lib/panduan.ts`), dokumentasi `README.md`/`DEPLOY.md`, bundel rilis (`scripts/siapkan-rilis.sh`), serta **115 rangkaian** uji regresi di `qa/regresi-penuh.sh` telah dimutakhirkan. **I1** (log perubahan show) tetap ditunda.
 
 ---
 

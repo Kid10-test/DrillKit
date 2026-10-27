@@ -83,6 +83,10 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
   const pelatih = teksDari(htmlPanduan({ namaTim: 'T', section: [], anggotaAktif: 1, sesi: 1, drill: 1, lagu: 1, hariBackup: 7, portabel: false }))
   uji('panduan pelatih menunjuk ke panduan anggota', pelatih.includes('Panduan anggota'))
   uji('panduan pelatih menyebut kotak Instrumen penala', pelatih.includes('Instrumen'))
+  uji('panduan pelatih menyebut pintu Buka berkas DrillKit (#7)', pelatih.includes('Buka berkas DrillKit'))
+  uji('panduan pelatih menyebut impor Pyware (#10)', pelatih.includes('Pyware'))
+  uji('panduan pelatih menyebut partitur & Pilih frasa di partitur (#11)', pelatih.includes('Buka partitur') && pelatih.includes('Pilih frasa di partitur'))
+  uji('panduan pelatih menyebut Backup + rekaman (ZIP) (#6/#11a)', pelatih.includes('Backup + rekaman (ZIP)'))
 }
 
 /* --------------- 3. Tombol yang disebut benar-benar ada --------------- */
@@ -91,12 +95,14 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
   const sumber = [
     'src/pages/Share.tsx', 'src/components/PengingatJadwal.tsx', 'src/components/TunerDrone.tsx',
     'src/components/PilihMode.tsx', 'src/components/ModePerangkat.tsx', 'src/pages/Music.tsx', 'src/App.tsx', 'index.html',
+    'src/components/ModalRekamanLagu.tsx', 'src/components/PanelPartitur.tsx', 'src/components/LayarPartitur.tsx',
   ].map(baca).join('\n').replace(/&amp;/g, '&')
   const LABEL = [
     'Saya anggota', 'Ambil materi dari situs', 'Buka paket tim', 'Ganti paket', 'Ganti nama',
     'Ada materi baru dari pelatih',
     'Pilih namamu dulu', 'Perbarui', 'Kalender', 'Kunci jawaban', 'Putar perpindahan', 'Belum dicatat',
     'Penala & nada dengung', 'Putar dengung', 'Dengarkan', 'Bb konser', 'Instrumen',
+    'Tambahkan rekaman dari pelatih', 'Tambahkan dari pelatih', 'Buka partitur', 'Ke part saya', 'Pilih frasa di partitur',
     'Lihat mode anggota', 'Bersihkan & muat ulang', 'Aplikasi gagal dimuat',
     'Penyimpanan browser belum bisa dipakai',
   ]
