@@ -3,19 +3,23 @@
 ![CI](https://github.com/Kid10-test/DrillKit/actions/workflows/ci/badge.svg)
 
 Aplikasi **all-in-one, gratis, dan offline-first** untuk pelatih marching band:
-editor formasi/drill, data anggota, absensi QR, jadwal latihan, metronom + tempo map,
-serta mode berbagi ke anggota.
+editor formasi/drill (+ impor CSV Pyware), data anggota, absensi QR, jadwal latihan,
+metronom + tempo map + rekaman MP3, pembaca & cetak partitur MusicXML/`.mxl`/PDF
+dengan latihan per frasa, serta penerbitan materi terenkripsi ke anggota.
 
-> Status: **v0.1 — semua modul utama berfungsi** (dashboard, anggota, absensi, jadwal,
-> drill & formasi, musik/metronom, berbagi/mode anggota, pengaturan & backup).
-> Build produksi sudah lolos uji: service worker (PWA) terdaftar, semua halaman tanpa error.
+> Status: **Seluruh modul utama & 11 rancangan lanjutan (#1–#11d) telah rampung**
+> (dashboard, anggota, absensi, evaluasi, jadwal/kalender, drill & formasi,
+> musik/metronom/rekaman/partitur, run sheet hari lomba, berbagi/mode anggota,
+> pusat data, serta pengaturan & backup ZIP). Diuji otomatis lewat **115 rangkaian**
+> regresi headless (Node + Chromium).
 
-**Mau langsung pakai?** Dua bundel sudah tersedia di folder proyek:
+**Mau langsung pakai?** Tiga bundel siap pakai tersedia di folder proyek (dapat dirakit ulang kapan saja dengan `bash scripts/siapkan-rilis.sh`):
 
-- **`drillkit-portable.zip`** — satu file `DrillKit.html`, **buka langsung di HP/laptop tanpa
-  hosting**. Semua fitur jalan & data tersimpan, tapi belum bisa di-install/offline penuh.
+- **`drillkit-portable.zip`** — satu file `DrillKit.html` (~2,8 MB, termasuk mesin partitur OSMD), **buka langsung di HP/laptop tanpa
+  hosting**. Semua fitur jalan & data tersimpan di IndexedDB, tanpa perlu server.
 - **`drillkit-release.zip`** — versi untuk **hosting gratis** (Netlify Drop/Vercel/GitHub Pages)
-  supaya bisa di-install ke layar utama HP dan jalan offline. Panduan lengkap: [`DEPLOY.md`](DEPLOY.md).
+  supaya bisa di-install ke layar utama HP dan jalan offline penuh.
+- **`drillkit-siap-unggah.zip`** — bundel tarik-lepas ke Netlify Drop lengkap dengan pengingat `paket.json`. Panduan lengkap: [`DEPLOY.md`](DEPLOY.md).
 
 ---
 
@@ -42,10 +46,12 @@ npm run dev     # buka http://localhost:5173
 Perintah lain:
 
 ```bash
-npm run build            # versi hosting (PWA aktif)   → dist/
-npm run build:portable   # satu berkas HTML portabel   → dist-standalone/index.html
-npm run preview          # mencoba hasil build di http://localhost:4173
-npx tsc --noEmit         # cek tipe TypeScript
+npm run build                  # versi hosting (PWA aktif)   → dist/
+npm run build:portable         # satu berkas HTML portabel   → dist-standalone/index.html
+PIN_PELATIH=1234 npm run build # build dengan pagar PIN pelatih tim (#8)
+bash scripts/siapkan-rilis.sh  # rakit ulang ketiga bundel .zip rilis
+npm run preview                # mencoba hasil build di http://localhost:4173
+npx tsc --noEmit               # cek tipe TypeScript
 ```
 
 ---
@@ -63,39 +69,50 @@ drillkit/
 │  │  ├─ db.ts              # skema IndexedDB (Dexie) + helper pengaturan
 │  │  └─ seed.ts            # data contoh & util hapus data
 │  ├─ lib/
+│  │  ├─ field.ts           # ⭐ geometri lapangan, grid/patok yard–meter (#9)
+│  │  ├─ tempoTimeline.ts   # ⭐ evaluator tempo map per ketuk/subdivisi & ramp (#5)
+│  │  ├─ segmenDrill.ts     # garis waktu musik × drill, bantuan hitungan, pecah/gabung set (#5)
+│  │  ├─ metronome.ts       # penjadwal WebAudio, hitung mundur, loop bagian/frasa, jam rekaman
+│  │  ├─ tempoLatihan.ts    # tempo latihan persen/BPM & naik otomatis (#4)
+│  │  ├─ rekaman.ts         # pemutar & pencocokan sidik SHA-256 rekaman audio MP3/WAV (#6)
+│  │  ├─ partitur.ts        # deteksi & ringkasan murni MusicXML/PDF (#11a)
+│  │  ├─ mxl.ts             # pengurai arsip .mxl via Central Directory + DecompressionStream (#11b)
+│  │  ├─ partiturRender.ts  # pembungkus lazy-load OSMD SVG hex & kotak birama (#11b–#11d)
+│  │  ├─ partiturBagian.ts  # kamus instrumen dwibahasa, filter seksi, & pilihan anggota (#11c)
+│  │  ├─ partiturCetak.ts   # dokumen HTML cetak part / buku saku Lyre A5 murni hex (#11c)
+│  │  ├─ partiturFrasa.ts   # geometri sorot birama, loop frasa, & tautan frasa ↔ set drill (#11d)
+│  │  ├─ pyware.ts          # pengurai & interpolasi CSV lembar koordinat Pyware 3D (#10)
+│  │  ├─ bukaBerkas.ts      # satu pintu deteksi & pratinjau semua berkas DrillKit (#7)
+│  │  ├─ terbit.ts          # penerbitan paket grup & enkripsi AES-256-GCM per anggota (#2)
+│  │  ├─ pinPelatih.ts      # pagar PIN pelatih tim via hash PBKDF2 saat build (#8)
+│  │  ├─ namaAnggota.ts     # nama resmi + panggilan & pencocokan lintas impor (#1)
+│  │  ├─ kalender.ts        # kalender bulan, agenda, seri berulang, & ekspor .ics (#3)
+│  │  ├─ laporan.ts         # laporan bulanan, kartu kehadiran, CSV matriks/ringkas (D4)
+│  │  ├─ tuner.ts           # deteksi nada dari mikrofon + nada dengung transposisi (E4)
+│  │  ├─ panduan.ts         # penyusun panduan 1 halaman A4 pelatih & anggota (F4, J1)
 │  │  ├─ kiosk.ts           # status kunci + penjaga global mode kios
-│  │  ├─ feedback.ts        # bunyi & getar untuk pemindai QR
-│  │  ├─ utils.ts           # format tanggal, CSV, ekspor file, warna section
-│  │  ├─ field.ts           # ⭐ geometri lapangan & konversi yard ⇄ langkah
-│  │  ├─ laporan.ts         # D4 — laporan bulanan, kartu kehadiran, CSV matriks/ringkas
-│  │  ├─ tuner.ts           # E4 — deteksi nada dari mikrofon + nada dengung (drone)
-│  │  ├─ panduan.ts         # F4 — penyusun panduan 1 halaman (pelatih & anggota, J1)
 │  │  └─ shortcut.ts        # daftar shortcut editor (dipakai dialog ? & panduan)
-│  ├─ hooks/useSettings.ts  # pembacaan data reaktif
+│  ├─ hooks/                # pembacaan pengaturan, mode anggota, tempo & frasa latihan
 │  ├─ components/
 │  │  ├─ ui.tsx             # Button, Card, Modal, Toast, ErrorBoundary, …
-│  │  ├─ Icons.tsx          # ikon SVG inline (tanpa CDN → aman offline)
-│  │  ├─ AdminReports.tsx   # D4 — kartu "Paket laporan admin" di tab Rekap
-│  │  ├─ TunerDrone.tsx     # E4 — penala & nada dengung di halaman Musik
-│  │  └─ Panduan.tsx        # F4 — kartu & tombol "Panduan 1 halaman"
+│  │  ├─ DrillEditor.tsx    # editor formasi, penggaris musik × drill, & partitur pendamping
+│  │  ├─ LayarPartitur.tsx  # pembaca partitur OSMD/PDF, sorot birama, & pilih/loop frasa
+│  │  ├─ BukaBerkas.tsx     # pintu seret-lepas & pratinjau berkas global (#7)
+│  │  ├─ ImporPyware.tsx    # modal impor CSV koordinat Pyware 3D (#10)
+│  │  ├─ TunerDrone.tsx     # penala & nada dengung di halaman Musik
+│  │  ├─ Panduan.tsx        # kartu & pratinjau cetak "Panduan 1 halaman"
 │  │  └─ Layout.tsx         # sidebar desktop + bottom nav mobile
-│  └─ pages/                # satu file per menu
-│     ├─ AttendanceRecap.tsx # rekap absensi (grafik, tabel, CSV, cetak)
-│     ├─ Dashboard.tsx      # ringkasan: kehadiran, jadwal, komposisi tim
-│     ├─ Members.tsx        # CRUD anggota, impor/ekspor CSV, kartu QR absensi
-│     ├─ Attendance.tsx     # absensi cepat (H/I/S/A), buka pemindai QR, riwayat
-│     ├─ KioskLock.tsx      # tombol kunci data, kartu PIN (mode kios)
-│     ├─ Schedule.tsx       # jadwal + checklist materi + catatan evaluasi
-│     ├─ Drill.tsx          # halaman drill (pilih drill; editornya di components/DrillEditor.tsx)
-│     ├─ Music.tsx          # metronom, tap tempo, tempo map, repertoar (`hanyaPutar` = mode anggota)
-│     ├─ Share.tsx          # ekspor paket tim + tampilan khusus anggota
-│     └─ Settings.tsx       # profil tim, standar lapangan, backup/restore
-├─ qa/                     # ⭐ 86 rangkaian uji regresi (Puppeteer) — lihat qa/README.md
-│  ├─ regresi-penuh.sh     # menjalankan semuanya lawan versi yang sudah dibangun
-│  ├─ pulihkan.sh          # pasang ulang node_modules & pustaka Chrome
-│  └─ *.mjs                # satu berkas per rangkaian uji
+│  └─ pages/                # satu file per menu (Dashboard, Members, Attendance, Evaluasi,
+│                           # Schedule, Drill, Music, Lomba, Share, Data, Settings)
+├─ qa/                      # ⭐ 115 rangkaian uji regresi (Node + Puppeteer) — lihat qa/README.md
+│  ├─ regresi-penuh.sh      # menjalankan ke-115 rangkaian lawan versi produksi
+│  ├─ bangun-logika.sh      # merakit modul TS murni ke /tmp/*.mjs untuk uji logika cepat
+│  └─ *.mjs                 # satu berkas per rangkaian uji
 ├─ scripts/
-│  └─ palette-hex.mjs      # konversi palet oklch Tailwind → heks (npm run palette)
+│  ├─ siapkan-rilis.sh      # merakit ulang ketiga bundel rilis (.zip) sekaligus
+│  ├─ siapkan-unggah.sh     # menyiapkan folder tarik-lepas Netlify Drop
+│  ├─ periksa-situs.sh      # memeriksa situs yang sudah terunggah
+│  └─ palette-hex.mjs       # konversi palet oklch Tailwind → heks (npm run palette)
 ├─ vite.config.ts          # build PWA (hosting)
 ├─ vite.config.portable.ts # build 1 berkas HTML (buka langsung dari file)
 └─ public/                  # ikon PWA
@@ -964,6 +981,22 @@ komputer tersebut belum mendukung `oklch()`.
 
 ---
 
+## Gelombang fitur terbaru (#7–#11)
+
+Rincian keputusan desain lengkap tercatat di [`RANCANGAN-LANJUTAN.md`](RANCANGAN-LANJUTAN.md):
+
+* **Satu pintu “Buka berkas DrillKit” (`#7`)** — seret berkas apa pun ke jendela aplikasi (atau buka dari **Dashboard** / menu **Impor & ekspor data**). Isi berkas dikenali otomatis dari bitanya (backup JSON/ZIP, paket anggota, show, repertoar, data pilihan, CSV anggota/jadwal/absensi/koordinat, CSV Pyware, hingga partitur MusicXML/`.mxl`/PDF), selalu menampilkan pratinjau sebelum menulis, dan menolak paket anggota di mode pelatih agar tidak menimpa data tim.
+* **PIN pelatih tim (`#8`)** — bila variabel lingkungan `PIN_PELATIH` diisi saat `npm run build` / `npm run build:portable`, hash PBKDF2-SHA256 ditanam ke bundel sehingga pilihan **Saya pelatih** (dan keluar dari mode anggota) meminta PIN tim. Tanpa `PIN_PELATIH`, aplikasi berjalan persis seperti biasa tanpa rintangan.
+* **Grid & patok yard–meter kustom (`#9`)** — geometri internal tetap disimpan dalam yard supaya presisi tidak bergeser saat mengganti tampilan **yard ↔ meter**; jarak grid utama, subgrid, hash, serta batas huruf (`A..E`) dan patok `T` diatur terpisah.
+* **Impor drill Pyware 3D (`#10`)** — migrasi satu arah **Pyware/Excel → DrillKit** lewat CSV *coordinate sheet* (tombol **Pyware** di editor formasi atau langsung lewat pintu *Buka berkas DrillKit*): satuan & titik asal sumbu Y ditebak otomatis, titik di luar lapangan diperingatkan, pemain dicocokkan ke anggota tim (dan diingat sebagai alias), set sela diinterpolasi lurus, serta seluruh impor tercatat di riwayat formasi sehingga bisa di-*undo*.
+* **Partitur MusicXML/`.mxl`/PDF, cetak part/Lyre, & latihan per frasa (`#11a`–`#11d`)** —
+  - Simpan bita berkas partitur terpisah di IndexedDB (`partiturBerkas`) lengkap dengan pemantau kuota, tombol `Minta Persisten` (`navigator.storage.persist()`), dan round-trip penuh di **Backup + rekaman (ZIP)**.
+  - Pengurai `.mxl` murni browser (`DecompressionStream('deflate-raw')` + pelindung anti-*zip-bomb* 8 MB) dan perender notasi vektor offline **OpenSheetMusicDisplay (`OSMD`)** dalam *lazy chunk* berpalet hex murni (`0` `oklch()`/`color-mix()`).
+  - Penyaringan **Full score**, per seksi (*Brass*, *Woodwind*, *Battery*, *Pit*), atau per instrumen tunggal (otomatis menggabungkan istirahat multi-birama), pencocokan otomatis ke instrumen anggota yang sedang login, serta pratinjau cetak/unduh HTML mandiri ukuran **A4 Tegak**, **A4 Mendatar**, dan **Buku Saku / Lyre A5**.
+  - **Sorot birama aktif & auto-scroll** sinkron `TempoTimeline` bersama metronom, rekaman audio (`#6`), maupun animasi lapangan di `DrillEditor`; **pilih & loop frasa** langsung dengan mengeklik birama pada SVG (`Shift+klik` / 2-ketuk, diingat per lagu per perangkat, mis. `"Frasa 5–8 · 80%"`); serta **tautan frasa ↔ set drill** (`"Set 4–6 = Bar 9–16"`) di Set List.
+
+---
+
 ## Catatan untuk pengembangan lanjut
 
 * Menambah tabel baru: tambahkan di `src/db/db.ts` dengan `this.version(N).stores({...})`.
@@ -971,6 +1004,4 @@ komputer tersebut belum mendukung `oklch()`.
   read-only dan akan memicu `ReadOnlyError`. Tulis cukup dari handler/aksi pengguna.
 * Konversi koordinat terpusat di `src/lib/field.ts`; kalau mengubah tampilan papan,
   pastikan sumbu x = memanjang dan y = melintang (lihat bagian “Konvensi data”).
-
-Ide lanjutan: undo/redo di editor, ekspor video animasi, cetak “dot sheet” per pemain,
-sinkronisasi opsional, dan mode gelap/terang.
+* Setiap fitur baru wajib menjaga warna dokumen cetak/HTML & `layar-partitur` tetap heksadesimal/rgb murni (tanpa `oklch()`/`color-mix()`) serta mendaftarkan skrip ujinya di `qa/regresi-penuh.sh`.

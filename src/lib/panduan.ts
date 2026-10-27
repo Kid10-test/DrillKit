@@ -1,5 +1,5 @@
 /**
- * F4 — Panduan pemakaian 1 halaman.
+ * F4 — Panduan pemakaian 1 halaman (dimutakhirkan pasca-#11).
  *
  * Satu lembar A4 yang bisa dicetak & ditempel, berisi: urutan pakai yang
  * paling sering, isi tiap menu, shortcut editor formasi, dan cara mengatasi
@@ -11,7 +11,7 @@
  *
  * Tata letaknya dua kolom (`column-count: 2`) dengan ukuran huruf kecil agar
  * benar-benar muat **satu halaman A4**. Kalau kelak menambah bagian baru,
- * periksa lagi jumlah halamannya (bisa lewat `Cetak → Pratinjau` di browser).
+ * periksa lagi jumlah halamannya (diuji otomatis di `qa/j1-polesan.mjs`).
  */
 
 import type { SectionDef } from '../db/types'
@@ -59,41 +59,42 @@ function tr(a: string, b: string): string {
 /** Langkah-langkah yang paling sering dipakai — urutan ini yang dicetak. */
 const LANGKAH: [string, string][] = [
   [
-    'Susun formasi',
-    'Menu <b>Drill &amp; Formasi</b>: tambah set, geser titik (Panah = 1 langkah, Shift + Panah = 4), lalu <b>Putar</b> untuk melihat perpindahannya. Tombol <b>F</b> membuka presenter layar penuh.',
+    'Susun formasi &amp; impor Pyware',
+    'Menu <b>Drill &amp; Formasi</b>: tambah set (atau tombol <b>Pyware</b> untuk impor CSV koordinat Pyware 3D), geser titik (Panah = 1 langkah, Shift + Panah = 4), cocokkan garis waktu segmen lagu × set, lalu <b>Putar</b>. Tombol <b>F</b> membuka presenter layar penuh.',
   ],
   [
     'Bawa ke lapangan',
-    'Di editor: <b>Dot sheet &amp; buku saku</b> → <b>Pratinjau</b> → <b>Cetak</b> di kertas A4. Potong tiap kartu mengikuti garis tepi, lipat garis putus-putusnya ke belakang menjadi kartu 9,5 × 13,5 cm, dan masuk saku pemain.',
+    'Di editor: <b>Dot sheet &amp; buku saku</b> → <b>Pratinjau</b> → <b>Cetak</b> di kertas A4. Potong mengikuti garis tepi dan lipat garis putus-putusnya menjadi kartu saku 9,5 × 13,5 cm.',
   ],
   [
-    'Jadwal &amp; absensi',
-    '<b>Jadwal</b>: buat sesi, pilih jenis kegiatan, isi checklist materi. <b>Absensi</b>: isi manual atau scan QR. Tab <b>Rekap</b>: tren kehadiran, lalu tombol <b>Pratinjau laporan</b> / <b>Pratinjau kartu</b>.',
+    'Partitur, frasa, &amp; penala',
+    'Menu <b>Musik &amp; Metronom</b>: pasang partitur (<i>.musicxml</i>/<i>.mxl</i>/<i>.pdf</i>) → <b>Buka partitur</b> (filter part/seksi, <b>Pilih frasa di partitur</b> + tempo latihan, cetak buku saku Lyre A5) &amp; selaraskan MP3. Kartu <b>Penala &amp; nada dengung</b>: pilih <b>Instrumen</b> (trumpet Bb, mellophone F, sax Eb), tombol <b>Bb konser</b> → <b>Putar dengung</b> → <b>Dengarkan</b>.',
   ],
   [
-    'Kirim ke anggota',
-    '<b>Berbagi</b> → <b>Ekspor paket</b> → kirim berkas <i>.json</i>-nya lewat WhatsApp. Anggota membuka berkas itu di HP, memilih namanya sekali, lalu melihat jadwal, posisi formasinya, dan rekap kehadirannya. Sertakan <b>Panduan anggota</b> (tombolnya di menu Berbagi).',
+    'Jadwal, absensi, &amp; lomba',
+    '<b>Jadwal</b>: kalender/agenda &amp; ekspor .ics. <b>Absensi</b>: isi manual atau scan QR · tab <b>Rekap</b> untuk laporan &amp; kartu kehadiran. <b>Run sheet hari lomba</b> untuk jadwal hari H.',
   ],
   [
-    'Kerja bareng pelatih lain',
-    'Di editor drill, tombol ⚙ → <b>Ekspor show</b>. Berkasnya dikirim; pelatih itu menyusun set sendiri lalu mengirim balik. Terima dengan <b>Impor show</b> → pilih <i>gabung</i>, <i>timpa</i>, atau <i>salinan</i>.',
+    'Terbitkan ke anggota',
+    '<b>Berbagi</b>: terbitkan materi satu tombol (grup atau terkunci QR per anak) lalu kirim lewat WhatsApp. Anggota memilih namanya sekali untuk melihat jadwal, formasi, partitur, &amp; kehadirannya. Sertakan <b>Panduan anggota</b>.',
   ],
   [
-    'Tuning sebelum latihan',
-    'Menu <b>Musik &amp; Metronom</b> → kartu <b>Penala &amp; nada dengung</b>: pilih nada (tombol cepat <b>Bb konser</b>), <b>Putar dengung</b>, lalu <b>Dengarkan</b>. Jarum di tengah = tepat. Kotak <b>Instrumen</b> menampilkan nada sesuai partitur (trumpet Bb, mellophone F, sax alto Eb).',
+    'Buka berkas &amp; kolaborasi pelatih',
+    'Seret berkas apa pun ke layar atau klik <b>Buka berkas DrillKit</b> (di Dashboard / <b>Impor &amp; ekspor data</b>) untuk pratinjau otomatis. Untuk bagi tugas set antar pelatih: tombol ⚙ di drill → <b>Ekspor show</b> / <b>Impor show</b>.',
   ],
 ]
 
 /** Isi tiap menu — mengikuti nama menu yang tampil di aplikasi. */
 const MENU: [string, string][] = [
-  ['Dashboard', 'Ringkasan: kehadiran 30 hari, jadwal terdekat, komposisi tim'],
-  ['Anggota', 'Data anggota, impor CSV, cetak kartu QR untuk absensi'],
-  ['Jadwal', 'Sesi latihan &amp; jenis kegiatan, checklist materi, catatan'],
-  ['Absensi', 'Isi kehadiran / scan QR · tab <b>Rekap</b>: tren, laporan, kartu kehadiran'],
-  ['Drill &amp; Formasi', 'Editor formasi: set, animasi, presenter, buku saku, berbagi show'],
-  ['Musik &amp; Metronom', 'Metronom &amp; pola ritme, penala, nada dengung, repertoar lagu'],
-  ['Berbagi', 'Paket .json untuk anggota: jadwal, formasi, absensi, catatan evaluasi'],
-  ['Pengaturan', 'Profil tim, standar lapangan, section, backup &amp; pulihkan data'],
+  ['Dashboard', 'Ringkasan kehadiran, jadwal terdekat, komposisi tim, &amp; pintu <b>Buka berkas DrillKit</b>'],
+  ['Anggota', 'Nama resmi &amp; panggilan, impor CSV, gabung duplikat, cetak kartu QR absensi'],
+  ['Absensi &amp; Evaluasi', 'Scan QR / manual, tab <b>Rekap</b> laporan, serta <b>Evaluasi &amp; kemajuan</b> set'],
+  ['Jadwal &amp; Lomba', 'Kalender/agenda latihan, seri berulang, .ics, &amp; <b>Run sheet hari lomba</b>'],
+  ['Drill &amp; Formasi', 'Editor formasi, penggaris musik × drill, impor CSV <b>Pyware</b>, presenter, buku saku'],
+  ['Musik &amp; Metronom', 'Metronom &amp; tempo map, tempo latihan, rekaman MP3, partitur &amp; cetak Lyre, penala'],
+  ['Berbagi', 'Terbitkan paket grup / terkunci QR per anggota, mode anggota, &amp; panduan anggota'],
+  ['Impor &amp; ekspor data', 'Pusat <b>Buka berkas DrillKit</b> (JSON/CSV/ZIP/Pyware/partitur) &amp; ekspor pilihan'],
+  ['Pengaturan', 'Profil tim, lapangan (yard/meter &amp; patok), PIN pelatih/kios, backup &amp; pulihkan'],
 ]
 
 /** Empat macet yang paling sering — beserta jalan keluarnya. */
@@ -101,7 +102,7 @@ function macet(hariBackup: number, portabel: boolean): [string, string][] {
   return [
     [
       'Tombol <b>Cetak</b> tidak memunculkan apa-apa',
-      'Browser memblokir jendela baru. Pakai <b>Pratinjau</b> (hasilnya tampil di dalam aplikasi), atau <b>Unduh HTML</b> lalu buka berkasnya dan tekan Ctrl + P.',
+      'Browser memblokir jendela baru. Pakai <b>Pratinjau</b> (tampil di dalam aplikasi), atau <b>Unduh HTML</b> lalu buka berkasnya dan tekan Ctrl + P.',
     ],
     [
       'Mikrofon penala tidak mau menyala',
@@ -115,8 +116,8 @@ function macet(hariBackup: number, portabel: boolean): [string, string][] {
     ],
     [
       'Takut data hilang / mau pindah perangkat',
-      `<b>Pengaturan → Kelola data → Ekspor backup (JSON)</b>, simpan berkasnya di luar perangkat (email/Drive/flashdisk), lalu <b>Pulihkan backup</b> di perangkat baru.${
-        hariBackup > 0 ? ` Pengingat backup menyala tiap <b>${hariBackup} hari</b>.` : ''
+      `<b>Pengaturan → Kelola data → Ekspor backup (JSON)</b> atau <b>Backup + rekaman (ZIP)</b> (agar MP3 &amp; partitur ikut), lalu <b>Pulihkan backup</b> di perangkat baru.${
+        hariBackup > 0 ? ` Pengingat menyala tiap <b>${hariBackup} hari</b>.` : ''
       }`,
     ],
   ]
@@ -135,7 +136,7 @@ export function bodyPanduan(d: DataPanduan): string {
 
   bagian.push(`<h2>Isi tiap menu</h2>
     <table>
-      <thead><tr><th style="width:26%">Menu</th><th>Untuk apa</th></tr></thead>
+      <thead><tr><th style="width:28%">Menu</th><th>Untuk apa</th></tr></thead>
       <tbody>${MENU.map(([a, b]) => tr(`<b>${a}</b>`, b)).join('')}</tbody>
     </table>`)
 
@@ -162,9 +163,9 @@ export function bodyPanduan(d: DataPanduan): string {
   bagian.push(`<h2>Yang perlu diingat</h2>
     <div class="kotak">
       <ul>
-        <li>Data tersimpan <b>hanya di perangkat ini</b> — bukan di server. Karena itu backup berkala itu wajib.</li>
-        <li>Bekerja <b>offline</b>: sekali dibuka, aplikasi tetap jalan tanpa sinyal.</li>
-        <li>Section tim ini: <b>${section}</b>. Standar lapangan &amp; ukuran langkah bisa diubah di <b>Pengaturan</b>.</li>
+        <li>Data tersimpan <b>hanya di perangkat ini</b> — bukan di server. Backup berkala (JSON/ZIP) itu wajib.</li>
+        <li>Bekerja <b>offline</b>: sekali dibuka, formasi, metronom, rekaman, &amp; partitur tetap jalan tanpa sinyal.</li>
+        <li>Section tim ini: <b>${section}</b>. Standar lapangan (yard/meter &amp; patok) dan PIN diatur di <b>Pengaturan</b>.</li>
         <li>Tidak sengaja mengubah formasi? <b>Ctrl + Z</b> berulang kali; <b>Ctrl + Shift + Z</b> untuk mengulang.</li>
       </ul>
     </div>`)
@@ -192,24 +193,24 @@ export function bodyPanduan(d: DataPanduan): string {
  * supaya muat satu halaman A4. Hex murni: aman untuk browser lama.
  */
 const CSS_PANDUAN = `
-    @page { size: A4 portrait; margin: 9mm 8mm; }
-    body { font-size: 8.4pt; line-height: 1.3; color:#000; }
-    .kop { display:flex; align-items:center; gap:8px; border-bottom:2px solid #111; padding-bottom:5px; margin-bottom:6px; }
-    .kop img { height:32px; width:auto; }
-    .kop .nama { font-size:12pt; font-weight:700; line-height:1.15; }
-    .kop .sub { font-size:7.4pt; color:#555; }
-    .isi { column-count:2; column-gap:6mm; }
-    h2 { font-size:8.6pt; margin:6px 0 3px; padding-left:4px; border-left:3px solid #111; break-after:avoid; }
-    ol, ul { margin:2px 0 4px; padding-left:12px; }
-    li { margin-bottom:2.5px; break-inside:avoid; }
-    table { width:100%; border-collapse:collapse; margin:2px 0 5px; }
-    th, td { border:1px solid #aaa; padding:1.6px 3px; text-align:left; vertical-align:top; }
-    th { background:#eef2f7; font-size:7.4pt; text-transform:uppercase; }
-    .kotak { border:1px solid #bbb; background:#fafafa; padding:4px 6px; margin:3px 0 4px; break-inside:avoid; }
-    .catatan { font-size:7.2pt; color:#444; margin-top:6px; border-top:1px solid #ccc; padding-top:4px; }
-    .qr { display:flex; gap:6px; align-items:center; border:1px solid #bbb; padding:4px; margin:3px 0 4px; break-inside:avoid; }
-    .qr img { width:24mm; height:24mm; }
-    .qr .alamat { font-family:monospace; font-size:7.4pt; word-break:break-all; }
+    @page { size: A4 portrait; margin: 8.5mm 8mm; }
+    body { font-size: 8.1pt; line-height: 1.27; color:#000; }
+    .kop { display:flex; align-items:center; gap:8px; border-bottom:2px solid #111; padding-bottom:4px; margin-bottom:5px; }
+    .kop img { height:30px; width:auto; }
+    .kop .nama { font-size:11.5pt; font-weight:700; line-height:1.15; }
+    .kop .sub { font-size:7.2pt; color:#555; }
+    .isi { column-count:2; column-gap:5.5mm; }
+    h2 { font-size:8.4pt; margin:5px 0 2.5px; padding-left:4px; border-left:3px solid #111; break-after:avoid; }
+    ol, ul { margin:2px 0 3.5px; padding-left:12px; }
+    li { margin-bottom:2px; break-inside:avoid; }
+    table { width:100%; border-collapse:collapse; margin:2px 0 4px; }
+    th, td { border:1px solid #aaa; padding:1.4px 3px; text-align:left; vertical-align:top; }
+    th { background:#eef2f7; font-size:7.2pt; text-transform:uppercase; }
+    .kotak { border:1px solid #bbb; background:#fafafa; padding:3.5px 5.5px; margin:2.5px 0 3.5px; break-inside:avoid; }
+    .catatan { font-size:7pt; color:#444; margin-top:5px; border-top:1px solid #ccc; padding-top:3.5px; }
+    .qr { display:flex; gap:6px; align-items:center; border:1px solid #bbb; padding:3.5px; margin:2.5px 0 3.5px; break-inside:avoid; }
+    .qr img { width:22mm; height:22mm; }
+    .qr .alamat { font-family:monospace; font-size:7.2pt; word-break:break-all; }
 `
 
 /** Panduan lengkap siap cetak / unduh. */
@@ -227,9 +228,9 @@ export function htmlPanduan(d: DataPanduan): string {
  * Panduan pelatih bercerita tentang menu yang **tidak pernah dilihat
  * anggota** (editor formasi, absensi, backup). Anggota butuh hal lain:
  * bagaimana membuka aplikasinya, bagaimana memasukkan berkas dari pelatih,
- * apa isi keenam tab di HP-nya, cara menala sesuai instrumennya, dan apa
- * yang dilakukan kalau macet. Bahasanya menyapa "kamu", sama seperti layar
- * mode anggota.
+ * apa isi keenam tab di HP-nya, cara menala sesuai instrumennya, cara
+ * memakai rekaman & partitur latihan, dan apa yang dilakukan kalau macet.
+ * Bahasanya menyapa "kamu", sama seperti layar mode anggota.
  *
  * Dua keadaan yang isinya memang berbeda, dan tidak boleh tertukar:
  * - **Disajikan situs** (`alamat` terisi): ada alamat + kode QR untuk
@@ -276,7 +277,7 @@ function tabAnggota(): [string, string][] {
     ['Catatan', 'Catatan evaluasi dari pelatih, khusus untukmu.'],
     [
       'Musik',
-      'Metronom, lagu, set list, penala, dan rekaman audio latihan (MP3). Tekan <b>Tambahkan rekaman dari pelatih</b> untuk menyelaraskan audio dengan tempo & formasi. Rekaman tetap tersimpan walau paket diperbarui.',
+      'Metronom, lagu, set list (beserta tautan set drill ↔ birama), penala, rekaman MP3 (<b>Tambahkan rekaman dari pelatih</b>), dan partitur per instrumen (<b>Buka partitur</b>, cetak buku saku Lyre).',
     ],
   ]
 }
@@ -308,8 +309,8 @@ function macetAnggota(disajikan: boolean): [string, string][] {
       'Buka menu <b>Berbagi</b> → <b>Lihat mode anggota</b>. Kalau HP ini diminta PIN untuk keluar dari mode anggota, itu memang disengaja pelatih.',
     ],
     [
-      'Rekaman audio di iPhone/Safari terhapus sendiri',
-      'Di iPhone/iPad (Safari), pasang DrillKit ke Layar Utama (<b>Add to Home Screen</b>) agar browser tidak membersihkan rekaman audio setelah 7 hari tidak dibuka.',
+      'Rekaman audio / partitur di iPhone terhapus sendiri',
+      'Di iPhone/iPad (Safari), pasang DrillKit ke Layar Utama (<b>Add to Home Screen</b>) agar browser tidak membersihkan rekaman &amp; partitur setelah 7 hari tidak dibuka.',
     ],
   )
   return baris
@@ -345,7 +346,7 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
           : '<li>Pelatih juga mengirim berkas <i>.json</i>. Unduh berkasnya, tekan <b>Buka paket tim</b>, lalu pilih berkas itu dari folder Unduhan.</li>'
       }
       <li>Berkas <b>atas namamu</b> (mis. <i>DrillKit-Nama-Kode.json</i>) langsung mengenali namamu. Berkas <b>grup</b>: ketik nama atau kodemu di <b>Pilih namamu dulu</b> — cukup sekali. Salah nama? Tekan <b>Ganti nama</b>.</li>
-      <li><b>Absensi</b> dan <b>Catatan</b> hanya terisi dari berkas atas namamu; berkas grup tidak memuat data pribadi siapa pun.</li>
+      <li><b>Absensi</b> dan <b>Catatan</b> hanya terisi dari berkas atas namamu (atau setelah memindai QR kunci pribadimu); berkas grup tidak memuat data pribadi siapa pun.</li>
     </ol>`)
 
   /* 3. Isi tiap tab */
@@ -364,9 +365,9 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
     </table>
     <p style="margin:2px 0 3px">Tekan <b>Putar dengung</b> (tombol cepat <b>Bb konser</b>), lalu <b>Dengarkan</b> dan mainkan nadanya. Jarum hijau di tengah (±5 sen) = tepat. Angka <b>minus</b> = terlalu rendah (dorong slide/mouthpiece masuk); <b>plus</b> = terlalu tinggi (tarik keluar).</p>`)
 
-  /* 5. Rekaman audio */
-  bagian.push(`<h2>5. Rekaman audio latihan</h2>
-    <p style="margin:2px 0 3px">Pelatih membagikan berkas MP3 lagu? Di tab <b>Musik</b>, buka lagu lalu tekan <b>Tambahkan rekaman dari pelatih</b>. Sistem akan mencocokkan sidik rekaman (✔). Berkas disimpan offline di HP dan <b>tidak terhapus</b> saat kamu memperbarui materi paket.</p>`)
+  /* 5. Rekaman audio & partitur latihan */
+  bagian.push(`<h2>5. Rekaman audio &amp; partitur latihan</h2>
+    <p style="margin:2px 0 3px">Di tab <b>Musik</b>, buka lagu: tekan <b>Tambahkan rekaman dari pelatih</b> untuk memasang MP3 (sidik rekaman dicocokkan ✔) dan <b>Tambahkan dari pelatih</b> untuk berkas partitur (<i>.musicxml</i>/<i>.mxl</i>/<i>.pdf</i>). Tekan <b>Buka partitur</b> — notasi tersaring otomatis ke instrumenmu (tombol <b>Ke part saya</b>), birama aktif disorot mengikuti musik, dan <b>Pilih frasa di partitur</b> mengulang bagian sulit dengan tempo latihan. Berkas disimpan offline di HP dan <b>tidak terhapus</b> saat kamu memperbarui materi paket.</p>`)
 
   /* 6. Materi berubah */
   bagian.push(`<h2>6. Kalau materi berubah</h2>
@@ -391,7 +392,7 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
     <div class="kotak">
       <ul>
         <li>Tidak perlu akun. Materi tersimpan <b>hanya di HP-mu</b> dan tetap bisa dibuka tanpa sinyal.</li>
-        <li>Berkas <b>atas namamu</b> berisi absensi &amp; catatan pribadimu — jangan diteruskan ke orang lain.</li>
+        <li>Berkas <b>atas namamu</b> / QR kunci pribadimu berisi absensi &amp; catatanmu — jangan diteruskan ke orang lain.</li>
       </ul>
     </div>`)
 

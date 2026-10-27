@@ -89,9 +89,14 @@ bash bangun-logika.sh || exit 1
 # tempo, fallback tanpa MusicXML, tautan Set 4-6 = Bar 9-16, serta sorot
 # partitur pendamping di DrillEditor). Jangan keluarkan lagi tanpa mencatat
 # alasannya di IDE-PENGEMBANGAN.md.
+#
+# Penutupan rilis pasca-#11 — `grid-patok-logika` (#9 geometri grid & patok
+# yard-meter; dirakit bangun-logika.sh sebagai /tmp/lapangan.mjs) dan
+# `portabel-rilis` (rakitan satu berkas `DrillKit.html` dibuka langsung lewat
+# protokol `file://` di Chromium bersama panduan portabel & render OSMD).
 
 bash regresi.sh "$BASE" \
-  mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika uji-situs uji-rilis uji-lapangan \
+  mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika grid-patok-logika uji-situs uji-rilis uji-lapangan \
   buka-berkas-logika evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
   sambutan-mode buka-paket tab-absensi formasi-anggota perbarui-materi \
   musik-anggota kuis-anggota pengingat-jadwal lebar-hp luring mikrofon-ditolak tim-besar cap-rilis \
@@ -100,7 +105,7 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
