@@ -338,9 +338,11 @@ html[data-kontras='1'] [data-lap='garis'],
 html[data-kontras='1'] [data-lap='hash'],
 html[data-kontras='1'] [data-lap='tepi'] {
   stroke: #ffffff;
+  stroke-opacity: 0.95;
 }
 html[data-kontras='1'] [data-lap='teks'] {
   fill: #ffffff;
+  fill-opacity: 1;
 }
 /* Titik pemain: cincin luarnya mengikuti latar yang sekarang hitam. */
 html[data-kontras='1'] [data-titik] {

@@ -1,4 +1,4 @@
-# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 25 Okt 2026 — #11 rampung penuh)
+# DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 28 Okt 2026 — #1 s.d. #11 selesai penuh)
 
 Dokumen ini merangkum delapan rancangan awal yang sudah didiskusikan dan
 diputuskan bersama pelatih, ditambah tiga usulan baru pasca PR #14
@@ -8,7 +8,7 @@ Semuanya siap dikerjakan di sesi baru. Setiap rancangan dijadikan PR
 tersendiri, sesuai kebiasaan proyek (satu ide = satu commit/PR,
 disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 
-**Status per 25 Okt 2026 (pemutakhiran #11d rampung — seluruh #11 selesai):**
+**Status per 28 Okt 2026 (seluruh #1 s.d. #11d selesai penuh):**
 - **#1, #2, #3, dan #4 telah rampung penuh** (PR #6 hingga PR #10).
 - **#5 telah rampung penuh** — fondasi tempo map custom per ketuk/subdivisi
   dan ramp eksplisit terintegrasi lewat **PR #14** (`TempoTimeline`), lalu
@@ -20,8 +20,7 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
   28 Sep 2026).
 - **#7 selesai (5 Okt 2026)** — satu pintu "Buka berkas DrillKit" (deteksi isi, pratinjau, pengarahan, tolak paket di mode pelatih), nama berkas jelas, Data sebagai pusat.
 - **#8 selesai (6 Okt 2026)** — PIN pelatih tim (`PIN_PELATIH` → hash PBKDF2 saat build), kartu Saya pelatih ber-PIN, diingat per perangkat, perangkat lama ditanya sekali, ganti PIN menanya ulang, Mode pelatih menerima PIN tim atau kios, tanpa env = perilaku lama.
-- **#9 fondasi selesai (3 Okt 2026)** — tipe & geometri grid/patok terpisah,
-  toggle yard↔meter tanpa geser, batas huruf/T & satuanJarak; UI + uji 41 butir.
+- **#9 selesai penuh (3 Okt & 28 Okt 2026)** — toggle satuan tampil tiga arah (`yard` / `meter` / `langkah`, internal tetap yard tanpa geser), jarak grid & subgrid kustom dengan hitungan garis otomatis dari `fieldBox`, palet warna hex murni (`WARNA_GARIS_GRID`) & ketebalan garis proporsional, pratinjau SVG lapangan langsung di `FieldConfigEditor` mengikuti warna lapangan & skala titik, satuan jarak patok `langkah` / `yard` / `meter` (selaras di `daftarPatok` & `patokRef`), serta opsi cepat + preset **"Indoor tanpa patok"**; teruji di `grid-patok-logika.mjs` (67 butir) & `lapangan-ui.mjs` (33 butir).
 - **#10 Impor drill Pyware selesai (6 Okt 2026)** — satu arah Pyware/Excel →
   DrillKit lewat CSV lembar koordinat: kolom dikenali per peran, satuan &
   asal Y ditebak lalu bisa diganti, pratinjau + peringatan titik di luar
@@ -89,12 +88,12 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 6 | Rekaman lagu (MP3) | Sedang–besar | **Selesai (PR #11 + susulan PR #12, 28 Sep 2026)** | Berkas Blob IndexedDB, sidik SHA-256, waveform & titik mulai, jam rekaman sinkron |
 | 7 | Pengelolaan berkas ("Buka berkas DrillKit") | Sedang | **Selesai (5 Okt 2026)** | Pintu Data+Dasbor+seret, deteksi isi (5 JSON+CSV+ZIP), pratinjau selalu, tolak paket di pelatih, Data pusat |
 | 8 | PIN pelatih tim | Kecil–sedang | **Selesai (6 Okt 2026)** | Pagar mode pelatih via hash ENV; tanpa ketergantungan |
-| 9 | Grid & patok yard–meter custom | Kecil–sedang | **Fondasi selesai (3 Okt 2026)** | Tipe, geometri & UI terpisah; yard↔meter tanpa geser; batas E/T26; 41 butir uji baru |
+| 9 | Grid & patok yard–meter custom | Kecil–sedang | **Selesai penuh (28 Okt 2026)** | Toggle `yard`/`meter`/`langkah` tanpa geser, grid/subgrid kustom + warna/tebal hex, pratinjau SVG langsung, `satuanJarak` langkah/yard/meter, & opsi/preset Indoor tanpa patok (`67` + `33` butir uji) |
 | 10 | Impor drill Pyware | Sedang | **Selesai (6 Okt 2026)** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo; 146 butir uji |
 | 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Selesai penuh (#11a–#11d, 22–25 Okt 2026)** | #11a: Blob IndexedDB, pintu #7, ringkasan, kuota, ZIP; #11b: `.mxl` + render OSMD hex lazy-load + PDF; #11c: filter part/section + anggota + cetak HTML hex; #11d: sorot sinkron `TempoTimeline`, loop frasa, & tautan frasa↔set drill |
 
-> **Status pelaksanaan keseluruhan (27 Okt 2026):**
-> **Seluruh 11 rancangan (`#1` s.d. `#11d`) telah tuntas** (fondasi `#9` grid/patok kustom sudah teruji penuh di `grid-patok-logika`).
+> **Status pelaksanaan keseluruhan (28 Okt 2026):**
+> **Seluruh 11 rancangan (`#1` s.d. `#11d`, termasuk `#9` selesai penuh) telah tuntas 100%.**
 > Panduan 1 halaman pelatih & anggota (`src/lib/panduan.ts`), dokumentasi `README.md`/`DEPLOY.md`, bundel rilis (`scripts/siapkan-rilis.sh`), serta **115 rangkaian** uji regresi di `qa/regresi-penuh.sh` telah dimutakhirkan. **I1** (log perubahan show) tetap ditunda.
 
 ---
@@ -791,11 +790,19 @@ dan patok **kustom** yang tetap kompatibel dengan data lama.
 **Tidak dilakukan pada tahap ini:** mengubah geometri lapangan atau
 menambah jenis hash baru di luar NFHS/NCAA/NFL/none.
 
-**Uji (fondasi 3 Okt 2026):** `qa/grid-patok-logika.mjs` 41 butir — A=YL50 (0), B 5 yard (8×0.625) & A# 2.5 yard, T-T 5 yard, yard↔meter identik (geometri tidak geser), batas E & T26 memotong patok saja (grid tetap 21 garis, grid/subgrid/hash terpisah), metrik 5 m =5.468 yard ≠8 langkah/5 yard (8 langkah=4.572 m); `qa/uji-lapangan.mjs` 94 & `qa/lapangan-ui.mjs` tetap lulus.
+**Uji (fondasi 3 Okt & penyelesaian penuh 28 Okt 2026):**
+- `qa/grid-patok-logika.mjs` (**67 butir**): A=YL50 (`0`), B 5 yard (`8×0.625`) & A# 2,5 yard, T–T 5 yard; konversi bolak-balik tiga satuan (`yard` / `meter` / `langkah`, mis. 100 yd = 160 langkah pada 8-to-5 & 120 langkah pada 6-to-5) tanpa menggeser `fieldBox`, `garisGridUtama`, maupun `daftarPatok`; `garisGridUtama` & `garisSubgrid` dihitung otomatis sepanjang area main `fieldBox` (termasuk grid kustom 2 m pada lapangan 40 m → 21 garis tepat bertengah `0`); palet `WARNA_GARIS_GRID` murni hex `#rrggbb` & `skalaGarisLapangan` proporsional; `satuanJarak: 'meter'` selaras antara `daftarPatok`, `patokRef`, dan `coordPatok` (termasuk penghormatan `maksT` pada sumbu T); serta preset `'indoor-polos'` (*Indoor tanpa patok*).
+- `qa/lapangan-ui.mjs` (**33 butir**): toggle langsung `Yard` ↔ `Meter` ↔ `Langkah` di `FieldConfigEditor`, audit SVG `pratinjau-lapangan-editor` murni `#rrggbb` hex tanpa `oklch()`/`rgba()`, pembaruan real-time skala titik contoh (`100%` → `150%`), jarak grid kustom + warna emas (`#fde047`) + subgrid, tombol cepat **"Tanpa patok (indoor kecil)"** & preset **"Indoor tanpa patok"**, serta penjagaan input `0`/kosong/`NaN`.
+- Regresi `qa/uji-lapangan.mjs` (94 butir), `qa/dd9-kompas.mjs` (35 butir), `qa/dd8*.mjs`, `qa/dd10b-*.mjs`, dan `qa/kartu-lipat.mjs` lulus penuh.
 
-### Status: Fondasi selesai (3 Okt 2026) — tanpa Pyware/partitur
+### Status: Selesai penuh (28 Okt 2026)
 
-Fondasi grid & patok diselesaikan tanpa menyentuh impor Pyware/partitur, sesuai instruksi. Yang dikerjakan: audit `field.ts`/`FieldConfigEditor`/`FieldSurface`/tipe, perbaikan `gantiSatuan` (hanya `patch({satuan})` — geometri tetap yard internal, konversi hanya tampil `*YD_TO_M`), pemisahan `gridUtama/subgrid/hash` (`gridTampil/subgridTampil/hashTampil/subgridYd`) dan `garis patok/label patok` (`tampilGaris/tampilLabel`), patok `daftarPatok` menghormati `maksHuruf` simetris (E=4 → A..E & E' simetris) & `maksT` per sumbu serta `satuanJarak: 'langkah'|'yard'` (8-to-5=8 langkah=5 yard=4.57 m, grid 5 m=5.468 yard beda fisik — tidak dipaksa snap), UI menjelaskan yard vs meter & pilihan jarak berbasis langkah vs yard, `typecheck` & regresi bersih.
+1. **Fondasi (3 Okt 2026):** pemisahan geometri grid utama, subgrid, hash, serta garis/label patok (`gridTampil`, `subgridTampil`, `hashTampil`, `subgridYd`, `tampilGaris`, `tampilLabel`), `maksHuruf` simetris & `maksT`, serta penjagaan yard vs meter tanpa snap paksa.
+2. **Penyelesaian penuh (28 Okt 2026):**
+   - Penambahan satuan tampilan **`'langkah'`** mendampingi `'yd'` dan `'m'` (`SatuanTampilLapangan`, `keSatuanTampil`, `dariSatuanTampil`) sementara penyimpanan internal tetap murni yard.
+   - Input jarak grid & subgrid kustom bebas (dengan tombol cepat per satuan) + penghitung garis otomatis dari `fieldBox` (`garisGridUtama`, `garisSubgrid`), dilengkapi palet warna hex murni (`WARNA_GARIS_GRID`: putih `#ffffff`, emas `#fde047`, biru muda `#7dd3fc`, perak `#cbd5e1`) dan ketebalan proporsional (`TEBAL_GARIS_GRID`, `skalaGarisLapangan`), menghapus pemakaian `rgba()` dari `FieldSurface.tsx`.
+   - **Pratinjau SVG lapangan langsung** (`FieldSurface` mode `pratinjau`) di dalam `FieldConfigEditor` beserta 5 titik contoh berskala `ukurTitik(f)` dan tombol preset lapangan di halaman **Pengaturan** maupun **Pengaturan drill**.
+   - Penyelarasan sumbu angka `T` di `patokRef` langsung terhadap `daftarPatok` + dukungan `satuanJarak: 'meter'` untuk pemasangan patok berpita meteran, serta tombol cepat **"Tanpa patok (indoor kecil)"** + preset **`Indoor tanpa patok`** (`40 × 20 m`, grid 2 m).
 
 ---
 

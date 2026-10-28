@@ -1,4 +1,10 @@
-import type { FieldConfig, HashPreset, PatokConfig, StepPreset } from '../db/types'
+import type {
+  FieldConfig,
+  HashPreset,
+  PatokConfig,
+  SatuanTampilLapangan,
+  StepPreset,
+} from '../db/types'
 
 /**
  * Geometri lapangan & konversi satuan.
@@ -94,6 +100,51 @@ export function ukurTitik(f: FieldConfig, nilai: number): number {
 export function warnaLapangan(f: FieldConfig): { rumput: string; zona: string } {
   const c = WARNA_LAPANGAN.find((w) => w.id === f.warna)
   return c ? { rumput: c.rumput, zona: c.zona } : WARNA_LAPANGAN[0]
+}
+
+/**
+ * Palet warna garis grid & tepi lapangan — **hex murni** (`#rrggbb`), tanpa
+ * `oklch()`/`color-mix()`, aman untuk cetak A4, buku saku, dan bundel portabel.
+ */
+export interface OpsiWarnaGrid {
+  id: string
+  label: string
+  hex: string
+}
+
+export const WARNA_GARIS_GRID: OpsiWarnaGrid[] = [
+  { id: 'putih', label: 'Putih klasik', hex: '#ffffff' },
+  { id: 'emas', label: 'Kuning emas', hex: '#fde047' },
+  { id: 'sian', label: 'Biru muda', hex: '#7dd3fc' },
+  { id: 'perak', label: 'Abu perak', hex: '#cbd5e1' },
+]
+
+export const TEBAL_GARIS_GRID: { nilai: number; label: string }[] = [
+  { nilai: 0.7, label: 'Tipis' },
+  { nilai: 1, label: 'Standar' },
+  { nilai: 1.5, label: 'Tebal' },
+]
+
+/** Warna garis grid yang sedang aktif (hex murni, bawaan putih `#ffffff`). */
+export function warnaGarisGrid(f: FieldConfig): OpsiWarnaGrid {
+  return WARNA_GARIS_GRID.find((w) => w.id === (f.warnaGrid ?? 'putih')) ?? WARNA_GARIS_GRID[0]
+}
+
+/** Pengali ketebalan garis grid yang diamankan (`0,4`–`2,5`, bawaan `1`). */
+export function tebalGarisGrid(f: FieldConfig): number {
+  const t = Number(f.tebalGrid)
+  return Number.isFinite(t) && t >= 0.4 && t <= 2.5 ? t : 1
+}
+
+/**
+ * Ketebalan efektif garis grid mengikuti panjang lapangan (sejalan `skalaTitik`)
+ * dikali `tebalGarisGrid(f)`, agar pada lapangan kecil (GOR 40 × 20 m) garis
+ * tidak tampak terlalu tebal dan pada lapangan standar DCI (120 yd) tetap `1×`.
+ */
+export function skalaGarisLapangan(f: FieldConfig): number {
+  const panjang = Math.max(4, (Number.isFinite(f.lengthYd) ? f.lengthYd : 100) + Math.max(0, f.endZoneYd || 0) * 2)
+  const proporsi = Math.min(1.35, Math.max(0.55, panjang / 120))
+  return proporsi * tebalGarisGrid(f)
 }
 
 /** Pengaturan patok lapangan ini — aman untuk `FieldConfig` lama yang belum punya. */
@@ -212,7 +263,7 @@ export const FIELD_PRESETS: {
   {
     id: 'indoor',
     label: 'Indoor / GOR',
-    hint: '40 × 20 m · lapangan dalam ruang, tanpa end zone — ukuran bisa diubah sendiri',
+    hint: '40 × 20 m · lapangan dalam ruang dengan patok — ukuran bisa diubah sendiri',
     config: {
       widthYd: 20 * M_TO_YD,
       lengthYd: 40 * M_TO_YD,
@@ -221,6 +272,21 @@ export const FIELD_PRESETS: {
       hash: 'none',
       satuan: 'm',
       patok: { ...PATOK_DEFAULT, aktif: 1 },
+    },
+  },
+  {
+    id: 'indoor-polos',
+    label: 'Indoor tanpa patok',
+    hint: '40 × 20 m · grid tiap 2 m tanpa sistem patok — untuk aula/GOR kecil',
+    config: {
+      widthYd: 20 * M_TO_YD,
+      lengthYd: 40 * M_TO_YD,
+      endZoneYd: 0,
+      gridYd: 2 * M_TO_YD,
+      hash: 'none',
+      showLabels: 0,
+      satuan: 'm',
+      patok: { ...PATOK_DEFAULT, aktif: 0 },
     },
   },
 ]
@@ -233,9 +299,10 @@ export const FIELD_PRESETS: {
 function kanonPreset(c: Record<string, unknown>): Record<string, unknown> {
   const patokNorm = JSON.stringify({ ...PATOK_DEFAULT, ...((c.patok as object) ?? {}) })
   const hashVal = c.hash as string | undefined
+  const sat = c.satuan === 'm' ? 'm' : c.satuan === 'langkah' ? 'langkah' : 'yd'
   return {
     ...c,
-    satuan: c.satuan === 'm' ? 'm' : 'yd',
+    satuan: sat,
     patok: patokNorm,
     garis: c.garis ?? 1,
     warna: c.warna ?? 'hijau',
@@ -243,7 +310,7 @@ function kanonPreset(c: Record<string, unknown>): Record<string, unknown> {
     gridTampil: (c.gridTampil as number | undefined) ?? 1,
     subgridYd: (c.subgridYd as number | undefined) ?? undefined,
     subgridTampil: (c.subgridTampil as number | undefined) ?? 0,
-    hashTampil: (c.hashTampil as number | undefined) ?? (hashVal && hashVal !== 'none' ? 1 : 0),
+    hashTampil: !hashVal || hashVal === 'none' ? 0 : ((c.hashTampil as number | undefined) ?? 1),
   }
 }
 
@@ -492,9 +559,25 @@ export function patokRef(x: number, y: number, f: FieldConfig): PatokRef {
   }
   const acuan = pas ?? huruf
 
-  // Sumbu angka — T1, T2, T3, … berurutan.
+  // Sumbu angka — T1, T2, T3, … diambil langsung dari `daftarPatok` seperti
+  // sumbu huruf, supaya mode `satuanJarak` ('langkah' | 'yard' | 'meter') dan
+  // `maksT` selalu selaras antara patok yang digambar dan buku saku.
+  const sumbuT: 'x' | 'y' = hurufIsY ? 'x' : 'y'
+  const daftarT = daftarPatok(fHitung, sumbuT)
   const uSteps = ((hurufIsY ? x : y) - aMin) / s
-  const nomor = Math.max(1, Math.round(uSteps / jt) + 1)
+  const posStepsT = (g: { pos: number }) => (g.pos - aMin) / s
+  let idxT = 0
+  let jauhT = Infinity
+  for (let i = 0; i < daftarT.length; i++) {
+    const d = Math.abs(uSteps - posStepsT(daftarT[i]))
+    if (d < jauhT) {
+      jauhT = d
+      idxT = i
+    }
+  }
+  const nomor = daftarT.length > 0 ? idxT + 1 : Math.max(1, Math.round(uSteps / jt) + 1)
+  const nomorOffset =
+    daftarT.length > 0 ? uSteps - posStepsT(daftarT[idxT]) : uSteps - (nomor - 1) * jt
 
   /**
    * Tanda jarak diukur **dari A**, bukan dari tepi lapangan:
@@ -534,7 +617,7 @@ export function patokRef(x: number, y: number, f: FieldConfig): PatokRef {
     huruf: labelHuruf,
     hurufOffset,
     nomor,
-    nomorOffset: uSteps - (nomor - 1) * jt,
+    nomorOffset,
   }
 }
 
@@ -634,6 +717,96 @@ export function hashGarisTampil(f: FieldConfig): boolean {
   return f.hash !== 'none'
 }
 
+/** Satuan tampilan ukuran & grid lapangan yang dinormalisasi (`'yd' | 'm' | 'langkah'`). */
+export function satuanLapanganOf(f: FieldConfig): SatuanTampilLapangan {
+  if (f.satuan === 'm' || f.satuan === 'langkah') return f.satuan
+  return 'yd'
+}
+
+/** Faktor pengali dari yard internal ke satuan tampilan (`yd`, `m`, atau `langkah`). */
+export function faktorTampilLapangan(
+  f: FieldConfig,
+  satuanOverride?: SatuanTampilLapangan,
+): number {
+  const sat = satuanOverride ?? satuanLapanganOf(f)
+  if (sat === 'm') return YD_TO_M
+  if (sat === 'langkah') return 1 / stepYd(f)
+  return 1
+}
+
+/** Konversi nilai yard internal ke angka tampilan (`yard` / `meter` / `langkah`). */
+export function keSatuanTampil(
+  nilaiYd: number,
+  f: FieldConfig,
+  satuanOverride?: SatuanTampilLapangan,
+): number {
+  return nilaiYd * faktorTampilLapangan(f, satuanOverride)
+}
+
+/** Konversi angka pada satuan tampilan (`yard` / `meter` / `langkah`) ke yard internal. */
+export function dariSatuanTampil(
+  nilaiTampil: number,
+  f: FieldConfig,
+  satuanOverride?: SatuanTampilLapangan,
+): number {
+  const faktor = faktorTampilLapangan(f, satuanOverride)
+  return faktor > 0 ? nilaiTampil / faktor : nilaiTampil
+}
+
+export function namaSatuanLapangan(s?: SatuanTampilLapangan): string {
+  if (s === 'm') return 'meter'
+  if (s === 'langkah') return 'langkah'
+  return 'yard'
+}
+
+export function singkatanSatuanLapangan(s?: SatuanTampilLapangan): string {
+  if (s === 'm') return 'm'
+  if (s === 'langkah') return 'lk'
+  return 'yd'
+}
+
+/**
+ * Daftar posisi garis grid utama membujur (yard, sumbu X internal), dihitung
+ * otomatis sepanjang area main (`fieldBox` dikurangi end zone).
+ */
+export function garisGridUtama(f: FieldConfig): number[] {
+  const step = Number.isFinite(f.gridYd) && f.gridYd > 0 ? f.gridYd : 5
+  const ez = Math.max(0, Number.isFinite(f.endZoneYd) ? f.endZoneYd : 0)
+  const box = fieldBox(f)
+  const minMain = box.minX + ez
+  const maxMain = box.maxX - ez
+  const out: number[] = []
+  const maks = 500
+  for (let x = minMain; x <= maxMain + 0.001 && out.length < maks; x += step) {
+    out.push(Math.abs(x) < 1e-9 ? 0 : x)
+  }
+  return out
+}
+
+/**
+ * Daftar posisi garis subgrid membujur (yard) sepanjang area main yang tidak
+ * berimpit dengan garis grid utama.
+ */
+export function garisSubgrid(f: FieldConfig): number[] {
+  if (!subgridTampil(f)) return []
+  const utama = Number.isFinite(f.gridYd) && f.gridYd > 0 ? f.gridYd : 5
+  const step = f.subgridYd
+  if (!step || !Number.isFinite(step) || step <= 0 || step >= utama) return []
+  const ez = Math.max(0, Number.isFinite(f.endZoneYd) ? f.endZoneYd : 0)
+  const box = fieldBox(f)
+  const minMain = box.minX + ez
+  const maxMain = box.maxX - ez
+  const out: number[] = []
+  const maks = 1000
+  for (let x = minMain; x <= maxMain + 0.001 && out.length < maks; x += step) {
+    const rasio = x / utama
+    if (Math.abs(rasio - Math.round(rasio)) >= 1e-6) {
+      out.push(Math.abs(x) < 1e-9 ? 0 : x)
+    }
+  }
+  return out
+}
+
 /**
  * Normalisasi batas huruf: undefined = tak terbatas,
  * 0=A, 1=B, …, 4=E. Nilai di-clamp >=0.
@@ -671,15 +844,13 @@ export function daftarPatok(f: FieldConfig, sumbu: 'x' | 'y'): GarisPatok[] {
   const box = fieldBox(f)
   const min = sumbu === 'y' ? box.minY : box.minX
   const max = sumbu === 'y' ? box.maxY : box.maxX
-  // jarak dalam yard (jika satuanJarak='yard' jarak sudah yard, bukan langkah)
-  const satuanLangkah = (p.satuanJarak ?? 'langkah') === 'langkah'
-  const jarakLangkah = () => jarakPatok(p)
-  const jhLangkah = jarakLangkah().jh
-  const jhashLangkah = jarakLangkah().jhash
-  const jtLangkah = jarakLangkah().jt
-  const jhYd = satuanLangkah ? jhLangkah * s : jhLangkah
-  const jhashYd = satuanLangkah ? jhashLangkah * s : jhashLangkah
-  const jtYd = satuanLangkah ? jtLangkah * s : jtLangkah
+  // Jarak dalam yard: 'langkah' ikut stepYd(f), 'yard' ukuran yard fisik, 'meter' ukuran meter fisik.
+  const modeJarak = p.satuanJarak ?? 'langkah'
+  const { jh: jhMentah, jhash: jhashMentah, jt: jtMentah } = jarakPatok(p)
+  const faktorJarakYd = modeJarak === 'yard' ? 1 : modeJarak === 'meter' ? M_TO_YD : s
+  const jhYd = jhMentah * faktorJarakYd
+  const jhashYd = jhashMentah * faktorJarakYd
+  const jtYd = jtMentah * faktorJarakYd
   // untuk batas tepi, hitung dalam satuan yard juga
   const lenYd = max - min
   const batasHuruf = batasHurufNorm(p.maksHuruf)

@@ -10,13 +10,29 @@
  * Pakai: node grid-patok-logika.mjs
  */
 import {
+  FIELD_PRESETS,
   M_TO_YD,
   YD_TO_M,
   STEP_YD,
+  WARNA_GARIS_GRID,
+  activePreset,
+  coordPatok,
   daftarPatok,
+  dariSatuanTampil,
+  faktorTampilLapangan,
   fieldBox,
+  garisGridUtama,
+  garisSubgrid,
+  keSatuanTampil,
+  namaSatuanLapangan,
   patokOf,
+  patokRef,
+  satuanLapanganOf,
+  singkatanSatuanLapangan,
+  skalaGarisLapangan,
   stepYd,
+  tebalGarisGrid,
+  warnaGarisGrid,
   gridUtamaTampil,
   subgridTampil,
   hashGarisTampil,
@@ -275,6 +291,151 @@ const LAP_FOOTBALL = {
   cek('4d: subgrid dapat ditampilkan terpisah dari grid utama', subgridTampil(fSub) === true, String(subgridTampil(fSub)))
   const fNoSub = { ...fMetric, subgridYd: undefined, subgridTampil: 0 }
   cek('4d: subgrid mati tidak memengaruhi grid utama', gridUtamaTampil(fNoSub) === true && subgridTampil(fNoSub) === false)
+}
+
+/* ---------------- 5. #9 — Toggle satuan tampil yard / meter / langkah ---------------- */
+{
+  const fYd = { ...LAP_FOOTBALL, satuan: 'yd' }
+  const fM = { ...LAP_FOOTBALL, satuan: 'm' }
+  const fLk = { ...LAP_FOOTBALL, satuan: 'langkah' }
+
+  cek('5a: satuanLapanganOf mengenali yd, m, langkah, dan bawaan yd',
+    satuanLapanganOf(fYd) === 'yd' &&
+    satuanLapanganOf(fM) === 'm' &&
+    satuanLapanganOf(fLk) === 'langkah' &&
+    satuanLapanganOf({ ...LAP_FOOTBALL, satuan: undefined }) === 'yd')
+  cek('5a: nama & singkatan satuan lengkap',
+    namaSatuanLapangan('langkah') === 'langkah' &&
+    singkatanSatuanLapangan('langkah') === 'lk' &&
+    singkatanSatuanLapangan('m') === 'm' &&
+    singkatanSatuanLapangan('yd') === 'yd')
+
+  // Pada 8-to-5 (0,625 yard/langkah): 100 yard = 160 langkah, 5 yard = 8 langkah
+  cek('5b: 100 yard pada 8-to-5 = 160 langkah tampilan', dekat(keSatuanTampil(100, fLk), 160, 1e-9), String(keSatuanTampil(100, fLk)))
+  cek('5b: 5 yard grid pada 8-to-5 = 8 langkah tampilan', dekat(keSatuanTampil(5, fLk), 8, 1e-9), String(keSatuanTampil(5, fLk)))
+  cek('5b: 53,33 yard lebar ≈ 85,328 langkah', dekat(keSatuanTampil(53.33, fLk), 85.328, 1e-6))
+  // Pada 6-to-5 (5/6 yard/langkah): 100 yard = 120 langkah
+  const f6to5 = { ...fLk, step: '6to5' }
+  cek('5b: 100 yard pada 6-to-5 = 120 langkah tampilan', dekat(keSatuanTampil(100, f6to5), 120, 1e-9))
+
+  // Bolak-balik konversi tampilan -> yard kembali tepat untuk ketiga satuan
+  for (const sat of ['yd', 'm', 'langkah']) {
+    const fUji = { ...LAP_FOOTBALL, satuan: sat }
+    const asal = 37.5
+    const balik = dariSatuanTampil(keSatuanTampil(asal, fUji), fUji)
+    cek(`5c: konversi bolak-balik ${sat} kembali tepat ke yard internal`,
+      dekat(balik, asal, 1e-9) && faktorTampilLapangan(fUji) > 0, `${balik} vs ${asal}`)
+  }
+
+  // Berpindah ke 'langkah' sama sekali tidak menggeser fieldBox, grid, maupun patok
+  const bYd = fieldBox(fYd)
+  const bLk = fieldBox(fLk)
+  cek('5d: fieldBox identik antara yard dan langkah',
+    dekat(bYd.minX, bLk.minX) && dekat(bYd.maxX, bLk.maxX) &&
+    dekat(bYd.minY, bLk.minY) && dekat(bYd.maxY, bLk.maxY))
+  const gYd = garisGridUtama(fYd)
+  const gLk = garisGridUtama(fLk)
+  cek('5d: posisi garisGridUtama identik antara yard dan langkah',
+    gYd.length === gLk.length && gYd.every((v, i) => dekat(v, gLk[i])))
+  const pYd = daftarPatok(fYd, 'x')
+  const pLk = daftarPatok(fLk, 'x')
+  cek('5d: daftarPatok identik antara yard dan langkah',
+    pYd.length === pLk.length && pYd.every((g, i) => g.label === pLk[i].label && dekat(g.pos, pLk[i].pos)))
+}
+
+/* ---------------- 6. #9 — Garis grid/subgrid otomatis dari fieldBox & palet hex ---------------- */
+{
+  const gFootball = garisGridUtama(LAP_FOOTBALL)
+  cek('6a: garisGridUtama 100 yd tiap 5 yd = 21 garis tepat dari fieldBox',
+    gFootball.length === 21 && gFootball.includes(0) && dekat(gFootball[0], -50) && dekat(gFootball[20], 50),
+    `len=${gFootball.length}`)
+
+  // Lapangan indoor 40x20 m dengan grid kustom 2 m -> 21 garis (-20 m .. 0 .. +20 m), tengah tepat 0
+  const fIndoor2m = {
+    ...LAP_FOOTBALL,
+    widthYd: 20 * M_TO_YD,
+    lengthYd: 40 * M_TO_YD,
+    endZoneYd: 0,
+    gridYd: 2 * M_TO_YD,
+    satuan: 'm',
+  }
+  const gIndoor = garisGridUtama(fIndoor2m)
+  cek('6a: lapangan 40 m dengan grid kustom 2 m menghasilkan 21 garis dengan tengah tepat 0',
+    gIndoor.length === 21 && gIndoor.includes(0), `len=${gIndoor.length}, mid=${gIndoor[10]}`)
+
+  // Subgrid 2,5 yd di dalam grid utama 5 yd menghasilkan tepat 20 garis dan tidak menumpuk garis utama
+  const fDenganSub = { ...LAP_FOOTBALL, gridYd: 5, subgridYd: 2.5, subgridTampil: 1 }
+  const gSub = garisSubgrid(fDenganSub)
+  cek('6b: subgrid 2,5 yd di dalam grid 5 yd (100 yd) menghasilkan 20 garis non-duplikat',
+    gSub.length === 20 && gSub.every((s) => !gFootball.some((u) => dekat(u, s, 1e-6))),
+    `len=${gSub.length}`)
+
+  // Semua warna garis grid wajib hex #rrggbb murni (aman cetak/portabel, nol oklch/rgba)
+  const semuaHex = WARNA_GARIS_GRID.length >= 4 && WARNA_GARIS_GRID.every((w) => /^#[0-9a-fA-F]{6}$/.test(w.hex))
+  cek('6c: semua palet WARNA_GARIS_GRID memakai hex #rrggbb murni', semuaHex)
+  cek('6c: warnaGarisGrid aman untuk kunci tak dikenal (jatuh ke #ffffff)',
+    warnaGarisGrid({ ...LAP_FOOTBALL, warnaGrid: 'tidak-ada' }).hex === '#ffffff' &&
+    warnaGarisGrid({ ...LAP_FOOTBALL, warnaGrid: 'emas' }).hex === '#fde047')
+  cek('6d: skalaGarisLapangan proporsional terhadap ukuran lapangan & pengali tebalGrid',
+    skalaGarisLapangan(fIndoor2m) < skalaGarisLapangan(LAP_FOOTBALL) &&
+    dekat(tebalGarisGrid({ ...LAP_FOOTBALL, tebalGrid: 1.5 }), 1.5) &&
+    skalaGarisLapangan({ ...LAP_FOOTBALL, tebalGrid: 1.5 }) > skalaGarisLapangan({ ...LAP_FOOTBALL, tebalGrid: 0.7 }))
+}
+
+/* ---------------- 7. #9 — Patok meter fisik, keselarasan sumbu T, & Indoor tanpa patok ---------------- */
+{
+  // Mode satuanJarak = 'meter': jarak patok mengikuti meter fisik dan patokRef selaras dengan daftarPatok
+  const fPatokMeter = {
+    ...LAP_FOOTBALL,
+    widthYd: 20 * M_TO_YD,
+    lengthYd: 40 * M_TO_YD,
+    endZoneYd: 0,
+    satuan: 'm',
+    patok: {
+      ...LAP_FOOTBALL.patok,
+      aktif: 1,
+      satuanJarak: 'meter',
+      jarakHuruf: 4,
+      jarakHash: 2,
+      jarakT: 5,
+    },
+  }
+  const dxM = daftarPatok(fPatokMeter, 'x')
+  const dyM = daftarPatok(fPatokMeter, 'y')
+  const aM = dxM.find((g) => g.label === 'A')
+  const bM = dxM.find((g) => g.label === 'B' && g.arah === 1)
+  cek('7a: satuanJarak="meter" menempatkan B tepat 4 meter fisik dari A',
+    !!(aM && bM && dekat(bM.pos - aM.pos, 4 * M_TO_YD, 1e-9)), `${bM && aM ? bM.pos - aM.pos : 'null'}`)
+  cek('7a: satuanJarak="meter" menempatkan T2 tepat 5 meter fisik dari T1',
+    dyM.length >= 2 && dekat(dyM[1].pos - dyM[0].pos, 5 * M_TO_YD, 1e-9))
+
+  // Keselarasan patokRef & coordPatok di sumbu T pada satuanJarak 'meter' dan 'yard'
+  const refT2Meter = patokRef(bM.pos, dyM[1].pos, fPatokMeter)
+  cek('7b: patokRef tepat di (B, T2) pada mode meter memberi huruf B & nomor 2 offset 0',
+    refT2Meter.huruf === 'B' && refT2Meter.nomor === 2 && dekat(refT2Meter.nomorOffset, 0, 1e-9),
+    JSON.stringify(refT2Meter))
+  cek('7b: coordPatok tepat di (B, T2) pada mode meter menulis singkatan "B2", dan 1 langkah di belakang menulis "B · T2 +1"',
+    coordPatok(bM.pos, dyM[1].pos, fPatokMeter) === 'B2' &&
+    coordPatok(bM.pos, dyM[1].pos + stepYd(fPatokMeter), fPatokMeter) === 'B · T2 +1',
+    coordPatok(bM.pos, dyM[1].pos, fPatokMeter))
+
+  // Batas maksT dihormati pula oleh patokRef (tidak pernah menyebut T di luar maksT)
+  const fBatasT4 = { ...fPatokMeter, patok: { ...fPatokMeter.patok, maksT: 3 } }
+  const refUjung = patokRef(0, fieldBox(fBatasT4).maxY, fBatasT4)
+  cek('7c: bila maksT=3, patokRef di tepi belakang tidak melampaui T3',
+    refUjung.nomor === 3 && refUjung.nomorOffset > 0, JSON.stringify(refUjung))
+
+  // Preset 'indoor-polos' (Tanpa patok untuk lapangan indoor kecil)
+  const presetPolos = FIELD_PRESETS.find((p) => p.id === 'indoor-polos')
+  cek('7d: FIELD_PRESETS menyediakan preset "indoor-polos" (Indoor tanpa patok)', !!presetPolos)
+  if (presetPolos) {
+    const fPolos = { ...LAP_FOOTBALL, showLabels: 0, ...presetPolos.config }
+    cek('7d: preset indoor-polos mematikan patok (aktif=0 & daftarPatok kosong)',
+      patokOf(fPolos).aktif === 0 && daftarPatok(fPolos, 'x').length === 0 && daftarPatok(fPolos, 'y').length === 0)
+    cek('7d: preset indoor-polos tetap menggambar 21 garis grid tiap 2 m dan dikenali activePreset',
+      garisGridUtama(fPolos).length === 21 && activePreset(fPolos) === 'indoor-polos',
+      `garis=${garisGridUtama(fPolos).length}, preset=${activePreset(fPolos)}`)
+  }
 }
 
 console.log(`\n${lulus} lulus, ${gagal.length} gagal`)

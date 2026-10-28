@@ -44,6 +44,7 @@ import {
   uid,
 } from '../lib/utils'
 import { FieldConfigEditor } from '../components/FieldConfigEditor'
+import { FIELD_PRESETS, activePreset } from '../lib/field'
 import { kenaliBerkas } from '../lib/bukaBerkas'
 import { mintaPratinjau } from '../components/BukaBerkas'
 import {
@@ -272,7 +273,32 @@ export default function Settings() {
         </Card>
 
         <Card>
-          <h2 className="mb-3 text-sm font-semibold text-slate-200">Standar lapangan (bawaan drill baru)</h2>
+          <h2 className="mb-2 text-sm font-semibold text-slate-200">Standar lapangan (bawaan drill baru)</h2>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {FIELD_PRESETS.map((p) => (
+              <Button
+                key={p.id}
+                size="sm"
+                variant={activePreset(form.defaultField) === p.id ? 'primary' : 'soft'}
+                onClick={() =>
+                  patch({
+                    defaultField: {
+                      ...form.defaultField,
+                      showLabels: 1,
+                      gridTampil: 1,
+                      subgridTampil: 0,
+                      subgridYd: undefined,
+                      hashTampil: p.config.hash && p.config.hash !== 'none' ? 1 : 0,
+                      ...p.config,
+                    },
+                  })
+                }
+                title={p.hint}
+              >
+                {p.label}
+              </Button>
+            ))}
+          </div>
           <FieldConfigEditor value={form.defaultField} onChange={(f) => patch({ defaultField: f })} />
         </Card>
 

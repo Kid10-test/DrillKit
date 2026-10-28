@@ -213,6 +213,12 @@ export interface AttendanceRecord {
 export type StepPreset = '8to5' | '6to5' | '4to5' | 'custom'
 export type HashPreset = 'nfhs' | 'ncaa' | 'nfl' | 'none'
 
+/** Satuan tampilan & input ukuran/grid lapangan di editor (internal tetap yard). */
+export type SatuanTampilLapangan = 'yd' | 'm' | 'langkah'
+
+/** Satuan jarak antarpatok (langkah mengikuti `step`, yard/meter ukuran fisik). */
+export type SatuanJarakPatok = 'langkah' | 'yard' | 'meter'
+
 export interface FieldConfig {
   /** lebar lapangan (yard), default 53.33 */
   widthYd: number
@@ -239,11 +245,11 @@ export interface FieldConfig {
   /** tampilkan label yard line (football) */
   showLabels: number
   /**
-   * Satuan yang dipakai saat mengisi panjang/lebar di editor.
+   * Satuan yang dipakai saat mengisi panjang/lebar/grid di editor (`yd` / `m` / `langkah`).
    * Nilai yang tersimpan **tetap yard** — ini hanya memengaruhi tampilan & input,
    * supaya drill lama tidak perlu diubah.
    */
-  satuan?: 'yd' | 'm'
+  satuan?: SatuanTampilLapangan
   /**
    * Sistem patok cara Indonesia (DD1).
    * Kosong atau `aktif: 0` = koordinat tetap memakai format football lama.
@@ -253,6 +259,10 @@ export interface FieldConfig {
   garis?: number
   /** Warna latar lapangan — kunci dari `WARNA_LAPANGAN`. Bawaan `'hijau'`. */
   warna?: string
+  /** Warna garis grid — kunci dari `WARNA_GARIS_GRID` (hex murni). Bawaan `'putih'`. */
+  warnaGrid?: string
+  /** Pengali ketebalan garis grid utama & subgrid (`0.7` tipis, `1` standar, `1.5` tebal). */
+  tebalGrid?: number
   /**
    * Pengali ukuran titik pemain. `1` = ukuran bawaan (sudah mengikuti luas
    * lapangan). Bisa diperkecil kalau formasi terasa sesak.
@@ -317,10 +327,10 @@ export interface PatokConfig {
   tampilLabel?: number
   /**
    * Satuan jarak patok: 'langkah' (bawaan) = jarak dalam langkah (ikut
-   * ukuran langkah 8-to-5); 'yard' = jarak fisik yard (mengikuti grid,
-   * tidak ikut langkah). Dipakai bila pelatih ingin patok sejajar garis grid.
+   * ukuran langkah 8-to-5); 'yard' = jarak fisik yard; 'meter' = jarak fisik
+   * meter (mengikuti ukuran pita meteran lapangan, tidak ikut langkah).
    */
-  satuanJarak?: 'langkah' | 'yard'
+  satuanJarak?: SatuanJarakPatok
 }
 
 export type Facing = 'front' | 'back' | 'left' | 'right' | 'custom'
