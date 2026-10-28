@@ -152,15 +152,17 @@ Posisi disimpan dalam **yard** relatif ke titik tengah lapangan:
 Selain standar football, aplikasi mendukung **lapangan cara Indonesia**:
 
 * **Preset:** DCI/kampus, SMA/NFHS, Pro/NFL, tanpa hash, **Sepak bola (105 × 68 m)**,
-  **Indoor/GOR (40 × 20 m)**, atau **kustom bebas** (panjang, lebar, dan jarak
-  antar patok diatur sendiri).
-* **Satuan** bisa **yard** atau **meter** — nilai tersimpan tetap yard, jadi
-  drill yang dibuat sebelum fitur ini ada tetap terbaca persis seperti semula.
+  **Indoor/GOR (40 × 20 m)**, **Indoor tanpa patok (40 × 20 m, grid 2 m)**, atau
+  **kustom bebas** (panjang, lebar, jarak grid/subgrid, warna/ketebalan garis hex,
+  serta jarak antar patok diatur sendiri disertai **pratinjau SVG langsung**).
+* **Satuan tampilan** bisa **yard**, **meter**, atau **langkah** — nilai tersimpan
+  tetap yard, jadi drill lama tetap terbaca persis seperti semula tanpa geser geometri.
 * **Patok** mengikuti kebiasaan tim. Bawaan: **`A` di titik tengah**, lalu
   keluar ke dua sisi — `# C # B # A # B # C #`. Pola lurus dari tepi
   (`A # B # C …`) juga tersedia. Jarak huruf→huruf, huruf→#, dan T→T diatur
-  dalam **langkah**, dan patok huruf bisa dipasang di sumbu melintang atau
-  membujur.
+  dalam **langkah**, **yard fisik**, atau **meter fisik**, patok huruf bisa dipasang
+  di sumbu melintang atau membujur, dan tersedia tombol cepat **Tanpa patok** untuk
+  aula/GOR kecil.
 * Patok angka bisa ditulis **`T1`, `T2`** atau cukup **`1`, `2`**.
 * Karena `A` di tengah, huruf yang sama ada di dua sisi. Bila perlu, satu sisi
   diberi tanda koma atas (`B'` · `B`) supaya tidak rancu di buku saku — tanda
@@ -987,7 +989,7 @@ Rincian keputusan desain lengkap tercatat di [`RANCANGAN-LANJUTAN.md`](RANCANGAN
 
 * **Satu pintu “Buka berkas DrillKit” (`#7`)** — seret berkas apa pun ke jendela aplikasi (atau buka dari **Dashboard** / menu **Impor & ekspor data**). Isi berkas dikenali otomatis dari bitanya (backup JSON/ZIP, paket anggota, show, repertoar, data pilihan, CSV anggota/jadwal/absensi/koordinat, CSV Pyware, hingga partitur MusicXML/`.mxl`/PDF), selalu menampilkan pratinjau sebelum menulis, dan menolak paket anggota di mode pelatih agar tidak menimpa data tim.
 * **PIN pelatih tim (`#8`)** — bila variabel lingkungan `PIN_PELATIH` diisi saat `npm run build` / `npm run build:portable`, hash PBKDF2-SHA256 ditanam ke bundel sehingga pilihan **Saya pelatih** (dan keluar dari mode anggota) meminta PIN tim. Tanpa `PIN_PELATIH`, aplikasi berjalan persis seperti biasa tanpa rintangan.
-* **Grid & patok yard–meter kustom (`#9`)** — geometri internal tetap disimpan dalam yard supaya presisi tidak bergeser saat mengganti tampilan **yard ↔ meter**; jarak grid utama, subgrid, hash, serta batas huruf (`A..E`) dan patok `T` diatur terpisah.
+* **Grid & patok yard–meter–langkah kustom (`#9`)** — geometri internal tetap disimpan dalam yard supaya presisi tidak bergeser saat mengganti tampilan **yard ↔ meter ↔ langkah**; jarak grid utama & subgrid kustom dihitung otomatis dari `fieldBox` dengan palet warna hex murni & ketebalan proporsional, dilengkapi pratinjau SVG langsung di editor, jarak patok berbasis langkah/yard/meter, serta opsi cepat & preset **Indoor tanpa patok**.
 * **Impor drill Pyware 3D (`#10`)** — migrasi satu arah **Pyware/Excel → DrillKit** lewat CSV *coordinate sheet* (tombol **Pyware** di editor formasi atau langsung lewat pintu *Buka berkas DrillKit*): satuan & titik asal sumbu Y ditebak otomatis, titik di luar lapangan diperingatkan, pemain dicocokkan ke anggota tim (dan diingat sebagai alias), set sela diinterpolasi lurus, serta seluruh impor tercatat di riwayat formasi sehingga bisa di-*undo*.
 * **Partitur MusicXML/`.mxl`/PDF, cetak part/Lyre, & latihan per frasa (`#11a`–`#11d`)** —
   - Simpan bita berkas partitur terpisah di IndexedDB (`partiturBerkas`) lengkap dengan pemantau kuota, tombol `Minta Persisten` (`navigator.storage.persist()`), dan round-trip penuh di **Backup + rekaman (ZIP)**.

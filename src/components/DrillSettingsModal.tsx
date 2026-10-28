@@ -209,7 +209,20 @@ export function DrillSettingsModal({
               key={p.id}
               size="sm"
               variant={activePreset(d.field) === p.id ? 'primary' : 'soft'}
-              onClick={() => setD({ ...d, field: { ...d.field, ...p.config } })}
+              onClick={() =>
+                setD({
+                  ...d,
+                  field: {
+                    ...d.field,
+                    showLabels: 1,
+                    gridTampil: 1,
+                    subgridTampil: 0,
+                    subgridYd: undefined,
+                    hashTampil: p.config.hash && p.config.hash !== 'none' ? 1 : 0,
+                    ...p.config,
+                  },
+                })
+              }
               title={p.hint}
             >
               {p.label}
