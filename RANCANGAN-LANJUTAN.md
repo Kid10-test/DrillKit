@@ -92,9 +92,9 @@ disertai uji dan catatan di `IDE-PENGEMBANGAN.md`).
 | 10 | Impor drill Pyware | Sedang | **Selesai (6 Okt 2026)** | CSV koordinat Pyware → DrillKit, pencocokan anggota reuse #1, pratinjau & undo; 146 butir uji |
 | 11 | Partitur full score / per instrumen + latihan per bar/frasa | Sedang–besar | **Selesai penuh (#11a–#11d, 22–25 Okt 2026)** | #11a: Blob IndexedDB, pintu #7, ringkasan, kuota, ZIP; #11b: `.mxl` + render OSMD hex lazy-load + PDF; #11c: filter part/section + anggota + cetak HTML hex; #11d: sorot sinkron `TempoTimeline`, loop frasa, & tautan frasa↔set drill |
 
-> **Status pelaksanaan keseluruhan (28 Okt 2026):**
+> **Status pelaksanaan keseluruhan (28 Okt 2026 — Rilis `v1.0.0`):**
 > **Seluruh 11 rancangan (`#1` s.d. `#11d`, termasuk `#9` selesai penuh) telah tuntas 100%.**
-> Panduan 1 halaman pelatih & anggota (`src/lib/panduan.ts`), dokumentasi `README.md`/`DEPLOY.md`, bundel rilis (`scripts/siapkan-rilis.sh`), serta **115 rangkaian** uji regresi di `qa/regresi-penuh.sh` telah dimutakhirkan. **I1** (log perubahan show) tetap ditunda.
+> Panduan 1 halaman pelatih & anggota (`src/lib/panduan.ts`), dokumentasi `README.md`/`DEPLOY.md`/`RILIS-v1.0.0.md`, bundel rilis `v1.0.0` (`scripts/siapkan-rilis.sh`), serta **116 rangkaian** uji regresi di `qa/regresi-penuh.sh` (termasuk `m6-drill-rekaman` dari PR #13) telah dimutakhirkan. **I1** (log perubahan show) tetap ditunda.
 
 ---
 
