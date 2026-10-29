@@ -110,19 +110,33 @@ export function shouldRemind(intervalDays: number): boolean {
 
 /** Kumpulkan seluruh data menjadi satu objek (dipakai unduhan & pratinjau). */
 export async function buildBackupPayload() {
-  const [members, sessions, attendance, drills, sets, songs, setlists, memberNotes, kemajuan, evaluasi] =
-    await Promise.all([
+  const [
+    members,
+    sessions,
+    attendance,
+    drills,
+    sets,
+    songs,
+    setlists,
+    memberNotes,
+    kemajuan,
+    evaluasi,
+    targetSetoran,
+    setoran,
+  ] = await Promise.all([
     db.members.toArray(),
     db.sessions.toArray(),
     db.attendance.toArray(),
     db.drills.toArray(),
     db.sets.toArray(),
     db.songs.toArray(),
-      db.setlists.toArray(),
-      db.memberNotes.toArray(),
-      db.kemajuan.toArray(),
-      db.evaluasi.toArray(),
-    ])
+    db.setlists.toArray(),
+    db.memberNotes.toArray(),
+    db.kemajuan.toArray(),
+    db.evaluasi.toArray(),
+    db.targetSetoran.toArray(),
+    db.setoran.toArray(),
+  ])
   return {
     format: 'drillkit-backup',
     version: 1,
@@ -138,6 +152,8 @@ export async function buildBackupPayload() {
     memberNotes,
     kemajuan,
     evaluasi,
+    targetSetoran,
+    setoran,
   }
 }
 

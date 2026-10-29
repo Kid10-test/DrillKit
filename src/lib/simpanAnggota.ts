@@ -12,6 +12,7 @@ import type { RencanaGabung } from './namaAnggota'
 import type { HasilCocok } from './namaAnggota'
 import type {
   AttendanceRecord,
+  CatatanSetoran,
   Drill,
   DrillSet,
   Evaluasi,
@@ -25,6 +26,7 @@ const TABEL = [
   db.members,
   db.attendance,
   db.evaluasi,
+  db.setoran,
   db.memberNotes,
   db.sets,
   db.drills,
@@ -48,6 +50,8 @@ export async function simpanRencana(r: {
   absensiHapus?: string[]
   evaluasi?: Evaluasi[]
   evaluasiHapus?: string[]
+  setoran?: CatatanSetoran[]
+  setoranHapus?: string[]
   catatan?: MemberNote[]
   sets?: DrillSet[]
   drills?: Drill[]
@@ -58,8 +62,10 @@ export async function simpanRencana(r: {
   await db.transaction('rw', TABEL, async () => {
     if (r.absensiHapus?.length) await db.attendance.bulkDelete(r.absensiHapus)
     if (r.evaluasiHapus?.length) await db.evaluasi.bulkDelete(r.evaluasiHapus)
+    if (r.setoranHapus?.length) await db.setoran.bulkDelete(r.setoranHapus)
     if (r.absensi?.length) await db.attendance.bulkPut(r.absensi)
     if (r.evaluasi?.length) await db.evaluasi.bulkPut(r.evaluasi)
+    if (r.setoran?.length) await db.setoran.bulkPut(r.setoran)
     if (r.catatan?.length) await db.memberNotes.bulkPut(r.catatan)
     if (r.sets?.length) await db.sets.bulkPut(r.sets)
     if (r.drills?.length) await db.drills.bulkPut(r.drills)
@@ -78,6 +84,8 @@ export async function simpanGabung(r: RencanaGabung): Promise<void> {
     absensiHapus: r.absensiHapus,
     evaluasi: r.evaluasi,
     evaluasiHapus: r.evaluasiHapus,
+    setoran: r.setoran,
+    setoranHapus: r.setoranHapus,
     catatan: r.catatan,
     sets: r.sets,
     drills: r.drills,
@@ -97,16 +105,17 @@ export async function muatJejakAnggota(): Promise<{ absensi: string[]; posisi: s
 }
 
 export async function muatUntukGabung() {
-  const [absensi, evaluasi, catatan, sets, drills, riwayat, kemajuan] = await Promise.all([
+  const [absensi, evaluasi, setoran, catatan, sets, drills, riwayat, kemajuan] = await Promise.all([
     db.attendance.toArray(),
     db.evaluasi.toArray(),
+    db.setoran.toArray(),
     db.memberNotes.toArray(),
     db.sets.toArray(),
     db.drills.toArray(),
     db.riwayat.toArray(),
     db.kemajuan.toArray(),
   ])
-  return { absensi, evaluasi, catatan, sets, drills, riwayat, kemajuan }
+  return { absensi, evaluasi, setoran, catatan, sets, drills, riwayat, kemajuan }
 }
 
 export type { HasilCocok }

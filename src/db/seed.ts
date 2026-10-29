@@ -172,14 +172,20 @@ export async function seedDemoData(): Promise<number> {
 }
 
 export async function wipeAllData() {
-  await db.transaction('rw', [db.members, db.sessions, db.attendance, db.drills, db.sets, db.songs], async () => {
-    await Promise.all([
-      db.members.clear(),
-      db.sessions.clear(),
-      db.attendance.clear(),
-      db.drills.clear(),
-      db.sets.clear(),
-      db.songs.clear(),
-    ])
-  })
+  await db.transaction(
+    'rw',
+    [db.members, db.sessions, db.attendance, db.drills, db.sets, db.songs, db.targetSetoran, db.setoran],
+    async () => {
+      await Promise.all([
+        db.members.clear(),
+        db.sessions.clear(),
+        db.attendance.clear(),
+        db.drills.clear(),
+        db.sets.clear(),
+        db.songs.clear(),
+        db.targetSetoran.clear(),
+        db.setoran.clear(),
+      ])
+    },
+  )
 }

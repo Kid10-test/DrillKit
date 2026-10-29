@@ -10,6 +10,7 @@ import type {
   MemberNote,
   Session,
   ShareBundle,
+  TargetSetoran,
 } from '../db/types'
 import { FieldSurface } from '../components/FieldSurface'
 import {
@@ -32,7 +33,19 @@ import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
 import { kenaliBerkas, namaPaketGrup, namaZipAnggota } from '../lib/bukaBerkas'
 import { mintaPratinjau } from '../components/BukaBerkas'
 import { pasangPartiturDariPaket, pulihkanAudioDariZipPaket, simpanPaketAnggota } from '../lib/paketMasuk'
+import { simpanLoncatLatih } from '../lib/partiturFrasa'
 import { buatLampiranPartiturPaket } from '../lib/partiturPaket'
+import {
+  LABEL_JENJANG_SETORAN,
+  LABEL_KATEGORI_SETORAN,
+  WARNA_JENJANG_GELAP,
+  apakahLulusSetoran,
+  batasLulusEfektif,
+  hitungRingkasanSetoranTim,
+  idCatatanSetoran,
+  targetBerlakuUntukAnggota,
+  urutkanTargetSetoran,
+} from '../lib/setoran'
 import { gabungPembaruan, materiLebihBaru, muatBerkasTerbit, bukaDataPribadi, tanggalIndonesia, type DataTerkunci } from '../lib/terbit'
 import { kunciDariUrl, simpanKunciAnggota, bacaKunciAnggota } from '../lib/kunci'
 import { TerbitkanAnggota } from '../components/TerbitkanAnggota'
@@ -102,6 +115,8 @@ function CoachExport() {
   const daftarSetList = useLiveQuery(() => db.setlists.toArray(), [], [])
   const attendance = useLiveQuery(() => db.attendance.toArray(), [], [])
   const memberNotes = useLiveQuery(() => db.memberNotes.toArray(), [], [])
+  const targetSetoran = useLiveQuery(() => db.targetSetoran.toArray(), [], [])
+  const catatanSetoran = useLiveQuery(() => db.setoran.toArray(), [], [])
   const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
   const partiturItems = useLiveQuery(() => db.partiturBerkas.toArray(), [], [])
   const rekamanItems = useLiveQuery(() => db.rekamanAudio.toArray(), [], [])
@@ -116,6 +131,8 @@ function CoachExport() {
   const [includeAttendance, setIncludeAttendance] = useState(true)
   /** Catatan evaluasi — dulu SELALU ikut berkas tanpa saklar apa pun. */
   const [includeNotes, setIncludeNotes] = useState(true)
+  /** #14 — target & capaian setoran hafalan pribadi per anggota. */
+  const [includeSetoran, setIncludeSetoran] = useState(true)
   const [preview, setPreview] = useState<ShareBundle | null>(null)
   const [petaPartiturSiap, setPetaPartiturSiap] = useState<Record<string, LampiranPartiturPaket>>({})
 
@@ -182,6 +199,8 @@ function CoachExport() {
       // Set list mengikuti saklar repertoar: ia tidak ada artinya tanpa lagu.
       setlists: includeSongs ? (daftarSetList ?? []) : [],
       partiturPaket: Object.keys(partiturTerpilih).length > 0 ? partiturTerpilih : undefined,
+      targetSetoran: includeSetoran ? (targetSetoran ?? []) : [],
+      setoran: includeSetoran ? (catatanSetoran ?? []) : [],
       attendance: includeAttendance ? (attendance ?? []) : [],
       // Catatan evaluasi — kini menghormati saklar, seperti jenis data lain.
       memberNotes: includeNotes ? (memberNotes ?? []) : [],
@@ -269,6 +288,8 @@ function CoachExport() {
     includeDrills,
     includeSongs,
     includePartitur,
+    includeSetoran,
+    targetSetoran,
     petaPartiturSiap,
   ])
 
@@ -382,6 +403,12 @@ function CoachExport() {
                 checked={includeNotes}
                 onChange={setIncludeNotes}
                 label={`Catatan evaluasi (${memberNotes?.length ?? 0})`}
+              />
+              <Toggle
+                testId="toggle-setoran"
+                checked={includeSetoran}
+                onChange={setIncludeSetoran}
+                label={`Setoran hafalan (${catatanSetoran?.length ?? 0} catatan, ${targetSetoran?.length ?? 0} target)`}
               />
               {includeSongs && (rekamanItems?.length ?? 0) > 0 && (
                 <Toggle
@@ -1014,7 +1041,22 @@ function MemberView() {
       ) : tab === 'absensi' ? (
         <MemberAttendance bundle={dataTerkunci ?? bundle} me={me} locked={!!dataTerkunci} />
       ) : (
-        <MemberNotes bundle={dataTerkunci ?? bundle} me={me} locked={!!dataTerkunci} />
+        <MemberNotes
+          bundle={dataTerkunci ?? bundle}
+          bundleGrup={bundle}
+          me={me}
+          locked={!!dataTerkunci}
+          onLatihDiMusik={(t) => {
+            if (!t.songId) return
+            simpanLoncatLatih({
+              songId: t.songId,
+              dari: t.biramaDari,
+              sampai: t.biramaSampai,
+              label: t.judul,
+            })
+            setTab('musik')
+          }}
+        />
       )}
     </div>
   )
@@ -2064,42 +2106,178 @@ function MemberKuis({ bundle, me, members }: { bundle: ShareBundle; me: Member; 
 }
 
 /**
- * Tab "Catatan" — catatan evaluasi pribadi yang ditulis pelatih.
- * Hanya catatan untuk anggota yang sedang dipilih yang ditampilkan.
+ * Tab "Catatan" — tanggungan setoran hafalan (#14) & catatan evaluasi pribadi pelatih.
+ * Hanya data untuk anggota yang sedang dipilih yang ditampilkan.
  */
-function MemberNotes({ bundle, me, locked }: { bundle: ShareBundle; me: Member; locked?: boolean }) {
+function MemberNotes({
+  bundle,
+  bundleGrup,
+  me,
+  locked,
+  onLatihDiMusik,
+}: {
+  bundle: ShareBundle
+  bundleGrup: ShareBundle
+  me: Member
+  locked?: boolean
+  onLatihDiMusik: (t: TargetSetoran) => void
+}) {
   const notes: MemberNote[] = useMemo(
     () => (bundle.memberNotes ?? []).filter((n) => n.memberId === me.id).sort((a, b) => b.at - a.at),
     [bundle.memberNotes, me.id],
   )
 
-  if (!notes.length) {
+  const semuaTarget = useMemo(
+    () => urutkanTargetSetoran(bundleGrup.targetSetoran ?? bundle.targetSetoran ?? []),
+    [bundleGrup.targetSetoran, bundle.targetSetoran],
+  )
+  const targetWajib = useMemo(
+    () => semuaTarget.filter((t) => targetBerlakuUntukAnggota(t, me)),
+    [semuaTarget, me],
+  )
+  const catatanSetoranMilikku = useMemo(
+    () => (bundle.setoran ?? []).filter((s) => s.memberId === me.id),
+    [bundle.setoran, me.id],
+  )
+  const ringkasanSaya = useMemo(
+    () => hitungRingkasanSetoranTim(targetWajib, catatanSetoranMilikku, [me], [], todayISO()),
+    [targetWajib, catatanSetoranMilikku, me],
+  )
+  const punyaAksesPribadi = Boolean(locked || bundleGrup.forMember === me.id)
+  const petaLagu = useMemo(
+    () => new Map((bundleGrup.songs ?? []).map((s) => [s.id, s])),
+    [bundleGrup.songs],
+  )
+  const hariIni = todayISO()
+
+  if (!notes.length && targetWajib.length === 0) {
     return (
       <div>
         <EmptyState
           title="Belum ada catatan"
           desc={locked
-            ? 'Catatan evaluasi dari pelatih akan muncul di sini setelah paket diperbarui.'
+            ? 'Catatan evaluasi & target setoran dari pelatih akan muncul di sini setelah paket diperbarui.'
             : 'Mintalah QR kunci ke pelatih untuk membuka catatan pribadi, atau tunggu materi diperbarui.'}
         />
       </div>
     )
   }
 
+  const statSaya = ringkasanSaya.perAnggota[me.id]
+
   return (
-    <Card padded={false}>
-      <ul className="divide-y divide-slate-800/70">
-        {notes.map((n) => (
-          <li key={n.id} className="px-4 py-3">
-            <p className="mb-1 text-[11px] text-slate-500">
-              {formatDateLong(new Date(n.at).toISOString().slice(0, 10))}
-              {n.by ? ` · ${n.by}` : ''}
-            </p>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{n.text}</p>
-          </li>
-        ))}
-      </ul>
-    </Card>
+    <div className="space-y-4">
+      {targetWajib.length > 0 && (
+        <Card data-testid="kartu-setoran-anggota">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-100">
+                Tanggungan Setoran Hafalan
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                {punyaAksesPribadi && statSaya
+                  ? `${statSaya.lulus}/${statSaya.wajib} target lulus penuh · Kesiapan ${statSaya.persenSiap}%`
+                  : `${targetWajib.length} target untuk seksimu — buka dengan kunci pribadi atau berkas per anggota untuk melihat nilai kelulusan`}
+              </p>
+            </div>
+            {punyaAksesPribadi && statSaya && (
+              <span
+                data-testid="persen-setoran-anggota"
+                className="rounded-full border border-emerald-700/50 bg-emerald-950/50 px-2.5 py-0.5 text-xs font-bold text-emerald-300"
+              >
+                {statSaya.persenSiap}%
+              </span>
+            )}
+          </div>
+
+          <ul className="mt-2.5 divide-y divide-slate-800/70">
+            {targetWajib.map((t) => {
+              const sel = ringkasanSaya.petaSel.get(idCatatanSetoran(t.id, me.id))
+              const jenjang = sel?.jenjang ?? 'belum'
+              const w = WARNA_JENJANG_GELAP[jenjang]
+              const lulus = apakahLulusSetoran(jenjang, batasLulusEfektif(t))
+              const terlambat = Boolean(t.tenggat && t.tenggat < hariIni && !lulus)
+              const lagu = t.songId ? petaLagu.get(t.songId) : undefined
+
+              return (
+                <li
+                  key={t.id}
+                  data-testid={`baris-setoran-anggota-${t.id}`}
+                  className="py-2.5 first:pt-0 last:pb-0"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-slate-100">{t.judul}</p>
+                      <p className="mt-0.5 text-[11px] text-slate-400">
+                        {LABEL_KATEGORI_SETORAN[t.kategori]}
+                        {t.biramaDari != null && t.biramaSampai != null
+                          ? ` · Birama ${t.biramaDari}–${t.biramaSampai}`
+                          : ''}
+                        {t.tenggat ? ` · Tenggat ${t.tenggat}` : ''}
+                        {terlambat && punyaAksesPribadi ? (
+                          <span className="ml-1.5 font-semibold text-rose-400">(Lewat tenggat)</span>
+                        ) : null}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {punyaAksesPribadi && (
+                        <span
+                          data-testid={`status-setoran-anggota-${t.id}`}
+                          style={{
+                            backgroundColor: w.bg,
+                            borderColor: w.border,
+                            color: w.text,
+                          }}
+                          className="rounded-md border px-2 py-0.5 text-[11px] font-semibold"
+                        >
+                          {LABEL_JENJANG_SETORAN[jenjang]}
+                        </span>
+                      )}
+                      {lagu && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          data-testid={`latih-setoran-${t.id}`}
+                          onClick={() => onLatihDiMusik(t)}
+                        >
+                          Latih di Musik
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {punyaAksesPribadi && (sel?.catatan || sel?.penguji) && (
+                    <p className="mt-1.5 rounded bg-slate-950/60 px-2.5 py-1.5 text-[11px] text-slate-300">
+                      {sel.catatan ? sel.catatan : 'Diuji'}
+                      {sel.penguji ? (
+                        <span className="text-slate-500">
+                          {' '}· {sel.penguji} ({sel.tanggal})
+                        </span>
+                      ) : null}
+                    </p>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </Card>
+      )}
+
+      {notes.length > 0 && (
+        <Card padded={false}>
+          <ul className="divide-y divide-slate-800/70">
+            {notes.map((n) => (
+              <li key={n.id} className="px-4 py-3">
+                <p className="mb-1 text-[11px] text-slate-500">
+                  {formatDateLong(new Date(n.at).toISOString().slice(0, 10))}
+                  {n.by ? ` · ${n.by}` : ''}
+                </p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{n.text}</p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+    </div>
   )
 }
 

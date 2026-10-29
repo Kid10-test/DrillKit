@@ -182,19 +182,33 @@ function TubuhData({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => vo
     ;(async () => {
       const kunci = (daftar: { id?: string; key?: string }[]) =>
         daftar.map((e) => e?.id ?? e?.key ?? '').filter(Boolean)
-      const [anggota, jadwal, absensi, lagu, setlist, drill, set, kemajuan, catatan, evaluasi] =
-        await Promise.all([
-          db.members.toArray(),
-          db.sessions.toArray(),
-          db.attendance.toArray(),
-          db.songs.toArray(),
-          db.setlists.toArray(),
-          db.drills.toArray(),
-          db.sets.toArray(),
-          db.kemajuan.toArray(),
-          db.memberNotes.toArray(),
-          db.evaluasi.toArray(),
-        ])
+      const [
+        anggota,
+        jadwal,
+        absensi,
+        lagu,
+        setlist,
+        drill,
+        set,
+        kemajuan,
+        catatan,
+        evaluasi,
+        targetSetoran,
+        setoran,
+      ] = await Promise.all([
+        db.members.toArray(),
+        db.sessions.toArray(),
+        db.attendance.toArray(),
+        db.songs.toArray(),
+        db.setlists.toArray(),
+        db.drills.toArray(),
+        db.sets.toArray(),
+        db.kemajuan.toArray(),
+        db.memberNotes.toArray(),
+        db.evaluasi.toArray(),
+        db.targetSetoran.toArray(),
+        db.setoran.toArray(),
+      ])
       if (!hidup) return
       setIdLokal({
         anggota: kunci(anggota),
@@ -207,6 +221,8 @@ function TubuhData({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => vo
         kemajuan: kunci(kemajuan),
         catatan: kunci(catatan),
         evaluasi: kunci(evaluasi),
+        targetSetoran: kunci(targetSetoran),
+        setoran: kunci(setoran),
       })
     })()
     return () => {

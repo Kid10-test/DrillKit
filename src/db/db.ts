@@ -17,6 +17,8 @@ import type {
   Simpanan,
   AudioRekamanItem,
   PartiturBerkasItem,
+  TargetSetoran,
+  CatatanSetoran,
 } from './types'
 
 /**
@@ -59,6 +61,10 @@ export class DrillKitDB extends Dexie {
    * `Song.partitur` (metadata kecilnya), bitanya menyusul lewat ZIP.
    */
   partiturBerkas!: Table<PartiturBerkasItem, string>
+  /** #14 — daftar target setoran hafalan (*checkpoints*). */
+  targetSetoran!: Table<TargetSetoran, string>
+  /** #14 — status capaian setoran hafalan `[targetId × memberId]`. */
+  setoran!: Table<CatatanSetoran, string>
 
   constructor() {
     super('drillkit')
@@ -101,6 +107,11 @@ export class DrillKitDB extends Dexie {
     // tidak perlu migrasi apa pun.
     this.version(10).stores({
       partiturBerkas: 'id, songId, updatedAt',
+    })
+    // #14 — matriks setoran hafalan (penambahan murni v11 tanpa menyentuh store lama).
+    this.version(11).stores({
+      targetSetoran: 'id, songId, urutan, createdAt',
+      setoran: 'id, targetId, memberId, [targetId+memberId], diubahAt',
     })
   }
 }

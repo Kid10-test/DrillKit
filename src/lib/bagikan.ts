@@ -64,6 +64,9 @@ export function paketGrup(b: ShareBundle): ShareBundle {
     members: b.members.map(bersihkanAnggota),
     attendance: [],
     memberNotes: [],
+    // #14 — targetSetoran (kurikulum tim) boleh terbawa lewat `...b`, tetapi
+    // capaian pribadi `setoran` WAJIB dikosongkan di paket grup.
+    setoran: [],
     mode: 'member',
     /*
      * Berkas grup bukan untuk siapa pun secara khusus — dibagikan ke semua
@@ -78,7 +81,7 @@ export function paketGrup(b: ShareBundle): ShareBundle {
 }
 
 /**
- * Paket untuk **satu anggota**: hanya absensi dan catatan miliknya sendiri.
+ * Paket untuk **satu anggota**: hanya absensi, catatan, dan setoran hafalan miliknya sendiri.
  *
  * `memberId` yang tidak dikenal tidak menghasilkan data pribadi apa pun —
  * bukan malah mengembalikan semuanya. Mengembalikan semuanya adalah
@@ -99,8 +102,10 @@ export function paketAnggota(b: ShareBundle, memberId: string): ShareBundle {
     songs: tersaring.songs,
     partiturPaket: tersaring.partiturPaket,
     members: b.members.map(bersihkanAnggota),
+    targetSetoran: dikenal ? (b.targetSetoran ?? []) : [],
     attendance: dikenal ? b.attendance.filter((a) => a.memberId === memberId) : [],
     memberNotes: dikenal ? (b.memberNotes ?? []).filter((n) => n.memberId === memberId) : [],
+    setoran: dikenal ? (b.setoran ?? []).filter((s) => s.memberId === memberId) : [],
     mode: 'member',
     /*
      * Tulis **untuk siapa** berkas ini, supaya yang membukanya tidak

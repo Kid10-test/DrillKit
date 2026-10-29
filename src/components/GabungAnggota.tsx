@@ -166,6 +166,7 @@ export function GabungAnggota({
           <ul className="mt-1.5 space-y-0.5 text-[11px] text-slate-400">
             <li>Absensi dipindah: {rencana.jumlah.absensi}</li>
             <li>Evaluasi dipindah: {rencana.jumlah.evaluasi}</li>
+            <li>Setoran hafalan dipindah: {rencana.jumlah.setoran}</li>
             <li>Catatan dipindah: {rencana.jumlah.catatan}</li>
             <li>
               Titik formasi dipindah: {rencana.jumlah.titik}

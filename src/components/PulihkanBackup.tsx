@@ -138,6 +138,8 @@ export async function tulisMuatanBackup(
       db.memberNotes,
       db.kemajuan,
       db.evaluasi,
+      db.targetSetoran,
+      db.setoran,
     ],
     async () => {
       if (diubah.members?.length) await db.members.bulkPut(diubah.members)
@@ -150,6 +152,8 @@ export async function tulisMuatanBackup(
       if (diubah.memberNotes?.length) await db.memberNotes.bulkPut(diubah.memberNotes)
       if (diubah.kemajuan?.length) await db.kemajuan.bulkPut(diubah.kemajuan)
       if (diubah.evaluasi?.length) await db.evaluasi.bulkPut(diubah.evaluasi)
+      if (diubah.targetSetoran?.length) await db.targetSetoran.bulkPut(diubah.targetSetoran)
+      if (diubah.setoran?.length) await db.setoran.bulkPut(diubah.setoran)
     },
   )
   if (diubah.settings) await db.settings.put({ ...diubah.settings, key: 'team' })
@@ -225,20 +229,35 @@ export function AlurPulihkanBackup({
     ;(async () => {
       const kunci = (daftar: { id?: string; key?: string }[]) =>
         daftar.map((e) => e?.id ?? e?.key ?? '').filter(Boolean)
-      const [members, sessions, attendance, songs, setlists, drills, sets, memberNotes, kemajuan, evaluasi, partiturBerkas] =
-        await Promise.all([
-          db.members.toArray(),
-          db.sessions.toArray(),
-          db.attendance.toArray(),
-          db.songs.toArray(),
-          db.setlists.toArray(),
-          db.drills.toArray(),
-          db.sets.toArray(),
-          db.memberNotes.toArray(),
-          db.kemajuan.toArray(),
-          db.evaluasi.toArray(),
-          db.partiturBerkas.toArray(),
-        ])
+      const [
+        members,
+        sessions,
+        attendance,
+        songs,
+        setlists,
+        drills,
+        sets,
+        memberNotes,
+        kemajuan,
+        evaluasi,
+        targetSetoran,
+        setoran,
+        partiturBerkas,
+      ] = await Promise.all([
+        db.members.toArray(),
+        db.sessions.toArray(),
+        db.attendance.toArray(),
+        db.songs.toArray(),
+        db.setlists.toArray(),
+        db.drills.toArray(),
+        db.sets.toArray(),
+        db.memberNotes.toArray(),
+        db.kemajuan.toArray(),
+        db.evaluasi.toArray(),
+        db.targetSetoran.toArray(),
+        db.setoran.toArray(),
+        db.partiturBerkas.toArray(),
+      ])
       if (!hidup) return
       setLokal(members)
       setIdLokal({
@@ -252,6 +271,8 @@ export function AlurPulihkanBackup({
         memberNotes: kunci(memberNotes),
         kemajuan: kunci(kemajuan),
         evaluasi: kunci(evaluasi),
+        targetSetoran: kunci(targetSetoran),
+        setoran: kunci(setoran),
         partiturBerkas: kunci(partiturBerkas),
       })
       const baris = susunSaran(Array.isArray(data.members) ? data.members : [], members)

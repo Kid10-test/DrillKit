@@ -54,6 +54,7 @@ import { KendaliTempoLatihan, LencanaLatihan } from '../components/KendaliTempoL
 import { useTempoLatihan } from '../hooks/useTempoLatihan'
 import { useFrasaLatihan } from '../hooks/useFrasaLatihan'
 import {
+  ambilLoncatLatih,
   bacaSemuaFrasa,
   formatLencanaFrasa,
   formatTautanSetBirama,
@@ -465,6 +466,31 @@ export default function Music({
       void db.songs.update(song.id, { ulangBagian: undefined })
     }
   }
+
+  // #14 — terapkan loncatan langsung dari Matriks Setoran Hafalan / Kartu Anggota.
+  useEffect(() => {
+    if (!songs || songs.length === 0) return
+    const req = ambilLoncatLatih()
+    if (!req) return
+    const targetLagu = songs.find((s) => s.id === req.songId) ?? null
+    if (!targetLagu) return
+    mainkanSetRef.current = false
+    setIndeksMain(null)
+    setSelected(targetLagu.id)
+    setUseMap(true)
+    if (req.dari != null && req.sampai != null) {
+      const f = susunFrasaTerurut(req.dari, req.sampai, 1, req.label)
+      setUlangBagian(f, targetLagu)
+      setMulaiDari(f.dari)
+      setMeasure(f.dari)
+    } else {
+      setMulaiDari(1)
+      setMeasure(1)
+    }
+    setHabis(false)
+    if (targetLagu.partitur) setPartiturTerbuka(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songs])
   const setUlang = (v: boolean) => {
     if (!song) return
     db.songs.update(song.id, { ulang: v ? 1 : 0 })

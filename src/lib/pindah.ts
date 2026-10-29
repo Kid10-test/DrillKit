@@ -24,6 +24,7 @@
  */
 import type {
   AttendanceRecord,
+  CatatanSetoran,
   Drill,
   DrillSet,
   Evaluasi,
@@ -33,6 +34,7 @@ import type {
   Session,
   SetList,
   Song,
+  TargetSetoran,
 } from '../db/types'
 
 export type JenisData =
@@ -46,6 +48,8 @@ export type JenisData =
   | 'kemajuan'
   | 'catatan'
   | 'evaluasi'
+  | 'targetSetoran'
+  | 'setoran'
 
 export const URUTAN_JENIS_DATA: JenisData[] = [
   'anggota',
@@ -58,6 +62,8 @@ export const URUTAN_JENIS_DATA: JenisData[] = [
   'kemajuan',
   'catatan',
   'evaluasi',
+  'targetSetoran',
+  'setoran',
 ]
 
 export const LABEL_JENIS_DATA: Record<JenisData, string> = {
@@ -71,6 +77,8 @@ export const LABEL_JENIS_DATA: Record<JenisData, string> = {
   kemajuan: 'Kemajuan',
   catatan: 'Catatan anggota',
   evaluasi: 'Evaluasi anggota',
+  targetSetoran: 'Target setoran',
+  setoran: 'Setoran hafalan',
 }
 
 /**
@@ -92,6 +100,8 @@ export interface BerkasPindah {
   kemajuan?: Kemajuan[]
   catatan?: MemberNote[]
   evaluasi?: Evaluasi[]
+  targetSetoran?: TargetSetoran[]
+  setoran?: CatatanSetoran[]
 }
 
 /** Ambil daftar entitas sebuah jenis. Kosong kalau tidak ada. */
@@ -111,6 +121,9 @@ function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void 
     case 'set': berkas.set = daftar as DrillSet[]; break
     case 'kemajuan': berkas.kemajuan = daftar as Kemajuan[]; break
     case 'catatan': berkas.catatan = daftar as MemberNote[]; break
+    case 'evaluasi': berkas.evaluasi = daftar as Evaluasi[]; break
+    case 'targetSetoran': berkas.targetSetoran = daftar as TargetSetoran[]; break
+    case 'setoran': berkas.setoran = daftar as CatatanSetoran[]; break
   }
 }
 
@@ -250,6 +263,30 @@ const ATURAN: AturanRujukan[] = [
       e.drillId = (v as string | undefined) ?? ''
     },
   },
+  {
+    sumber: 'targetSetoran',
+    target: 'lagu',
+    baca: (e: TargetSetoran) => e.songId,
+    tulis: (e: TargetSetoran, v) => {
+      e.songId = (v as string | undefined) ?? undefined
+    },
+  },
+  {
+    sumber: 'setoran',
+    target: 'targetSetoran',
+    baca: (e: CatatanSetoran) => e.targetId,
+    tulis: (e: CatatanSetoran, v) => {
+      e.targetId = (v as string | undefined) ?? ''
+    },
+  },
+  {
+    sumber: 'setoran',
+    target: 'anggota',
+    baca: (e: CatatanSetoran) => e.memberId,
+    tulis: (e: CatatanSetoran, v) => {
+      e.memberId = (v as string | undefined) ?? ''
+    },
+  },
 ]
 
 /** Id yang tersedia untuk sebuah jenis: gabungan berkas & perangkat. */
@@ -351,6 +388,9 @@ function kolomRujukan(sumber: JenisData, target: JenisData): string {
     'set>drill': 'drill',
     'evaluasi>anggota': 'anggota',
     'kemajuan>drill': 'drill',
+    'targetSetoran>lagu': 'lagu',
+    'setoran>targetSetoran': 'target setoran',
+    'setoran>anggota': 'anggota',
   }
   return peta[`${sumber}>${target}`] ?? target
 }
