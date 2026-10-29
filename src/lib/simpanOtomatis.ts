@@ -1,6 +1,6 @@
 import { db } from '../db/db'
 import { buildBackupPayload, formatBytes } from './backup'
-import { namaBackup } from './bukaBerkas'
+import { namaBackup } from './namaBerkas'
 
 /**
  * 1b — Simpan otomatis ke berkas yang dipilih sekali.

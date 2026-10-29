@@ -23,7 +23,11 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
   pull_request:
+    paths-ignore:
+      - '**.md'
 
 # Commit baru di ref yang sama membatalkan run yang masih berjalan.
 #
@@ -46,9 +50,9 @@ jobs:
     # menggantung selamanya bila ada yang macet.
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

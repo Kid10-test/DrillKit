@@ -48,7 +48,7 @@ Pemeriksaan menyeluruh terhadap build produksi `v1.0.0` (`8bf02bd`) mencatat gar
 
 | # | Nama Rancangan | Gelombang | Ukuran | Dampak Utama | Ketergantungan |
 | :---: | :--- | :---: | :---: | :--- | :--- |
-| **#12** | Polesan Performa Bundel, Navigasi Mobile Pelatih, Modularisasi, & CI | `v1.0.1` | Sedang | Pangkas JS awal >35%, laci menu HP, pecah komponen besar, hemat CI | Fondasi sebelum fitur `v1.1+` |
+| **#12** | Polesan Performa Bundel, Navigasi Mobile Pelatih, Modularisasi, & CI | `v1.0.1` | Sedang | **12a, 12b, & 12d Selesai** (JS awal `-30%` ke `377,8 kB`, laci HP, label form, CI Node 24 + `paths-ignore`); sisa **12c** modularisasi komponen besar sebelum `#16` | Fondasi sebelum fitur `v1.1+` |
 | **#13** | Partitur Per-Suara & Audio Panduan di Paket Anggota + Sintesis Nada & Drone | `v1.1` | Sedang–Besar | Anggota bisa baca partitur seksinya, putar bunyi notasi/rekaman, & latih intonasi | Melanjutkan `#2`, `#6`, `#11c–d` |
 | **#14** | Matriks Setoran Hafalan (*Music & Visual Pass-Off Tracker*) | `v1.1` | Sedang | Pelacakan hafalan per segmen lagu × anggota untuk pelatih seksi & *Section Leader* | Tersambung ke `songs`, `Share`, `#2` |
 | **#15** | Sinkronisasi Multi-Pelatih Seksi & Log Perubahan Show (`I1`) | `v1.1` | Sedang | Alur 1-klik setoran asisten → pelatih kepala + catatan revisi show otomatis | Melanjutkan `pindah.ts` & `riwayat` |
@@ -67,14 +67,13 @@ Pemeriksaan menyeluruh terhadap build produksi `v1.0.0` (`8bf02bd`) mencatat gar
 
 ### Gelombang 1 — Pemeliharaan, Performa, & Ergonomi (`v1.0.1`)
 
-#### `#12` — Polesan Performa Bundel, Navigasi Mobile Pelatih, Modularisasi, & Efisiensi CI
+#### `#12` — Polesan Performa Bundel, Navigasi Mobile Pelatih, Modularisasi, & Efisiensi CI *(12a, 12b, & 12d Selesai di `v1.0.1`; sisa 12c)*
 * **Masalah yang diselesaikan:** Halaman awal memuat modul impor berkas yang belum dipakai, bilah bawah HP pelatih terlalu panjang untuk 11 menu, dan lima berkas utama terlalu besar untuk dirawat jangka panjang.
-* **Ruang lingkup pengerjaan:**
-  1. **Pemangkasan Bundel Utama (`12a`):** Ubah `PratinjauGlobal` dan `LapisanSeretBerkas` di `Layout.tsx` menjadi komponen *lazy-loaded* (hanya memuat logika berat `bukaBerkas`/`pyware`/`partitur`/`zip` saat pengguna menyeret berkas atau mengeklik tombol *Buka berkas*); seragamkan impor `src/lib/ucap.ts`. Target bundel JS awal turun dari `537 kB` ke **< 320 kB**.
-  2. **Laci Navigasi HP & Ergonomi Sentuh (`12b`):** Di layar `< 1024px` pada Mode Pelatih, tampilkan 4 menu paling sering dipakai di lapangan (*Beranda, Absensi, Drill, Musik*) ditambah tombol **Lainnya** yang membuka laci menu lengkap tanpa geser horizontal sempit. Naikkan tinggi minimum tombol sekunder di tampilan HP menjadi `≥ 36 px` dan lengkapi atribut `htmlFor`/`id` atau `aria-label` pada kontrol form.
-  3. **Modularisasi Komponen Raksasa (`12c`):** Pecah `DrillEditor.tsx`, `Music.tsx`, dan `Share.tsx` menjadi modul/komponen bagian yang bersih (mis. bilah alat kanvas, panel properti set, penggaris garis waktu, tab anggota) tanpa mengubah perilaku maupun antarmuka uji yang sudah ada.
-  4. **Pembaruan CI (`12d`):** Perbarui `actions/checkout` dan `actions/setup-node` ke versi runtime Node 24 serta tambahkan `paths-ignore: ['**.md']` pada `.github/workflows/ci.yml` agar suntingan dokumentasi tidak menguras jatah menit CI bulanan.
-* **Ukuran:** Sedang (dapat dijadikan 1–2 PR bersih tanpa perubahan versi IndexedDB).
+* **Ruang lingkup pengerjaan & status:**
+  1. **Pemangkasan Bundel Utama (`12a` — Selesai):** `PratinjauGlobal` dan `TombolBukaBerkas` dipisahkan dari tubuh berat `PratinjauBerkasModal.tsx` & `bukaBerkas.ts`, pembentuk nama berkas dipisahkan ke `namaBerkas.ts`, `Panduan` & `seedDemoData` di Dashboard dimuat malas, dan impor `ucap.ts` diseragamkan. Hasil aktual: bundel JS awal turun dari `537,76 kB` (`177,11 kB` gzip) menjadi **`377,82 kB` (`122,52 kB` gzip)** (`-160 kB` / `-30%`, di bawah ambang peringatan `500 kB`).
+  2. **Laci Navigasi HP & Ergonomi Sentuh (`12b` — Selesai):** Di layar `< 1024px` pada Mode Pelatih, bilah bawah kini menampilkan 4 menu utama lapangan (*Beranda, Absensi, Drill, Musik*) ditambah tombol **Lainnya** (`data-testid="tombol-menu-lainnya"`) yang membuka laci 7 menu sekunder dalam kisi 2 kolom (`min-h-[44px]`), bebas geser horizontal di `360px`, dan menampilkan nama pendek rute sekunder saat aktif. Komponen `<Field>` kini mengaitkan `<label htmlFor>` ke `<Input>/<Select>/<Textarea>` secara otomatis lewat `useId()`, tombol silang `<Modal>` memiliki `aria-label="Tutup"`, dan tombol `size="sm"` di layar HP memiliki `min-h-[34px]`.
+  3. **Modularisasi Komponen Raksasa (`12c` — Menunggu sebelum `#16`):** Pecah `DrillEditor.tsx`, `Music.tsx`, dan `Share.tsx` menjadi modul/komponen bagian yang bersih tanpa mengubah perilaku maupun antarmuka uji yang sudah ada.
+  4. **Pembaruan CI (`12d` — Selesai):** `actions/checkout` dan `actions/setup-node` diperbarui ke `@v5` (runtime Node 24) serta ditambahkan `paths-ignore: ['**.md']` pada `.github/workflows/ci.yml`. Teruji di `qa/polesan-v101.mjs` (22/22, total **117 rangkaian** regresi penuh).
 
 ---
 

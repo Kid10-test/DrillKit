@@ -211,16 +211,21 @@ export function PratinjauPanduan({
   )
 }
 
+/** Dialog pratinjau panduan pelatih mandiri (dipakai pemuat malas di Dashboard). */
+export function DialogPanduanDasbor({ onClose }: { onClose: () => void }) {
+  const data = pakaiDataPanduan()
+  return <PratinjauPanduan open onClose={onClose} data={data} />
+}
+
 /** Tombol kecil untuk membuka panduan — dipakai di Dashboard. */
 export function TombolPanduan({ label = 'Panduan' }: { label?: string }) {
-  const data = pakaiDataPanduan()
   const [open, setOpen] = useState(false)
   return (
     <>
       <Button data-testid="tombol-panduan-dasbor" onClick={() => setOpen(true)} title="Panduan pemakaian 1 halaman">
         <IconEye size={16} /> {label}
       </Button>
-      <PratinjauPanduan open={open} onClose={() => setOpen(false)} data={data} />
+      {open && <DialogPanduanDasbor onClose={() => setOpen(false)} />}
     </>
   )
 }

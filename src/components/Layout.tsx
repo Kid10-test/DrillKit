@@ -46,6 +46,13 @@ export const NAV: NavItem[] = [
   { to: '/pengaturan', label: 'Pengaturan', short: 'Setelan', icon: IconSettings },
 ]
 
+/**
+ * #12b — Empat rute utama lapangan yang tampil langsung di bilah bawah HP
+ * pelatih. Tujuh rute lainnya masuk ke laci "Lainnya" supaya bilah bawah
+ * tidak perlu digeser horizontal berulang kali di layar sempit (360px).
+ */
+const RUTE_UTAMA_HP = new Set(['/', '/absensi', '/drill', '/musik'])
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const settings = useSettings()
   const loc = useLocation()
@@ -96,6 +103,38 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [showPortableNotice, setShowPortableNotice] = useState(
     () => location.protocol === 'file:' && localStorage.getItem('drillkit.portableNotice') !== 'off',
   )
+
+  const [bukaLaciHp, setBukaLaciHp] = useState(false)
+
+  useEffect(() => {
+    setBukaLaciHp(false)
+  }, [loc.pathname])
+
+  useEffect(() => {
+    if (!bukaLaciHp) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setBukaLaciHp(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [bukaLaciHp])
+
+  const pakaiLaciHp = nav.length > 5
+  const navUtamaHp = useMemo(
+    () => (pakaiLaciHp ? nav.filter((n) => RUTE_UTAMA_HP.has(n.to)) : nav),
+    [nav, pakaiLaciHp],
+  )
+  const navLainnyaHp = useMemo(
+    () => (pakaiLaciHp ? nav.filter((n) => !RUTE_UTAMA_HP.has(n.to)) : []),
+    [nav, pakaiLaciHp],
+  )
+  const itemAktif = useMemo(
+    () =>
+      nav.find((n) => (n.to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(n.to))) ??
+      null,
+    [nav, loc.pathname],
+  )
+  const aktifDiLaci = pakaiLaciHp && itemAktif != null && !RUTE_UTAMA_HP.has(itemAktif.to)
 
   /*
    * Layar sambutan menutupi seluruh aplikasi sampai pilihannya dibuat.
@@ -159,7 +198,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="mt-auto px-3 pt-4">
           <KioskButton full />
           <p className="pt-3 text-[11px] leading-relaxed text-slate-600">
-            DrillKit v0.1 · rilis{' '}
+            DrillKit v1.0.1 · rilis{' '}
             <span data-testid="cap-build-singkat">{capBuildSingkat()}</span> — data tersimpan di
             perangkat ini, tetap jalan offline.
           </p>
@@ -227,7 +266,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <p className="truncate text-sm font-semibold text-slate-100">
                   {settings?.teamName ?? 'DrillKit'}
                 </p>
-                <p className="text-[11px] text-slate-500">{loc.pathname === '/' ? 'Dashboard' : ''}</p>
+                <p className="truncate text-[11px] text-slate-500">{itemAktif?.label ?? ''}</p>
               </div>
             </div>
             <KioskButton />
@@ -236,28 +275,109 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </main>
 
+      {/* #12b — Laci menu lainnya (HP mode pelatih) */}
+      {pakaiLaciHp && bukaLaciHp && (
+        <div
+          data-kiosk-allow
+          className="no-print fixed inset-0 z-50 flex flex-col justify-end lg:hidden"
+        >
+          <div
+            data-kiosk-allow
+            aria-hidden="true"
+            className="absolute inset-0 bg-slate-950/70 backdrop-blur-[1px]"
+            onClick={() => setBukaLaciHp(false)}
+          />
+          <div
+            id="laci-menu-lainnya"
+            data-testid="laci-menu-lainnya"
+            data-kiosk-allow
+            role="dialog"
+            aria-label="Menu pelatih lainnya"
+            className="relative max-h-[75vh] overflow-y-auto rounded-t-2xl border-t border-slate-800 bg-slate-900 px-4 pt-3.5 pb-20 shadow-2xl"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+                Menu lainnya
+              </p>
+              <button
+                type="button"
+                data-kiosk-allow
+                data-testid="tutup-menu-lainnya"
+                aria-label="Tutup menu lainnya"
+                onClick={() => setBukaLaciHp(false)}
+                className="min-h-[34px] rounded-lg px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+              >
+                Tutup ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {navLainnyaHp.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setBukaLaciHp(false)}
+                  className={({ isActive }) =>
+                    cx(
+                      'flex min-h-[44px] items-center gap-2.5 rounded-xl border px-3 py-2.5 text-xs font-medium transition',
+                      isActive
+                        ? 'border-emerald-500/40 bg-emerald-600/15 text-emerald-300'
+                        : 'border-slate-800 bg-slate-950/50 text-slate-300 hover:bg-slate-800/80',
+                    )
+                  }
+                >
+                  <item.icon size={18} />
+                  <span className="truncate">{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bottom nav (mobile) */}
       <nav
         data-kiosk-allow
-        className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-slate-800 bg-slate-900/95 backdrop-blur lg:hidden"
+        data-testid="nav-bawah-hp"
+        className="no-print fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-900/95 backdrop-blur lg:hidden"
       >
-        <div className="scroll-thin flex overflow-x-auto px-1 pb-[env(safe-area-inset-bottom)]">
-          {nav.map((item) => (
+        <div className="flex items-stretch px-1 pb-[env(safe-area-inset-bottom)]">
+          {navUtamaHp.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
+              onClick={() => setBukaLaciHp(false)}
               className={({ isActive }) =>
                 cx(
-                  'flex min-w-[72px] flex-1 flex-col items-center gap-1 px-2 py-2.5 text-[10px] font-medium transition',
-                  isActive ? 'text-emerald-400' : 'text-slate-500',
+                  'flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-medium transition',
+                  isActive ? 'text-emerald-400' : 'text-slate-400',
                 )
               }
             >
               <item.icon size={20} />
-              {item.short}
+              <span className="max-w-full truncate">{item.short}</span>
             </NavLink>
           ))}
+          {pakaiLaciHp && (
+            <button
+              type="button"
+              data-kiosk-allow
+              data-testid="tombol-menu-lainnya"
+              aria-expanded={bukaLaciHp}
+              aria-controls="laci-menu-lainnya"
+              aria-label="Menu lainnya"
+              onClick={() => setBukaLaciHp((v) => !v)}
+              className={cx(
+                'relative flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-medium transition',
+                bukaLaciHp || aktifDiLaci ? 'text-emerald-400' : 'text-slate-400',
+              )}
+            >
+              <IkonLainnya size={20} />
+              <span className="max-w-full truncate">
+                {aktifDiLaci && itemAktif ? itemAktif.short : 'Lainnya'}
+              </span>
+            </button>
+          )}
         </div>
       </nav>
 
@@ -267,6 +387,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <PratinjauGlobal />
       <LapisanSeretBerkas />
     </div>
+  )
+}
+
+function IkonLainnya({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="5" cy="12" r="1.5" />
+      <circle cx="12" cy="12" r="1.5" />
+      <circle cx="19" cy="12" r="1.5" />
+      <path d="M4 6h16M4 18h16" />
+    </svg>
   )
 }
 

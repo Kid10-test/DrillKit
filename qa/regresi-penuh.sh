@@ -100,6 +100,10 @@ bash bangun-logika.sh || exit 1
 # latihan pada pemutar drill × rekaman audio WAV #6; 32 butir peramban) sehingga
 # total regresi penuh menjadi 116 rangkaian.
 
+# Rilis v1.0.1 (#12) — menambahkan `polesan-v101` (bundel malas, laci navigasi
+# HP pelatih, pengait label form, & konfigurasi CI Node 24) sehingga total
+# regresi penuh menjadi 117 rangkaian.
+
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika grid-patok-logika uji-situs uji-rilis uji-lapangan \
   buka-berkas-logika evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
@@ -110,7 +114,7 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
