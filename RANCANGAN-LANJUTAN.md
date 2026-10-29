@@ -1,5 +1,7 @@
 # DrillKit — Rancangan lanjutan (hasil diskusi 26 Sep 2026, pemutakhiran 28 Okt 2026 — #1 s.d. #11 selesai penuh)
 
+> **Catatan Pasca-`v1.0.0`:** Seluruh rancangan `#1` s.d. `#11d` di dokumen ini telah selesai penuh pada rilis stabil `v1.0.0`. Untuk rencana pengembangan generasi berikutnya (`#12` s.d. `#21`), lihat **[`PETA-JALAN-v2.md`](./PETA-JALAN-v2.md)**.
+
 Dokumen ini merangkum delapan rancangan awal yang sudah didiskusikan dan
 diputuskan bersama pelatih, ditambah tiga usulan baru pasca PR #14
 (grid/patok yard–meter custom, impor Pyware, partitur full score/per instrumen)
