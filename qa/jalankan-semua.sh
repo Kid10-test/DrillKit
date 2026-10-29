@@ -35,7 +35,7 @@ echo "== BLOK 3: berkas, jadwal, lomba, Pyware, partitur, & portabel ==" >> "$LO
 bash regresi.sh "$BASE" \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
   kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data \
-  pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis \
+  pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 \
   >> "$LOG" 2>&1
 
 echo "== BLOK 4: musik, metronom, tempo latihan, & rekaman ==" >> "$LOG"

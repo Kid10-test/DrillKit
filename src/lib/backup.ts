@@ -1,7 +1,7 @@
 import { db, getSettings } from '../db/db'
 import { downloadBlob, downloadFile } from './utils'
 import { bikinZip, type EntriZip } from './zip'
-import { namaBackup, namaBackupZip } from './bukaBerkas'
+import { namaBackup, namaBackupZip } from './namaBerkas'
 
 /**
  * Backup otomatis — pengingat & riwayat backup.

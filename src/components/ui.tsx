@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { cx } from '../lib/utils'
 
 /* --------------------------------- Toast -------------------------------- */
@@ -158,7 +158,10 @@ export function Button({
 }) {
   const base =
     'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition active:scale-[.98] disabled:opacity-40 disabled:pointer-events-none'
-  const sizes = size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3.5 py-2 text-sm'
+  const sizes =
+    size === 'sm'
+      ? 'max-sm:min-h-[34px] px-2.5 py-1.5 text-xs'
+      : 'max-sm:min-h-[38px] px-3.5 py-2 text-sm'
   const variants: Record<BtnVariant, string> = {
     primary: 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm',
     soft: 'bg-slate-800 text-slate-200 hover:bg-slate-700 ring-1 ring-slate-700',
@@ -182,31 +185,47 @@ export function Button({
 
 /* --------------------------------- Input --------------------------------- */
 
+const FieldIdCtx = createContext<string | undefined>(undefined)
+
 const fieldBase =
   'w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40'
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  const { className, ...rest } = props
-  return <input {...rest} className={cx(fieldBase, className)} />
+  const ctxId = useContext(FieldIdCtx)
+  const { className, id, ...rest } = props
+  return <input id={id ?? ctxId} {...rest} className={cx(fieldBase, className)} />
 }
 
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  const { className, ...rest } = props
-  return <textarea {...rest} className={cx(fieldBase, 'min-h-[80px] resize-y', className)} />
+  const ctxId = useContext(FieldIdCtx)
+  const { className, id, ...rest } = props
+  return <textarea id={id ?? ctxId} {...rest} className={cx(fieldBase, 'min-h-[80px] resize-y', className)} />
 }
 
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  const { className, children, ...rest } = props
+  const ctxId = useContext(FieldIdCtx)
+  const { className, children, id, ...rest } = props
   return (
-    <select {...rest} className={cx(fieldBase, 'appearance-none pr-8', className)}>
+    <select id={id ?? ctxId} {...rest} className={cx(fieldBase, 'appearance-none pr-8', className)}>
       {children}
     </select>
   )
 }
 
-export function Label({ children, hint }: { children: React.ReactNode; hint?: string }) {
+export function Label({
+  children,
+  hint,
+  htmlFor,
+}: {
+  children: React.ReactNode
+  hint?: string
+  htmlFor?: string
+}) {
   return (
-    <label className="mb-1 flex items-baseline justify-between text-xs font-medium text-slate-400">
+    <label
+      htmlFor={htmlFor}
+      className="mb-1 flex items-baseline justify-between text-xs font-medium text-slate-400"
+    >
       <span>{children}</span>
       {hint && <span className="text-[11px] font-normal text-slate-500">{hint}</span>}
     </label>
@@ -214,11 +233,16 @@ export function Label({ children, hint }: { children: React.ReactNode; hint?: st
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  const autoId = useId()
   return (
-    <div>
-      <Label hint={hint}>{label}</Label>
-      {children}
-    </div>
+    <FieldIdCtx.Provider value={autoId}>
+      <div>
+        <Label htmlFor={autoId} hint={hint}>
+          {label}
+        </Label>
+        {children}
+      </div>
+    </FieldIdCtx.Provider>
   )
 }
 
@@ -278,6 +302,8 @@ export function Modal({
           <button
             data-kiosk-allow
             onClick={onClose}
+            aria-label="Tutup"
+            title="Tutup"
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

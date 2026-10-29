@@ -1,8 +1,8 @@
+import { Suspense, lazy, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import { db } from '../db/db'
 import type { AttendanceStatus, Member } from '../db/types'
-import { seedDemoData } from '../db/seed'
 import { useSettings } from '../hooks/useSettings'
 import {
   Badge,
@@ -16,6 +16,7 @@ import {
 import {
   IconCalendar,
   IconCheck,
+  IconEye,
   IconGrid,
   IconMusic,
   IconUsers,
@@ -23,8 +24,31 @@ import {
 import { BackupReminder } from '../components/BackupReminder'
 import { TombolBukaBerkas } from '../components/BukaBerkas'
 import { PengingatJadwal } from '../components/PengingatJadwal'
-import { TombolPanduan } from '../components/Panduan'
 import { NamaTampil, useModeNama } from '../components/NamaTampil'
+
+const DialogPanduanMalas = lazy(() =>
+  import('../components/Panduan').then((m) => ({ default: m.DialogPanduanDasbor })),
+)
+
+function TombolPanduanDasbor() {
+  const [buka, setBuka] = useState(false)
+  return (
+    <>
+      <Button
+        data-testid="tombol-panduan-dasbor"
+        onClick={() => setBuka(true)}
+        title="Panduan pemakaian 1 halaman"
+      >
+        <IconEye size={16} /> Panduan
+      </Button>
+      {buka && (
+        <Suspense fallback={null}>
+          <DialogPanduanMalas onClose={() => setBuka(false)} />
+        </Suspense>
+      )}
+    </>
+  )
+}
 import { namaTampil } from '../lib/namaAnggota'
 import {
   sectionDot,
@@ -87,6 +111,7 @@ export default function Dashboard() {
   const lastFilled = lastSession ? attendance.filter((a) => a.sessionId === lastSession.id).length : 0
 
   async function loadDemo() {
+    const { seedDemoData } = await import('../db/seed')
     const n = await seedDemoData()
     if (n) toast.push(`Data contoh dimuat: ${n} anggota + jadwal + drill`)
     else toast.push('Data sudah ada, tidak ditambahkan', 'info')
@@ -98,7 +123,7 @@ export default function Dashboard() {
         <PageHeader
           title={`Halo, ${settings?.coachName ?? 'Pelatih'}!`}
           subtitle="Selamat datang di DrillKit"
-          actions={<TombolPanduan />}
+          actions={<TombolPanduanDasbor />}
         />
         <EmptyState
           title="Belum ada data anggota"
@@ -123,7 +148,7 @@ export default function Dashboard() {
         subtitle={`${settings?.teamName ?? 'Tim'} · ${formatDateLong(today)}`}
         actions={
           <div className="flex flex-wrap gap-2">
-            <TombolPanduan />
+            <TombolPanduanDasbor />
             {nextSession && (
               <Link to="/absensi">
                 <Button variant="primary">

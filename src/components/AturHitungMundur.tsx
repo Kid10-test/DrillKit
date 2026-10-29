@@ -13,7 +13,7 @@
 import { useEffect, useState } from 'react'
 import type { HitungMundur, TandaBirama } from '../db/types'
 import { posisiHitungMundur, ucapHitungMundur, normalisasiBirama } from '../lib/birama'
-import { bisaUcap, daftarSuara, ucap } from '../lib/ucap'
+import { bisaUcap, daftarSuara, pilihSuara, ucap } from '../lib/ucap'
 import { Button, Field, Input, Select, Toggle } from './ui'
 
 interface Props {
@@ -134,14 +134,8 @@ export default function AturHitungMundur({ nilai, onChange, birama }: Props) {
                       variant="ghost"
                       onClick={() => {
                         const v = suaraKe >= 0 ? suaraTersedia[suaraKe] : null
-                        if (v) {
-                          import('../lib/ucap').then((m) => {
-                            m.pilihSuara(v)
-                            ucapan.forEach((u, i) => window.setTimeout(() => m.ucap(u), i * 350))
-                          })
-                        } else {
-                          ucapan.forEach((u, i) => window.setTimeout(() => ucap(u), i * 350))
-                        }
+                        if (v) pilihSuara(v)
+                        ucapan.forEach((u, i) => window.setTimeout(() => ucap(u), i * 350))
                       }}
                       data-testid="hm-coba"
                     >
