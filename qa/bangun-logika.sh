@@ -108,6 +108,9 @@ rakit src/lib/partiturBagian.ts partiturBagian
 rakit src/lib/partiturCetak.ts  partiturCetak
 # #11d — frasa latihan per perangkat, geometri sorot birama, & tautan frasa↔set drill.
 rakit src/lib/partiturFrasa.ts  partiturFrasa
+# #13 — penyaring partitur per suara di paket anggota & pengurai bunyi notasi WebAudio.
+rakit src/lib/partiturPaket.ts  partiturPaket
+rakit src/lib/partiturBunyi.ts  partiturBunyi
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.

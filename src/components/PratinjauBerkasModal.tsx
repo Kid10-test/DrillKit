@@ -19,7 +19,7 @@ import {
   ringkasPaket,
   type BerkasDikenal,
 } from '../lib/bukaBerkas'
-import { simpanPaketAnggota } from '../lib/paketMasuk'
+import { pulihkanAudioDariZipPaket, simpanPaketAnggota } from '../lib/paketMasuk'
 import { cekBerkas, type BerkasShow } from '../lib/show'
 import { bacaPaket, perluPeringatan, ringkasanImpor, terapkanPaket } from '../lib/repertoar'
 import type { PaketRepertoar } from '../db/types'
@@ -116,6 +116,7 @@ export default function TubuhPratinjau({
         <TubuhPaket
           hasil={hasil}
           data={(dataPaket ?? hasil.data) as Record<string, unknown>}
+          bitaZip={paket.bita}
           onTutup={onTutup}
         />
       )}
@@ -424,10 +425,12 @@ function RingkasanMini({ judul, baru, timpa }: { judul: string; baru: number; ti
 function TubuhPaket({
   hasil,
   data,
+  bitaZip,
   onTutup,
 }: {
   hasil: BerkasDikenal
   data: Record<string, unknown>
+  bitaZip?: Uint8Array
   onTutup: () => void
 }) {
   const toast = useToast()
@@ -440,6 +443,9 @@ function TubuhPaket({
     setSedang(true)
     try {
       const h = await simpanPaketAnggota(data as unknown as Parameters<typeof simpanPaketAnggota>[0])
+      if (bitaZip && (hasil.audioZip ?? 0) > 0) {
+        await pulihkanAudioDariZipPaket(bitaZip)
+      }
       if (h.penerima) {
         try {
           localStorage.setItem('drillkit.meId', h.penerima.id)
@@ -478,6 +484,13 @@ function TubuhPaket({
           {ringkas.jumlahAnggota} anggota · {ringkas.jumlahJadwal} jadwal · {ringkas.jumlahDrill}{' '}
           drill ({ringkas.jumlahSet} set) · {ringkas.jumlahLagu} lagu
         </li>
+        {(ringkas.jumlahPartitur > 0 || (hasil.audioZip ?? 0) > 0) && (
+          <li data-testid="buka-paket-partitur">
+            {ringkas.jumlahPartitur > 0 && `${ringkas.jumlahPartitur} partitur siap baca`}
+            {ringkas.jumlahPartitur > 0 && (hasil.audioZip ?? 0) > 0 && ' · '}
+            {(hasil.audioZip ?? 0) > 0 && `${hasil.audioZip} rekaman panduan`}
+          </li>
+        )}
         {(ringkas.jumlahAbsensi > 0 || ringkas.jumlahCatatan > 0) && (
           <li>
             {ringkas.jumlahAbsensi} absensi · {ringkas.jumlahCatatan} catatan
