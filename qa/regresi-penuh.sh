@@ -95,6 +95,11 @@ bash bangun-logika.sh || exit 1
 # `portabel-rilis` (rakitan satu berkas `DrillKit.html` dibuka langsung lewat
 # protokol `file://` di Chromium bersama panduan portabel & render OSMD).
 
+# Rilis stabil v1.0.0 — menyerap `m6-drill-rekaman` dari PR #13 (sinkronisasi
+# titik mulai set berbeda durasi, scrub garis waktu, presenter, dan laju tempo
+# latihan pada pemutar drill × rekaman audio WAV #6; 32 butir peramban) sehingga
+# total regresi penuh menjadi 116 rangkaian.
+
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika grid-patok-logika uji-situs uji-rilis uji-lapangan \
   buka-berkas-logika evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
@@ -111,6 +116,6 @@ bash regresi.sh "$BASE" \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
   nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill m1-penggaris-drill \
-  m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman \
+  m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman m6-drill-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \
   dd8 dd8b dd9-kompas dd10b-kartu dd10b-mode dd10b-override kartu-lipat

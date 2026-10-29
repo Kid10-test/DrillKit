@@ -7,11 +7,11 @@ editor formasi/drill (+ impor CSV Pyware), data anggota, absensi QR, jadwal lati
 metronom + tempo map + rekaman MP3, pembaca & cetak partitur MusicXML/`.mxl`/PDF
 dengan latihan per frasa, serta penerbitan materi terenkripsi ke anggota.
 
-> Status: **Seluruh modul utama & 11 rancangan lanjutan (#1–#11d) telah rampung**
+> Status: **Rilis stabil `v1.0.0` — seluruh modul utama & 11 rancangan lanjutan (#1–#11d) telah rampung penuh**
 > (dashboard, anggota, absensi, evaluasi, jadwal/kalender, drill & formasi,
 > musik/metronom/rekaman/partitur, run sheet hari lomba, berbagi/mode anggota,
-> pusat data, serta pengaturan & backup ZIP). Diuji otomatis lewat **115 rangkaian**
-> regresi headless (Node + Chromium).
+> pusat data, serta pengaturan & backup ZIP). Diuji otomatis lewat **116 rangkaian**
+> regresi headless (Node + Chromium). Lihat catatan rilis di [`RILIS-v1.0.0.md`](RILIS-v1.0.0.md).
 
 **Mau langsung pakai?** Tiga bundel siap pakai tersedia di folder proyek (dapat dirakit ulang kapan saja dengan `bash scripts/siapkan-rilis.sh`):
 
@@ -104,8 +104,8 @@ drillkit/
 │  │  └─ Layout.tsx         # sidebar desktop + bottom nav mobile
 │  └─ pages/                # satu file per menu (Dashboard, Members, Attendance, Evaluasi,
 │                           # Schedule, Drill, Music, Lomba, Share, Data, Settings)
-├─ qa/                      # ⭐ 115 rangkaian uji regresi (Node + Puppeteer) — lihat qa/README.md
-│  ├─ regresi-penuh.sh      # menjalankan ke-115 rangkaian lawan versi produksi
+├─ qa/                      # ⭐ 116 rangkaian uji regresi (Node + Puppeteer) — lihat qa/README.md
+│  ├─ regresi-penuh.sh      # menjalankan ke-116 rangkaian lawan versi produksi
 │  ├─ bangun-logika.sh      # merakit modul TS murni ke /tmp/*.mjs untuk uji logika cepat
 │  └─ *.mjs                 # satu berkas per rangkaian uji
 ├─ scripts/
