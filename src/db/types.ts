@@ -1074,6 +1074,28 @@ export interface MemberNote {
 
 /* --------------------------- Paket berbagi ------------------------------- */
 
+/**
+ * #13a — Lampiran berkas partitur yang disematkan ke paket anggota.
+ *
+ * Di paket grup (`paket.json`), `xml` berisi skor penuh agar setiap seksi bisa
+ * menyaring part-nya sendiri di perangkat. Di paket per anggota, `xml` sudah
+ * dipangkas khusus ke part instrumen/seksi penerima supaya berkas ringan dan
+ * langsung tampil di `LayarPartitur` secara luring tanpa kirim `.musicxml` terpisah.
+ */
+export interface LampiranPartiturPaket {
+  songId: string
+  namaFile: string
+  tipe: 'musicxml' | 'pdf'
+  /** Teks MusicXML (skor penuh atau hasil pangkas per suara). */
+  xml?: string
+  /** Base64 biner untuk PDF partitur berukuran ringkas. */
+  base64?: string
+  ukuran: number
+  hash: string
+  /** Daftar id part XML yang disertakan bila dipangkas khusus untuk anggota. */
+  partTersaring?: string[]
+}
+
 export interface ShareBundle {
   format: 'drillkit-share'
   version: 1
@@ -1092,6 +1114,11 @@ export interface ShareBundle {
    * penampilannya — padahal metronom bisa memutarnya berurutan.
    */
   setlists?: SetList[]
+  /**
+   * #13a — peta `songId -> LampiranPartiturPaket` untuk membuka notasi lagu
+   * secara luring langsung dari paket anggota.
+   */
+  partiturPaket?: Record<string, LampiranPartiturPaket>
   attendance: AttendanceRecord[]
   /** Catatan evaluasi per anggota (opsional — paket lama belum punya) */
   memberNotes?: MemberNote[]

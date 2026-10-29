@@ -26,6 +26,7 @@
 import type { Member, ShareBundle } from '../db/types'
 import { namaDenganPanggilan } from './namaAnggota'
 import { namaPaketAnggota } from './bukaBerkas'
+import { saringPartiturPaketUntukAnggota } from './partiturPaket'
 
 /**
  * Kolom yang **tidak pernah** meninggalkan perangkat pelatih.
@@ -86,8 +87,17 @@ export function paketGrup(b: ShareBundle): ShareBundle {
 export function paketAnggota(b: ShareBundle, memberId: string): ShareBundle {
   const penerima = b.members.find((m) => m.id === memberId)
   const dikenal = !!penerima
+  // #13a — untuk berkas per anggota, saring partitur MusicXML agar hanya memuat
+  // suara/seksi milik anggota penerima. Untuk `memberId` tak dikenal, jangan
+  // bocorkan lampiran apa pun.
+  const tersaring =
+    dikenal && penerima && b.partiturPaket
+      ? saringPartiturPaketUntukAnggota(b.partiturPaket, b.songs ?? [], penerima, b.team?.sections)
+      : { partiturPaket: undefined, songs: b.songs ?? [] }
   return {
     ...b,
+    songs: tersaring.songs,
+    partiturPaket: tersaring.partiturPaket,
     members: b.members.map(bersihkanAnggota),
     attendance: dikenal ? b.attendance.filter((a) => a.memberId === memberId) : [],
     memberNotes: dikenal ? (b.memberNotes ?? []).filter((n) => n.memberId === memberId) : [],

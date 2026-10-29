@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, DEFAULT_FIELD } from '../db/db'
-import type { AttendanceRecord, DrillSet, FieldConfig, Member, MemberNote, Session, ShareBundle } from '../db/types'
+import type {
+  AttendanceRecord,
+  DrillSet,
+  FieldConfig,
+  LampiranPartiturPaket,
+  Member,
+  MemberNote,
+  Session,
+  ShareBundle,
+} from '../db/types'
 import { FieldSurface } from '../components/FieldSurface'
 import {
   Badge,
@@ -22,7 +31,8 @@ import { TombolPanduanAnggota } from '../components/Panduan'
 import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
 import { kenaliBerkas, namaPaketGrup, namaZipAnggota } from '../lib/bukaBerkas'
 import { mintaPratinjau } from '../components/BukaBerkas'
-import { simpanPaketAnggota } from '../lib/paketMasuk'
+import { pasangPartiturDariPaket, pulihkanAudioDariZipPaket, simpanPaketAnggota } from '../lib/paketMasuk'
+import { buatLampiranPartiturPaket } from '../lib/partiturPaket'
 import { gabungPembaruan, materiLebihBaru, muatBerkasTerbit, bukaDataPribadi, tanggalIndonesia, type DataTerkunci } from '../lib/terbit'
 import { kunciDariUrl, simpanKunciAnggota, bacaKunciAnggota } from '../lib/kunci'
 import { TerbitkanAnggota } from '../components/TerbitkanAnggota'
@@ -31,7 +41,7 @@ import { NamaTampil } from '../components/NamaTampil'
 import Music from './Music'
 import { useMemberMode } from '../hooks/useMemberMode'
 import { TombolKeluarModeAnggota, TombolMasukModeAnggota } from '../components/ModePerangkat'
-import { bikinZip } from '../lib/zip'
+import { bikinZip, type EntriZip } from '../lib/zip'
 import {
   sectionDot,
   sectionLabel,
@@ -93,16 +103,61 @@ function CoachExport() {
   const attendance = useLiveQuery(() => db.attendance.toArray(), [], [])
   const memberNotes = useLiveQuery(() => db.memberNotes.toArray(), [], [])
   const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
+  const partiturItems = useLiveQuery(() => db.partiturBerkas.toArray(), [], [])
+  const rekamanItems = useLiveQuery(() => db.rekamanAudio.toArray(), [], [])
 
   const [includeSchedule, setIncludeSchedule] = useState(true)
   const [includeDrills, setIncludeDrills] = useState(true)
   const [includeSongs, setIncludeSongs] = useState(true)
+  /** #13a — sertakan berkas partitur (disaring per suara otomatis pada berkas per anggota). */
+  const [includePartitur, setIncludePartitur] = useState(true)
+  /** #13a — opsional sertakan rekaman audio panduan lagu ke dalam ZIP per anggota. */
+  const [includeAudioZip, setIncludeAudioZip] = useState(false)
   const [includeAttendance, setIncludeAttendance] = useState(true)
   /** Catatan evaluasi — dulu SELALU ikut berkas tanpa saklar apa pun. */
   const [includeNotes, setIncludeNotes] = useState(true)
   const [preview, setPreview] = useState<ShareBundle | null>(null)
+  const [petaPartiturSiap, setPetaPartiturSiap] = useState<Record<string, LampiranPartiturPaket>>({})
+
+  useEffect(() => {
+    let batal = false
+    const daftar = partiturItems ?? []
+    if (daftar.length === 0) {
+      setPetaPartiturSiap({})
+      return
+    }
+    void (async () => {
+      const peta: Record<string, LampiranPartiturPaket> = {}
+      for (const item of daftar) {
+        try {
+          const bita = new Uint8Array(await item.blob.arrayBuffer())
+          const lamp = buatLampiranPartiturPaket(
+            item.songId,
+            item.namaFile,
+            item.tipe,
+            bita,
+            item.hash,
+          )
+          if (lamp) peta[item.songId] = lamp
+        } catch {
+          // abaikan berkas rusak
+        }
+      }
+      if (!batal) setPetaPartiturSiap(peta)
+    })()
+    return () => {
+      batal = true
+    }
+  }, [partiturItems])
 
   function build(): ShareBundle {
+    const idLaguIkut = new Set((includeSongs ? (songs ?? []) : []).map((s) => s.id))
+    const partiturTerpilih: Record<string, LampiranPartiturPaket> = {}
+    if (includeSongs && includePartitur) {
+      for (const [songId, lamp] of Object.entries(petaPartiturSiap)) {
+        if (idLaguIkut.has(songId)) partiturTerpilih[songId] = lamp
+      }
+    }
     return {
       format: 'drillkit-share',
       version: 1,
@@ -114,6 +169,7 @@ function CoachExport() {
             city: settings.city,
             logo: settings.logo,
             defaultField: settings.defaultField,
+            sections: settings.sections,
             memberMode: 1,
           }
         : null,
@@ -125,6 +181,7 @@ function CoachExport() {
       songs: includeSongs ? (songs ?? []) : [],
       // Set list mengikuti saklar repertoar: ia tidak ada artinya tanpa lagu.
       setlists: includeSongs ? (daftarSetList ?? []) : [],
+      partiturPaket: Object.keys(partiturTerpilih).length > 0 ? partiturTerpilih : undefined,
       attendance: includeAttendance ? (attendance ?? []) : [],
       // Catatan evaluasi — kini menghormati saklar, seperti jenis data lain.
       memberNotes: includeNotes ? (memberNotes ?? []) : [],
@@ -150,31 +207,70 @@ function CoachExport() {
   /**
    * Berkas **per anggota** — satu ZIP berisi satu berkas per anggota.
    *
-   * Tiap berkas hanya memuat absensi & catatan anggota itu sendiri.
+   * Tiap berkas hanya memuat absensi & catatan anggota itu sendiri, serta
+   * partitur MusicXML yang sudah dipangkas ke part instrumen/seksinya (#13a).
    */
-  function unduhPerAnggota() {
+  async function unduhPerAnggota() {
     const dasar = build()
     if (dasar.members.length === 0) {
       toast.push('Belum ada anggota untuk dibagikan', 'err')
       return
     }
-    const entri = dasar.members.map((m) => ({
+    const entri: EntriZip[] = dasar.members.map((m) => ({
       nama: namaBerkasAnggota(m),
       isi: JSON.stringify(paketAnggota(dasar, m.id)),
     }))
+    if (includeSongs && includeAudioZip && (rekamanItems?.length ?? 0) > 0) {
+      const idLaguIkut = new Set(dasar.songs.map((s) => s.id))
+      const manifestAudio: Record<
+        string,
+        { songId: string; namaFile: string; durasi: number; hash: string }
+      > = {}
+      for (const item of rekamanItems ?? []) {
+        if (!idLaguIkut.has(item.songId)) continue
+        const ab = await item.blob.arrayBuffer()
+        const safeName = item.namaFile.replace(/[^\w.-]/g, '_')
+        const pathZip = `audio/${item.songId}_${safeName}`
+        entri.push({ nama: pathZip, isi: new Uint8Array(ab) })
+        manifestAudio[pathZip] = {
+          songId: item.songId,
+          namaFile: item.namaFile,
+          durasi: item.durasi,
+          hash: item.hash,
+        }
+      }
+      if (Object.keys(manifestAudio).length > 0) {
+        entri.push({
+          nama: 'audio/manifest.json',
+          isi: JSON.stringify(manifestAudio, null, 2),
+        })
+      }
+    }
     downloadBlob(namaZipAnggota(namaTim()), bikinZip(entri))
     toast.push(
-      `${entri.length} berkas anggota dibungkus — tiap berkas hanya memuat datanya sendiri, ` +
-        `dan begitu dibuka langsung mengenali namanya`,
+      `${dasar.members.length} berkas anggota dibungkus — tiap berkas hanya memuat data & partitur suaranya sendiri`,
     )
   }
+
+  const jmlPartiturSiap = Object.keys(petaPartiturSiap).length
 
   const size = useMemo(() => {
     // Dihitung dari berkas GRUP, karena itulah yang benar-benar diunduh
     // sebagai satu berkas — bukan dari paket lengkap yang tak pernah dibagikan.
     const n = JSON.stringify(paketGrup(build())).length
     return n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`
-  }, [members, sessions, drills, sets, songs, includeSchedule, includeDrills, includeSongs])
+  }, [
+    members,
+    sessions,
+    drills,
+    sets,
+    songs,
+    includeSchedule,
+    includeDrills,
+    includeSongs,
+    includePartitur,
+    petaPartiturSiap,
+  ])
 
   return (
     <div>
@@ -220,6 +316,14 @@ function CoachExport() {
               onChange={setIncludeSongs}
               label={`Repertoar & tempo (${songs?.length ?? 0})`}
             />
+            {includeSongs && (
+              <Toggle
+                testId="toggle-partitur-paket"
+                checked={includePartitur}
+                onChange={setIncludePartitur}
+                label={`Partitur lagu siap baca — disaring per instrumen di berkas per anggota (${jmlPartiturSiap})`}
+              />
+            )}
           </div>
           <p className="mt-3 rounded-lg bg-slate-950/50 p-3 text-[11px] leading-relaxed text-slate-500">
             Yang <b>selalu</b> ikut: daftar anggota (nama, section, instrumen) dan nama tim — diperlukan
@@ -279,6 +383,14 @@ function CoachExport() {
                 onChange={setIncludeNotes}
                 label={`Catatan evaluasi (${memberNotes?.length ?? 0})`}
               />
+              {includeSongs && (rekamanItems?.length ?? 0) > 0 && (
+                <Toggle
+                  testId="toggle-rekaman-zip"
+                  checked={includeAudioZip}
+                  onChange={setIncludeAudioZip}
+                  label={`Rekaman panduan lagu di ZIP (${rekamanItems?.length ?? 0} audio)`}
+                />
+              )}
             </div>
             <Button
               variant="primary"
@@ -477,10 +589,16 @@ function MemberView() {
       const lama = pkg?.data
       const laguLokal = await db.songs.toArray()
       const digabung = gabungPembaruan(data, lama, laguLokal)
+      // #13a — pasang berkas partitur dari paket terbit ke `db.partiturBerkas`
+      // lebih dulu, lalu simpan salinan paket ringan ke `db.packages`.
+      await pasangPartiturDariPaket(digabung)
+      const digabungRingan: ShareBundle = digabung.partiturPaket
+        ? { ...digabung, partiturPaket: undefined }
+        : digabung
       await db.packages.put({
         key: 'current',
         importedAt: Date.now(),
-        data: digabung,
+        data: digabungRingan,
       })
       /*
        * Lagu dan set list harus sampai ke **tabelnya**, bukan sekadar ikut
@@ -614,6 +732,9 @@ function MemberView() {
       const h = await simpanPaketAnggota(
         data as Parameters<typeof simpanPaketAnggota>[0],
       )
+      if ((kenal.audioZip ?? 0) > 0) {
+        await pulihkanAudioDariZipPaket(bita)
+      }
       // Nama + bagian terkunci diurus pendengar 'drillkit:paket-baru'.
       toast.push(
         h.penerima

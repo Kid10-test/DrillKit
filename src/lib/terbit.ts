@@ -507,6 +507,12 @@ export async function susunTerkunci(
   const terkunci: DataTerkunci = {}
   const tanpaKunci: string[] = []
 
+  // #13a — `partiturPaket` sudah tercantum sekali di bagian terbuka `grup`
+  // (`paket.json`), jadi tidak dienkripsi berulang kali per anggota di `locked`.
+  const tanpaLampiranPartitur: ShareBundle = b.partiturPaket
+    ? { ...b, partiturPaket: undefined }
+    : b
+
   for (const m of b.members) {
     const kunciBase64 = petaKunci[m.id]
     if (!kunciBase64) {
@@ -514,7 +520,7 @@ export async function susunTerkunci(
       continue
     }
     const kunci = await imporKunci(kunciBase64)
-    const isi = JSON.stringify(paketAnggota(b, m.id))
+    const isi = JSON.stringify(paketAnggota(tanpaLampiranPartitur, m.id))
     terkunci[m.id] = { d: await enkripsi(isi, kunci) }
   }
 

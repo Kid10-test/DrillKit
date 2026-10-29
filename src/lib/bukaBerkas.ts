@@ -774,6 +774,7 @@ export interface RingkasanPaket {
   jumlahDrill: number
   jumlahSet: number
   jumlahLagu: number
+  jumlahPartitur: number
   jumlahAbsensi: number
   jumlahCatatan: number
   terkunci: number
@@ -791,6 +792,7 @@ export function ringkasPaket(data: unknown): RingkasanPaket | null {
     drills?: unknown[]
     sets?: unknown[]
     songs?: unknown[]
+    partiturPaket?: Record<string, unknown>
     attendance?: unknown[]
     memberNotes?: unknown[]
     locked?: Record<string, unknown>
@@ -816,6 +818,10 @@ export function ringkasPaket(data: unknown): RingkasanPaket | null {
     jumlahDrill: Array.isArray(d.drills) ? d.drills.length : 0,
     jumlahSet: Array.isArray(d.sets) ? d.sets.length : 0,
     jumlahLagu: Array.isArray(d.songs) ? d.songs.length : 0,
+    jumlahPartitur:
+      d.partiturPaket && typeof d.partiturPaket === 'object' && !Array.isArray(d.partiturPaket)
+        ? Object.keys(d.partiturPaket).length
+        : 0,
     jumlahAbsensi: Array.isArray(d.attendance) ? d.attendance.length : 0,
     jumlahCatatan: Array.isArray(d.memberNotes) ? d.memberNotes.length : 0,
     terkunci: d.locked && typeof d.locked === 'object' ? Object.keys(d.locked).length : 0,

@@ -61,9 +61,15 @@ import {
   type ProgresRenderPartitur,
 } from '../lib/partiturRender'
 import { muatPartiturBerkas } from '../lib/partiturSimpan'
+import { teksPartitur } from '../lib/partitur'
+import {
+  PemutarNadaPartitur,
+  jadwalkanDetikNada,
+  uraiJadwalNadaMusicXml,
+} from '../lib/partiturBunyi'
 import type { TempoLatihan } from '../lib/tempoLatihan'
 import { DEFAULT_SECTIONS, cx } from '../lib/utils'
-import { IconDownload, IconLoop, IconPause, IconPlay, IconPrinter } from './Icons'
+import { IconDownload, IconLoop, IconMusic, IconPause, IconPlay, IconPrinter } from './Icons'
 import { PratinjauCetakPartitur } from './PratinjauCetakPartitur'
 import { Button } from './ui'
 
@@ -94,10 +100,10 @@ export function LayarPartitur({
   sectionsTim = DEFAULT_SECTIONS,
   namaTim,
   hanyaPutar = false,
-  biramaAktif = 1,
-  sedangMain = false,
+  biramaAktif: biramaAktifLuar = 1,
+  sedangMain: sedangMainLuar = false,
   tahapKetuk = null,
-  ketukAktif = null,
+  ketukAktif: ketukAktifLuar = null,
   onToggleMain,
   onLoncatBirama,
   frasa = null,
@@ -165,6 +171,16 @@ export function LayarPartitur({
   const [modePilihFrasa, setModePilihFrasa] = useState(false)
   const [calonAwalFrasa, setCalonAwalFrasa] = useState<number | null>(null)
   const [setAwalTerpilih, setSetAwalTerpilih] = useState<number | null>(null)
+
+  // #13b — pemutar sintesis bunyi notasi WebAudio langsung dari MusicXML
+  const pemutarNotRef = useRef<PemutarNadaPartitur | null>(null)
+  const [sedangBunyiNot, setSedangBunyiNot] = useState(false)
+  const [posisiNot, setPosisiNot] = useState<{ birama: number; ketuk: number } | null>(null)
+  const [teksXmlPartitur, setTeksXmlPartitur] = useState<string>('')
+
+  const biramaAktif = sedangBunyiNot && posisiNot ? posisiNot.birama : biramaAktifLuar
+  const sedangMain = sedangMainLuar || sedangBunyiNot
+  const ketukAktif = sedangBunyiNot && posisiNot ? posisiNot.ketuk : ketukAktifLuar
 
   // Cadangan daftar part dari OSMD untuk berkas D4 (`terurai: false`, mis. `<score-timewise>`)
   // yang pada saat dipindai `#11a` belum memiliki `meta.parts`.
@@ -243,14 +259,25 @@ export function LayarPartitur({
     }
 
     void muatPartiturBerkas(song.id)
-      .then((hasil) => {
+      .then(async (hasil) => {
         if (!hidup) return
         setItemBerkas(hasil ?? null)
+        if (hasil?.blob && hasil.tipe === 'musicxml') {
+          try {
+            const bita = new Uint8Array(await hasil.blob.arrayBuffer())
+            if (hidup) setTeksXmlPartitur(teksPartitur(bita))
+          } catch {
+            if (hidup) setTeksXmlPartitur('')
+          }
+        } else {
+          setTeksXmlPartitur('')
+        }
         setMemuatBerkas(false)
       })
       .catch(() => {
         if (!hidup) return
         setItemBerkas(null)
+        setTeksXmlPartitur('')
         setMemuatBerkas(false)
       })
 
@@ -428,6 +455,124 @@ export function LayarPartitur({
     [song.tempoMap, batasMaksBirama],
   )
 
+  // #13b — urai jadwal nada sesuai part yang sedang disaring (`filterIdAktif`)
+  const jadwalNadaPartitur = useMemo(
+    () =>
+      teksXmlPartitur
+        ? uraiJadwalNadaMusicXml(
+            teksXmlPartitur,
+            tandaFilterId === '__SEMUA__' ? null : tandaFilterId.split('\u0001'),
+          )
+        : null,
+    [teksXmlPartitur, tandaFilterId],
+  )
+
+  const adaNadaUntukDibunyikan = (jadwalNadaPartitur?.nada.length ?? 0) > 0
+
+  function hentikanBunyiNot() {
+    pemutarNotRef.current?.henti()
+    pemutarNotRef.current = null
+    setSedangBunyiNot(false)
+    setPosisiNot(null)
+  }
+
+  // Hentikan pemutar notasi saat komponen dilepas atau lagu berganti.
+  useEffect(() => {
+    return () => {
+      pemutarNotRef.current?.henti()
+      pemutarNotRef.current = null
+    }
+  }, [song.id])
+
+  // Bila pemutar eksternal (metronom / rekaman) dinyalakan, hentikan bunyi notasi agar tidak bertabrakan.
+  useEffect(() => {
+    if (sedangMainLuar && sedangBunyiNot) {
+      hentikanBunyiNot()
+    }
+  }, [sedangMainLuar, sedangBunyiNot])
+
+  // Bila filter part diubah saat sedang membunyikan not, mulai ulang dengan part baru.
+  useEffect(() => {
+    if (!sedangBunyiNot || !jadwalNadaPartitur || jadwalNadaPartitur.nada.length === 0) return
+    const pemutar = pemutarNotRef.current
+    if (!pemutar) return
+    const persen =
+      tempoLatihan?.mode === 'bpm' && song.bpm > 0
+        ? Math.round((Math.max(20, song.bpm + tempoLatihan.geser) / song.bpm) * 100)
+        : (tempoLatihan?.persen ?? 100)
+    const dari = frasaMenyala && frasa ? frasa.dari : Math.max(1, posisiNot?.birama ?? biramaAktifLuar)
+    const sampai =
+      frasaMenyala && frasa
+        ? frasa.sampai
+        : Math.max(dari, jadwalNadaPartitur.jumlahBirama)
+    const hasilJadwal = jadwalkanDetikNada(jadwalNadaPartitur, {
+      tempoMap: song.tempoMap,
+      tempoDasar: song.bpm || meta?.tempo,
+      persenTempo: persen,
+      dariBirama: dari,
+      sampaiBirama: sampai,
+    })
+    void pemutar.mulai({
+      hasilJadwal,
+      ulang: frasaMenyala,
+      onPosisi: (b, k) => setPosisiNot({ birama: b, ketuk: k }),
+      onSelesai: () => {
+        setSedangBunyiNot(false)
+        setPosisiNot(null)
+      },
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tandaFilterId, tempoLatihan?.persen, tempoLatihan?.geser, tempoLatihan?.mode, frasaMenyala, frasa?.dari, frasa?.sampai])
+
+  async function toggleBunyikanNot() {
+    if (sedangBunyiNot) {
+      hentikanBunyiNot()
+      return
+    }
+    if (!jadwalNadaPartitur || jadwalNadaPartitur.nada.length === 0) return
+    if (sedangMainLuar) {
+      onToggleMain?.()
+    }
+    const pemutar = new PemutarNadaPartitur()
+    pemutarNotRef.current = pemutar
+    const persen =
+      tempoLatihan?.mode === 'bpm' && song.bpm > 0
+        ? Math.round((Math.max(20, song.bpm + tempoLatihan.geser) / song.bpm) * 100)
+        : (tempoLatihan?.persen ?? 100)
+    const maksBirama = Math.max(1, jadwalNadaPartitur.jumlahBirama)
+    const dari =
+      frasaMenyala && frasa
+        ? Math.min(maksBirama, Math.max(1, frasa.dari))
+        : biramaAktifLuar >= 1 && biramaAktifLuar <= maksBirama
+          ? biramaAktifLuar
+          : 1
+    const sampai =
+      frasaMenyala && frasa
+        ? Math.min(maksBirama, Math.max(dari, frasa.sampai))
+        : maksBirama
+    const hasilJadwal = jadwalkanDetikNada(jadwalNadaPartitur, {
+      tempoMap: song.tempoMap,
+      tempoDasar: song.bpm || meta?.tempo,
+      persenTempo: persen,
+      dariBirama: dari,
+      sampaiBirama: sampai,
+    })
+    setSedangBunyiNot(true)
+    setPosisiNot({ birama: dari, ketuk: 0 })
+    const ok = await pemutar.mulai({
+      hasilJadwal,
+      ulang: frasaMenyala,
+      onPosisi: (b, k) => setPosisiNot({ birama: b, ketuk: k }),
+      onSelesai: () => {
+        setSedangBunyiNot(false)
+        setPosisiNot(null)
+      },
+    })
+    if (!ok) {
+      hentikanBunyiNot()
+    }
+  }
+
   // 6. Auto-scroll pintar saat birama aktif berpindah keluar zona nyaman baca.
   useEffect(() => {
     if (
@@ -569,9 +714,15 @@ export function LayarPartitur({
   const persenAktif =
     tempoLatihan?.mode === 'bpm' ? null : (tempoLatihan?.persen ?? 100)
 
+  const bisaBunyiNot = tipe === 'musicxml' && adaNadaUntukDibunyikan
   const tampilkanBilahLatihan =
-    Boolean(onToggleMain || onUbahFrasa || onLoncatBirama || daftarSetDrill.length > 0) &&
-    Boolean(itemBerkas || meta)
+    Boolean(
+      onToggleMain ||
+        onUbahFrasa ||
+        onLoncatBirama ||
+        daftarSetDrill.length > 0 ||
+        bisaBunyiNot,
+    ) && Boolean(itemBerkas || meta)
 
   return (
     <>
@@ -907,7 +1058,7 @@ export function LayarPartitur({
                     data-testid="partitur-tombol-putar"
                     onClick={onToggleMain}
                     style={
-                      sedangMain
+                      sedangMainLuar
                         ? {
                             backgroundColor: '#be123c',
                             borderColor: '#e11d48',
@@ -921,8 +1072,35 @@ export function LayarPartitur({
                     }
                     className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold"
                   >
-                    {sedangMain ? <IconPause size={12} /> : <IconPlay size={12} />}
-                    {sedangMain ? 'Berhenti' : labelKonteksPutar ? `Putar ${labelKonteksPutar}` : 'Putar'}
+                    {sedangMainLuar ? <IconPause size={12} /> : <IconPlay size={12} />}
+                    {sedangMainLuar ? 'Berhenti' : labelKonteksPutar ? `Putar ${labelKonteksPutar}` : 'Putar'}
+                  </button>
+                )}
+
+                {bisaBunyiNot && (
+                  <button
+                    type="button"
+                    data-testid="partitur-bunyikan-not"
+                    data-kiosk-allow
+                    onClick={() => void toggleBunyikanNot()}
+                    title="Bunyikan notasi suara yang sedang tampil dengan sintesis WebAudio (mengikuti tempo latihan & frasa)"
+                    style={
+                      sedangBunyiNot
+                        ? {
+                            backgroundColor: '#be123c',
+                            borderColor: '#e11d48',
+                            color: '#ffffff',
+                          }
+                        : {
+                            backgroundColor: '#0f766e',
+                            borderColor: '#14b8a6',
+                            color: '#ffffff',
+                          }
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold"
+                  >
+                    {sedangBunyiNot ? <IconPause size={12} /> : <IconMusic size={12} />}
+                    {sedangBunyiNot ? 'Hentikan not' : 'Bunyikan not'}
                   </button>
                 )}
 

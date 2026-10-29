@@ -12,9 +12,12 @@ import {
   dengungTertulis,
   keTertulis,
   nadaKeHz,
+  panduanAkorDengung,
   pesanMikrofon,
   simpanSetelan,
   type HasilNada,
+  type ModeHarmoniDengung,
+  type ModeTemperamenDengung,
   type SetelanPenala,
 } from '../lib/tuner'
 
@@ -90,7 +93,9 @@ export default function TunerDrone() {
         hz: nadaKeHz(s.nada, s.oktaf, s.a4),
         bentuk: s.bentuk,
         volume: s.volume,
-        kelima: !!s.kelima,
+        kelima: s.harmoni !== 'tunggal',
+        harmoni: s.harmoni,
+        temperamen: s.temperamen,
       })
       setBunyi(true)
     } catch (e) {
@@ -375,28 +380,101 @@ export default function TunerDrone() {
             </div>
           </div>
 
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-[11px] text-slate-500">Harmoni drone</label>
+              <Select
+                data-testid="pilih-harmoni-dengung"
+                data-kiosk-allow
+                value={st.harmoni}
+                onChange={(e) => {
+                  const harmoni = e.target.value as ModeHarmoniDengung
+                  ubahYangPerluMulaiUlang({
+                    harmoni,
+                    kelima: harmoni === 'tunggal' ? 0 : 1,
+                  })
+                }}
+              >
+                <option value="tunggal">Nada dasar saja</option>
+                <option value="kuinta">Dasar + Kuinta (5th)</option>
+                <option value="mayor">Akor Mayor (1–3–5)</option>
+                <option value="minor">Akor Minor (1–♭3–5)</option>
+                <option value="oktaf">Dasar + Oktaf</option>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-slate-500">Temperamen</label>
+              <Select
+                data-testid="pilih-temperamen-dengung"
+                data-kiosk-allow
+                value={st.temperamen}
+                disabled={st.harmoni === 'tunggal' || st.harmoni === 'oktaf'}
+                onChange={(e) =>
+                  ubahYangPerluMulaiUlang({
+                    temperamen: e.target.value as ModeTemperamenDengung,
+                  })
+                }
+              >
+                <option value="murni">Murni / Just (Brass)</option>
+                <option value="setara">Setara / 12-TET (Pit)</option>
+              </Select>
+            </div>
+          </div>
+
+          {st.harmoni !== 'tunggal' && (
+            <div
+              data-testid="panduan-akor-dengung"
+              className="mt-2.5 rounded-lg border border-slate-800/90 bg-slate-950/60 px-3 py-2 text-[11px] leading-relaxed text-slate-300"
+            >
+              <span className="font-medium text-slate-400">
+                Susunan {tr.geser !== 0 ? `partitur ${tr.label}` : 'konser'}:{' '}
+              </span>
+              {panduanAkorDengung(st.nada, st.oktaf, tr.geser, st.harmoni, st.temperamen).map(
+                (item, idx) => (
+                  <span key={item.peran}>
+                    {idx > 0 && ' · '}
+                    <span className="text-slate-400">{item.peran}</span>{' '}
+                    <b className="tabular-nums text-emerald-300">{item.tertulis}</b>
+                    {item.koreksiSen !== 0 && (
+                      <span className="ml-0.5 tabular-nums text-amber-300">
+                        ({item.koreksiSen > 0 ? `+${item.koreksiSen}` : item.koreksiSen} sen)
+                      </span>
+                    )}
+                  </span>
+                ),
+              )}
+            </div>
+          )}
+
           <button
             type="button"
             data-testid="toggle-kelima"
-            onClick={() => ubahYangPerluMulaiUlang({ kelima: st.kelima ? 0 : 1 })}
-            className="mt-3 flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2.5 text-xs text-slate-300 hover:bg-slate-800/50"
+            onClick={() => {
+              const aktifkan = st.harmoni === 'tunggal'
+              ubahYangPerluMulaiUlang({
+                kelima: aktifkan ? 1 : 0,
+                harmoni: aktifkan ? 'kuinta' : 'tunggal',
+              })
+            }}
+            className="mt-2.5 flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800/50"
           >
-            <span>Tambah nada kelima (harmoni 3:2)</span>
+            <span>Harmoni pendamping (kuinta / akor)</span>
             <span
               className="relative h-5 w-9 shrink-0 rounded-full transition"
-              style={{ background: st.kelima ? '#10b981' : '#334155' }}
+              style={{ background: st.harmoni !== 'tunggal' ? '#10b981' : '#334155' }}
             >
               <span
                 className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all"
-                style={{ left: st.kelima ? '18px' : '2px' }}
+                style={{ left: st.harmoni !== 'tunggal' ? '18px' : '2px' }}
               />
             </span>
           </button>
 
           <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
             <IconMusic size={12} className="mr-1 inline align-[-1px]" />
-            Nada kelima membuat dengung terdengar seperti harmoni band, bukan sekadar bunyi pipa —
-            telinga lebih mudah menangkap nada yang melenceng.
+            Temperamen <b>Murni (Just)</b> menghilangkan layangan gelombang pada akor seksi tiup
+            (terts mayor diturunkan 14 sen, terts minor dinaikkan 16 sen); gunakan <b>12-TET</b> saat
+            menyelaraskan instrumen bilah pit.
           </p>
         </div>
       </div>

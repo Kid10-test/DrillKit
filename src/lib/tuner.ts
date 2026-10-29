@@ -349,6 +349,123 @@ export class Penala {
 
 /* ------------------------------ Nada dengung -------------------------------- */
 
+/**
+ * #13c — Mode harmoni drone untuk latihan intonasi seksi tiup (*Brass Arc*)
+ * maupun perkusi bernada (*Pit*).
+ */
+export type ModeHarmoniDengung = 'tunggal' | 'kuinta' | 'mayor' | 'minor' | 'oktaf'
+
+/**
+ * #13c — Temperamen interval harmoni:
+ * - `'murni'` (*Just Intonation*): rasio utuh bebas layangan (3:2, 5:4, 6:5) untuk tiup/brass;
+ * - `'setara'` (*12-TET*): tangga nada 12-semiton setara standar instrumen bilah pit/marimba.
+ */
+export type ModeTemperamenDengung = 'murni' | 'setara'
+
+export interface KomponenHarmoniDengung {
+  peran: string
+  semiton: number
+  rasio: number
+  skala: number
+  /** Selisih sen terhadap 12-TET (mis. terts besar murni = -14 sen, kuinta murni = +2 sen). */
+  koreksiSen: number
+}
+
+export interface PanduanNadaAkor {
+  peran: string
+  tertulis: string
+  konser: string
+  koreksiSen: number
+}
+
+const DAFTAR_MODE_HARMONI: ModeHarmoniDengung[] = ['tunggal', 'kuinta', 'mayor', 'minor', 'oktaf']
+const DAFTAR_MODE_TEMPERAMEN: ModeTemperamenDengung[] = ['murni', 'setara']
+
+/** Susun daftar komponen rasio frekuensi dan koreksi sen untuk mode harmoni & temperamen drone. */
+export function susunKomponenHarmoniDengung(
+  harmoni: ModeHarmoniDengung,
+  temperamen: ModeTemperamenDengung = 'murni',
+): KomponenHarmoniDengung[] {
+  const murni = temperamen === 'murni'
+  switch (harmoni) {
+    case 'tunggal':
+      return [{ peran: 'Dasar', semiton: 0, rasio: 1, skala: 1, koreksiSen: 0 }]
+    case 'oktaf':
+      return [
+        { peran: 'Dasar', semiton: 0, rasio: 1, skala: 0.9, koreksiSen: 0 },
+        { peran: 'Oktaf', semiton: 12, rasio: 2, skala: 0.3, koreksiSen: 0 },
+      ]
+    case 'mayor':
+      return [
+        { peran: 'Dasar', semiton: 0, rasio: 1, skala: 0.85, koreksiSen: 0 },
+        {
+          peran: 'Terts',
+          semiton: 4,
+          rasio: murni ? 1.25 : Math.pow(2, 4 / 12),
+          skala: 0.3,
+          koreksiSen: murni ? -14 : 0,
+        },
+        {
+          peran: 'Kuinta',
+          semiton: 7,
+          rasio: murni ? 1.5 : Math.pow(2, 7 / 12),
+          skala: 0.34,
+          koreksiSen: murni ? 2 : 0,
+        },
+      ]
+    case 'minor':
+      return [
+        { peran: 'Dasar', semiton: 0, rasio: 1, skala: 0.85, koreksiSen: 0 },
+        {
+          peran: 'Terts',
+          semiton: 3,
+          rasio: murni ? 1.2 : Math.pow(2, 3 / 12),
+          skala: 0.3,
+          koreksiSen: murni ? 16 : 0,
+        },
+        {
+          peran: 'Kuinta',
+          semiton: 7,
+          rasio: murni ? 1.5 : Math.pow(2, 7 / 12),
+          skala: 0.34,
+          koreksiSen: murni ? 2 : 0,
+        },
+      ]
+    case 'kuinta':
+    default:
+      return [
+        { peran: 'Dasar', semiton: 0, rasio: 1, skala: 1, koreksiSen: 0 },
+        {
+          peran: 'Kuinta',
+          semiton: 7,
+          rasio: murni ? 1.5 : Math.pow(2, 7 / 12),
+          skala: 0.34,
+          koreksiSen: murni ? 2 : 0,
+        },
+      ]
+  }
+}
+
+/**
+ * #13c — Panduan nama nada tertulis (sesuai transposisi instrumen) beserta target
+ * koreksi sen untuk tiap komponen harmoni drone yang sedang dipilih.
+ */
+export function panduanAkorDengung(
+  namaKonser: string,
+  oktaf: number,
+  geserTransposisi: number,
+  harmoni: ModeHarmoniDengung,
+  temperamen: ModeTemperamenDengung = 'murni',
+): PanduanNadaAkor[] {
+  const midiDasar = 12 * (oktaf + 1) + indeksNada(namaKonser)
+  return susunKomponenHarmoniDengung(harmoni, temperamen).map((k) => ({
+    peran: k.peran,
+    konser: namaMidi(midiDasar + k.semiton).label,
+    tertulis: namaMidi(midiDasar + k.semiton + geserTransposisi).label,
+    koreksiSen: k.koreksiSen,
+  }))
+}
+
 export interface OpsiDengung {
   /** frekuensi nada acuan (Hz) */
   hz: number
@@ -356,19 +473,23 @@ export interface OpsiDengung {
   bentuk: OscillatorType
   /** volume 0–1 */
   volume: number
-  /** tambahkan **nada kelima** di atasnya (rasio 3:2) */
+  /** tambahkan **nada kelima** di atasnya (kompatibilitas lama bila `harmoni` tidak diisi) */
   kelima: boolean
+  /** #13c — mode harmoni lengkap (bila diisi, mengungguli `kelima`). */
+  harmoni?: ModeHarmoniDengung
+  /** #13c — temperamen murni (*Just*) vs 12-TET (*Equal*). */
+  temperamen?: ModeTemperamenDengung
 }
 
 /**
  * Nada dengung (drone): nada panjang yang terus berbunyi untuk dijadikan acuan
- * tuning. Bisa ditambah nada kelima supaya terdengar "berisi" seperti
- * harmoni band, tidak sekadar bunyi pipa.
+ * tuning. Bisa ditambah kuinta, oktaf, atau akor mayor/minor murni (*Brass Arc*).
  */
 export class Dengung {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private osilator: OscillatorNode[] = []
+  private rasioAktif: number[] = []
 
   get aktif(): boolean {
     return this.osilator.length > 0
@@ -392,9 +513,14 @@ export class Dengung {
     saring.connect(ctx.destination)
     this.master = master
 
+    const modeHarmoni: ModeHarmoniDengung = o.harmoni ?? (o.kelima ? 'kuinta' : 'tunggal')
+    const komponen = susunKomponenHarmoniDengung(modeHarmoni, o.temperamen ?? 'murni')
+    this.rasioAktif = komponen.map((k) => k.rasio)
+
     const sekarang = ctx.currentTime
-    this.buat(ctx, master, o.hz, o.bentuk, 1)
-    if (o.kelima) this.buat(ctx, master, o.hz * 1.5, o.bentuk, 0.34)
+    for (const k of komponen) {
+      this.buat(ctx, master, o.hz * k.rasio, o.bentuk, k.skala)
+    }
 
     // Naikkan volume perlahan (0,3 detik) supaya tidak ada "jedug" di awal.
     master.gain.setValueAtTime(0.0001, sekarang)
@@ -427,8 +553,8 @@ export class Dengung {
     const ctx = this.ctx
     if (!ctx) return
     this.osilator.forEach((osc, i) => {
-      const f = i === 0 ? hz : hz * 1.5
-      osc.frequency.setTargetAtTime(f, ctx.currentTime, 0.03)
+      const rasio = this.rasioAktif[i] ?? (i === 0 ? 1 : 1.5)
+      osc.frequency.setTargetAtTime(hz * rasio, ctx.currentTime, 0.03)
     })
   }
 
@@ -440,6 +566,7 @@ export class Dengung {
     this.ctx = null
     this.master = null
     this.osilator = []
+    this.rasioAktif = []
     if (!ctx) return
     const sekarang = ctx.currentTime
     if (master) {
@@ -469,8 +596,12 @@ export interface SetelanPenala {
   oktaf: number
   bentuk: OscillatorType
   volume: number
-  /** 1 = sertakan nada kelima */
+  /** 1 = sertakan nada kelima (tetap dijaga selaras dengan `harmoni` untuk kompatibilitas) */
   kelima: number
+  /** #13c — mode harmoni drone: tunggal, kuinta, mayor, minor, atau oktaf. */
+  harmoni: ModeHarmoniDengung
+  /** #13c — temperamen drone: 'murni' (Just Intonation) atau 'setara' (12-TET). */
+  temperamen: ModeTemperamenDengung
   /**
    * J1 — id transposisi instrumen pemakai perangkat ini (lihat
    * `DAFTAR_TRANSPOSISI`). Disimpan per perangkat, bukan per tim: HP pemain
@@ -488,6 +619,8 @@ export const SETELAN_BAKU: SetelanPenala = {
   bentuk: 'triangle',
   volume: 0.35,
   kelima: 1,
+  harmoni: 'kuinta',
+  temperamen: 'murni',
   transposisi: 'c',
 }
 
@@ -497,13 +630,27 @@ export function bacaSetelan(): SetelanPenala {
     const mentah = localStorage.getItem(KUNCI_SETELAN)
     if (!mentah) return { ...SETELAN_BAKU }
     const d = JSON.parse(mentah) as Partial<SetelanPenala>
+    const kelimaLama = d.kelima === undefined ? SETELAN_BAKU.kelima : d.kelima ? 1 : 0
+    const harmoniSah =
+      typeof d.harmoni === 'string' && DAFTAR_MODE_HARMONI.includes(d.harmoni as ModeHarmoniDengung)
+        ? (d.harmoni as ModeHarmoniDengung)
+        : kelimaLama
+          ? 'kuinta'
+          : 'tunggal'
+    const temperamenSah =
+      typeof d.temperamen === 'string' &&
+      DAFTAR_MODE_TEMPERAMEN.includes(d.temperamen as ModeTemperamenDengung)
+        ? (d.temperamen as ModeTemperamenDengung)
+        : SETELAN_BAKU.temperamen
     return {
       a4: typeof d.a4 === 'number' ? d.a4 : SETELAN_BAKU.a4,
       nada: typeof d.nada === 'string' ? d.nada : SETELAN_BAKU.nada,
       oktaf: typeof d.oktaf === 'number' ? d.oktaf : SETELAN_BAKU.oktaf,
       bentuk: (d.bentuk ?? SETELAN_BAKU.bentuk) as OscillatorType,
       volume: typeof d.volume === 'number' ? d.volume : SETELAN_BAKU.volume,
-      kelima: d.kelima ? 1 : 0,
+      kelima: harmoniSah === 'tunggal' ? 0 : 1,
+      harmoni: harmoniSah,
+      temperamen: temperamenSah,
       // Setelan dari versi sebelum J1 tidak punya kolom ini → konser, persis
       // perilaku lama. Id yang tidak dikenal juga jatuh ke konser.
       transposisi: cariTransposisi(typeof d.transposisi === 'string' ? d.transposisi : undefined).id,
