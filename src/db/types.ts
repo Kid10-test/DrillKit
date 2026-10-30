@@ -176,6 +176,71 @@ export interface Evaluasi {
   createdAt: number
 }
 
+/** #14 — Kategori target setoran hafalan (*pass-off*). */
+export type KategoriSetoran = 'musik' | 'visual' | 'gabungan'
+
+/**
+ * #14 — Jenjang kelulusan bertahap untuk satu sel `[Anggota × Target]`:
+ * `Belum` → `Baca Lancar` → `Tempo Latihan` → `Tempo Asli` → `Hafal Musik` → `Lulus Sambil Gerak`.
+ */
+export type JenjangSetoran =
+  | 'belum'
+  | 'baca_lancar'
+  | 'tempo_latihan'
+  | 'tempo_asli'
+  | 'hafal_musik'
+  | 'lulus_gerak'
+
+/**
+ * #14 — Definisi satu target setoran (*checkpoint*), mis. "Mars Nusantara: Birama 1–16".
+ *
+ * Aman disertakan di paket grup maupun per anggota karena hanya mendeskripsikan
+ * kurikulum target tim/seksi tanpa memuat status pribadi siapa pun.
+ */
+export interface TargetSetoran {
+  id: string
+  judul: string
+  kategori: KategoriSetoran
+  /** Tautan opsional ke lagu di repertoar (`Song.id`). */
+  songId?: string
+  /** Birama awal rentang latihan (1-based inklusif, opsional). */
+  biramaDari?: number
+  /** Birama akhir rentang latihan (1-based inklusif, opsional). */
+  biramaSampai?: number
+  /** Pembatasan seksi opsional (`undefined` / kosong = berlaku bagi seluruh seksi). */
+  sections?: string[]
+  /** Jenjang minimal yang dihitung 100% lulus (bawaan `'lulus_gerak'`, atau `'hafal_musik'` untuk seksi statis/pit). */
+  batasLulus?: Exclude<JenjangSetoran, 'belum'>
+  /** Tenggat tanggal ISO opsional (`YYYY-MM-DD`). */
+  tenggat?: string
+  /** Urutan tampil pada kolom matriks. */
+  urutan: number
+  catatan?: string
+  createdAt: number
+}
+
+/**
+ * #14 — Status capaian satu anggota pada satu target setoran.
+ *
+ * `id` disusun deterministik (`${targetId}__${memberId}`) supaya bebas duplikat
+ * saat penggabungan lintas perangkat pelatih/asisten (#15). Di paket berbagi,
+ * hanya rekaman milik penerima paket yang disertakan (dan ikut terenkripsi di `locked` #2).
+ */
+export interface CatatanSetoran {
+  id: string
+  targetId: string
+  memberId: string
+  jenjang: JenjangSetoran
+  /** Tanggal pembaruan/kelulusan ISO (`YYYY-MM-DD`). */
+  tanggal: string
+  /** Waktu pembaruan terakhir (epoch ms). */
+  diubahAt: number
+  /** Nama pelatih / section leader penguji. */
+  penguji?: string
+  /** Catatan singkat umpan balik untuk anggota. */
+  catatan?: string
+}
+
 /** Jenis blok dalam rencana latihan. Terpisah dari `SessionType` yang ada. */
 export type JenisBlok = 'pemanasan' | 'section' | 'gabungan' | 'pendingin' | 'lainnya'
 
@@ -1119,6 +1184,10 @@ export interface ShareBundle {
    * secara luring langsung dari paket anggota.
    */
   partiturPaket?: Record<string, LampiranPartiturPaket>
+  /** #14 — daftar target setoran hafalan tim/seksi (publik tim). */
+  targetSetoran?: TargetSetoran[]
+  /** #14 — status setoran hafalan khusus milik penerima paket (kosong di berkas grup). */
+  setoran?: CatatanSetoran[]
   attendance: AttendanceRecord[]
   /** Catatan evaluasi per anggota (opsional — paket lama belum punya) */
   memberNotes?: MemberNote[]

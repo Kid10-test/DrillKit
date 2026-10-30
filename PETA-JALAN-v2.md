@@ -50,7 +50,7 @@ Pemeriksaan menyeluruh terhadap build produksi `v1.0.0` (`8bf02bd`) mencatat gar
 | :---: | :--- | :---: | :---: | :--- | :--- |
 | **#12** | Polesan Performa Bundel, Navigasi Mobile Pelatih, Modularisasi, & CI | `v1.0.1` | Sedang | **12a, 12b, & 12d Selesai** (JS awal `-30%` ke `377,8 kB`, laci HP, label form, CI Node 24 + `paths-ignore`); sisa **12c** modularisasi komponen besar sebelum `#16` | Fondasi sebelum fitur `v1.1+` |
 | **#13** | Partitur Per-Suara & Audio Panduan di Paket Anggota + Sintesis Nada & Drone | `v1.1` | Sedang–Besar | **Selesai (`v1.1.0`)** — Partitur tersaring per suara di paket anggota, audio panduan di ZIP, sintesis bunyi notasi WebAudio, & akor/temperamen drone penala | Melanjutkan `#2`, `#6`, `#11c–d` |
-| **#14** | Matriks Setoran Hafalan (*Music & Visual Pass-Off Tracker*) | `v1.1` | Sedang | Pelacakan hafalan per segmen lagu × anggota untuk pelatih seksi & *Section Leader* | Tersambung ke `songs`, `Share`, `#2` |
+| **#14** | Matriks Setoran Hafalan (*Music & Visual Pass-Off Tracker*) | `v1.1` | Sedang | **Selesai (`v1.1.1`)** — Target setoran dari segmen lagu/manual, matriks 6 jenjang ketuk-cepat, uji cepat *Section Leader* + *loop* frasa, cetak A4 hex, & kartu anggota terkunci | Tersambung ke `songs`, `Share`, `#2` |
 | **#15** | Sinkronisasi Multi-Pelatih Seksi & Log Perubahan Show (`I1`) | `v1.1` | Sedang | Alur 1-klik setoran asisten → pelatih kepala + catatan revisi show otomatis | Melanjutkan `pindah.ts` & `riwayat` |
 | **#16** | Koreografi Visual Lanjut: Jalur Per-Kelompok, *FTL*, *Hold/Ripple*, & *Moving Props* | `v1.2` | Besar | Gerak per kelompok/pemain, *Hold* + simbol visual di buku saku, properti bergerak | Melanjutkan `DD2`, `DD10b`, `A7`, `#12c` |
 | **#17** | Lembar Hitungan *Color Guard* (*Count Sheet*) & Buku Saku Visual | `v1.2` | Sedang | Kerja alat *Guard* per *8-counts* sinkron birama/set, cetak A4/A5, & Mode Anggota | Tersambung ke `Drill`, `Song`, `#13` |
@@ -87,14 +87,13 @@ Pemeriksaan menyeluruh terhadap build produksi `v1.0.0` (`8bf02bd`) mencatat gar
   3. **Sintesis Bunyi Partitur Ringan (`13b` — Selesai):** Modul `src/lib/partiturBunyi.ts` mengurai `<pitch>`, transposisi kromatik konser (`<transpose><chromatic>`), penyambungan `<tie>` lintas birama, `<chord/>`, dan ketukan perkusi `<unpitched>`, lalu menyintesisnya lewat WebAudio (`PemutarNadaPartitur`) pada tombol **Bunyikan not** (`partitur-bunyikan-not`) di `LayarPartitur.tsx` sinkron dengan sorot birama aktif, tempo latihan `#4`, dan *loop* frasa `#11d`. Bundel JS awal tetap ringan di **`377,90 kB` (`122,54 kB` gzip)**.
   4. **Akor & Temperamen Drone di Penala (`13c` — Selesai):** `Dengung` (`src/lib/tuner.ts` & `TunerDrone.tsx`) kini mendukung mode harmoni *Nada Dasar*, *Kuinta*, *Akor Mayor (1–3–5)*, *Akor Minor (1–♭3–5)*, dan *Oktaf* dalam temperamen **Murni / Just Intonation** (*Brass Arc*, lengkap dengan panduan nada tertulis sesuai transposisi instrumen & target koreksi `-14` / `+16` / `+2` sen) maupun **Setara / 12-TET** (*Pit*). Teruji penuh di `qa/partitur-paket-bunyi-logika.mjs` (35/35) dan `qa/partitur-paket-bunyi.mjs` (21/21; total **119 rangkaian** regresi penuh).
 
-#### `#14` — Matriks Setoran Hafalan (*Music & Visual Pass-Off Tracker*)
+#### `#14` — Matriks Setoran Hafalan (*Music & Visual Pass-Off Tracker*) *(Selesai di `v1.1.1`)*
 * **Masalah yang diselesaikan:** Evaluasi 4-aspek (`H2`) bagus untuk rapor bulanan, dan centang `Kemajuan` (`K3`) bagus untuk menandai set formasi yang sudah dilatih bersama, tetapi pelatih seksi & *Section Leader* belum punya alat untuk menagih **tanggungan setoran hafalan per potongan lagu** tiap pemain.
-* **Ruang lingkup pengerjaan:**
-  1. **Daftar Target Setoran (*Checkpoints*):** Pelatih menetapkan target setoran dari lagu/segmen yang sudah ada (mis. *Lagu 1: Birama 1–16*, *Birama 17–36*, *Cadence*, atau *Warm-up Brass*) beserta tenggat tanggal opsional.
-  2. **Jenjang Status Bertahap:** Tiap sel `[Anggota × Target]` memiliki jenjang yang dapat diketuk cepat: `Belum` → `Baca Lancar` → `Tempo Latihan` → `Tempo Asli` → `Hafal Musik` → `Lulus Sambil Gerak` (beserta tanggal lulus, penguji, dan catatan singkat).
-  3. **Mode Uji Cepat *Section Leader*:** Tampilan daftar per seksi di HP yang bisa memutar *loop* frasa lagu (`#11d`) sambil langsung mengetuk status kelulusan pemain di depannya.
-  4. **Papan Kesiapan Tim & Kartu Anggota:** Grafik % kesiapan hafalan per seksi/lagu di halaman Evaluasi & Dashboard, cetak matriks A4 hex untuk ditempel di ruang latihan, serta daftar tanggungan pribadi di Mode Anggota (ikut terkunci dengan kunci pribadi `#2`).
-* **Dampak Data:** Store baru Dexie `setoran` (penambahan murni tanpa mengubah store lama).
+* **Ruang lingkup pengerjaan & hasil aktual (`v1.1.1`):**
+  1. **Daftar Target Setoran (*Checkpoints* — Selesai):** Store Dexie `v11` (`targetSetoran` + `setoran` berkunci deterministik `${targetId}__${memberId}`), pembuatan target manual (kategori *Musik / Visual / Musik+Gerak*, rentang birama, batas kelulusan per seksi, tenggat tanggal) maupun generator 1-klik `buatSaranTargetDariLagu(song)` dari `tempoMap` / blok 16 birama.
+  2. **Jenjang Status Bertahap (`[Anggota × Target]` — Selesai):** Matriks ketuk-cepat 6 jenjang (`Belum` → `Baca Lancar` → `Tempo Latihan` → `Tempo Asli` → `Hafal Musik` → `Lulus Sambil Gerak`) atomik ke IndexedDB + modal rincian (tanggal uji, penguji, dan catatan umpan balik singkat).
+  3. **Mode Uji Cepat *Section Leader* (Selesai):** Tampilan kartu ramah jempol di HP (bebas luapan di `390px`) yang memutar *loop* frasa lagu secara langsung lewat `PemutarNadaPartitur` (`#13b`, baik dari MusicXML maupun ketuk metronom bersegmen pada tempo `75%`/`85%`/`100%`) sambil mengetuk pil kelulusan pemain di depannya.
+  4. **Papan Kesiapan Tim, Cetak A4 Hex, Privasi Berbagi, & Putaran Data (Selesai):** Grafik % kesiapan per seksi dan per target di halaman Evaluasi (`?tab=setoran`), baris ringkasan di Dashboard, pratinjau cetak A4 mendatar murni `#hex` (`0` `oklch()`/`color-mix()`) + **Unduh HTML**, perlindungan privasi di `paketGrup` (`setoran: []`) & `paketAnggota` / `locked` `#2` + kartu tanggungan pribadi di Mode Anggota lengkap tombol 1-klik **Latih di Musik**, serta putaran penuh di Backup ZIP, Pusat Data (`pindah.ts`), dan penggabungan anggota ganda (`namaAnggota.ts`). Teruji di `qa/setoran-logika.mjs` (22/22) dan `qa/setoran-hafalan.mjs` (18/18; total **121 rangkaian** regresi penuh).
 
 #### `#15` — Kolaborasi Multi-Pelatih Seksi & Log Perubahan Show (`I1`)
 * **Masalah yang diselesaikan:** Di lapangan, asisten pelatih (*Brass, Battery, Pit, Color Guard*) mencatat absensi, evaluasi, dan setoran hafalan di perangkat masing-masing, lalu kerepotan menyatukannya ke laptop Pelatih Kepala. Di sisi lain, saat desainer drill/musik mengubah formasi atau birama, staf & anggota sering tidak sadar titik mana saja yang berubah (kandidat lama `I1`).
@@ -166,13 +165,13 @@ Pemeriksaan menyeluruh terhadap build produksi `v1.0.0` (`8bf02bd`) mencatat gar
 
 ## 5. Peta Dampak Skema IndexedDB (`Dexie`) & Pagar Privasi Berkas
 
-Saat ini `src/db/db.ts` berada pada **versi 10** (`16` tabel/store). Agar seluruh data pengguna `v1.0.0` dijamin aman tanpa risiko hilang saat *upgrade*, pengembangan `#12`–`#21` wajib mematuhi aturan migrasi **tambah-murni (*additive-only*)**:
+Saat `v1.0.0`, `src/db/db.ts` berada pada **versi 10** (`16` tabel/store), dan per `v1.1.1` (`#14`) berada pada **versi 11** (`18` tabel/store: `+ targetSetoran`, `+ setoran`). Agar seluruh data pengguna dijamin aman tanpa risiko hilang saat *upgrade*, pengembangan `#12`–`#21` wajib mematuhi aturan migrasi **tambah-murni (*additive-only*)**:
 
 | Rancangan | Perubahan Store Dexie (`v11+`) | Ikut Backup Lengkap ZIP? | Ikut Paket Anggota (`.dkp` / `ShareBundle`)? | Catatan Privasi & Ukuran |
 | :--- | :--- | :---: | :--- | :--- |
 | **`#12`** | *Tidak ada perubahan skema (`v10`)* | — | — | Murni optimasi kode, UI, & CI |
 | **`#13`** | *Tidak ada tabel baru* (memakai `partiturBerkas` & `rekamanAudio`) | Ya (sudah di `#6` & `#11a`) | **Ya, opsional bersaklar** (partitur dipangkas ke instrumen penerima) | Menjaga paket anggota tetap ringan |
-| **`#14`** | `+ setoran` (target & status *pass-off*) | Ya | **Ya (khusus milik penerima, terenkripsi di `#2`)** | Anggota hanya melihat setoran dirinya |
+| **`#14`** | `v11`: `+ targetSetoran`, `+ setoran` *(Selesai)* | Ya | **Ya (`targetSetoran` publik tim; `setoran` khusus milik penerima, terenkripsi di `#2`)** | Anggota hanya melihat setoran dirinya |
 | **`#15`** | `+ logPerubahan` (atau kolom ringkas di `riwayat`/terbitan) | Ya | **Ya** (ringkasan perubahan show publik tim) | Tidak memuat evaluasi/catatan privat |
 | **`#16`** | Kolom opsional di `DrillSet` / `DrillPoint` / `FieldMarker` | Ya | **Ya** (bagian dari definisi drill) | Drill lama tanpa kolom baru tetap jalan identik |
 | **`#17`** | `+ countSheets` (hitungan *Color Guard* per lagu/drill) | Ya | **Ya** (tampil otomatis bagi seksi *Guard*) | Ringan (JSON teks murni) |

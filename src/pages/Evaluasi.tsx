@@ -15,7 +15,9 @@
  * ini hanya menyajikan.
  */
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { NamaTampil, useModeNama } from '../components/NamaTampil'
+import { PanelSetoranHafalan } from '../components/PanelSetoranHafalan'
 import { namaTampil, bacaModeNama } from '../lib/namaAnggota'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
@@ -34,7 +36,7 @@ import {
   useToast,
 } from '../components/ui'
 import { IconPlus, IconUsers } from '../components/Icons'
-import { sectionLabel, todayISO, uid } from '../lib/utils'
+import { cx, sectionLabel, todayISO, uid } from '../lib/utils'
 import {
   LABEL_ASPEK,
   MAX_NILAI,
@@ -53,8 +55,19 @@ import {
 
 export default function Evaluasi() {
   const toast = useToast()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabAktif: 'berkala' | 'setoran' =
+    searchParams.get('tab') === 'setoran' ? 'setoran' : 'berkala'
   const members = useLiveQuery(() => db.members.toArray(), [], [])
   const daftar = useLiveQuery(() => db.evaluasi.toArray(), [], [])
+  const jmlTargetSetoran = useLiveQuery(() => db.targetSetoran.count(), [], 0)
+
+  function pilihTab(tab: 'berkala' | 'setoran') {
+    const p = new URLSearchParams(searchParams)
+    if (tab === 'setoran') p.set('tab', 'setoran')
+    else p.delete('tab')
+    setSearchParams(p, { replace: true })
+  }
 
   const [saring, setSaring] = useState<string>('all')
   const [urut, setUrut] = useState<'nama' | 'nilai' | 'tren'>('nama')
@@ -105,18 +118,58 @@ export default function Evaluasi() {
     <div>
       <PageHeader
         title="Evaluasi & kemajuan"
-        subtitle="Nilai perkembangan anggota dari waktu ke waktu — untuk pembinaan, bukan sekadar catatan"
+        subtitle="Nilai perkembangan 4 aspek berkala dan pantau matriks setoran hafalan tim"
         actions={
-          <Button
-            variant="primary"
-            data-testid="tambah-evaluasi"
-            onClick={() => setSunting({ memberId: baris[0]?.member.id ?? '', nama: baris[0] ? namaTampil(baris[0].member, bacaModeNama()) : '' })}
-            disabled={baris.length === 0}
-          >
-            <IconPlus size={16} /> Nilai anggota
-          </Button>
+          tabAktif === 'berkala' ? (
+            <Button
+              variant="primary"
+              data-testid="tambah-evaluasi"
+              onClick={() => setSunting({ memberId: baris[0]?.member.id ?? '', nama: baris[0] ? namaTampil(baris[0].member, bacaModeNama()) : '' })}
+              disabled={baris.length === 0}
+            >
+              <IconPlus size={16} /> Nilai anggota
+            </Button>
+          ) : undefined
         }
       />
+
+      <div
+        data-testid="bar-tab-evaluasi"
+        className="mb-4 flex flex-wrap gap-1.5 rounded-lg border border-slate-800 bg-slate-900/50 p-1"
+      >
+        <button
+          type="button"
+          data-testid="tab-evaluasi-berkala"
+          onClick={() => pilihTab('berkala')}
+          className={cx(
+            'flex-1 rounded-md px-3 py-2 text-xs font-semibold transition',
+            tabAktif === 'berkala'
+              ? 'bg-emerald-600 text-white'
+              : 'text-slate-400 hover:text-slate-100',
+          )}
+        >
+          Evaluasi Berkala (4 Aspek)
+        </button>
+        <button
+          type="button"
+          data-testid="tab-setoran-hafalan"
+          onClick={() => pilihTab('setoran')}
+          className={cx(
+            'flex-1 rounded-md px-3 py-2 text-xs font-semibold transition',
+            tabAktif === 'setoran'
+              ? 'bg-emerald-600 text-white'
+              : 'text-slate-400 hover:text-slate-100',
+          )}
+        >
+          Matriks Setoran Hafalan
+          {jmlTargetSetoran > 0 ? ` (${jmlTargetSetoran})` : ''}
+        </button>
+      </div>
+
+      {tabAktif === 'setoran' ? (
+        <PanelSetoranHafalan />
+      ) : (
+        <>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <StatTile
@@ -257,6 +310,8 @@ export default function Evaluasi() {
           onClose={() => setRiwayat(null)}
           onHapus={hapus}
         />
+      )}
+        </>
       )}
     </div>
   )

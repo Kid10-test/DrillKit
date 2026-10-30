@@ -111,6 +111,8 @@ rakit src/lib/partiturFrasa.ts  partiturFrasa
 # #13 — penyaring partitur per suara di paket anggota & pengurai bunyi notasi WebAudio.
 rakit src/lib/partiturPaket.ts  partiturPaket
 rakit src/lib/partiturBunyi.ts  partiturBunyi
+# #14 — matriks setoran hafalan: jenjang bertahap, ringkasan kesiapan, & cetak A4 hex.
+rakit src/lib/setoran.ts        setoran
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.

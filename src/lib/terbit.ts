@@ -399,8 +399,10 @@ export function gabungPembaruan(
   return {
     ...baru,
     songs: gabungLagu(baru.songs ?? [], lama?.songs, laguLokal),
+    targetSetoran: baru.targetSetoran ?? lama?.targetSetoran,
     attendance: lama?.attendance ?? [],
     memberNotes: lama?.memberNotes ?? [],
+    setoran: lama?.setoran ?? [],
     forMember: lama?.forMember,
     namaPenerima: lama?.namaPenerima,
   }

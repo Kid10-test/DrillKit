@@ -31,7 +31,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             key={t.id}
             className={cx(
-              'pointer-events-auto rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg ring-1 backdrop-blur',
+              'pointer-events-none rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg ring-1 backdrop-blur',
               t.kind === 'ok' && 'bg-emerald-500/15 text-emerald-200 ring-emerald-500/30',
               t.kind === 'err' && 'bg-rose-500/15 text-rose-200 ring-rose-500/30',
               t.kind === 'info' && 'bg-slate-800/90 text-slate-200 ring-slate-600/40',

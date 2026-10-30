@@ -674,3 +674,44 @@ export function hitunganPadaBirama(
   }
   return Math.min(totalHitungan, Math.max(0, Math.round(((bawah + atas) / 2) * 100) / 100))
 }
+
+/* --------------- #14 — Loncat Cepat ke Frasa Lagu di Musik --------------- */
+
+export const KUNCI_LONCAT_LATIH = 'drillkit_loncat_latih_v1'
+
+export interface PermintaanLoncatLatih {
+  songId: string
+  dari?: number
+  sampai?: number
+  label?: string
+}
+
+export function simpanLoncatLatih(req: PermintaanLoncatLatih): void {
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(KUNCI_LONCAT_LATIH, JSON.stringify(req))
+    }
+  } catch {
+    // abaikan jika sessionStorage diblokir
+  }
+}
+
+export function ambilLoncatLatih(): PermintaanLoncatLatih | null {
+  try {
+    if (typeof sessionStorage === 'undefined') return null
+    const mentah = sessionStorage.getItem(KUNCI_LONCAT_LATIH)
+    if (!mentah) return null
+    sessionStorage.removeItem(KUNCI_LONCAT_LATIH)
+    const obj = JSON.parse(mentah) as Partial<PermintaanLoncatLatih>
+    if (!obj || typeof obj.songId !== 'string' || !obj.songId) return null
+    return {
+      songId: obj.songId,
+      dari: typeof obj.dari === 'number' && Number.isFinite(obj.dari) ? obj.dari : undefined,
+      sampai: typeof obj.sampai === 'number' && Number.isFinite(obj.sampai) ? obj.sampai : undefined,
+      label: typeof obj.label === 'string' ? obj.label : undefined,
+    }
+  } catch {
+    return null
+  }
+}
+

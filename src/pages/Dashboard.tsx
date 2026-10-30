@@ -50,6 +50,7 @@ function TombolPanduanDasbor() {
   )
 }
 import { namaTampil } from '../lib/namaAnggota'
+import { hitungRingkasanSetoranTim } from '../lib/setoran'
 import {
   sectionDot,
   sesiMeta,
@@ -71,9 +72,18 @@ export default function Dashboard() {
   const drills = useLiveQuery(() => db.drills.toArray(), [], [])
   const sets = useLiveQuery(() => db.sets.toArray(), [], [])
   const attendance = useLiveQuery(() => db.attendance.toArray(), [], [])
+  const targetSetoran = useLiveQuery(() => db.targetSetoran.toArray(), [], [])
+  const catatanSetoran = useLiveQuery(() => db.setoran.toArray(), [], [])
 
   const active = members.filter((m) => m.active)
   const today = todayISO()
+  const ringkasanSetoran = hitungRingkasanSetoranTim(
+    targetSetoran,
+    catatanSetoran,
+    members,
+    visibleSections(),
+    today,
+  )
   const upcoming = sessions.filter((s) => daysFromToday(s.date) >= 0)
   const past = sessions.filter((s) => daysFromToday(s.date) < 0)
   const nextSession = upcoming[0]
@@ -354,6 +364,15 @@ export default function Dashboard() {
               to="/absensi"
             />
             <SummaryRow label="Jumlah drill" value={`${drills.length} drill · ${sets.length} set`} to="/drill" />
+            <SummaryRow
+              label="Setoran hafalan"
+              value={
+                ringkasanSetoran.jumlahTarget > 0
+                  ? `${ringkasanSetoran.persenSiap}% siap · ${ringkasanSetoran.totalLulus}/${ringkasanSetoran.totalWajib} lulus`
+                  : 'Atur target setoran'
+              }
+              to="/evaluasi?tab=setoran"
+            />
             <SummaryRow label="Repertoar & tempo" value="Buka metronom" to="/musik" />
             <SummaryRow label="Berbagi ke anggota" value="Ekspor/import paket tim" to="/berbagi" />
           </div>

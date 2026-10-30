@@ -679,6 +679,8 @@ export const TABEL_BACKUP: { kolom: string; label: string }[] = [
   { kolom: 'memberNotes', label: 'Catatan anggota' },
   { kolom: 'kemajuan', label: 'Kemajuan' },
   { kolom: 'evaluasi', label: 'Evaluasi' },
+  { kolom: 'targetSetoran', label: 'Target setoran' },
+  { kolom: 'setoran', label: 'Setoran hafalan' },
 ]
 
 /**
@@ -713,6 +715,8 @@ export const TABEL_DATA: { kolom: string; label: string }[] = [
   { kolom: 'kemajuan', label: 'Kemajuan' },
   { kolom: 'catatan', label: 'Catatan anggota' },
   { kolom: 'evaluasi', label: 'Evaluasi' },
+  { kolom: 'targetSetoran', label: 'Target setoran' },
+  { kolom: 'setoran', label: 'Setoran hafalan' },
 ]
 
 /** Ringkas isi berkas data pilihan (dipakai pratinjau pintu baru). */
@@ -777,6 +781,8 @@ export interface RingkasanPaket {
   jumlahPartitur: number
   jumlahAbsensi: number
   jumlahCatatan: number
+  jumlahTargetSetoran: number
+  jumlahSetoran: number
   terkunci: number
 }
 
@@ -795,6 +801,8 @@ export function ringkasPaket(data: unknown): RingkasanPaket | null {
     partiturPaket?: Record<string, unknown>
     attendance?: unknown[]
     memberNotes?: unknown[]
+    targetSetoran?: unknown[]
+    setoran?: unknown[]
     locked?: Record<string, unknown>
   }
   if (!d || typeof d !== 'object') return null
@@ -824,6 +832,8 @@ export function ringkasPaket(data: unknown): RingkasanPaket | null {
         : 0,
     jumlahAbsensi: Array.isArray(d.attendance) ? d.attendance.length : 0,
     jumlahCatatan: Array.isArray(d.memberNotes) ? d.memberNotes.length : 0,
+    jumlahTargetSetoran: Array.isArray(d.targetSetoran) ? d.targetSetoran.length : 0,
+    jumlahSetoran: Array.isArray(d.setoran) ? d.setoran.length : 0,
     terkunci: d.locked && typeof d.locked === 'object' ? Object.keys(d.locked).length : 0,
   }
 }

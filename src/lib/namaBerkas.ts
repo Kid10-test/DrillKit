@@ -25,9 +25,12 @@ export function bersihNama(s: string, batas = 60): string {
     .replace(/[. ]+$/, '')
 }
 
-/** Buang aksara beraksen supaya aman di semua sistem berkas. */
+/** Buang aksara beraksen & tanda pisah Unicode supaya aman di semua sistem berkas. */
 function tanpaAksen(s: string): string {
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2010-\u2015]/g, '-')
 }
 
 export function namaBackup(t?: Date): string {

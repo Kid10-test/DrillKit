@@ -21,6 +21,7 @@
 
 import type {
   AttendanceRecord,
+  CatatanSetoran,
   Drill,
   DrillSet,
   Evaluasi,
@@ -30,6 +31,7 @@ import type {
   MemberRole,
   RiwayatSnapshot,
 } from '../db/types'
+import { gabungCatatanSetoran, idCatatanSetoran } from './setoran'
 import { uid } from './utils'
 
 /* ------------------------------ Nama tampil -------------------------------- */
@@ -388,6 +390,37 @@ export function tulisUlangCatatan(rows: MemberNote[], peta: Record<string, strin
   })
 }
 
+export function tulisUlangSetoran(
+  rows: CatatanSetoran[],
+  peta: Record<string, string>,
+): { rows: CatatanSetoran[]; hapus: string[]; bentrok: string[] } {
+  const bentrok: string[] = []
+  const hapus: string[] = []
+  const oleh = new Map<string, CatatanSetoran>()
+  const urut = [
+    ...rows.filter((r) => (peta[r.memberId] ?? r.memberId) === r.memberId),
+    ...rows.filter((r) => (peta[r.memberId] ?? r.memberId) !== r.memberId),
+  ]
+  for (const r of urut) {
+    const ke = peta[r.memberId] ?? r.memberId
+    const idBaru = idCatatanSetoran(r.targetId, ke)
+    if (ke !== r.memberId && r.id !== idBaru) {
+      hapus.push(r.id)
+    }
+    const dimutakhirkan: CatatanSetoran =
+      ke === r.memberId && r.id === idBaru ? r : { ...r, id: idBaru, memberId: ke }
+    const ada = oleh.get(idBaru)
+    if (ada) {
+      const pemenang = gabungCatatanSetoran(ada, dimutakhirkan)
+      oleh.set(idBaru, { ...pemenang, id: idBaru, memberId: ke })
+      bentrok.push(`Setoran target ${r.targetId}: capaian digabung ke jenjang tertinggi`)
+      continue
+    }
+    oleh.set(idBaru, dimutakhirkan)
+  }
+  return { rows: [...oleh.values()], hapus, bentrok }
+}
+
 export function tulisUlangKemajuan(
   k: Kemajuan,
   peta: Record<string, string>,
@@ -439,6 +472,7 @@ export interface MuatanRujukan {
   catatan?: MemberNote[]
   memberNotes?: MemberNote[]
   evaluasi?: Evaluasi[]
+  setoran?: CatatanSetoran[]
   set?: DrillSet[]
   sets?: DrillSet[]
   drill?: Drill | Drill[]
@@ -450,11 +484,20 @@ export interface MuatanRujukan {
 export function tulisUlangMuatan<T extends MuatanRujukan>(
   data: T,
   peta: Record<string, string>,
-): { data: T; bentrok: string[]; absensiHapus: string[]; evaluasiHapus: string[] } {
+): {
+  data: T
+  bentrok: string[]
+  absensiHapus: string[]
+  evaluasiHapus: string[]
+  setoranHapus: string[]
+} {
   const bentrok: string[] = []
   const absensiHapus: string[] = []
   const evaluasiHapus: string[] = []
-  if (!Object.keys(peta).length) return { data, bentrok, absensiHapus, evaluasiHapus }
+  const setoranHapus: string[] = []
+  if (!Object.keys(peta).length) {
+    return { data, bentrok, absensiHapus, evaluasiHapus, setoranHapus }
+  }
   const out = { ...data }
 
   const abs = (rows: AttendanceRecord[] | undefined) => {
@@ -471,9 +514,17 @@ export function tulisUlangMuatan<T extends MuatanRujukan>(
     evaluasiHapus.push(...h.hapus)
     return h.rows
   }
+  const sto = (rows: CatatanSetoran[] | undefined) => {
+    if (!rows) return undefined
+    const h = tulisUlangSetoran(rows, peta)
+    bentrok.push(...h.bentrok)
+    setoranHapus.push(...h.hapus)
+    return h.rows
+  }
   if (out.absensi) out.absensi = abs(out.absensi)
   if (out.attendance) out.attendance = abs(out.attendance)
   if (out.evaluasi) out.evaluasi = eva(out.evaluasi)
+  if (out.setoran) out.setoran = sto(out.setoran)
   if (out.catatan) out.catatan = tulisUlangCatatan(out.catatan, peta)
   if (out.memberNotes) out.memberNotes = tulisUlangCatatan(out.memberNotes, peta)
   if (out.set) {
@@ -507,7 +558,7 @@ export function tulisUlangMuatan<T extends MuatanRujukan>(
       return h.snap
     })
   }
-  return { data: out, bentrok, absensiHapus, evaluasiHapus }
+  return { data: out, bentrok, absensiHapus, evaluasiHapus, setoranHapus }
 }
 
 /* ------------------------------ Pencocokan --------------------------------- */
@@ -791,6 +842,8 @@ export interface RencanaGabung {
   absensiHapus: string[]
   evaluasi: Evaluasi[]
   evaluasiHapus: string[]
+  setoran: CatatanSetoran[]
+  setoranHapus: string[]
   catatan: MemberNote[]
   sets: DrillSet[]
   drills: Drill[]
@@ -801,6 +854,7 @@ export interface RencanaGabung {
   jumlah: {
     absensi: number
     evaluasi: number
+    setoran: number
     catatan: number
     titik: number
     langkah: number
@@ -813,6 +867,7 @@ export interface RencanaGabung {
 function hitungRujukan(id: string, data: MuatanRujukan): RencanaGabung['jumlah'] {
   let absensi = 0
   let evaluasi = 0
+  let setoran = 0
   let catatan = 0
   let titik = 0
   let langkah = 0
@@ -820,6 +875,7 @@ function hitungRujukan(id: string, data: MuatanRujukan): RencanaGabung['jumlah']
   let riwayat = 0
   for (const r of [...(data.absensi ?? []), ...(data.attendance ?? [])]) if (r.memberId === id) absensi += 1
   for (const r of data.evaluasi ?? []) if (r.memberId === id) evaluasi += 1
+  for (const r of data.setoran ?? []) if (r.memberId === id) setoran += 1
   for (const r of [...(data.catatan ?? []), ...(data.memberNotes ?? [])]) if (r.memberId === id) catatan += 1
   const drillTitik = new Set<string>()
   for (const s of [...(data.set ?? []), ...(data.sets ?? [])]) {
@@ -840,7 +896,7 @@ function hitungRujukan(id: string, data: MuatanRujukan): RencanaGabung['jumlah']
       s.isiSet.some((set) => set.points?.[id] || set.langkah?.[id])
     if (ada) riwayat += 1
   }
-  return { absensi, evaluasi, catatan, titik, langkah, roster, riwayat, drill: drillTitik.size }
+  return { absensi, evaluasi, setoran, catatan, titik, langkah, roster, riwayat, drill: drillTitik.size }
 }
 
 export function rencanakanGabung(opts: {
@@ -848,6 +904,7 @@ export function rencanakanGabung(opts: {
   buang: Member
   absensi: AttendanceRecord[]
   evaluasi: Evaluasi[]
+  setoran?: CatatanSetoran[]
   catatan: MemberNote[]
   sets: DrillSet[]
   drills: Drill[]
@@ -856,9 +913,11 @@ export function rencanakanGabung(opts: {
 }): RencanaGabung | null {
   if (opts.simpan.id === opts.buang.id) return null
   const peta = { [opts.buang.id]: opts.simpan.id }
+  const setoranAwal = opts.setoran ?? []
   const muatan: MuatanRujukan = {
     absensi: opts.absensi,
     evaluasi: opts.evaluasi,
+    setoran: setoranAwal,
     catatan: opts.catatan,
     sets: opts.sets,
     drills: opts.drills,
@@ -905,6 +964,7 @@ export function rencanakanGabung(opts: {
   const kemajuan = (tulis.data.kemajuan ?? []).filter((k, i) => k !== opts.kemajuan[i])
   const absensiAsli = new Map(opts.absensi.map((r) => [r.id, r]))
   const evaluasiAsli = new Map(opts.evaluasi.map((r) => [r.id, r]))
+  const setoranAsli = new Map(setoranAwal.map((r) => [r.id, r]))
   const catatanAsli = new Map(opts.catatan.map((r) => [r.id, r]))
 
   return {
@@ -914,6 +974,8 @@ export function rencanakanGabung(opts: {
     absensiHapus: tulis.absensiHapus,
     evaluasi: (tulis.data.evaluasi ?? []).filter((r) => evaluasiAsli.get(r.id)?.memberId !== r.memberId),
     evaluasiHapus: tulis.evaluasiHapus,
+    setoran: (tulis.data.setoran ?? []).filter((r) => setoranAsli.get(r.id) !== r),
+    setoranHapus: tulis.setoranHapus,
     catatan: (tulis.data.catatan ?? []).filter((r) => catatanAsli.get(r.id)?.memberId !== r.memberId),
     sets,
     drills,
@@ -934,6 +996,7 @@ export function rencanakanInduk(opts: {
   hasil: HasilCocok
   absensi: AttendanceRecord[]
   evaluasi: Evaluasi[]
+  setoran?: CatatanSetoran[]
   catatan: MemberNote[]
   sets: DrillSet[]
   drills: Drill[]
@@ -944,6 +1007,8 @@ export function rencanakanInduk(opts: {
   absensiHapus: string[]
   evaluasi: Evaluasi[]
   evaluasiHapus: string[]
+  setoran: CatatanSetoran[]
+  setoranHapus: string[]
   catatan: MemberNote[]
   sets: DrillSet[]
   drills: Drill[]
@@ -951,10 +1016,12 @@ export function rencanakanInduk(opts: {
   kemajuan: Kemajuan[]
   bentrok: string[]
 } {
+  const setoranAwal = opts.setoran ?? []
   const tulis = tulisUlangMuatan(
     {
       absensi: opts.absensi,
       evaluasi: opts.evaluasi,
+      setoran: setoranAwal,
       catatan: opts.catatan,
       sets: opts.sets,
       drills: opts.drills,
@@ -967,11 +1034,14 @@ export function rencanakanInduk(opts: {
     const peta = new Map(lama.map((r) => [r.id, r.memberId]))
     return (baru ?? []).filter((r) => peta.get(r.id) !== r.memberId)
   }
+  const setoranAsli = new Map(setoranAwal.map((r) => [r.id, r]))
   return {
     absensi: bedaId(tulis.data.absensi, opts.absensi),
     absensiHapus: tulis.absensiHapus,
     evaluasi: bedaId(tulis.data.evaluasi, opts.evaluasi),
     evaluasiHapus: tulis.evaluasiHapus,
+    setoran: (tulis.data.setoran ?? []).filter((r) => setoranAsli.get(r.id) !== r),
+    setoranHapus: tulis.setoranHapus,
     catatan: bedaId(tulis.data.catatan, opts.catatan),
     sets: (tulis.data.sets ?? []).filter((r, i) => r !== opts.sets[i]),
     drills: (tulis.data.drills ?? []).filter((r, i) => r !== opts.drills[i]),

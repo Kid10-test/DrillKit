@@ -73,6 +73,8 @@ function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void 
     case 'kemajuan': berkas.kemajuan = daftar as never; break
     case 'catatan': berkas.catatan = daftar as never; break
     case 'evaluasi': berkas.evaluasi = daftar as never; break
+    case 'targetSetoran': berkas.targetSetoran = daftar as never; break
+    case 'setoran': berkas.setoran = daftar as never; break
   }
 }
 
@@ -92,10 +94,25 @@ export default function Data() {
   const kemajuan = useLiveQuery(() => db.kemajuan.toArray(), [], [])
   const catatan = useLiveQuery(() => db.memberNotes.toArray(), [], [])
   const evaluasi = useLiveQuery(() => db.evaluasi.toArray(), [], [])
+  const targetSetoran = useLiveQuery(() => db.targetSetoran.toArray(), [], [])
+  const setoran = useLiveQuery(() => db.setoran.toArray(), [], [])
 
   const sumber: Record<JenisData, unknown[]> = useMemo(
-    () => ({ anggota, jadwal, absensi, lagu, setlist, drill, set, kemajuan, catatan, evaluasi }),
-    [anggota, jadwal, absensi, lagu, setlist, drill, set, kemajuan, catatan, evaluasi],
+    () => ({
+      anggota,
+      jadwal,
+      absensi,
+      lagu,
+      setlist,
+      drill,
+      set,
+      kemajuan,
+      catatan,
+      evaluasi,
+      targetSetoran,
+      setoran,
+    }),
+    [anggota, jadwal, absensi, lagu, setlist, drill, set, kemajuan, catatan, evaluasi, targetSetoran, setoran],
   )
 
   // #7 — titipan CSV dari pintu baru: bukakan tab CSV-nya sekalian.
@@ -125,6 +142,9 @@ export default function Data() {
       set: kunci(set),
       kemajuan: kunci(kemajuan),
       catatan: kunci(catatan),
+      evaluasi: kunci(evaluasi),
+      targetSetoran: kunci(targetSetoran),
+      setoran: kunci(setoran),
     }
   }, [sumber])
 
@@ -360,7 +380,20 @@ function AlurPindah({
       // batal. `evaluasi` dulu tertinggal (2a).
       await db.transaction(
         'rw',
-        [db.members, db.sessions, db.attendance, db.drills, db.sets, db.songs, db.setlists, db.kemajuan, db.memberNotes, db.evaluasi],
+        [
+          db.members,
+          db.sessions,
+          db.attendance,
+          db.drills,
+          db.sets,
+          db.songs,
+          db.setlists,
+          db.kemajuan,
+          db.memberNotes,
+          db.evaluasi,
+          db.targetSetoran,
+          db.setoran,
+        ],
         async () => {
           if (b.anggota?.length) await db.members.bulkPut(b.anggota)
           if (b.jadwal?.length) await db.sessions.bulkPut(b.jadwal)
@@ -372,6 +405,8 @@ function AlurPindah({
           if (b.kemajuan?.length) await db.kemajuan.bulkPut(b.kemajuan)
           if (b.catatan?.length) await db.memberNotes.bulkPut(b.catatan)
           if (b.evaluasi?.length) await db.evaluasi.bulkPut(b.evaluasi)
+          if (b.targetSetoran?.length) await db.targetSetoran.bulkPut(b.targetSetoran)
+          if (b.setoran?.length) await db.setoran.bulkPut(b.setoran)
         },
       )
       setMenunggu(null)
