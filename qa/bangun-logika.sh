@@ -113,6 +113,9 @@ rakit src/lib/partiturPaket.ts  partiturPaket
 rakit src/lib/partiturBunyi.ts  partiturBunyi
 # #14 — matriks setoran hafalan: jenjang bertahap, ringkasan kesiapan, & cetak A4 hex.
 rakit src/lib/setoran.ts        setoran
+# #15 — kolaborasi multi-pelatih seksi & log perubahan show otomatis (I1).
+rakit src/lib/kolaborasiSeksi.ts kolaborasiSeksi
+rakit src/lib/logPerubahan.ts    logPerubahan
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.

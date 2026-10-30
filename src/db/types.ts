@@ -1188,6 +1188,11 @@ export interface ShareBundle {
   targetSetoran?: TargetSetoran[]
   /** #14 — status setoran hafalan khusus milik penerima paket (kosong di berkas grup). */
   setoran?: CatatanSetoran[]
+  /**
+   * #15b (I1) — ringkasan perubahan show & materi dibanding terbitan/acuan
+   * sebelumnya (publik tim, 0 data privat anggota).
+   */
+  perubahanPaket?: RingkasanPerubahanPaket
   attendance: AttendanceRecord[]
   /** Catatan evaluasi per anggota (opsional — paket lama belum punya) */
   memberNotes?: MemberNote[]
@@ -1211,3 +1216,63 @@ export interface ShareBundle {
    */
   namaPenerima?: string
 }
+
+/* ------------------ #15b — Log Perubahan Show (I1) ----------------------- */
+
+export type KategoriPerubahanShow = 'drill' | 'lagu' | 'jadwal' | 'target'
+
+/**
+ * Satu butir perubahan show berbahasa manusia untuk ditampilkan kepada pelatih
+ * maupun anggota pada kartu "Apa yang berubah di paket ini".
+ *
+ * Pagar privasi keras: struktur ini HANYA memuat perubahan formasi, lagu,
+ * jadwal, atau target setoran tim — tidak pernah memuat nilai evaluasi,
+ * absensi, telepon, token QR, maupun catatan pribadi anggota.
+ */
+export interface ButirPerubahanShow {
+  kategori: KategoriPerubahanShow
+  /** Nama entitas terkait, mis. "Opening Show" atau "Mars Nusantara". */
+  subjek: string
+  /** Kalimat ringkas berbahasa manusia, mis. "Set 8–11: posisi Trumpet T1–T6 berubah > 2 langkah". */
+  teks: string
+  /** Kode pemain yang titiknya terdampak (mis. ["T1", "T2"]), supaya HP anggota bisa menyorot miliknya. */
+  kodeTerdampak?: string[]
+  /** Id seksi yang terdampak (mis. ["brass"]). */
+  seksiTerdampak?: string[]
+}
+
+export interface RingkasanPerubahanPaket {
+  dibuatAt: number
+  dibandingkanDariAt: number
+  labelAcuan?: string
+  catatanPelatih?: string
+  butir: ButirPerubahanShow[]
+}
+
+/**
+ * Foto ringan keadaan show/materi publik untuk pembanding revisi berikutnya.
+ */
+export interface KeadaanAcuanShow {
+  dibuatAt: number
+  defaultField?: FieldConfig
+  members: Pick<Member, 'id' | 'code' | 'name' | 'section'>[]
+  drills: Drill[]
+  sets: DrillSet[]
+  songs: Song[]
+  sessions: Session[]
+  targetSetoran: TargetSetoran[]
+}
+
+/**
+ * Entri riwayat log perubahan show di IndexedDB (`db.logPerubahan`, v12).
+ */
+export interface ItemLogPerubahan {
+  id: string
+  dibuatAt: number
+  label?: string
+  cicipSebelum?: string
+  cicipSesudah: string
+  ringkasan: RingkasanPerubahanPaket
+  keadaanSesudah: KeadaanAcuanShow
+}
+

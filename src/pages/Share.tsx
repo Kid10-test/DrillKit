@@ -46,6 +46,15 @@ import {
   targetBerlakuUntukAnggota,
   urutkanTargetSetoran,
 } from '../lib/setoran'
+import {
+  LABEL_KATEGORI_PERUBAHAN,
+  apakahButirMenyangkutAnggota,
+  bandingkanKeadaanShow,
+  cicipKeadaanShow,
+  ekstrakKeadaanShow,
+  pilihAcuanPerubahan,
+} from '../lib/logPerubahan'
+import { uid } from '../lib/utils'
 import { gabungPembaruan, materiLebihBaru, muatBerkasTerbit, bukaDataPribadi, tanggalIndonesia, type DataTerkunci } from '../lib/terbit'
 import { kunciDariUrl, simpanKunciAnggota, bacaKunciAnggota } from '../lib/kunci'
 import { TerbitkanAnggota } from '../components/TerbitkanAnggota'
@@ -117,6 +126,7 @@ function CoachExport() {
   const memberNotes = useLiveQuery(() => db.memberNotes.toArray(), [], [])
   const targetSetoran = useLiveQuery(() => db.targetSetoran.toArray(), [], [])
   const catatanSetoran = useLiveQuery(() => db.setoran.toArray(), [], [])
+  const riwayatLogPerubahan = useLiveQuery(() => db.logPerubahan.toArray(), [], [])
   const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
   const partiturItems = useLiveQuery(() => db.partiturBerkas.toArray(), [], [])
   const rekamanItems = useLiveQuery(() => db.rekamanAudio.toArray(), [], [])
@@ -133,6 +143,9 @@ function CoachExport() {
   const [includeNotes, setIncludeNotes] = useState(true)
   /** #14 — target & capaian setoran hafalan pribadi per anggota. */
   const [includeSetoran, setIncludeSetoran] = useState(true)
+  /** #15b — sertakan log perubahan show otomatis di paket anggota. */
+  const [includeLogPerubahan, setIncludeLogPerubahan] = useState(true)
+  const [catatanPerubahan, setCatatanPerubahan] = useState('')
   const [preview, setPreview] = useState<ShareBundle | null>(null)
   const [petaPartiturSiap, setPetaPartiturSiap] = useState<Record<string, LampiranPartiturPaket>>({})
 
@@ -167,6 +180,91 @@ function CoachExport() {
     }
   }, [partiturItems])
 
+  const keadaanSekarang = useMemo(
+    () =>
+      ekstrakKeadaanShow({
+        defaultField: settings?.defaultField,
+        members: members ?? [],
+        drills: includeDrills ? (drills ?? []) : [],
+        sets: includeDrills ? (sets ?? []) : [],
+        songs: includeSongs ? (songs ?? []) : [],
+        sessions: includeSchedule ? (sessions ?? []) : [],
+        targetSetoran: includeSetoran ? (targetSetoran ?? []) : [],
+      }),
+    [
+      settings?.defaultField,
+      members,
+      drills,
+      sets,
+      songs,
+      sessions,
+      targetSetoran,
+      includeDrills,
+      includeSongs,
+      includeSchedule,
+      includeSetoran,
+    ],
+  )
+
+  const pilihanAcuan = useMemo(
+    () => pilihAcuanPerubahan(keadaanSekarang, riwayatLogPerubahan ?? []),
+    [keadaanSekarang, riwayatLogPerubahan],
+  )
+
+  const ringkasanPerubahanAktif = useMemo(() => {
+    if (pilihanAcuan.acuan) {
+      return bandingkanKeadaanShow(pilihanAcuan.acuan, keadaanSekarang, {
+        labelAcuan: pilihanAcuan.labelAcuan,
+        catatanPelatih: catatanPerubahan,
+      })
+    }
+    if (catatanPerubahan.trim()) {
+      const skrg = Date.now()
+      return {
+        dibuatAt: skrg,
+        dibandingkanDariAt: skrg,
+        catatanPelatih: catatanPerubahan.trim(),
+        butir: [],
+      }
+    }
+    return null
+  }, [pilihanAcuan, keadaanSekarang, catatanPerubahan])
+
+  async function catatAcuanTerbitan(resetMurni = false) {
+    const sekarang = Date.now()
+    const cicipSkrg = cicipKeadaanShow(keadaanSekarang)
+    if (resetMurni) {
+      await db.logPerubahan.put({
+        id: uid('log_'),
+        dibuatAt: sekarang,
+        label: `Acuan ${new Date(sekarang).toLocaleDateString('id-ID')}`,
+        cicipSebelum: undefined,
+        cicipSesudah: cicipSkrg,
+        ringkasan: { dibuatAt: sekarang, dibandingkanDariAt: sekarang, butir: [] },
+        keadaanSesudah: { ...keadaanSekarang, dibuatAt: sekarang },
+      })
+      toast.push('Keadaan show saat ini ditandai sebagai titik acuan revisi')
+      return
+    }
+    // Bila keadaan show belum berubah dari entri terakhir (mis. klik Unduh grup lalu Unduh ZIP),
+    // jangan menumpuk entri duplikat supaya diff revisi tetap terjaga.
+    if (pilihanAcuan.pakaiUlangEntri) return
+    const cicipSblm = pilihanAcuan.acuan ? cicipKeadaanShow(pilihanAcuan.acuan) : undefined
+    await db.logPerubahan.put({
+      id: uid('log_'),
+      dibuatAt: sekarang,
+      label: `Terbitan ${new Date(sekarang).toLocaleDateString('id-ID')}`,
+      cicipSebelum: cicipSblm,
+      cicipSesudah: cicipSkrg,
+      ringkasan: ringkasanPerubahanAktif ?? {
+        dibuatAt: sekarang,
+        dibandingkanDariAt: pilihanAcuan.acuan?.dibuatAt ?? sekarang,
+        butir: [],
+      },
+      keadaanSesudah: { ...keadaanSekarang, dibuatAt: sekarang },
+    })
+  }
+
   function build(): ShareBundle {
     const idLaguIkut = new Set((includeSongs ? (songs ?? []) : []).map((s) => s.id))
     const partiturTerpilih: Record<string, LampiranPartiturPaket> = {}
@@ -175,6 +273,10 @@ function CoachExport() {
         if (idLaguIkut.has(songId)) partiturTerpilih[songId] = lamp
       }
     }
+    const sertakanLog =
+      includeLogPerubahan &&
+      ringkasanPerubahanAktif != null &&
+      (ringkasanPerubahanAktif.butir.length > 0 || !!ringkasanPerubahanAktif.catatanPelatih)
     return {
       format: 'drillkit-share',
       version: 1,
@@ -201,6 +303,7 @@ function CoachExport() {
       partiturPaket: Object.keys(partiturTerpilih).length > 0 ? partiturTerpilih : undefined,
       targetSetoran: includeSetoran ? (targetSetoran ?? []) : [],
       setoran: includeSetoran ? (catatanSetoran ?? []) : [],
+      perubahanPaket: sertakanLog ? ringkasanPerubahanAktif : undefined,
       attendance: includeAttendance ? (attendance ?? []) : [],
       // Catatan evaluasi — kini menghormati saklar, seperti jenis data lain.
       memberNotes: includeNotes ? (memberNotes ?? []) : [],
@@ -220,6 +323,7 @@ function CoachExport() {
   function unduhGrup() {
     const bundle = paketGrup(build())
     downloadFile(namaPaketGrup(), JSON.stringify(bundle))
+    void catatAcuanTerbitan(false)
     toast.push('Berkas grup diunduh — tanpa data pribadi, aman dibagikan ke mana saja')
   }
 
@@ -266,6 +370,7 @@ function CoachExport() {
       }
     }
     downloadBlob(namaZipAnggota(namaTim()), bikinZip(entri))
+    await catatAcuanTerbitan(false)
     toast.push(
       `${dasar.members.length} berkas anggota dibungkus — tiap berkas hanya memuat data & partitur suaranya sendiri`,
     )
@@ -312,7 +417,7 @@ function CoachExport() {
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <TerbitkanAnggota susun={build} />
+        <TerbitkanAnggota susun={build} onTerbitBerhasil={() => catatAcuanTerbitan(false)} />
         <Card className="lg:col-span-2">
           <h2 className="mb-3 text-sm font-semibold text-slate-200">Isi bersama</h2>
           <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
@@ -346,6 +451,73 @@ function CoachExport() {
               />
             )}
           </div>
+
+          {/* #15b (I1) — Log Perubahan Show Otomatis */}
+          <div
+            data-testid="kartu-log-perubahan-pelatih"
+            className="mt-3 rounded-lg border border-sky-900/50 bg-sky-950/20 p-3"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Toggle
+                testId="toggle-log-perubahan"
+                checked={includeLogPerubahan}
+                onChange={setIncludeLogPerubahan}
+                label={`Log perubahan show otomatis (${ringkasanPerubahanAktif?.butir.length ?? 0} perubahan terdeteksi)`}
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                data-testid="simpan-acuan-perubahan"
+                onClick={() => void catatAcuanTerbitan(true)}
+              >
+                Tandai acuan sekarang
+              </Button>
+            </div>
+
+            {!pilihanAcuan.acuan ? (
+              <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+                Belum ada titik acuan revisi di perangkat ini. Tekan <b>Tandai acuan sekarang</b>{' '}
+                (atau unduh paket pertama) — setelah Anda mengubah posisi set, birama, atau tempo,
+                daftar perubahannya muncul otomatis di sini dan ikut dikirim ke HP anggota.
+              </p>
+            ) : ringkasanPerubahanAktif && ringkasanPerubahanAktif.butir.length > 0 ? (
+              <ul
+                data-testid="daftar-butir-perubahan-pelatih"
+                className="mt-2 space-y-1 rounded bg-slate-950/60 p-2 text-[11px] text-slate-200"
+              >
+                {ringkasanPerubahanAktif.butir.slice(0, 6).map((b, idx) => (
+                  <li key={idx} className="flex flex-wrap items-baseline gap-1.5">
+                    <span className="rounded bg-sky-900/60 px-1.5 py-0.5 text-[10px] font-semibold text-sky-200">
+                      {LABEL_KATEGORI_PERUBAHAN[b.kategori]}
+                    </span>
+                    <b className="text-slate-100">{b.subjek}:</b>
+                    <span>{b.teks}</span>
+                  </li>
+                ))}
+                {ringkasanPerubahanAktif.butir.length > 6 && (
+                  <li className="text-slate-400">
+                    +{ringkasanPerubahanAktif.butir.length - 6} perubahan lainnya
+                  </li>
+                )}
+              </ul>
+            ) : (
+              <p className="mt-2 text-[11px] text-slate-400">
+                Belum ada perubahan formasi/lagu dibanding acuan terakhir (
+                {new Date(pilihanAcuan.acuan.dibuatAt).toLocaleDateString('id-ID')}).
+              </p>
+            )}
+
+            <div className="mt-2">
+              <Input
+                data-testid="input-catatan-perubahan"
+                placeholder="Pesan revisi opsional untuk anggota (mis. Fokus latihan Sabtu: perhatikan Set 3)…"
+                value={catatanPerubahan}
+                onChange={(e) => setCatatanPerubahan(e.target.value)}
+                className="text-xs"
+              />
+            </div>
+          </div>
+
           <p className="mt-3 rounded-lg bg-slate-950/50 p-3 text-[11px] leading-relaxed text-slate-500">
             Yang <b>selalu</b> ikut: daftar anggota (nama, section, instrumen) dan nama tim — diperlukan
             supaya anggota bisa memilih namanya dan melihat formasinya di antara rekan-rekannya.
@@ -530,6 +702,8 @@ function MemberView() {
   const [q, setQ] = useState('')
   const [sedangMuat, setSedangMuat] = useState(false)
   const [pemberitahuan, setPemberitahuan] = useState<string | null>(null)
+  /** #15b — exportedAt paket yang kartu perubahannya disembunyikan sementara oleh anggota. */
+  const [tutupPerubahanAt, setTutupPerubahanAt] = useState<number | null>(null)
   /**
    * Kunci pribadi anggota. Dibaca dari URL fragment (#) sekali, lalu
    * disimpan di localStorage supaya tidak perlu memindai QR lagi.
@@ -927,6 +1101,90 @@ function MemberView() {
           </div>
         )}
       </Card>
+
+      {/* #15b (I1) — Kartu "Apa yang berubah di paket ini" */}
+      {bundle.perubahanPaket &&
+        (bundle.perubahanPaket.butir.length > 0 || !!bundle.perubahanPaket.catatanPelatih) &&
+        (tutupPerubahanAt === bundle.exportedAt ? (
+          <div className="mb-4 flex justify-end">
+            <Button
+              size="sm"
+              variant="ghost"
+              data-testid="buka-perubahan-paket"
+              onClick={() => setTutupPerubahanAt(null)}
+            >
+              Lihat apa yang berubah ({bundle.perubahanPaket.butir.length})
+            </Button>
+          </div>
+        ) : (
+          <Card
+            data-testid="kartu-perubahan-paket"
+            className="mb-4 border-sky-800/60 bg-sky-950/20"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-sky-200">
+                  Apa yang berubah di paket ini
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Dibandingkan paket/acuan sebelumnya (
+                  {new Date(bundle.perubahanPaket.dibandingkanDariAt).toLocaleDateString('id-ID')})
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                data-testid="tutup-perubahan-paket"
+                onClick={() => setTutupPerubahanAt(bundle.exportedAt)}
+              >
+                Sembunyikan
+              </Button>
+            </div>
+
+            {bundle.perubahanPaket.catatanPelatih && (
+              <p
+                data-testid="catatan-pelatih-perubahan"
+                className="mt-2 rounded bg-sky-900/30 px-2.5 py-1.5 text-xs text-sky-100"
+              >
+                💬 <b>Pesan pelatih:</b> {bundle.perubahanPaket.catatanPelatih}
+              </p>
+            )}
+
+            {bundle.perubahanPaket.butir.length > 0 && (
+              <ul className="mt-2.5 space-y-1.5 text-xs">
+                {bundle.perubahanPaket.butir.map((b, idx) => {
+                  const kenaSaya = apakahButirMenyangkutAnggota(b, me)
+                  return (
+                    <li
+                      key={idx}
+                      data-testid={`butir-perubahan-paket-${idx}`}
+                      className={cx(
+                        'flex flex-wrap items-baseline gap-1.5 rounded px-2.5 py-1.5',
+                        kenaSaya
+                          ? 'border border-amber-500/40 bg-amber-950/30 text-amber-100'
+                          : 'bg-slate-900/60 text-slate-200',
+                      )}
+                    >
+                      <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">
+                        {LABEL_KATEGORI_PERUBAHAN[b.kategori]}
+                      </span>
+                      <b className="text-slate-100">{b.subjek}:</b>
+                      <span className="flex-1">{b.teks}</span>
+                      {kenaSaya && (
+                        <span
+                          data-testid="lencana-menyangkut-saya"
+                          className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300"
+                        >
+                          Menyangkut titikmu!
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Card>
+        ))}
 
       {/* Alamat materi — tempat tombol Perbarui mengambilnya */}
       {BISA_AMBIL && (

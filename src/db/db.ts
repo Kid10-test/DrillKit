@@ -19,6 +19,7 @@ import type {
   PartiturBerkasItem,
   TargetSetoran,
   CatatanSetoran,
+  ItemLogPerubahan,
 } from './types'
 
 /**
@@ -65,6 +66,8 @@ export class DrillKitDB extends Dexie {
   targetSetoran!: Table<TargetSetoran, string>
   /** #14 — status capaian setoran hafalan `[targetId × memberId]`. */
   setoran!: Table<CatatanSetoran, string>
+  /** #15b — riwayat acuan & ringkasan perubahan show (I1). */
+  logPerubahan!: Table<ItemLogPerubahan, string>
 
   constructor() {
     super('drillkit')
@@ -112,6 +115,10 @@ export class DrillKitDB extends Dexie {
     this.version(11).stores({
       targetSetoran: 'id, songId, urutan, createdAt',
       setoran: 'id, targetId, memberId, [targetId+memberId], diubahAt',
+    })
+    // #15b — riwayat acuan & log perubahan show (penambahan murni v12).
+    this.version(12).stores({
+      logPerubahan: 'id, dibuatAt',
     })
   }
 }

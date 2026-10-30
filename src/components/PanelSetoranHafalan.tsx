@@ -35,7 +35,7 @@ import {
   Textarea,
   useToast,
 } from './ui'
-import { IconDownload, IconMusic, IconPause, IconPlay, IconPlus } from './Icons'
+import { IconDownload, IconMusic, IconPause, IconPlay, IconPlus, IconShare } from './Icons'
 import {
   LABEL_JENJANG_SETORAN,
   LABEL_KATEGORI_SETORAN,
@@ -510,6 +510,19 @@ export function PanelSetoranHafalan() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              data-testid="pintasan-kirim-seksi"
+              onClick={() =>
+                navigate(
+                  saringSeksi !== 'all'
+                    ? `/data?seksi=${encodeURIComponent(saringSeksi)}`
+                    : '/data',
+                )
+              }
+            >
+              <IconShare size={14} /> Kirim Setoran Seksi
+            </Button>
             <Button
               size="sm"
               data-testid="tombol-cetak-setoran"

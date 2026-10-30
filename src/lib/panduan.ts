@@ -88,12 +88,12 @@ const LANGKAH: [string, string][] = [
 const MENU: [string, string][] = [
   ['Dashboard', 'Ringkasan kehadiran, jadwal terdekat, komposisi tim, &amp; pintu <b>Buka berkas DrillKit</b>'],
   ['Anggota', 'Nama resmi &amp; panggilan, impor CSV, gabung duplikat, cetak kartu QR absensi'],
-  ['Absensi &amp; Evaluasi', 'Scan QR / manual, tab <b>Rekap</b> laporan, serta <b>Evaluasi &amp; kemajuan</b> set'],
+  ['Absensi &amp; Evaluasi', 'Scan QR / manual, tab <b>Rekap</b> laporan, <b>Evaluasi</b>, &amp; <b>Setoran hafalan</b>'],
   ['Jadwal &amp; Lomba', 'Kalender/agenda latihan, seri berulang, .ics, &amp; <b>Run sheet hari lomba</b>'],
   ['Drill &amp; Formasi', 'Editor formasi, penggaris musik × drill, impor CSV <b>Pyware</b>, presenter, buku saku'],
   ['Musik &amp; Metronom', 'Metronom &amp; tempo map, tempo latihan, rekaman MP3, partitur &amp; cetak Lyre, penala'],
-  ['Berbagi', 'Terbitkan paket grup / terkunci QR per anggota, mode anggota, &amp; panduan anggota'],
-  ['Impor &amp; ekspor data', 'Pusat <b>Buka berkas DrillKit</b> (JSON/CSV/ZIP/Pyware/partitur) &amp; ekspor pilihan'],
+  ['Berbagi', 'Terbitkan paket grup / terkunci QR per anggota, log perubahan show, &amp; panduan anggota'],
+  ['Impor &amp; ekspor data', '<b>Buka berkas DrillKit</b>, 1-klik <b>Kirim/gabung setoran seksi</b>, &amp; ekspor pilihan'],
   ['Pengaturan', 'Profil tim, lapangan (yard/meter &amp; patok), PIN pelatih/kios, backup &amp; pulihkan'],
 ]
 
@@ -377,7 +377,7 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
           ? '<li>Kalau muncul tulisan <b>Ada materi baru dari pelatih</b>, tekan <b>Perbarui</b>. Absensi, catatan, dan setelan latihan yang kamu ubah sendiri <b>tidak</b> ikut tertimpa.</li>'
           : ''
       }
-      <li>Pelatih mengirim berkas baru? Tekan <b>Ganti paket</b> dan pilih berkas terbarunya.</li>
+      <li>Pelatih mengirim berkas baru? Tekan <b>Ganti paket</b> dan pilih berkasnya (kartu <b>Apa yang berubah</b> merangkum revisi).</li>
       <li>Yang kamu ubah di HP-mu <b>tidak</b> terkirim ke pelatih. Absensi selalu diisi pelatih.</li>
     </ul>`)
 

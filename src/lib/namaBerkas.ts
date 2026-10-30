@@ -45,6 +45,13 @@ export function namaData(t?: Date): string {
   return `DrillKit - DATA PILIHAN - ${capTanggal(t)}.json`
 }
 
+/** #15a — `DrillKit - SETORAN SEKSI Brass (Kak Raka) - 2026-10-30.json`. */
+export function namaSetoranSeksi(labelSeksi: string, oleh?: string, t?: Date): string {
+  const s = bersihNama(tanpaAksen(labelSeksi), 30) || 'seksi'
+  const o = oleh && oleh.trim() ? ` (${bersihNama(tanpaAksen(oleh.trim()), 24)})` : ''
+  return `DrillKit - SETORAN SEKSI ${s}${o} - ${capTanggal(t)}.json`
+}
+
 export function namaShow(namaDrill: string, t?: Date): string {
   const nama = bersihNama(tanpaAksen(namaDrill), 50) || 'show'
   return `DrillKit - SHOW ${nama} - ${capTanggal(t)}.json`

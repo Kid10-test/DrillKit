@@ -14,8 +14,9 @@
  */
 import { db } from '../db/db'
 import type { PartiturBerkasItem, ShareBundle } from '../db/types'
+import { bandingkanPaketShow } from './logPerubahan'
 import { bitaDariLampiranPartiturPaket } from './partiturPaket'
-import type { DataTerkunci } from './terbit'
+import { materiLebihBaru, type DataTerkunci } from './terbit'
 import { bukaZip } from './zip'
 
 export interface HasilSimpanPaket {
@@ -138,15 +139,29 @@ export async function simpanPaketAnggota(
       : {}
   const { locked: _buang, ...grup } = data
   const paket = grup as ShareBundle
+  // #15b — bila paket baru tidak membawa `perubahanPaket` dan sudah ada paket
+  // sebelumnya yang lebih tua di HP ini, hitung ringkasan perubahan otomatis.
+  const paketSebelumnya = await db.packages.get('current')
+  let perubahanEfektif = paket.perubahanPaket
+  if (
+    !perubahanEfektif &&
+    paketSebelumnya?.data &&
+    materiLebihBaru(paketSebelumnya.data.exportedAt, paket.exportedAt)
+  ) {
+    const diffOtomatis = bandingkanPaketShow(paketSebelumnya.data, paket)
+    if (diffOtomatis.butir.length > 0) perubahanEfektif = diffOtomatis
+  }
   // #13a — pasang berkas partitur lebih dulu (aturan #11a §8: bita dulu, metadata kemudian).
   const jumlahPartitur = await pasangPartiturDariPaket(paket)
   if (paket.songs?.length) await db.songs.bulkPut(paket.songs)
   if (paket.setlists?.length) await db.setlists.bulkPut(paket.setlists)
   // Simpan paket ke `db.packages` tanpa menyalin ulang bita `partiturPaket` yang
   // sudah mendarat di `db.partiturBerkas` supaya kuota IndexedDB tetap hemat.
-  const paketRingan: ShareBundle = paket.partiturPaket
-    ? { ...paket, partiturPaket: undefined }
-    : paket
+  const paketRingan: ShareBundle = {
+    ...paket,
+    partiturPaket: undefined,
+    ...(perubahanEfektif ? { perubahanPaket: perubahanEfektif } : {}),
+  }
   await db.packages.put({ key: 'current', data: paketRingan, importedAt: Date.now() })
   const penerima = (paket.members ?? []).find(
     (m) => paket.forMember != null && m.id === paket.forMember,

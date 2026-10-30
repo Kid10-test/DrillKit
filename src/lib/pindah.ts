@@ -81,6 +81,19 @@ export const LABEL_JENIS_DATA: Record<JenisData, string> = {
   setoran: 'Setoran hafalan',
 }
 
+export interface MetaSetoranSeksi {
+  /** Id seksi yang diekspor asisten pelatih, mis. "brass". */
+  seksi: string
+  /** Nama tampilan seksi, mis. "Brass". */
+  labelSeksi: string
+  /** Nama asisten pelatih / section leader pengirim (opsional). */
+  oleh?: string
+  /** Rentang waktu rekaman yang disertakan. */
+  rentang: 'hari-ini' | '7-hari' | 'semua'
+  /** Tanggal acuan YYYY-MM-DD saat berkas dibuat. */
+  tanggalAcuan: string
+}
+
 /**
  * Satu berkas pindah. Semua bagian **opsional** — berkas boleh hanya berisi
  * lagu, atau hanya jadwal. Ini yang membedakannya dari backup, yang selalu
@@ -90,6 +103,8 @@ export interface BerkasPindah {
   format: 'drillkit-data'
   versi: 1
   dibuat: number
+  /** #15a — penanda bila berkas ini berasal dari pintasan "Kirim Setoran Seksi" asisten pelatih. */
+  asistenSeksi?: MetaSetoranSeksi
   anggota?: Member[]
   jadwal?: Session[]
   absensi?: AttendanceRecord[]

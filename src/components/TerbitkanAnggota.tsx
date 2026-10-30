@@ -37,7 +37,13 @@ import {
 } from '../lib/kunci'
 import type { PetaKunci } from '../lib/kunci'
 
-export function TerbitkanAnggota({ susun }: { susun: () => ShareBundle }) {
+export function TerbitkanAnggota({
+  susun,
+  onTerbitBerhasil,
+}: {
+  susun: () => ShareBundle
+  onTerbitBerhasil?: () => void | Promise<void>
+}) {
   const toast = useToast()
   const atur = bacaAtur()
   const [sedang, setSedang] = useState(false)
@@ -93,6 +99,7 @@ export function TerbitkanAnggota({ susun }: { susun: () => ShareBundle }) {
       const hasil = await terbitkan(atur, json, kirimGithub)
       toast.push(hasil.pesan, hasil.ok ? 'ok' : 'err')
       if (hasil.ok) {
+        await onTerbitBerhasil?.()
         const h = await muatRiwayat(atur, kirimGithub)
         if (!('salah' in h)) setRiwayat(h)
       }

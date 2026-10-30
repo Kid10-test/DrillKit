@@ -140,6 +140,7 @@ export async function tulisMuatanBackup(
       db.evaluasi,
       db.targetSetoran,
       db.setoran,
+      db.logPerubahan,
     ],
     async () => {
       if (diubah.members?.length) await db.members.bulkPut(diubah.members)
@@ -154,6 +155,7 @@ export async function tulisMuatanBackup(
       if (diubah.evaluasi?.length) await db.evaluasi.bulkPut(diubah.evaluasi)
       if (diubah.targetSetoran?.length) await db.targetSetoran.bulkPut(diubah.targetSetoran)
       if (diubah.setoran?.length) await db.setoran.bulkPut(diubah.setoran)
+      if (diubah.logPerubahan?.length) await db.logPerubahan.bulkPut(diubah.logPerubahan)
     },
   )
   if (diubah.settings) await db.settings.put({ ...diubah.settings, key: 'team' })
@@ -242,6 +244,7 @@ export function AlurPulihkanBackup({
         evaluasi,
         targetSetoran,
         setoran,
+        logPerubahan,
         partiturBerkas,
       ] = await Promise.all([
         db.members.toArray(),
@@ -256,6 +259,7 @@ export function AlurPulihkanBackup({
         db.evaluasi.toArray(),
         db.targetSetoran.toArray(),
         db.setoran.toArray(),
+        db.logPerubahan.toArray(),
         db.partiturBerkas.toArray(),
       ])
       if (!hidup) return
@@ -273,6 +277,7 @@ export function AlurPulihkanBackup({
         evaluasi: kunci(evaluasi),
         targetSetoran: kunci(targetSetoran),
         setoran: kunci(setoran),
+        logPerubahan: kunci(logPerubahan),
         partiturBerkas: kunci(partiturBerkas),
       })
       const baris = susunSaran(Array.isArray(data.members) ? data.members : [], members)

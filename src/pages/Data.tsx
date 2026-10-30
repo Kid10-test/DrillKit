@@ -21,21 +21,34 @@
  *   rujukan yang putus — asalkan yang putus tidak diam-diam.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import {
   Button,
   Card,
   EmptyState,
+  Field,
+  Input,
   Modal,
   PageHeader,
+  Select,
   useToast,
 } from '../components/ui'
 import { IconDownload, IconUpload, IconShare } from '../components/Icons'
-import { downloadFile, uid } from '../lib/utils'
+import { DEFAULT_SECTIONS, downloadFile, uid } from '../lib/utils'
 import { intipTitipan, mintaPratinjau, TombolBukaBerkas, useTitipan } from '../components/BukaBerkas'
-import { kenaliBerkas, kenaliTeks, namaData } from '../lib/bukaBerkas'
+import { capTanggal, kenaliBerkas, kenaliTeks, namaData, namaSetoranSeksi } from '../lib/bukaBerkas'
+import {
+  LABEL_RENTANG_SEKSI,
+  gabungAbsensiAsisten,
+  gabungKemajuanAman,
+  gabungSetoranAman,
+  hitungPratinjauSetoranSeksi,
+  ringkasGabungSeksi,
+  susunBerkasSetoranSeksi,
+  type RentangSetoranSeksi,
+} from '../lib/kolaborasiSeksi'
 import {
   LABEL_JENIS_DATA,
   URUTAN_JENIS_DATA,
@@ -46,7 +59,17 @@ import {
   totalBerkas,
 } from '../lib/pindah'
 import type { BerkasPindah, JenisData, RingkasanJenis, YangAda } from '../lib/pindah'
-import type { AttendanceRecord, Member } from '../db/types'
+import type {
+  AttendanceRecord,
+  CatatanSetoran,
+  Evaluasi,
+  Kemajuan,
+  Member,
+  MemberNote,
+  SectionDef,
+  Session,
+  TargetSetoran,
+} from '../db/types'
 import {
   keputusanAwal,
   perluDitanya,
@@ -82,8 +105,11 @@ function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void 
 const JENIS_PILIH: JenisData[] = ['lagu', 'setlist', 'drill']
 
 export default function Data() {
+  const [searchParams] = useSearchParams()
+  const seksiDariUrl = searchParams.get('seksi') || ''
   const [alur, setAlur] = useState<'pindah' | 'csv'>('pindah')
 
+  const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
   const anggota = useLiveQuery(() => db.members.toArray(), [], [])
   const jadwal = useLiveQuery(() => db.sessions.toArray(), [], [])
   const absensi = useLiveQuery(() => db.attendance.toArray(), [], [])
@@ -247,7 +273,13 @@ export default function Data() {
       </Card>
 
       {alur === 'pindah' ? (
-        <AlurPindah sumber={sumber} yangAda={yangAda} />
+        <AlurPindah
+          sumber={sumber}
+          yangAda={yangAda}
+          daftarSeksi={settings?.sections ?? DEFAULT_SECTIONS}
+          seksiAwal={seksiDariUrl}
+          namaPelatihBawaan={settings?.coachName ?? ''}
+        />
       ) : (
         <AlurCsv sumber={sumber} />
       )}
@@ -262,9 +294,15 @@ export default function Data() {
 function AlurPindah({
   sumber,
   yangAda,
+  daftarSeksi,
+  seksiAwal,
+  namaPelatihBawaan,
 }: {
   sumber: Record<JenisData, unknown[]>
   yangAda: YangAda
+  daftarSeksi: SectionDef[]
+  seksiAwal?: string
+  namaPelatihBawaan?: string
 }) {
   const toast = useToast()
   /** Jenis yang dicentang. Bawaan: kosong, supaya tidak ada yang ikut tanpa sengaja. */
@@ -272,9 +310,94 @@ function AlurPindah({
   /** Entitas yang dicentang, khusus jenis yang bisa dipilih satu-satu. */
   const [pilihEntitas, setPilihEntitas] = useState<Set<string>>(new Set())
 
+  /** #15a — Kolaborasi Pelatih Seksi (1-Klik Kirim Setoran Seksi). */
+  const pilihanSeksi = useMemo(() => {
+    const peta = new Map<string, SectionDef>()
+    for (const s of daftarSeksi) peta.set(s.id, s)
+    for (const m of (sumber.anggota ?? []) as Member[]) {
+      if (m.section && !peta.has(m.section)) {
+        peta.set(m.section, {
+          id: m.section,
+          label: m.section,
+          short: m.section.slice(0, 3).toUpperCase(),
+          dot: '#94a3b8',
+        })
+      }
+    }
+    return [...peta.values()]
+  }, [daftarSeksi, sumber.anggota])
+
+  const [seksiKolab, setSeksiKolab] = useState<string>(() => seksiAwal || '')
+  const [rentangKolab, setRentangKolab] = useState<RentangSetoranSeksi>('7-hari')
+  const [namaAsisten, setNamaAsisten] = useState<string>('')
+
+  useEffect(() => {
+    if (seksiAwal && pilihanSeksi.some((s) => s.id === seksiAwal)) {
+      setSeksiKolab(seksiAwal)
+    } else if (!seksiKolab && pilihanSeksi.length > 0) {
+      // Pilih seksi pertama yang memiliki anggota aktif, atau seksi pertama
+      const adaAnggota = pilihanSeksi.find((s) =>
+        ((sumber.anggota ?? []) as Member[]).some((m) => m.section === s.id),
+      )
+      setSeksiKolab((adaAnggota ?? pilihanSeksi[0]).id)
+    }
+  }, [seksiAwal, pilihanSeksi, seksiKolab, sumber.anggota])
+
+  const seksiKolabEfektif =
+    seksiKolab || (pilihanSeksi.length > 0 ? pilihanSeksi[0].id : '')
+
+  const sumberKolab = useMemo(
+    () => ({
+      anggota: (sumber.anggota ?? []) as Member[],
+      jadwal: (sumber.jadwal ?? []) as Session[],
+      absensi: (sumber.absensi ?? []) as AttendanceRecord[],
+      evaluasi: (sumber.evaluasi ?? []) as Evaluasi[],
+      catatan: (sumber.catatan ?? []) as MemberNote[],
+      targetSetoran: (sumber.targetSetoran ?? []) as TargetSetoran[],
+      setoran: (sumber.setoran ?? []) as CatatanSetoran[],
+      kemajuan: (sumber.kemajuan ?? []) as Kemajuan[],
+    }),
+    [sumber],
+  )
+
+  const pratinjauSeksi = useMemo(
+    () =>
+      hitungPratinjauSetoranSeksi(
+        sumberKolab,
+        seksiKolabEfektif,
+        rentangKolab,
+        capTanggal(),
+      ),
+    [sumberKolab, seksiKolabEfektif, rentangKolab],
+  )
+
+  function unduhSetoranSeksi() {
+    if (!seksiKolabEfektif) {
+      toast.push('Pilih seksinya terlebih dahulu', 'err')
+      return
+    }
+    const defSeksi = pilihanSeksi.find((s) => s.id === seksiKolabEfektif)
+    const labelSeksi = defSeksi?.label ?? seksiKolabEfektif
+    const oleh = namaAsisten.trim() || namaPelatihBawaan?.trim() || undefined
+    const berkas = susunBerkasSetoranSeksi(sumberKolab, {
+      seksi: seksiKolabEfektif,
+      labelSeksi,
+      oleh,
+      rentang: rentangKolab,
+      tanggalAcuan: capTanggal(),
+    })
+    if (totalBerkas(berkas) === 0) {
+      toast.push(`Belum ada data seksi ${labelSeksi} pada rentang tersebut`, 'err')
+      return
+    }
+    downloadFile(namaSetoranSeksi(labelSeksi, oleh), JSON.stringify(berkas, null, 2))
+    toast.push(`Setoran seksi ${labelSeksi} diunduh — kirim ke Pelatih Kepala`)
+  }
+
   /** Berkas yang sedang menunggu konfirmasi. `null` = tidak ada. */
   const [menunggu, setMenunggu] = useState<BerkasPindah | null>(null)
   const [ringkasan, setRingkasan] = useState<RingkasanJenis[]>([])
+  const [utamakanAbsensiAsisten, setUtamakanAbsensiAsisten] = useState(true)
   const [laporan, setLaporan] = useState<string[] | null>(null)
   const [saran, setSaran] = useState<SaranBaris[]>([])
   const [keputusan, setKeputusan] = useState<Record<string, KeputusanCocok>>({})
@@ -345,35 +468,116 @@ function AlurPindah({
       toast.push(hasil.alasan, 'err')
       return
     }
-    const anggotaLokal = (sumber.anggota ?? []) as Member[]
+    // Baca langsung dari IndexedDB supaya saat Data baru dipasang lewat
+    // navigasi Pintu #7 (`useTitipan`), `useLiveQuery` yang masih `[]` di
+    // render pertama tidak salah menganggap seluruh anggota lokal kosong!
+    const kunci = (daftar: { id?: string; key?: string }[]) =>
+      daftar.map((e) => e?.id ?? e?.key ?? '').filter(Boolean)
+    const [
+      anggotaLokal,
+      jadwalDb,
+      absensiDb,
+      laguDb,
+      setlistDb,
+      drillDb,
+      setDb,
+      kemajuanDb,
+      catatanDb,
+      evaluasiDb,
+      targetSetoranDb,
+      setoranDb,
+    ] = await Promise.all([
+      db.members.toArray(),
+      db.sessions.toArray(),
+      db.attendance.toArray(),
+      db.songs.toArray(),
+      db.setlists.toArray(),
+      db.drills.toArray(),
+      db.sets.toArray(),
+      db.kemajuan.toArray(),
+      db.memberNotes.toArray(),
+      db.evaluasi.toArray(),
+      db.targetSetoran.toArray(),
+      db.setoran.toArray(),
+    ])
+    const yangAdaSegar: YangAda = {
+      anggota: kunci(anggotaLokal),
+      jadwal: kunci(jadwalDb),
+      absensi: kunci(absensiDb),
+      lagu: kunci(laguDb),
+      setlist: kunci(setlistDb),
+      drill: kunci(drillDb),
+      set: kunci(setDb),
+      kemajuan: kunci(kemajuanDb),
+      catatan: kunci(catatanDb),
+      evaluasi: kunci(evaluasiDb),
+      targetSetoran: kunci(targetSetoranDb),
+      setoran: kunci(setoranDb),
+    }
     const masuk = hasil.berkas.anggota ?? []
     const baris = susunSaran(masuk, anggotaLokal)
     setSaran(baris)
     setKeputusan(keputusanAwal(baris))
     setMenunggu(hasil.berkas)
-    setRingkasan(hitungBentrok(hasil.berkas, yangAda))
+    setUtamakanAbsensiAsisten(true)
+    setRingkasan(hitungBentrok(hasil.berkas, yangAdaSegar))
     setLaporan(null)
   }
 
+  const ringkasanGabungPerSeksi = useMemo(() => {
+    if (!menunggu) return null
+    return ringkasGabungSeksi(
+      menunggu,
+      {
+        anggota: (sumber.anggota ?? []) as Member[],
+        jadwal: (sumber.jadwal ?? []) as Session[],
+        absensi: (sumber.absensi ?? []) as AttendanceRecord[],
+      },
+      pilihanSeksi,
+    )
+  }, [menunggu, sumber.anggota, sumber.jadwal, sumber.absensi, pilihanSeksi])
+
   async function terapkan() {
     if (!menunggu) return
+    const apakahAsisten = !!menunggu.asistenSeksi
     const anggotaLokal = (sumber.anggota ?? []) as Member[]
     const hasilCocok = terapkanCocok({
       masuk: menunggu.anggota ?? [],
       lokal: anggotaLokal,
       keputusan,
       arah: 'lokal',
-      timpaSamaId: true,
+      // #15a — berkas asisten seksi membawa anggota tanpa token/phone/notes:
+      // jangan menimpa profil anggota lokal yang id-nya sudah sama!
+      timpaSamaId: !apakahAsisten,
     })
     const { data: dipetakan, bentrok } = tulisUlangMuatan(menunggu, hasilCocok.peta)
     if (menunggu.anggota) dipetakan.anggota = hasilCocok.anggotaTulis
     if (dipetakan.absensi) {
-      const saring = saringBentrokLokal(dipetakan.absensi, (sumber.absensi ?? []) as AttendanceRecord[])
-      dipetakan.absensi = saring.tulis
-      bentrok.push(...saring.bentrok)
+      if (apakahAsisten) {
+        const gabungAbs = gabungAbsensiAsisten(
+          dipetakan.absensi,
+          (sumber.absensi ?? []) as AttendanceRecord[],
+          utamakanAbsensiAsisten,
+        )
+        dipetakan.absensi = gabungAbs.tulis
+        bentrok.push(...gabungAbs.laporan)
+      } else {
+        const saring = saringBentrokLokal(dipetakan.absensi, (sumber.absensi ?? []) as AttendanceRecord[])
+        dipetakan.absensi = saring.tulis
+        bentrok.push(...saring.bentrok)
+      }
     }
     const { berkas, putus } = putusRujukan(dipetakan, yangAda)
     const b = berkas
+    if (apakahAsisten && b.kemajuan?.length) {
+      const gabungKem = gabungKemajuanAman(b.kemajuan, (sumber.kemajuan ?? []) as Kemajuan[])
+      b.kemajuan = gabungKem.tulis
+    }
+    if (apakahAsisten && b.setoran?.length) {
+      const gabungSet = gabungSetoranAman(b.setoran, (sumber.setoran ?? []) as CatatanSetoran[])
+      b.setoran = gabungSet.tulis
+      bentrok.push(...gabungSet.laporan)
+    }
     try {
       // Setiap tabel yang ditulis di bawah WAJIB tercantum di cakupan ini.
       // Dexie menolak tabel di luar cakupan (NotFound) dan seluruh berkas
@@ -419,6 +623,80 @@ function AlurPindah({
 
   return (
     <>
+      {/* -------------------------------------- #15a: Kolaborasi Pelatih Seksi */}
+      <Card className="mb-4 border-emerald-900/50 bg-emerald-950/10" data-testid="kartu-kolaborasi-seksi">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-emerald-200">
+              Kolaborasi Pelatih Seksi — 1-Klik Kirim Setoran Seksi
+            </h2>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+              Khusus asisten pelatih (<i>Brass, Battery, Pit, Color Guard</i>): ekspor otomatis
+              absensi, evaluasi, setoran hafalan, catatan, dan centang kemajuan <b>hanya untuk seksi
+              Anda</b>. Saat dibuka Pelatih Kepala lewat <b>Buka berkas</b>, seksi lain dijamin
+              tidak tersentuh.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <Field label="Seksi Anda">
+            <Select
+              data-testid="pilih-seksi-kolaborasi"
+              value={seksiKolabEfektif}
+              onChange={(e) => setSeksiKolab(e.target.value)}
+            >
+              {pilihanSeksi.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Rentang waktu">
+            <Select
+              data-testid="pilih-rentang-seksi"
+              value={rentangKolab}
+              onChange={(e) => setRentangKolab(e.target.value as RentangSetoranSeksi)}
+            >
+              <option value="hari-ini">{LABEL_RENTANG_SEKSI['hari-ini']}</option>
+              <option value="7-hari">{LABEL_RENTANG_SEKSI['7-hari']}</option>
+              <option value="semua">{LABEL_RENTANG_SEKSI.semua}</option>
+            </Select>
+          </Field>
+
+          <Field label="Nama asisten (opsional)">
+            <Input
+              data-testid="input-nama-asisten"
+              placeholder="Mis. Kak Raka (Brass)"
+              value={namaAsisten}
+              onChange={(e) => setNamaAsisten(e.target.value)}
+            />
+          </Field>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2">
+          <p className="text-xs text-slate-300" data-testid="pratinjau-kirim-seksi">
+            Siap dikirim: <b>{pratinjauSeksi.anggota}</b> anggota ·{' '}
+            <b>{pratinjauSeksi.absensi}</b> absensi ·{' '}
+            <b>{pratinjauSeksi.evaluasi}</b> evaluasi ·{' '}
+            <b>{pratinjauSeksi.setoran}</b> setoran hafalan ·{' '}
+            <b>{pratinjauSeksi.catatan}</b> catatan ·{' '}
+            <b>{pratinjauSeksi.kemajuanCentang}</b> centang kemajuan
+          </p>
+          <Button
+            variant="primary"
+            size="sm"
+            data-testid="kirim-setoran-seksi"
+            disabled={pratinjauSeksi.anggota === 0 && pratinjauSeksi.totalAksi === 0}
+            onClick={unduhSetoranSeksi}
+          >
+            <IconDownload size={14} /> Unduh Setoran Seksi
+          </Button>
+        </div>
+      </Card>
+
       {/* ---------------------------------------------------------- ekspor */}
       <Card className="mb-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-200">Ekspor — pilih datanya</h2>
@@ -542,9 +820,98 @@ function AlurPindah({
       >
         {menunggu && (
           <div data-testid="konfirmasi-impor">
+            {menunggu.asistenSeksi && ringkasanGabungPerSeksi && (
+              <div
+                data-testid="ringkasan-gabung-seksi"
+                className="mb-3 rounded-lg border border-emerald-700/50 bg-emerald-950/25 p-3 text-xs leading-relaxed"
+              >
+                <p className="font-semibold text-emerald-200">
+                  Gabung Setoran Asisten Seksi: {menunggu.asistenSeksi.labelSeksi}
+                  {menunggu.asistenSeksi.oleh ? ` · oleh ${menunggu.asistenSeksi.oleh}` : ''}
+                </p>
+                <p className="mt-0.5 text-[11px] text-emerald-200/80">
+                  Rentang: {LABEL_RENTANG_SEKSI[menunggu.asistenSeksi.rentang]}
+                  {menunggu.asistenSeksi.tanggalAcuan ? ` (${menunggu.asistenSeksi.tanggalAcuan})` : ''}
+                </p>
+
+                {ringkasanGabungPerSeksi.perSeksi.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {ringkasanGabungPerSeksi.perSeksi.map((b) => (
+                      <li
+                        key={b.seksi}
+                        data-testid={`ringkas-seksi-${b.seksi}`}
+                        className="rounded bg-slate-900/70 px-2.5 py-1.5 text-[11px] text-slate-200"
+                      >
+                        <b>{b.label}:</b>{' '}
+                        {[
+                          b.absensiBaru > 0 ? `${b.absensiBaru} absensi baru` : '',
+                          b.absensiBentrok > 0 ? `${b.absensiBentrok} absensi bentrok` : '',
+                          b.evaluasi > 0 ? `${b.evaluasi} evaluasi` : '',
+                          b.setoran > 0 ? `${b.setoran} setoran hafalan` : '',
+                          b.catatan > 0 ? `${b.catatan} catatan` : '',
+                          b.kemajuanCentang > 0 ? `${b.kemajuanCentang} centang kemajuan` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || 'Hanya daftar anggota seksi'}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {ringkasanGabungPerSeksi.seksiTakTersentuh.length > 0 && (
+                  <p
+                    data-testid="seksi-aman-tak-tersentuh"
+                    className="mt-2 text-[11px] text-emerald-300"
+                  >
+                    ✓ Seksi lain aman tidak tersentuh:{' '}
+                    <b>{ringkasanGabungPerSeksi.seksiTakTersentuh.map((s) => s.label).join(', ')}</b>
+                  </p>
+                )}
+
+                {ringkasanGabungPerSeksi.bentrokAbsensi.length > 0 && (
+                  <div
+                    data-testid="daftar-bentrok-absensi"
+                    className="mt-2.5 rounded border border-amber-600/40 bg-amber-950/30 p-2 text-[11px] text-amber-100"
+                  >
+                    <p className="font-semibold text-amber-200">
+                      Ditemukan {ringkasanGabungPerSeksi.bentrokAbsensi.length} status absensi berbeda:
+                    </p>
+                    <ul className="mt-1 space-y-0.5">
+                      {ringkasanGabungPerSeksi.bentrokAbsensi.slice(0, 5).map((bt) => (
+                        <li key={`${bt.sessionId}|${bt.memberId}`}>
+                          • {bt.namaAnggota} ({bt.judulSesi}): lokal <b>{bt.statusLokal}</b> vs asisten{' '}
+                          <b>{bt.statusMasuk}</b>
+                        </li>
+                      ))}
+                    </ul>
+                    <label className="mt-2 flex cursor-pointer items-center gap-2 text-amber-100">
+                      <input
+                        type="checkbox"
+                        data-testid="utamakan-absensi-asisten"
+                        checked={utamakanAbsensiAsisten}
+                        onChange={(e) => setUtamakanAbsensiAsisten(e.target.checked)}
+                        className="h-3.5 w-3.5 accent-emerald-500"
+                      />
+                      <span>Utamakan status absensi dari asisten pelatih untuk baris di atas</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
+
             <p className="mb-3 text-sm text-slate-300">
-              Berkas berisi <b>{totalBerkas(menunggu)}</b> entitas. Yang sudah ada di perangkat ini
-              akan <b>ditimpa</b> — suntingan lokalnya tidak bisa dikembalikan.
+              Berkas berisi <b>{totalBerkas(menunggu)}</b> entitas.{' '}
+              {menunggu.asistenSeksi ? (
+                <>
+                  Profil anggota lokal, token QR, dan centang seksi lain <b>dipertahankan utuh</b>;
+                  setoran hafalan digabung ke jenjang tertinggi.
+                </>
+              ) : (
+                <>
+                  Yang sudah ada di perangkat ini akan <b>ditimpa</b> — suntingan lokalnya tidak
+                  bisa dikembalikan.
+                </>
+              )}
             </p>
             <ul className="space-y-1">
               {ringkasan.map((r) => (
