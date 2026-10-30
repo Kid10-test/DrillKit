@@ -3,7 +3,18 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import type { Drill, DrillSet, Member, Song } from '../db/types'
 import { facingDeg, ukurTitik } from '../lib/field'
-import { cocokPutaran, deltaBusur, gerakOf, progresPemain, titikJalur } from '../lib/gerak'
+import {
+  bangunPetaFtl,
+  cocokPutaran,
+  deltaBusur,
+  deltaPoliFtl,
+  gerakOf,
+  kelompokPemain,
+  progresPemain,
+  ringkasKoreografiSet,
+  titikJalur,
+} from '../lib/gerak'
+import { penandaEfektifPadaSet } from '../lib/propertiGerak'
 import { TINGKAT_LABEL, URUTAN_TINGKAT, analisisPerpindahan, lebihBerat } from '../lib/analitik'
 import { stepYd } from '../lib/field'
 import { useSettings } from '../hooks/useSettings'
@@ -479,20 +490,31 @@ export function DrillPresenter({
       if (!ikutGerak(id)) continue
       vec.push([id, sx(q.x) - sx(p.x), sy(q.y) - sy(p.y)])
     }
-    // DD2 — gerak set ini: bentuk jalur, pembagian kecepatan, tunda per section.
+    // DD2/#16 — gerak set ini: bentuk jalur, pembagian kecepatan, tunda, ripple, Move+Hold, FTL.
     const gr = gerakOf(set.gerak)
     const lengkungGerak = gr.jalur === 'lengkung' ? gr.lengkung : 0
     const busur = petaBusur(set, nextSet)
+    const awalSvg: Record<string, { x: number; y: number }> = {}
+    const akhirSvg: Record<string, { x: number; y: number }> = {}
+    for (const [id, pt] of Object.entries(set.points)) awalSvg[id] = { x: sx(pt.x), y: sy(pt.y) }
+    for (const [id, pt] of Object.entries(nextSet.points)) akhirSvg[id] = { x: sx(pt.x), y: sy(pt.y) }
+    const petaFtl = gr.kelompok?.length ? bangunPetaFtl(gr.kelompok, awalSvg, akhirSvg) : new Map()
     const loop = () => {
       const p = Math.min(1, (performance.now() - t0) / total)
       for (const [id, vx, vy] of vec) {
         const g = dotRefs.current.get(id)
         if (!g) continue
-        const t = progresPemain(p, gr, rosterById.get(id)?.section, counts)
+        const t = progresPemain(p, gr, rosterById.get(id)?.section, counts, id)
+        const ftl = petaFtl.get(id)
+        const klp = kelompokPemain(gr, id)
         const bs = busur.get(id)
-        const [tx, ty] = bs
-          ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser)
-          : titikJalur(t, vx, vy, lengkungGerak)
+        const [tx, ty] = ftl
+          ? deltaPoliFtl(ftl, t)
+          : klp
+            ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
+            : bs
+              ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser)
+              : titikJalur(t, vx, vy, lengkungGerak)
         g.setAttribute('transform', `translate(${tx} ${ty})`)
       }
       if (p < 1) {
@@ -563,10 +585,15 @@ export function DrillPresenter({
           const q = ke.points[id]
           if (q && ikutGerak(id)) vec.push([id, sx(q.x) - sx(p.x), sy(q.y) - sy(p.y)])
         }
-        // DD2 — pengaturan gerak diambil dari set ASAL perpindahan ini.
+        // DD2/#16 — pengaturan gerak diambil dari set ASAL perpindahan ini.
         const gr = gerakOf(dari.gerak)
         const lengkungGerak = gr.jalur === 'lengkung' ? gr.lengkung : 0
         const busur = petaBusur(dari, ke)
+        const awalSvg: Record<string, { x: number; y: number }> = {}
+        const akhirSvg: Record<string, { x: number; y: number }> = {}
+        for (const [id, pt] of Object.entries(dari.points)) awalSvg[id] = { x: sx(pt.x), y: sy(pt.y) }
+        for (const [id, pt] of Object.entries(ke.points)) akhirSvg[id] = { x: sx(pt.x), y: sy(pt.y) }
+        const petaFtl = gr.kelompok?.length ? bangunPetaFtl(gr.kelompok, awalSvg, akhirSvg) : new Map()
         const t0 = performance.now()
         const loop = () => {
           if (batal) return selesai()
@@ -574,11 +601,17 @@ export function DrillPresenter({
           for (const [id, vx, vy] of vec) {
             const g = dotRefs.current.get(id)
             if (!g) continue
-            const t = progresPemain(p, gr, rosterById.get(id)?.section, counts)
+            const t = progresPemain(p, gr, rosterById.get(id)?.section, counts, id)
+            const ftl = petaFtl.get(id)
+            const klp = kelompokPemain(gr, id)
             const bs = busur.get(id)
-            const [tx, ty] = bs
-              ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser)
-              : titikJalur(t, vx, vy, lengkungGerak)
+            const [tx, ty] = ftl
+              ? deltaPoliFtl(ftl, t)
+              : klp
+                ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
+                : bs
+                  ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser)
+                  : titikJalur(t, vx, vy, lengkungGerak)
             g.setAttribute('transform', `translate(${tx} ${ty})`)
           }
           // Harus dibatasi ke dalam presenter: editor di belakangnya juga punya
@@ -751,6 +784,11 @@ export function DrillPresenter({
               {idx + 1}/{ordered.length}
             </span>
             {set?.counts ? <span className="text-slate-500"> · {set.counts} count</span> : null}
+            {set && ringkasKoreografiSet(set).length > 0 && (
+              <span className="ml-2 text-amber-300" data-testid="presenter-isyarat-koreo">
+                {ringkasKoreografiSet(set).join(' · ')}
+              </span>
+            )}
           </p>
         </div>
         <TombolKunci terkunci={layarTerkunci} onKunci={kunciLayar} />
@@ -874,8 +912,13 @@ export function DrillPresenter({
           <g transform={rotated ? `translate(${VH} 0) rotate(90)` : undefined}>
             <FieldSurface f={f} VW={VW} VH={VH} sx={sx} sy={sy} />
 
-            {/* A7 — penanda lapangan ikut tampil di layar latihan. */}
-            <MarkerLayer markers={drill.markers ?? []} sx={sx} sy={sy} redup />
+            {/* A7 & #16.4 — penanda lapangan & properti bergerak ikut tampil di layar latihan. */}
+            <MarkerLayer
+              markers={penandaEfektifPadaSet(drill.markers ?? [], ordered, idx)}
+              sx={sx}
+              sy={sy}
+              redup
+            />
 
             {/*
               Jejak gerak ke set berikutnya — di layar lapangan panahnya dibuat

@@ -268,7 +268,7 @@ export function LapisanSeretBerkas() {
   return (
     <div
       data-testid="lapisan-seret"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6"
+      className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-950/80 p-6"
     >
       <div className="rounded-2xl border-2 border-dashed border-emerald-500/60 bg-slate-900/90 px-10 py-14 text-center">
         <p className="text-base font-semibold text-slate-100">Lepaskan berkasnya di sini</p>

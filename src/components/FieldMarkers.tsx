@@ -10,8 +10,10 @@
  * Warna selalu hex murni (bukan `oklch()`/`lab()`) supaya tetap aman di
  * browser lama pada berkas portabel.
  */
-import type { Drill, FieldMarker, MarkerKind } from '../db/types'
+import type { Drill, FieldMarker, MarkerKind, Member, PosisiPenandaSet } from '../db/types'
 import { Button, Card, ConfirmButton, Field, Input, Modal, Select, useToast } from './ui'
+import { apakahPropertiBergerak, ringkasKruProperti } from '../lib/propertiGerak'
+import { esc } from '../lib/print'
 import { uid } from '../lib/utils'
 
 /** Palet warna penanda — hex murni, kontras di atas lapangan hijau/gelap. */
@@ -76,9 +78,14 @@ export function MarkerLayer({
         const x2 = dua ? sx(m.x2 ?? m.x) : x
         const y2 = dua ? sy(m.y2 ?? m.y) : y
 
+        const rot = m.rotasi ?? 0
+        const cxRot = dua ? (x + x2) / 2 : x
+        const cyRot = dua ? (y + y2) / 2 : y
+        const tfRot = rot ? `rotate(${rot.toFixed(2)}, ${cxRot.toFixed(3)}, ${cyRot.toFixed(3)})` : undefined
+
         if (m.jenis === 'kotak') {
           return (
-            <g key={m.id} data-penanda={m.jenis}>
+            <g key={m.id} data-penanda={m.jenis} transform={tfRot}>
               <rect
                 x={Math.min(x, x2)}
                 y={Math.min(y, y2)}
@@ -101,7 +108,7 @@ export function MarkerLayer({
 
         if (m.jenis === 'garis') {
           return (
-            <g key={m.id} data-penanda={m.jenis}>
+            <g key={m.id} data-penanda={m.jenis} transform={tfRot}>
               <line x1={x} y1={y} x2={x2} y2={y2} stroke={w} strokeWidth={0.3} strokeDasharray="1.4 0.9" />
               {m.label && (
                 <text x={(x + x2) / 2} y={(y + y2) / 2 - 0.8} fontSize={1.7} fill={w} textAnchor="middle">
@@ -120,7 +127,7 @@ export function MarkerLayer({
           const p1 = [x2 - s * Math.cos(a - 0.42), y2 - s * Math.sin(a - 0.42)]
           const p2 = [x2 - s * Math.cos(a + 0.42), y2 - s * Math.sin(a + 0.42)]
           return (
-            <g key={m.id} data-penanda={m.jenis}>
+            <g key={m.id} data-penanda={m.jenis} transform={tfRot}>
               <line x1={x} y1={y} x2={x2} y2={y2} stroke={w} strokeWidth={0.35} />
               <polygon points={`${x2},${y2} ${p1[0]},${p1[1]} ${p2[0]},${p2[1]}`} fill={w} />
               {m.label && (
@@ -137,6 +144,7 @@ export function MarkerLayer({
             <text
               key={m.id}
               data-penanda={m.jenis}
+              transform={tfRot}
               x={x}
               y={y}
               fontSize={2.6}
@@ -150,19 +158,23 @@ export function MarkerLayer({
         }
 
         // titik / properti
+        const rad = m.r && m.r > 0 ? m.r : 1.6
         return (
-          <g key={m.id} data-penanda={m.jenis}>
+          <g key={m.id} data-penanda={m.jenis} transform={tfRot}>
             <circle
               cx={x}
               cy={y}
-              r={m.r && m.r > 0 ? m.r : 1.6}
+              r={rad}
               fill={w}
               fillOpacity={0.2}
               stroke={w}
               strokeWidth={0.3}
             />
+            {rot !== 0 && (
+              <line x1={x} y1={y} x2={x} y2={y + rad} stroke={w} strokeWidth={0.35} />
+            )}
             {m.label && (
-              <text x={x} y={y - (m.r && m.r > 0 ? m.r : 1.6) - 0.8} fontSize={1.7} fill={w} textAnchor="middle">
+              <text x={x} y={y - rad - 0.8} fontSize={1.7} fill={w} textAnchor="middle">
                 {m.label}
               </text>
             )}
@@ -189,6 +201,8 @@ export function PenandaPanel({
   petik,
   setPetik,
   onSimpan,
+  setAktif,
+  roster = [],
 }: {
   markers: FieldMarker[]
   /** yard per langkah — untuk menampilkan koordinat dalam langkah */
@@ -198,10 +212,17 @@ export function PenandaPanel({
   petik: { draf: FieldMarker; tahap: 1 | 2 } | null
   setPetik: (v: { draf: FieldMarker; tahap: 1 | 2 } | null) => void
   onSimpan: (daftar: FieldMarker[]) => void
+  /** #16.4 — set yang sedang aktif di editor (untuk keyframe properti bergerak) */
+  setAktif?: { id: string; name: string }
+  /** #16.4 — daftar anggota drill untuk penunjukan kru dorong properti */
+  roster?: Member[]
 }) {
   const toast = useToast()
   const draf = edit?.draf
   const dua = draf ? butuhDuaTitik(draf.jenis) : false
+  const rosterById = new Map(roster.map((m) => [m.id, m]))
+  const kfSetAktif: PosisiPenandaSet | undefined =
+    draf && setAktif ? draf.perSet?.[setAktif.id] : undefined
 
   function buka(jenis: MarkerKind = 'titik') {
     setEdit({ draf: penandaBaru(jenis), baru: true })
@@ -210,6 +231,47 @@ export function PenandaPanel({
   function ubah(patch: Partial<FieldMarker>) {
     if (!draf) return
     setEdit({ draf: { ...draf, ...patch }, baru: !!edit?.baru })
+  }
+
+  function jugKeyframeSetAktif(nyala: boolean) {
+    if (!draf || !setAktif) return
+    const salin = { ...(draf.perSet ?? {}) }
+    if (nyala) {
+      salin[setAktif.id] = {
+        x: draf.x,
+        y: draf.y,
+        ...(dua ? { x2: draf.x2 ?? draf.x, y2: draf.y2 ?? draf.y } : {}),
+        rotasi: draf.rotasi ?? 0,
+      }
+    } else {
+      delete salin[setAktif.id]
+    }
+    ubah({ perSet: Object.keys(salin).length ? salin : undefined })
+  }
+
+  function ubahKeyframeSetAktif(patch: Partial<PosisiPenandaSet>) {
+    if (!draf || !setAktif) return
+    const lama: PosisiPenandaSet = draf.perSet?.[setAktif.id] ?? {
+      x: draf.x,
+      y: draf.y,
+      x2: draf.x2,
+      y2: draf.y2,
+      rotasi: draf.rotasi ?? 0,
+    }
+    ubah({
+      perSet: {
+        ...(draf.perSet ?? {}),
+        [setAktif.id]: { ...lama, ...patch },
+      },
+    })
+  }
+
+  function jugKru(memberId: string) {
+    if (!draf) return
+    const s = new Set(draf.kruIds ?? [])
+    if (s.has(memberId)) s.delete(memberId)
+    else s.add(memberId)
+    ubah({ kruIds: s.size ? [...s] : undefined })
   }
 
   function simpan() {
@@ -260,10 +322,21 @@ export function PenandaPanel({
                 {infoJenis(m.jenis).ikon}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs text-slate-200">{m.label}</p>
+                <p className="flex items-center gap-1.5 truncate text-xs text-slate-200">
+                  <span className="truncate">{m.label}</span>
+                  {apakahPropertiBergerak(m) && (
+                    <span
+                      data-testid="lencana-properti-bergerak"
+                      className="shrink-0 rounded border border-amber-500/40 bg-amber-500/15 px-1 py-0 text-[9px] font-semibold text-amber-200"
+                    >
+                      Bergerak
+                    </span>
+                  )}
+                </p>
                 <p className="truncate text-[10px] text-slate-500">
                   {infoJenis(m.jenis).label} · {langkah(m.x)}, {langkah(m.y)}
                   {butuhDuaTitik(m.jenis) && m.x2 !== undefined ? ` → ${langkah(m.x2 ?? 0)}, ${langkah(m.y2 ?? 0)}` : ''}
+                  {m.kruIds?.length ? ` · Kru: ${ringkasKruProperti(m, rosterById)}` : ''}
                 </p>
               </div>
               <Button
@@ -322,7 +395,12 @@ export function PenandaPanel({
             </Field>
 
             <Field label="Nama / label" hint="muncul di sebelah penanda">
-              <Input value={draf.label} onChange={(e) => ubah({ label: e.target.value })} placeholder="mis. Podium" />
+              <Input
+                value={draf.label}
+                onChange={(e) => ubah({ label: e.target.value })}
+                placeholder="mis. Podium"
+                data-testid="label-penanda"
+              />
             </Field>
 
             <div>
@@ -388,7 +466,103 @@ export function PenandaPanel({
                   />
                 </Field>
               )}
+              <Field label="Sudut putar (°)">
+                <Input
+                  type="number"
+                  step="5"
+                  data-testid="rotasi-penanda"
+                  value={draf.rotasi ?? 0}
+                  onChange={(e) => ubah({ rotasi: Number(e.target.value) || 0 })}
+                />
+              </Field>
             </div>
+
+            {/* #16.4 — Properti bergerak per Set */}
+            {setAktif && (
+              <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-2.5">
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="accent-amber-500"
+                    data-testid="toggle-penanda-perset"
+                    checked={Boolean(kfSetAktif)}
+                    onChange={(e) => jugKeyframeSetAktif(e.target.checked)}
+                  />
+                  <span>Posisi khusus di Set {setAktif.name} (Properti bergerak)</span>
+                </label>
+                {kfSetAktif ? (
+                  <div className="mt-2.5 grid grid-cols-3 gap-2">
+                    <Field label="X set ini (lk)">
+                      <Input
+                        type="number"
+                        step="0.25"
+                        data-testid="penanda-perset-x"
+                        value={Math.round((kfSetAktif.x / sYd) * 4) / 4}
+                        onChange={(e) =>
+                          ubahKeyframeSetAktif({ x: (Number(e.target.value) || 0) * sYd })
+                        }
+                      />
+                    </Field>
+                    <Field label="Y set ini (lk)">
+                      <Input
+                        type="number"
+                        step="0.25"
+                        data-testid="penanda-perset-y"
+                        value={Math.round((kfSetAktif.y / sYd) * 4) / 4}
+                        onChange={(e) =>
+                          ubahKeyframeSetAktif({ y: (Number(e.target.value) || 0) * sYd })
+                        }
+                      />
+                    </Field>
+                    <Field label="Rotasi (°)">
+                      <Input
+                        type="number"
+                        step="5"
+                        data-testid="penanda-perset-rotasi"
+                        value={kfSetAktif.rotasi ?? 0}
+                        onChange={(e) =>
+                          ubahKeyframeSetAktif({ rotasi: Number(e.target.value) || 0 })
+                        }
+                      />
+                    </Field>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                    Centang bila properti ini berpindah atau berputar saat memasuki Set {setAktif.name}.
+                    Gerakannya akan diinterpolasi mulus saat diputar.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* #16.4 — Kru pendorong properti */}
+            {roster.length > 0 && (
+              <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-2.5">
+                <p className="text-xs font-medium text-slate-300">
+                  Kru pendorong / penanggung jawab properti ({draf.kruIds?.length ?? 0})
+                </p>
+                <div className="mt-1.5 flex max-h-28 flex-wrap gap-1 overflow-y-auto" data-testid="pilihan-kru-penanda">
+                  {roster.map((m) => {
+                    const aktif = Boolean(draf.kruIds?.includes(m.id))
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        data-testid={`kru-penanda-${m.id}`}
+                        onClick={() => jugKru(m.id)}
+                        className={
+                          aktif
+                            ? 'rounded border border-amber-500/60 bg-amber-500/20 px-2 py-0.5 text-[11px] font-semibold text-amber-200'
+                            : 'rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] text-slate-400 hover:bg-slate-800'
+                        }
+                      >
+                        {m.code}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="rounded-lg bg-slate-950/50 p-2.5">
               {petik ? (
@@ -430,21 +604,32 @@ export function PenandaPanel({
 }
 
 /** Baris tabel penanda untuk dot sheet yang dicetak. */
-export function barisPenandaCetak(markers: FieldMarker[], sYd: number): string {
+export function barisPenandaCetak(
+  markers: FieldMarker[],
+  sYd: number,
+  rosterById?: Map<string, Pick<Member, 'code' | 'name'>>,
+): string {
   if (!markers.length) return ''
   const langkah = (v: number) => `${Math.round((v / sYd) * 4) / 4}`
   return `<section class="page">
-      <header><div><h2>Penanda lapangan</h2></div></header>
+      <header><div><h2>Penanda &amp; properti lapangan</h2></div></header>
       <table>
-        <thead><tr><th>Jenis</th><th>Label</th><th>Koordinat (langkah)</th></tr></thead>
+        <thead><tr><th>Jenis</th><th>Label</th><th>Koordinat dasar (langkah)</th><th>Keterangan</th></tr></thead>
         <tbody>
           ${markers
-            .map(
-              (m) =>
-                `<tr><td>${infoJenis(m.jenis).label}</td><td>${m.label}</td><td class="mono">${langkah(m.x)}, ${langkah(m.y)}${
-                  butuhDuaTitik(m.jenis) && m.x2 !== undefined ? ` → ${langkah(m.x2 ?? 0)}, ${langkah(m.y2 ?? 0)}` : ''
-                }</td></tr>`,
-            )
+            .map((m) => {
+              const ket: string[] = []
+              if (m.rotasi) ket.push(`Putar ${m.rotasi}&deg;`)
+              if (apakahPropertiBergerak(m)) {
+                ket.push(`Bergerak (${Object.keys(m.perSet ?? {}).length} set)`)
+              }
+              if (m.kruIds?.length && rosterById) {
+                ket.push(`Kru: ${esc(ringkasKruProperti(m, rosterById))}`)
+              }
+              return `<tr><td>${esc(infoJenis(m.jenis).label)}</td><td>${esc(m.label)}</td><td class="mono">${langkah(m.x)}, ${langkah(m.y)}${
+                butuhDuaTitik(m.jenis) && m.x2 !== undefined ? ` → ${langkah(m.x2 ?? 0)}, ${langkah(m.y2 ?? 0)}` : ''
+              }</td><td>${ket.join(' &middot; ') || '-'}</td></tr>`
+            })
             .join('')}
         </tbody>
       </table>

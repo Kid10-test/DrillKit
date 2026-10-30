@@ -26,6 +26,8 @@ import {
   IconPrinter,
 } from './Icons'
 import { barisPenandaCetak } from './FieldMarkers'
+import { ringkasKoreografiSet } from '../lib/gerak'
+import { tugasKruPropertiAnggota } from '../lib/propertiGerak'
 
 import {
   coordText as coorTextSafe,
@@ -215,12 +217,23 @@ export function DotSheetModal({
         // DD8 — langkah per hitungan untuk perpindahan dari set ini ke berikutnya.
         const selLpc = sertakanLpc ? `<td>${selLangkahPerCount(met)}</td>` : ''
         const selUk = sertakanUkuran ? `<td>${selUkuranLangkah(met)}</td>` : ''
+        const isyarat = ringkasKoreografiSet(set, {
+          memberId: m.id,
+          sectionId: m.section,
+          padat: compact,
+        })
         if (compact) {
-          return `<tr><td>${i + 1}</td><td>${esc(set.name)}</td><td>${set.counts}</td><td class="mono">${esc(koordinat)}</td><td>${next ? dist : '-'}${panahHtml}</td>${selLpc}${selUk}</tr>`
+          const ekorVisual = isyarat.length
+            ? ` <span class="isyarat-visual">· ${esc(isyarat.join(' '))}</span>`
+            : ''
+          return `<tr><td>${i + 1}</td><td>${esc(set.name)}${ekorVisual}</td><td>${set.counts}</td><td class="mono">${esc(koordinat)}</td><td>${next ? dist : '-'}${panahHtml}</td>${selLpc}${selUk}</tr>`
         }
+        const blokVisual = isyarat.length
+          ? `<div class="isyarat-a4">${esc(isyarat.join(' · '))}</div>`
+          : ''
         return `<tr>
           <td>${i + 1}</td>
-          <td>${esc(set.name)}</td>
+          <td>${esc(set.name)}${blokVisual}</td>
           <td>${set.counts}</td>
           <td class="mono">${esc(koordinat)}</td>
           <td>${Math.round((p.x / sYd) * 4) / 4}</td>
@@ -236,6 +249,12 @@ export function DotSheetModal({
   function buildHtml(): string {
     const lipat = format === 'lipat'
     const targets = memberId === 'all' ? roster : roster.filter((m) => m.id === memberId)
+    const rosterById = new Map(roster.map((m) => [m.id, m]))
+    function htmlKruProperti(m: Member): string {
+      const daftarKru = tugasKruPropertiAnggota(drill.markers ?? [], m.id)
+      if (!daftarKru.length) return ''
+      return `<p class="notes kru-properti"><b>Tugas kru properti:</b> ${esc(daftarKru.map((mk) => mk.label).join(', '))}</p>`
+    }
     /**
      * DD8 — metrik gerak dihitung **sekali** untuk semua perpindahan, lalu
      * dipakai bersama oleh semua pemain. Sengaja tidak dihitung per pemain:
@@ -375,7 +394,7 @@ export function DotSheetModal({
                 : `<p class="muka-penuh">Seluruh ${ordered.length} set ada di muka depan.</p>`
               : ''
         const ekorBelakang = terakhir
-          ? `${legendaHtml()}${notes.trim() ? `<p class="notes">${esc(notes)}</p>` : ''}<p class="kaki">muka belakang · kartu ${k + 1}/${nKartu} · ${new Date().toLocaleDateString('id-ID')}</p>`
+          ? `${legendaHtml()}${htmlKruProperti(m)}${notes.trim() ? `<p class="notes">${esc(notes)}</p>` : ''}<p class="kaki">muka belakang · kartu ${k + 1}/${nKartu} · ${new Date().toLocaleDateString('id-ID')}</p>`
           : `<p class="kaki">kartu ${k + 1}/${nKartu} · bersambung ke kartu ${k + 2} →</p>`
         return `<section class="kartu" data-pemain="${esc(m.name)}" data-kartu="${k + 1}/${nKartu}">
         <span class="gunting tl">✂</span><span class="gunting tr">✂</span><span class="gunting bl">✂</span><span class="gunting br">✂</span>
@@ -405,7 +424,7 @@ export function DotSheetModal({
       for (let i = 0; i < semuaKartu.length; i += 2) {
         halaman.push(`<div class="halaman">${semuaKartu.slice(i, i + 2).join(pisah)}</div>`)
       }
-      const penanda = barisPenandaCetak(drill.markers ?? [], sYd)
+      const penanda = barisPenandaCetak(drill.markers ?? [], sYd, rosterById)
       if (penanda) halaman.push(`<div class="halaman">${penanda}</div>`)
 
       return printShell(
@@ -461,6 +480,7 @@ export function DotSheetModal({
           <tbody>${rowsFor(m, false, lpc)}</tbody>
         </table>
         ${legendaHtml()}
+        ${htmlKruProperti(m)}
         ${notes.trim() ? `<p class="notes">${esc(notes)}</p>` : ''}
       </section>`,
       )
@@ -473,6 +493,7 @@ export function DotSheetModal({
          header { border-bottom: 1.5px solid #000; padding-bottom: 6px; margin-bottom: 8px; }
          table { font-size: 11px; }
          th, td { padding: 4px 6px; }
+         .isyarat-a4 { font-size: 9px; color: #334155; font-weight: 600; margin-top: 1px; }
          .notes { margin-top: 8px; font-size: 10.5px; }
          .legend { margin-top: 4px; font-size: 9px; color:#555; }
          .kompas { display:flex; gap:8px; align-items:center; margin-bottom:6px; padding:4px 6px; border:1px solid #cbd5e1; background:#f8fafc; font-size:9px; color:#475569; line-height:1.4; }
@@ -485,7 +506,7 @@ export function DotSheetModal({
          <p class="sub">Lembar koordinat (dot sheet) · ${new Date().toLocaleDateString('id-ID')}</p>
        </div>
        ${pages}
-       ${barisPenandaCetak(drill.markers ?? [], sYd)}`,
+       ${barisPenandaCetak(drill.markers ?? [], sYd, rosterById)}`,
       `${css}
        h1 { font-size: 15px; margin: 0 0 2px; }
        .head { margin-bottom: 10px; }

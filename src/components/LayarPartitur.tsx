@@ -736,7 +736,7 @@ export function LayarPartitur({
         }}
         className={cx(
           layarPenuh
-            ? 'fixed inset-0 z-40 flex flex-col p-3 sm:p-5'
+            ? 'fixed inset-0 z-[110] flex flex-col p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-5'
             : 'min-w-0 rounded-2xl border p-4 shadow-sm sm:p-5 lg:col-span-3',
         )}
       >

@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cx } from '../lib/utils'
 
 /* --------------------------------- Toast -------------------------------- */
@@ -26,7 +27,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastCtx.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[100] flex flex-col items-center gap-2 px-4 sm:bottom-6">
+      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[250] flex flex-col items-center gap-2 px-4 sm:bottom-6">
         {items.map((t) => (
           <div
             key={t.id}
@@ -287,13 +288,13 @@ export function Modal({
   }, [open])
 
   if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+  const konten = (
+    <div className="no-print fixed inset-0 z-[220] flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
       <div className="absolute inset-0" onClick={onClose} />
       <div
         data-testid={testId}
         className={cx(
-          'relative max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-slate-800 bg-slate-900 shadow-2xl sm:rounded-2xl',
+          'relative max-h-[92vh] max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl border border-slate-800 bg-slate-900 shadow-2xl sm:rounded-2xl',
           wide ? 'sm:max-w-3xl' : 'sm:max-w-lg',
         )}
       >
@@ -317,17 +318,18 @@ export function Modal({
           bawah sekali. Tanpa ruang ini, tombol di akhir isi — misalnya
           "Tambah segmen" di editor lagu — tidak bisa diklik.
         */}
-        <div className={cx('space-y-4 px-5 pt-4', footer ? 'pb-20' : 'pb-4')}>
+        <div className={cx('space-y-4 px-5 pt-4', footer ? 'pb-20' : 'pb-[max(1rem,env(safe-area-inset-bottom))]')}>
           {children}
         </div>
         {footer && (
-          <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-800 bg-slate-900/95 px-5 py-3.5 backdrop-blur">
+          <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-800 bg-slate-900/95 px-5 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] backdrop-blur">
             {footer}
           </div>
         )}
       </div>
     </div>
   )
+  return typeof document !== 'undefined' ? createPortal(konten, document.body) : konten
 }
 
 export function ConfirmButton({
