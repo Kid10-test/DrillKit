@@ -681,6 +681,7 @@ export const TABEL_BACKUP: { kolom: string; label: string }[] = [
   { kolom: 'evaluasi', label: 'Evaluasi' },
   { kolom: 'targetSetoran', label: 'Target setoran' },
   { kolom: 'setoran', label: 'Setoran hafalan' },
+  { kolom: 'logPerubahan', label: 'Log perubahan show' },
 ]
 
 /**
@@ -723,7 +724,17 @@ export const TABEL_DATA: { kolom: string; label: string }[] = [
 export function ringkasDataPindah(
   data: unknown,
   ada: Record<string, string[]> = {},
-): { baris: BarisPratinjau[]; total: number } {
+): {
+  baris: BarisPratinjau[]
+  total: number
+  asistenSeksi?: {
+    seksi: string
+    labelSeksi: string
+    oleh?: string
+    rentang: 'hari-ini' | '7-hari' | 'semua'
+    tanggalAcuan: string
+  }
+} {
   const d = (data ?? {}) as Record<string, unknown>
   const baris: BarisPratinjau[] = []
   for (const t of TABEL_DATA) {
@@ -731,7 +742,31 @@ export function ringkasDataPindah(
     if (h.jumlah === 0) continue
     baris.push({ label: t.label, ...h })
   }
-  return { baris, total: baris.reduce((a, b) => a + b.jumlah, 0) }
+  const mentahAsisten = d.asistenSeksi as Record<string, unknown> | undefined
+  const rentangMentah = mentahAsisten?.rentang
+  const rentangSah: 'hari-ini' | '7-hari' | 'semua' =
+    rentangMentah === 'hari-ini' || rentangMentah === '7-hari' || rentangMentah === 'semua'
+      ? rentangMentah
+      : 'semua'
+  const asistenSeksi =
+    mentahAsisten && typeof mentahAsisten === 'object' && typeof mentahAsisten.seksi === 'string'
+      ? {
+          seksi: mentahAsisten.seksi,
+          labelSeksi:
+            typeof mentahAsisten.labelSeksi === 'string'
+              ? mentahAsisten.labelSeksi
+              : mentahAsisten.seksi,
+          oleh: typeof mentahAsisten.oleh === 'string' ? mentahAsisten.oleh : undefined,
+          rentang: rentangSah,
+          tanggalAcuan:
+            typeof mentahAsisten.tanggalAcuan === 'string' ? mentahAsisten.tanggalAcuan : '',
+        }
+      : undefined
+  return {
+    baris,
+    total: baris.reduce((a, b) => a + b.jumlah, 0),
+    ...(asistenSeksi ? { asistenSeksi } : {}),
+  }
 }
 
 export interface RingkasanShow {
@@ -860,6 +895,7 @@ export {
   namaPaketAnggota,
   namaPaketGrup,
   namaRepertoar,
+  namaSetoranSeksi,
   namaShow,
   namaZipAnggota,
 } from './namaBerkas'

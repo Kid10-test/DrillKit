@@ -19,6 +19,7 @@ import type { ShareBundle, Song } from '../db/types'
 import { paketGrup, paketAnggota } from './bagikan'
 import type { PetaKunci } from './kunci'
 import { enkripsi, dekripsi, imporKunci } from './kunci'
+import { bandingkanPaketShow } from './logPerubahan'
 
 export const NAMA_BERKAS = 'paket.json'
 export const KUNCI_TERBIT = 'drillkit.terbit'
@@ -396,10 +397,16 @@ export function gabungPembaruan(
   lama: ShareBundle | null | undefined,
   laguLokal: Song[] = [],
 ): ShareBundle {
+  let perubahanPaket = baru.perubahanPaket
+  if (!perubahanPaket && lama && materiLebihBaru(lama.exportedAt, baru.exportedAt)) {
+    const diffOtomatis = bandingkanPaketShow(lama, baru)
+    if (diffOtomatis.butir.length > 0) perubahanPaket = diffOtomatis
+  }
   return {
     ...baru,
     songs: gabungLagu(baru.songs ?? [], lama?.songs, laguLokal),
     targetSetoran: baru.targetSetoran ?? lama?.targetSetoran,
+    perubahanPaket,
     attendance: lama?.attendance ?? [],
     memberNotes: lama?.memberNotes ?? [],
     setoran: lama?.setoran ?? [],
@@ -509,11 +516,12 @@ export async function susunTerkunci(
   const terkunci: DataTerkunci = {}
   const tanpaKunci: string[] = []
 
-  // #13a — `partiturPaket` sudah tercantum sekali di bagian terbuka `grup`
-  // (`paket.json`), jadi tidak dienkripsi berulang kali per anggota di `locked`.
-  const tanpaLampiranPartitur: ShareBundle = b.partiturPaket
-    ? { ...b, partiturPaket: undefined }
-    : b
+  // #13a & #15b — `partiturPaket` dan `perubahanPaket` sudah tercantum sekali di
+  // bagian terbuka `grup` (`paket.json`), jadi tidak dienkripsi berulang per anggota.
+  const tanpaLampiranPartitur: ShareBundle =
+    b.partiturPaket || b.perubahanPaket
+      ? { ...b, partiturPaket: undefined, perubahanPaket: undefined }
+      : b
 
   for (const m of b.members) {
     const kunciBase64 = petaKunci[m.id]

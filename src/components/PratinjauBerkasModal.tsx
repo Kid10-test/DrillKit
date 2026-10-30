@@ -19,6 +19,7 @@ import {
   ringkasPaket,
   type BerkasDikenal,
 } from '../lib/bukaBerkas'
+import { LABEL_RENTANG_SEKSI } from '../lib/kolaborasiSeksi'
 import { pulihkanAudioDariZipPaket, simpanPaketAnggota } from '../lib/paketMasuk'
 import { cekBerkas, type BerkasShow } from '../lib/show'
 import { bacaPaket, perluPeringatan, ringkasanImpor, terapkanPaket } from '../lib/repertoar'
@@ -241,6 +242,22 @@ function TubuhData({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => vo
 
   return (
     <div data-testid="buka-data">
+      {ringkas.asistenSeksi && (
+        <div
+          data-testid="buka-info-asisten-seksi"
+          className="mb-3 rounded-lg border border-emerald-700/50 bg-emerald-950/25 p-3 text-xs leading-relaxed text-emerald-100"
+        >
+          <p className="font-semibold text-emerald-200">
+            Setoran Asisten Seksi: {ringkas.asistenSeksi.labelSeksi}
+            {ringkas.asistenSeksi.oleh ? ` · oleh ${ringkas.asistenSeksi.oleh}` : ''}
+          </p>
+          <p className="mt-0.5 text-[11px] text-emerald-200/80">
+            Rentang: {LABEL_RENTANG_SEKSI[ringkas.asistenSeksi.rentang]}
+            {ringkas.asistenSeksi.tanggalAcuan ? ` (${ringkas.asistenSeksi.tanggalAcuan})` : ''} ·
+            Digabung aman per seksi tanpa menimpa seksi lain.
+          </p>
+        </div>
+      )}
       {idLokal == null ? (
         <p className="text-xs text-slate-500">Menghitung isi berkas…</p>
       ) : (
@@ -266,12 +283,13 @@ function TubuhData({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => vo
         </ul>
       )}
       <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-        Penerapannya di menu Data — di sana Anda bisa mencocokkan anggota dulu sebelum menekan
-        Terapkan.
+        {ringkas.asistenSeksi
+          ? 'Di menu Data Anda akan melihat ringkasan per seksi, seksi mana saja yang aman tak tersentuh, dan penyelesaian bentrokan sebelum menekan Terapkan.'
+          : 'Penerapannya di menu Data — di sana Anda bisa mencocokkan anggota dulu sebelum menekan Terapkan.'}
       </p>
       <div className="mt-3 flex justify-end">
         <Button variant="primary" data-testid="buka-lanjut-data" onClick={lanjut}>
-          Buka di menu Data
+          {ringkas.asistenSeksi ? 'Gabung setoran seksi di Data' : 'Buka di menu Data'}
         </Button>
       </div>
     </div>
