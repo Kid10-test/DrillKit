@@ -202,7 +202,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="mt-auto px-3 pt-4">
           <KioskButton full />
           <p className="pt-3 text-[11px] leading-relaxed text-slate-600">
-            DrillKit v1.1.2 · rilis{' '}
+            DrillKit v1.2.0 · rilis{' '}
             <span data-testid="cap-build-singkat">{capBuildSingkat()}</span> — data tersimpan di
             perangkat ini, tetap jalan offline.
           </p>

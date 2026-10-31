@@ -249,6 +249,13 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 
 /* --------------------------------- Modal --------------------------------- */
 
+/**
+ * Tumpukan penutup modal aktif supaya menekan `Escape` saat ada modal berlapis
+ * (mis. `DotSheetModal` + `Pratinjau hasil cetak`) hanya menutup modal paling
+ * atas, bukan menutup keduanya sekaligus.
+ */
+const tumpukanModal: (() => void)[] = []
+
 export function Modal({
   open,
   onClose,
@@ -267,24 +274,24 @@ export function Modal({
   /** M1 — penanda untuk pengujian; diletakkan di panel dalam modal. */
   testId?: string
 }) {
-  /**
-   * `onClose` disimpan di ref supaya efek ini **tidak perlu dipasang ulang**
-   * setiap kali induknya render ulang. Dulu efeknya bergantung pada
-   * `onClose` (fungsi baru tiap render) — setiap render ulang, listener
-   * Escape dilepas lalu dipasang lagi, dan kalau kebetulan ada tombol Escape
-   * yang masuk di sela itu, tekanannya hilang (modal baru menutup pada
-   * tekanan kedua). Dengan ref, listener terpasang sekali selama modal
-   * terbuka, jadi Escape selalu diterima.
-   */
   const closeRef = useRef(onClose)
   closeRef.current = onClose
   useEffect(() => {
     if (!open) return
+    const tutupIni = () => closeRef.current()
+    tumpukanModal.push(tutupIni)
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeRef.current()
+      if (e.key === 'Escape' && tumpukanModal[tumpukanModal.length - 1] === tutupIni) {
+        e.stopImmediatePropagation()
+        tutupIni()
+      }
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      const i = tumpukanModal.lastIndexOf(tutupIni)
+      if (i >= 0) tumpukanModal.splice(i, 1)
+    }
   }, [open])
 
   if (!open) return null

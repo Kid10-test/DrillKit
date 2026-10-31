@@ -14,7 +14,7 @@ import {
   ringkasKoreografiSet,
   titikJalur,
 } from '../lib/gerak'
-import { penandaEfektifPadaSet } from '../lib/propertiGerak'
+import { apakahPropertiBergerak, penandaEfektifPadaSet } from '../lib/propertiGerak'
 import { TINGKAT_LABEL, URUTAN_TINGKAT, analisisPerpindahan, lebihBerat } from '../lib/analitik'
 import { stepYd } from '../lib/field'
 import { useSettings } from '../hooks/useSettings'
@@ -129,6 +129,7 @@ export function DrillPresenter({
   const ordered = useMemo(() => [...sets].sort((a, b) => a.order - b.order), [sets])
   const [idx, setIdx] = useState(Math.min(Math.max(0, startIdx), Math.max(0, ordered.length - 1)))
   const [playing, setPlaying] = useState(false)
+  const [progresProp, setProgresProp] = useState(0)
   /**
    * Putar 90° supaya lapangan memenuhi layar HP yang dipegang tegak.
    * Nilai awal mengikuti bentuk layar: kalau tinggi > lebar (HP berdiri),
@@ -499,6 +500,7 @@ export function DrillPresenter({
     for (const [id, pt] of Object.entries(set.points)) awalSvg[id] = { x: sx(pt.x), y: sy(pt.y) }
     for (const [id, pt] of Object.entries(nextSet.points)) akhirSvg[id] = { x: sx(pt.x), y: sy(pt.y) }
     const petaFtl = gr.kelompok?.length ? bangunPetaFtl(gr.kelompok, awalSvg, akhirSvg) : new Map()
+    const adaPropGerak = (drill.markers ?? []).some(apakahPropertiBergerak)
     const loop = () => {
       const p = Math.min(1, (performance.now() - t0) / total)
       for (const [id, vx, vy] of vec) {
@@ -517,10 +519,12 @@ export function DrillPresenter({
               : titikJalur(t, vx, vy, lengkungGerak)
         g.setAttribute('transform', `translate(${tx} ${ty})`)
       }
+      if (adaPropGerak) setProgresProp(p)
       if (p < 1) {
         rafRef.current = requestAnimationFrame(loop)
       } else {
         for (const [id] of vec) dotRefs.current.get(id)?.removeAttribute('transform')
+        if (adaPropGerak) setProgresProp(0)
         hentiKlik()
         setPlaying(false)
         setIdx((i) => Math.min(i + 1, ordered.length - 1))
@@ -914,7 +918,7 @@ export function DrillPresenter({
 
             {/* A7 & #16.4 — penanda lapangan & properti bergerak ikut tampil di layar latihan. */}
             <MarkerLayer
-              markers={penandaEfektifPadaSet(drill.markers ?? [], ordered, idx)}
+              markers={penandaEfektifPadaSet(drill.markers ?? [], ordered, idx, progresProp)}
               sx={sx}
               sy={sy}
               redup

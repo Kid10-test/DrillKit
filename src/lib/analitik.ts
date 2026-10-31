@@ -6,7 +6,7 @@ import type {
   Member,
   SetelanLangkah,
 } from '../db/types'
-import { gerakOf, tundaFraksi } from './gerak'
+import { bangunPetaFtl, countEfektifPemain, gerakOf, kelompokPemain } from './gerak'
 import { sectionLabel } from './utils'
 
 /**
@@ -252,10 +252,14 @@ export function analisisPerpindahan(
   const amb = ambangEfektif(ambang)
 
   const g = gerakOf(dari.gerak)
-  // 31e — kalau desainer memilih jarak lurus, kelengkungan diabaikan:
+  // 31e — kalau desainer memilih jarak lurus, kelengkungan & FTL diabaikan:
   // yang dihitung perpindahan titik awal → akhir, bukan jarak tempuh kaki.
-  const rasio =
+  const rasioDasar =
     dasarJarak === 'lurus' ? 1 : g.jalur === 'lengkung' ? rasioLengkung(g.lengkung) : 1
+  const petaFtlYd =
+    dasarJarak !== 'lurus' && g.kelompok?.length
+      ? bangunPetaFtl(g.kelompok, dari.points, ke.points)
+      : new Map()
   const perMenit = Math.max(1, tempo) / Math.max(1, beatsPerCount)
 
   const daftar: MetrikPemain[] = []
@@ -264,12 +268,20 @@ export function analisisPerpindahan(
     const p = dari.points[m.id]
     const q = ke.points[m.id]
     if (!p || !q) continue
+    const ftl = petaFtlYd.get(m.id)
+    const klp = kelompokPemain(g, m.id)
     const lurusYd = Math.hypot(q.x - p.x, q.y - p.y)
-    if (lurusYd < 0.01) continue
-    const jarakYd = lurusYd * rasio
-    // Waktu yang tersedia buat pemain ini (DD2: section yang ditunda waktunya
-    // terpotong, jadi ia harus mengejar).
-    const sisa = counts * (1 - tundaFraksi(g, m.section, counts))
+    const jarakYd = ftl
+      ? ftl.totalPanjang
+      : dasarJarak === 'lurus'
+        ? lurusYd
+        : klp
+          ? lurusYd * (klp.jalur === 'lengkung' ? rasioLengkung(klp.lengkung ?? 0.4) : 1)
+          : lurusYd * rasioDasar
+    if (jarakYd < 0.01) continue
+    // Waktu yang benar-benar tersedia buat pemain ini (memperhitungkan
+    // Move+Hold `jalanCount`, `tunda` per seksi, dan gelombang `ripple`).
+    const sisa = countEfektifPemain(g, m.section, counts, m.id)
 
     /**
      * DD10b — dua cara menghitung langkah, dipilih per pemain per perpindahan.

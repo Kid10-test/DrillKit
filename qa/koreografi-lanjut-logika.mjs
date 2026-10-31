@@ -31,6 +31,10 @@ import {
   bandingkanKeadaanShow,
   cicipKeadaanShow,
 } from '/tmp/logPerubahan.mjs'
+import { analisisPerpindahan } from '/tmp/analitik.mjs'
+import { pecahSet } from '/tmp/segmen.mjs'
+import { tulisUlangDrill, tulisUlangSet } from '/tmp/namaAnggota.mjs'
+import { putusRujukan } from '/tmp/pindah.mjs'
 
 let lulus = 0
 let gagal = 0
@@ -305,6 +309,101 @@ console.log('== #16 Koreografi Visual Lanjut — Uji Logika Murni ==')
     log.butir.some((b) => b.teks.includes('koreografi visual')) &&
       log.butir.some((b) => b.teks.includes('properti panggung')),
     'bandingkanKeadaanShow mencatat pembaruan koreografi visual dan properti panggung di log show',
+  )
+}
+
+/* ---- 6. Integrasi Analitik, Pecah Set, Gabung Anggota, & Pindah Data ---- */
+{
+  const anggota = [
+    { id: 'm1', code: 'T1', name: 'Adi', section: 'brass', active: 1, token: '' },
+    { id: 'm2', code: 'T2', name: 'Budi', section: 'brass', active: 1, token: '' },
+  ]
+  // Jarak 10 yard = 16 langkah 8-to-5 (0,625 yd). Pada 16 count jalanCount=8 -> 2 lk/cnt!
+  const s1 = {
+    id: 's1',
+    drillId: 'd1',
+    order: 0,
+    name: '1',
+    counts: 16,
+    points: {
+      m1: { x: 0, y: 0, facing: 'front' },
+      m2: { x: -10, y: 0, facing: 'front' },
+    },
+    gerak: {
+      jalur: 'lurus',
+      jalanCount: 8,
+      kelompok: [{ id: 'k1', nama: 'Ular', memberIds: ['m1', 'm2'], jalur: 'ftl' }],
+      ripple: { mode: 'kejar', selangCount: 2, urutan: { m1: 0, m2: 1 } },
+    },
+  }
+  const s2 = {
+    id: 's2',
+    drillId: 'd1',
+    order: 1,
+    name: '2',
+    counts: 8,
+    points: {
+      m1: { x: 0, y: 10, facing: 'front' },
+      m2: { x: 0, y: 0, facing: 'front' },
+    },
+  }
+  const hasilAnalitik = analisisPerpindahan(s1, s2, anggota, 0.625, 120, 1)
+  const metM1 = hasilAnalitik.daftar.find((d) => d.id === 'm1')
+  cek(
+    dekat(metM1.langkahPerCount, 2, 0.01) && dekat(metM1.langkahPerMenit, 240, 0.1),
+    'analisisPerpindahan menghitung kecepatan sebenarnya berdasarkan jalanCount (Move+Hold)',
+  )
+
+  // Pecah set di hitungan 8 pada Move 8 + Hold 8 -> tengah m1 sudah di tujuan (0, 10)
+  const pecahan = pecahSet({
+    counts: 16,
+    points: s1.points,
+    gerak: s1.gerak,
+    tujuan: s2.points,
+    di: 8,
+  })
+  cek(
+    dekat(pecahan.tengah.m1.y, 10) && pecahan.gerakKedua.jalanCount === undefined,
+    'pecahSet menjaga posisi tiba Move+Hold/FTL dan membersihkan jalanCount berlebih di pecahan ke-2',
+  )
+
+  // Gabung duplikat anggota (m2 -> m_baru) menulis ulang kelompok FTL, ripple, & kruIds properti
+  const petaGabung = { m2: 'm_baru' }
+  const { set: setBaru } = tulisUlangSet(s1, petaGabung)
+  const drillBaru = tulisUlangDrill(
+    {
+      id: 'd1',
+      name: 'Pembuka',
+      tempo: 120,
+      beatsPerCount: 1,
+      rosterIds: ['m1', 'm2'],
+      markers: [{ id: 'mk1', jenis: 'kotak', label: 'Menara', x: 0, y: 0, warna: '#f59e0b', kruIds: ['m2'] }],
+    },
+    petaGabung,
+  )
+  cek(
+    setBaru.gerak.kelompok[0].memberIds.includes('m_baru') &&
+      setBaru.gerak.ripple.urutan.m_baru === 1 &&
+      drillBaru.markers[0].kruIds[0] === 'm_baru',
+    'tulisUlangSet & tulisUlangDrill menulis ulang ID anggota pada FTL, Ripple, dan kru properti',
+  )
+
+  // putusRujukan menyaring ID anggota yang hilang dari kru properti, kelompok gerak, & ripple
+  const { berkas: bersih, putus } = putusRujukan(
+    {
+      format: 'drillkit-pindah',
+      versi: 1,
+      dibuat: 1000,
+      drill: [drillBaru],
+      set: [setBaru],
+    },
+    { anggota: ['m1'], drill: ['d1'] },
+  )
+  cek(
+    bersih.drill[0].markers[0].kruIds === undefined &&
+      !bersih.set[0].gerak.kelompok[0].memberIds.includes('m_baru') &&
+      putus.some((p) => p.kolom === 'kru properti'),
+    'putusRujukan menyaring ID anggota tak dikenal pada kru properti, kelompok FTL, & ripple serta melaporkannya',
   )
 }
 

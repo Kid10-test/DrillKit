@@ -21,7 +21,7 @@ import {
   ringkasKoreografiSet,
   titikJalur,
 } from "../../lib/gerak"
-import { penandaEfektifPadaSet, tugasKruPropertiAnggota } from "../../lib/propertiGerak"
+import { apakahPropertiBergerak, penandaEfektifPadaSet, tugasKruPropertiAnggota } from "../../lib/propertiGerak"
 import {
   LABEL_JENJANG_SETORAN,
   LABEL_KATEGORI_SETORAN,
@@ -83,6 +83,7 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
   /** Elemen <g> tiap titik — dipakai untuk menggerakkan saat animasi. */
   const dotRefs = useRef(new Map<string, SVGGElement>())
   const rafRef = useRef(0)
+  const [progresProp, setProgresProp] = useState(0)
 
   /**
    * Animasi perpindahan ke set berikutnya. Sama seperti mode presenter: titik
@@ -111,6 +112,7 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
     const lengkung = gr.jalur === 'lengkung' ? gr.lengkung : 0
     const petaFtl = gr.kelompok?.length ? bangunPetaFtl(gr.kelompok, awalSvg, akhirSvg) : new Map()
     const seksiMap = new Map(members.map((m) => [m.id, m.section]))
+    const adaPropGerak = (drill.markers ?? []).some(apakahPropertiBergerak)
     const loop = () => {
       const p = Math.min(1, (performance.now() - t0) / total)
       for (const [id, vx, vy] of vec) {
@@ -126,10 +128,12 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
             : titikJalur(t, vx, vy, lengkung)
         g.setAttribute('transform', `translate(${tx} ${ty})`)
       }
+      if (adaPropGerak) setProgresProp(p)
       if (p < 1) {
         rafRef.current = requestAnimationFrame(loop)
       } else {
         for (const [id] of vec) dotRefs.current.get(id)?.removeAttribute('transform')
+        if (adaPropGerak) setProgresProp(0)
         setPlaying(false)
         setSetId(nextSet.id)
       }
@@ -209,7 +213,7 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
             <FieldSurface f={f} VW={VW} VH={VH} sx={sx} sy={sy} />
             {(drill.markers?.length ?? 0) > 0 && (
               <MarkerLayer
-                markers={penandaEfektifPadaSet(drill.markers ?? [], sets, idxSet)}
+                markers={penandaEfektifPadaSet(drill.markers ?? [], sets, idxSet, progresProp)}
                 sx={sx}
                 sy={sy}
               />

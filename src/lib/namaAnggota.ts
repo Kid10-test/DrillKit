@@ -282,16 +282,53 @@ export function tulisUlangSet(
 ): { set: DrillSet; bentrok: string[] } {
   if (!Object.keys(peta).length) return { set, bentrok: [] }
   const sentuh = (rec?: Record<string, unknown>) => !!rec && Object.keys(rec).some((k) => k in peta)
-  if (!sentuh(set.points) && !sentuh(set.langkah)) return { set, bentrok: [] }
+  const sentuhKelompok = Boolean(
+    set.gerak?.kelompok?.some((k) => k.memberIds.some((id) => id in peta)),
+  )
+  const sentuhRipple = sentuh(set.gerak?.ripple?.urutan)
+  if (!sentuh(set.points) && !sentuh(set.langkah) && !sentuhKelompok && !sentuhRipple) {
+    return { set, bentrok: [] }
+  }
   const titik = petaKunci(set.points, peta, `Titik ${set.name || set.id}`)
   const langkah = set.langkah ? petaKunci(set.langkah, peta, `Langkah ${set.name || set.id}`) : null
+  const rippleBaru =
+    set.gerak?.ripple && sentuhRipple
+      ? petaKunci(set.gerak.ripple.urutan, peta, `Ripple ${set.name || set.id}`)
+      : null
+  const gerakBaru =
+    (sentuhKelompok || rippleBaru) && set.gerak
+      ? {
+          ...set.gerak,
+          ...(sentuhKelompok && set.gerak.kelompok
+            ? {
+                kelompok: set.gerak.kelompok.map((klp) => ({
+                  ...klp,
+                  memberIds: tulisUlangRoster(klp.memberIds, peta),
+                })),
+              }
+            : {}),
+          ...(rippleBaru && set.gerak.ripple
+            ? {
+                ripple: {
+                  ...set.gerak.ripple,
+                  urutan: rippleBaru.rec,
+                },
+              }
+            : {}),
+        }
+      : set.gerak
   return {
     set: {
       ...set,
       points: titik.rec,
       ...(langkah ? { langkah: langkah.rec } : {}),
+      ...(gerakBaru ? { gerak: gerakBaru } : {}),
     },
-    bentrok: [...titik.bentrok, ...(langkah?.bentrok ?? [])],
+    bentrok: [
+      ...titik.bentrok,
+      ...(langkah?.bentrok ?? []),
+      ...(rippleBaru?.bentrok ?? []),
+    ],
   }
 }
 
@@ -309,8 +346,24 @@ export function tulisUlangRoster(ids: string[] | undefined, peta: Record<string,
 
 export function tulisUlangDrill(drill: Drill, peta: Record<string, string>): Drill {
   if (!Object.keys(peta).length) return drill
-  if (!(drill.rosterIds ?? []).some((id) => id in peta)) return drill
-  return { ...drill, rosterIds: tulisUlangRoster(drill.rosterIds, peta) }
+  const sentuhRoster = (drill.rosterIds ?? []).some((id) => id in peta)
+  const sentuhKru = Boolean(
+    drill.markers?.some((mk) => mk.kruIds?.some((id) => id in peta)),
+  )
+  if (!sentuhRoster && !sentuhKru) return drill
+  return {
+    ...drill,
+    ...(sentuhRoster ? { rosterIds: tulisUlangRoster(drill.rosterIds, peta) } : {}),
+    ...(sentuhKru && drill.markers
+      ? {
+          markers: drill.markers.map((mk) =>
+            mk.kruIds?.some((id) => id in peta)
+              ? { ...mk, kruIds: tulisUlangRoster(mk.kruIds, peta) }
+              : mk,
+          ),
+        }
+      : {}),
+  }
 }
 
 export function tulisUlangAbsensi(

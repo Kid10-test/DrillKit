@@ -159,6 +159,29 @@ export async function imporShow(data: BerkasShow, mode: ModeImpor): Promise<Hasi
   if (mode === 'salinan') {
     drillId = uid('dr_')
     nama = `${data.drill.name} (dari ${data.tim || 'berkas'})`
+    // Set ikut jadi milik show baru, dengan id baru supaya tidak tabrakan.
+    // Peta id lama -> id baru ikut memetakan keyframe `markers[].perSet` (#16.4).
+    const petaIdSet = new Map<string, string>()
+    const sets: DrillSet[] = data.sets
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map((s, i) => {
+        const idBaru = uid('st_')
+        petaIdSet.set(s.id, idBaru)
+        return { ...s, id: idBaru, drillId, order: i, points: { ...s.points } }
+      })
+    const markersSalinan = (data.drill.markers ?? []).map((m) => {
+      if (!m.perSet) return { ...m }
+      const perSetBaru: NonNullable<typeof m.perSet> = {}
+      for (const [idLama, kf] of Object.entries(m.perSet)) {
+        const idTujuan = petaIdSet.get(idLama)
+        if (idTujuan) perSetBaru[idTujuan] = { ...kf }
+      }
+      return {
+        ...m,
+        perSet: Object.keys(perSetBaru).length ? perSetBaru : undefined,
+      }
+    })
     await db.drills.put({
       ...data.drill,
       // #7 — berkas show lama/buatan tangan bisa tidak membawa `field`
@@ -168,15 +191,10 @@ export async function imporShow(data: BerkasShow, mode: ModeImpor): Promise<Hasi
       id: drillId,
       name: nama,
       rosterIds: [...(data.drill.rosterIds ?? [])],
-      markers: (data.drill.markers ?? []).map((m) => ({ ...m })),
+      markers: markersSalinan,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     })
-    // Set ikut jadi milik show baru, dengan id baru supaya tidak tabrakan.
-    const sets: DrillSet[] = data.sets
-      .slice()
-      .sort((a, b) => a.order - b.order)
-      .map((s, i) => ({ ...s, id: uid('st_'), drillId, order: i, points: { ...s.points } }))
     await db.sets.bulkPut(sets)
     return { drillId, nama, setDitulis: sets.length, setDihapus: 0, anggotaBaru: anggotaBaru.length, laguBaru }
   }

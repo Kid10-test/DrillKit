@@ -388,6 +388,77 @@ export function putusRujukan(
     if (sah.length !== kemajuan.length) hasil.kemajuan = sah
   }
 
+  // #16 — Saring rujukan anggota di dalam `drill.markers[].kruIds`,
+  // `set.gerak.kelompok[].memberIds`, serta `set.gerak.ripple.urutan` agar
+  // impor sebagian tidak menyisakan ID anggota yang tidak ada di perangkat.
+  const idAnggotaSah = kumpulkanId(berkas, yangAda, 'anggota')
+  const daftarDrill = ambil(hasil, 'drill') as Drill[]
+  for (const d of daftarDrill) {
+    if (!d.markers?.length) continue
+    let berubah = false
+    const markersBaru = d.markers.map((mk) => {
+      if (!mk.kruIds?.length) return mk
+      const sah = mk.kruIds.filter((id) => idAnggotaSah.has(id))
+      if (sah.length === mk.kruIds.length) return mk
+      berubah = true
+      for (const id of mk.kruIds) {
+        if (!idAnggotaSah.has(id)) {
+          putus.push({ jenis: 'drill', id: d.id, kolom: 'kru properti', nilai: id })
+        }
+      }
+      return { ...mk, kruIds: sah.length ? sah : undefined }
+    })
+    if (berubah) d.markers = markersBaru
+  }
+
+  const daftarSet = ambil(hasil, 'set') as DrillSet[]
+  for (const s of daftarSet) {
+    if (!s.gerak) continue
+    let klpBerubah = false
+    let kelompokBaru = s.gerak.kelompok
+    if (s.gerak.kelompok?.length) {
+      kelompokBaru = s.gerak.kelompok
+        .map((klp) => {
+          const sah = klp.memberIds.filter((id) => idAnggotaSah.has(id))
+          if (sah.length === klp.memberIds.length) return klp
+          klpBerubah = true
+          for (const id of klp.memberIds) {
+            if (!idAnggotaSah.has(id)) {
+              putus.push({ jenis: 'set', id: s.id, kolom: 'kelompok gerak', nilai: id })
+            }
+          }
+          return { ...klp, memberIds: sah }
+        })
+        .filter((klp) => klp.memberIds.length > 0)
+    }
+
+    let rplBerubah = false
+    let rippleBaru = s.gerak.ripple
+    if (s.gerak.ripple?.urutan) {
+      const urutanSah: Record<string, number> = {}
+      for (const [id, gel] of Object.entries(s.gerak.ripple.urutan)) {
+        if (idAnggotaSah.has(id)) urutanSah[id] = gel
+        else {
+          rplBerubah = true
+          putus.push({ jenis: 'set', id: s.id, kolom: 'ripple', nilai: id })
+        }
+      }
+      if (rplBerubah) {
+        rippleBaru = Object.keys(urutanSah).length
+          ? { ...s.gerak.ripple, urutan: urutanSah }
+          : undefined
+      }
+    }
+
+    if (klpBerubah || rplBerubah) {
+      s.gerak = {
+        ...s.gerak,
+        kelompok: kelompokBaru?.length ? kelompokBaru : undefined,
+        ripple: rippleBaru,
+      }
+    }
+  }
+
   return { berkas: hasil, putus }
 }
 

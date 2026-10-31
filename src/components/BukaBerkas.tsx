@@ -50,14 +50,21 @@ export function mintaPratinjau(hasil: BerkasDikenal, bita?: Uint8Array): void {
   // dengan pesan MusicXML terkompresi). Urai secara asinkron di sini supaya
   // semua tombol lama ikut mengenali .mxl tanpa menarik mxl/partitur di awal.
   if (bita && hasil.jenis === 'tak-dikenal' && hasil.catatan?.includes('MusicXML terkompresi (.mxl)')) {
-    void import('../lib/bukaBerkas').then(({ kenaliBerkasAsync }) =>
-      kenaliBerkasAsync(hasil.nama, bita).then((baru) => {
-        siarkan({ hasil: baru, bita })
-      }),
+    void Promise.all([import('../lib/bukaBerkas'), import('./PratinjauBerkasModal')]).then(
+      ([{ kenaliBerkasAsync }]) =>
+        kenaliBerkasAsync(hasil.nama, bita).then((baru) => {
+          siarkan({ hasil: baru, bita })
+        }),
     )
     return
   }
-  siarkan({ hasil, bita })
+  // Muat potongan kode `PratinjauBerkasModal` lebih dulu sebelum menyiarkan
+  // modal, sehingga begitu `[data-testid="modal-buka-berkas"]` muncul di DOM,
+  // seluruh isi (`buka-jenis`, `buka-tolak`, `buka-lanjut`) sudah siap tampil
+  // pada frame pertama tanpa jeda fallback `<Suspense>`.
+  void import('./PratinjauBerkasModal').then(() => {
+    siarkan({ hasil, bita })
+  })
 }
 
 export function tutupPratinjau(): void {

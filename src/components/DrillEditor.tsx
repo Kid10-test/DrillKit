@@ -72,11 +72,12 @@ import {
   susunBentukCepat,
   type OpsiBentukCepat,
 } from '../lib/bentukFormasi'
-import { penandaEfektifPadaSet } from '../lib/propertiGerak'
+import { apakahPropertiBergerak, penandaEfektifPadaSet } from '../lib/propertiGerak'
 import {
   type GerakLengkap,
   bangunPetaFtl,
   cocokPutaran,
+  countEfektifPemain,
   deltaBusur,
   deltaPoliFtl,
   gerakOf,
@@ -512,6 +513,8 @@ export function Editor({
 
   /** A7 — penanda lapangan milik drill ini (drill lama belum punya → []). */
   const markers = useMemo(() => drill?.markers ?? [], [drill?.markers])
+  const markersRef = useRef(markers)
+  markersRef.current = markers
 
   /** Simpan daftar penanda ke database drill. */
   const simpanPenanda = useCallback(
@@ -747,12 +750,23 @@ export function Editor({
     const mode = timpa?.mode ?? drill.setelanLangkah?.mode ?? 'tetap'
     if (mode === 'menyesuaikan') {
       const k = timpa?.langkahPerCount ?? drill.setelanLangkah?.langkahPerCount ?? 1
-      return Math.max(1, Math.round((set?.counts ?? 0) * k))
+      const cAktif = countEfektifPemain(gerakSet, seksiMember.get(id), set?.counts ?? 0, id)
+      return Math.max(1, Math.round(cAktif * k))
     }
+    const lurus = (drill.setelanJarak ?? 'jalur') === 'lurus'
+    if (!lurus && set && nextSet && gerakSet.kelompok?.some((k) => k.jalur === 'ftl' && k.memberIds.includes(id))) {
+      const petaYd = bangunPetaFtl(gerakSet.kelompok, set.points, nextSet.points)
+      const ftlYd = petaYd.get(id)
+      if (ftlYd && ftlYd.totalPanjang > 0) return Math.max(1, Math.round(ftlYd.totalPanjang / sYd))
+    }
+    const klp = kelompokPemain(gerakSet, id)
     // 31e — sama dengan analitik: `lurus` mengabaikan kelengkungan.
-    const rasio =
-      (drill.setelanJarak ?? 'jalur') === 'lurus'
-        ? 1
+    const rasio = lurus
+      ? 1
+      : klp
+        ? klp.jalur === 'lengkung'
+          ? rasioLengkung(klp.lengkung ?? 0.4)
+          : 1
         : gerakSet.jalur === 'lengkung'
           ? rasioLengkung(gerakSet.lengkung ?? 0)
           : 1
@@ -841,16 +855,32 @@ export function Editor({
     await db.drills.update(drill.id, { updatedAt: Date.now() })
   }
 
+  async function bersihkanKeyframeSetPenanda(idSetDihapus: string) {
+    if (!markers.some((m) => m.perSet && idSetDihapus in m.perSet)) return
+    const bersih = markers.map((m) => {
+      if (!m.perSet || !(idSetDihapus in m.perSet)) return m
+      const perSetBaru = { ...m.perSet }
+      delete perSetBaru[idSetDihapus]
+      return {
+        ...m,
+        perSet: Object.keys(perSetBaru).length ? perSetBaru : undefined,
+      }
+    })
+    await simpanPenanda(bersih)
+  }
+
   async function removeSet() {
     if (!set || sets.length <= 1) return
     // 1a — difoto dulu: menghapus set bersama semua titiknya adalah
     // kehilangan yang paling sering disesali, dan paling sering baru
     // disadari besoknya.
     await foto(drill.id, 'sebelum-hapus-set')
-    await db.sets.delete(set.id)
+    const idHapus = set.id
+    await db.sets.delete(idHapus)
+    await bersihkanKeyframeSetPenanda(idHapus)
     // K3 — centang untuk set ini tidak ada gunanya lagi.
-    await hapusTandaSet(drill.id, set.id)
-    const rest = sets.filter((s) => s.id !== set.id)
+    await hapusTandaSet(drill.id, idHapus)
+    const rest = sets.filter((s) => s.id !== idHapus)
     await Promise.all(rest.map((s, i) => (s.order === i ? null : db.sets.update(s.id, { order: i }))))
     setIdx(Math.max(0, idx - 1))
     toast.push('Set dihapus', 'info')
@@ -957,8 +987,10 @@ export function Editor({
     const counts = Math.max(1, Math.floor(set.counts)) + Math.max(1, Math.floor(nextSet.counts))
     const gerak = gabungGerak(set.gerak, nextSet.gerak)
     await db.sets.update(set.id, { counts, gerak })
-    await db.sets.delete(nextSet.id)
-    await hapusTandaSet(drill.id, nextSet.id)
+    const idLeleh = nextSet.id
+    await db.sets.delete(idLeleh)
+    await bersihkanKeyframeSetPenanda(idLeleh)
+    await hapusTandaSet(drill.id, idLeleh)
     await Promise.all(sets.slice(idx + 2).map((s, i) => db.sets.update(s.id, { order: idx + 1 + i })))
     await db.drills.update(drill.id, { updatedAt: Date.now() })
     setPecahTerbuka(false)
@@ -1942,7 +1974,7 @@ export function Editor({
               : titikJalur(t, vx, vy, lengkung)
         g.setAttribute('transform', `translate(${tx} ${ty})`)
       }
-      if (markers.some((m) => m.perSet && Object.keys(m.perSet).length > 0)) {
+      if (markersRef.current.some(apakahPropertiBergerak)) {
         setProgress(p)
       }
       tulisCount(p)

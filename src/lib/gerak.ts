@@ -187,6 +187,45 @@ export function progresPemain(
   return ease(Math.min(1, Math.max(0, lokal)), mudahEfektif)
 }
 
+/**
+ * #16 — Jumlah hitungan bergerak efektif yang tersedia bagi seorang pemain,
+ * setelah memotong fase *Hold* (`jalanCount`), `tunda` per seksi, serta
+ * gelombang `ripple` per pemain.
+ *
+ * Bila set tidak memakai `jalanCount`, `ripple`, maupun `kelompok`, hasilnya
+ * identik 100% dengan rumus lama `counts * (1 - tundaFraksi(g, sectionId, counts))`.
+ */
+export function countEfektifPemain(
+  g: GerakLengkap,
+  sectionId: string | undefined,
+  counts: number,
+  memberId?: string,
+): number {
+  const totalCount = Math.max(0, counts)
+  if (totalCount <= 0) return 0
+  const klp = kelompokPemain(g, memberId)
+  const rawJalan = klp?.jalanCount ?? g.jalanCount
+  const adaHold = typeof rawJalan === 'number' && rawJalan > 0 && rawJalan < totalCount
+  const jalanCount = adaHold ? rawJalan : totalCount
+
+  const tundaSeksiCount = sectionId ? Math.max(0, g.tunda[sectionId] ?? 0) : 0
+  const gelRipple =
+    memberId && g.ripple && typeof g.ripple.urutan?.[memberId] === 'number'
+      ? Math.max(0, g.ripple.urutan[memberId])
+      : 0
+  const tundaRippleCount = g.ripple ? gelRipple * Math.max(0, g.ripple.selangCount || 0) : 0
+  const totalTundaCount = tundaSeksiCount + tundaRippleCount
+
+  if (g.ripple?.mode === 'bertahap' && tundaRippleCount > 0) {
+    const mulai = Math.min(totalCount * 0.9, totalTundaCount)
+    return Math.max(totalCount * 0.1, Math.min(jalanCount, totalCount - mulai))
+  }
+
+  const akhirF = Math.min(1, Math.max(0.05, jalanCount / totalCount))
+  const dF = Math.min(akhirF * 0.9, Math.max(0, totalTundaCount / totalCount))
+  return Math.max(totalCount * 0.05, (akhirF - dF) * totalCount)
+}
+
 /** Label siap tampil untuk pilihan pembagian kecepatan. */
 export const MUDAH_LABEL: Record<GerakLengkap['mudah'], string> = {
   rata: 'Rata (kecepatan tetap)',
