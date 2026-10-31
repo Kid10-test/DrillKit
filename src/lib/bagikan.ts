@@ -36,7 +36,7 @@ import { saringPartiturPaketUntukAnggota } from './partiturPaket'
  * - `phone` — nomor telepon pribadi anggota.
  * - `notes` — catatan pelatih tentang anggota itu, untuk pelatih sendiri.
  */
-export type KolomRahasia = 'token' | 'phone' | 'notes'
+export type KolomRahasia = 'token' | 'phone' | 'notes' | 'ukuranSeragam'
 
 /**
  * Anggota tanpa kolom rahasianya.
@@ -45,9 +45,13 @@ export type KolomRahasia = 'token' | 'phone' | 'notes'
  * `section`, `instrument`, `role`, `joinYear`, `active`. Semua itu diperlukan
  * supaya anggota bisa memilih namanya — lengkap maupun panggilan — dan melihat
  * formasinya di antara rekan-rekannya.
+ *
+ * #18 — `ukuranSeragam` juga dibuang dari daftar umum `members` supaya ukuran
+ * tubuh & nomor seri seragam anggota lain tidak ikut terbaca di berkas grup/rekan;
+ * milik penerima sendiri dikirim khusus lewat `perlengkapanPribadi`.
  */
 export function bersihkanAnggota(m: Member): Member {
-  const { token: _token, phone: _phone, notes: _notes, ...sisa } = m
+  const { token: _token, phone: _phone, notes: _notes, ukuranSeragam: _ukuranSeragam, ...sisa } = m
   return { ...sisa, token: '' } as Member
 }
 
@@ -67,6 +71,9 @@ export function paketGrup(b: ShareBundle): ShareBundle {
     // #14 — targetSetoran (kurikulum tim) boleh terbawa lewat `...b`, tetapi
     // capaian pribadi `setoran` WAJIB dikosongkan di paket grup.
     setoran: [],
+    // #18 — daftar aset & ukuran seragam pribadi tidak pernah ikut di berkas grup.
+    perlengkapanPribadi: undefined,
+    perlengkapanPerAnggota: undefined,
     mode: 'member',
     /*
      * Berkas grup bukan untuk siapa pun secara khusus — dibagikan ke semua
@@ -104,6 +111,11 @@ export function paketAnggota(b: ShareBundle, memberId: string): ShareBundle {
     members: b.members.map(bersihkanAnggota),
     targetSetoran: dikenal ? (b.targetSetoran ?? []) : [],
     countSheets: dikenal ? (b.countSheets ?? []) : [],
+    perlengkapanPerAnggota: undefined,
+    perlengkapanPribadi: dikenal
+      ? (b.perlengkapanPerAnggota?.[memberId] ??
+        (b.perlengkapanPribadi?.memberId === memberId ? b.perlengkapanPribadi : undefined))
+      : undefined,
     attendance: dikenal ? b.attendance.filter((a) => a.memberId === memberId) : [],
     memberNotes: dikenal ? (b.memberNotes ?? []).filter((n) => n.memberId === memberId) : [],
     setoran: dikenal ? (b.setoran ?? []).filter((s) => s.memberId === memberId) : [],

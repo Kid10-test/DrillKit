@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import QRCode from 'qrcode'
 import { db } from '../db/db'
@@ -45,10 +46,26 @@ import { PilihModeNama } from '../components/PilihModeNama'
 
 const ROLES: MemberRole[] = ['member', 'sectionLeader', 'drumMajor', 'assistant']
 
+const muatPanelInventarisSeragam = () => import('../components/anggota/PanelInventarisSeragam')
+const PanelBukuInventarisLazy = lazy(() =>
+  muatPanelInventarisSeragam().then((m) => ({ default: m.PanelBukuInventaris })),
+)
+const PanelSeragamFittingLazy = lazy(() =>
+  muatPanelInventarisSeragam().then((m) => ({ default: m.PanelSeragamFitting })),
+)
+
+type TabHalamanAnggota = 'anggota' | 'inventaris' | 'seragam'
+
 export default function Members() {
   const toast = useToast()
   const modeNama = useModeNama()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabUrl = searchParams.get('tab')
+  const tabAktif: TabHalamanAnggota =
+    tabUrl === 'inventaris' || tabUrl === 'seragam' ? tabUrl : 'anggota'
   const members = useLiveQuery(() => db.members.orderBy('name').toArray(), [], [])
+  const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
+  const jmlInventaris = useLiveQuery(() => db.inventaris.count(), [], 0)
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Section | 'all'>('all')
   const [showInactive, setShowInactive] = useState(false)
@@ -109,8 +126,18 @@ export default function Members() {
   }
 
   async function remove(m: Member) {
-    await db.members.delete(m.id)
-    await db.attendance.where('memberId').equals(m.id).delete()
+    await db.transaction('rw', [db.members, db.attendance, db.inventaris], async () => {
+      await db.members.delete(m.id)
+      await db.attendance.where('memberId').equals(m.id).delete()
+      const dipinjam = await db.inventaris.where('pemegangId').equals(m.id).toArray()
+      for (const it of dipinjam) {
+        await db.inventaris.update(it.id, {
+          pemegangId: undefined,
+          tanggalPinjam: undefined,
+          targetKembali: undefined,
+        })
+      }
+    })
     toast.push(`${m.name} dihapus`, 'info')
   }
 
@@ -238,6 +265,61 @@ export default function Members() {
         }}
       />
 
+      {/* #18 — Pengalih Tab: Daftar Anggota | Inventaris Alat | Seragam & Fitting */}
+      <div
+        className="mb-4 flex flex-wrap items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/70 p-1"
+        data-testid="tab-bar-anggota"
+      >
+        {(
+          [
+            { id: 'anggota', label: `Daftar Anggota (${members.filter((m) => m.active === 1).length})`, testId: 'tab-daftar-anggota' },
+            { id: 'inventaris', label: `Inventaris Alat (${jmlInventaris})`, testId: 'tab-inventaris-alat' },
+            { id: 'seragam', label: 'Seragam & Fitting', testId: 'tab-seragam-fitting' },
+          ] as const
+        ).map((tb) => {
+          const aktif = tabAktif === tb.id
+          return (
+            <button
+              key={tb.id}
+              type="button"
+              data-testid={tb.testId}
+              onMouseEnter={() => {
+                if (tb.id !== 'anggota') void muatPanelInventarisSeragam()
+              }}
+              onClick={async () => {
+                if (tb.id !== 'anggota') await muatPanelInventarisSeragam()
+                const next = new URLSearchParams(searchParams)
+                if (tb.id === 'anggota') next.delete('tab')
+                else next.set('tab', tb.id)
+                setSearchParams(next, { replace: true })
+              }}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                aktif
+                  ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
+                  : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
+              }`}
+            >
+              {tb.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {tabAktif === 'inventaris' ? (
+        <Suspense fallback={<Card className="p-6 text-center text-xs text-slate-400">Memuat buku inventaris…</Card>}>
+          <PanelBukuInventarisLazy
+            members={members}
+            namaTim={settings?.teamName || 'Unit Marching Band'}
+            namaPelatih={settings?.coachName}
+            kota={settings?.city}
+          />
+        </Suspense>
+      ) : tabAktif === 'seragam' ? (
+        <Suspense fallback={<Card className="p-6 text-center text-xs text-slate-400">Memuat daftar seragam &amp; fitting…</Card>}>
+          <PanelSeragamFittingLazy members={members} namaTim={settings?.teamName || 'Unit Marching Band'} />
+        </Suspense>
+      ) : (
+      <>
       {/* Filter */}
       <Card className="mb-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -344,6 +426,8 @@ export default function Members() {
             </Card>
           ))}
         </div>
+      )}
+      </>
       )}
 
       <MemberModal

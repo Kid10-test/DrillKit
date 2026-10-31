@@ -26,13 +26,16 @@ import type {
   Drill,
   DrillSet,
   Evaluasi,
+  ItemInventaris,
   Kemajuan,
+  ManifesLogistikLomba,
   Member,
   MemberNote,
   MemberRole,
   RiwayatSnapshot,
 } from '../db/types'
 import { gabungCatatanSetoran, idCatatanSetoran } from './setoran'
+import { gabungProfilUkuranSeragam } from './inventarisLogistik'
 import { uid } from './utils'
 
 /* ------------------------------ Nama tampil -------------------------------- */
@@ -523,6 +526,25 @@ export function tulisUlangCountSheet(cs: CountSheet, peta: Record<string, string
   return { ...cs, memberIds: tulisUlangRoster(cs.memberIds, peta) }
 }
 
+export function tulisUlangInventaris(it: ItemInventaris, peta: Record<string, string>): ItemInventaris {
+  if (!it.pemegangId || !(it.pemegangId in peta)) return it
+  return { ...it, pemegangId: peta[it.pemegangId] }
+}
+
+export function tulisUlangLogistikLomba(
+  mf: ManifesLogistikLomba,
+  peta: Record<string, string>,
+): ManifesLogistikLomba {
+  if (!mf.butir?.length) return mf
+  let berubah = false
+  const butir = mf.butir.map((bt) => {
+    if (!bt.penanggungJawabId || !(bt.penanggungJawabId in peta)) return bt
+    berubah = true
+    return { ...bt, penanggungJawabId: peta[bt.penanggungJawabId] }
+  })
+  return berubah ? { ...mf, butir } : mf
+}
+
 export interface MuatanRujukan {
   anggota?: Member[]
   members?: Member[]
@@ -540,6 +562,8 @@ export interface MuatanRujukan {
   riwayat?: RiwayatSnapshot[]
   countSheet?: CountSheet[]
   countSheets?: CountSheet[]
+  inventaris?: ItemInventaris[]
+  logistikLomba?: ManifesLogistikLomba[]
 }
 
 export function tulisUlangMuatan<T extends MuatanRujukan>(
@@ -624,6 +648,12 @@ export function tulisUlangMuatan<T extends MuatanRujukan>(
   }
   if (out.countSheets) {
     out.countSheets = out.countSheets.map((cs) => tulisUlangCountSheet(cs, peta))
+  }
+  if (out.inventaris) {
+    out.inventaris = out.inventaris.map((it) => tulisUlangInventaris(it, peta))
+  }
+  if (out.logistikLomba) {
+    out.logistikLomba = out.logistikLomba.map((mf) => tulisUlangLogistikLomba(mf, peta))
   }
   return { data: out, bentrok, absensiHapus, evaluasiHapus, setoranHapus }
 }
@@ -743,6 +773,9 @@ function gabungRestore(file: Member, lokal: Member): Member {
   return rapikanAnggota({
     ...file,
     token: file.token?.trim() ? file.token : lokal.token,
+    phone: file.phone !== undefined ? file.phone : lokal.phone,
+    notes: file.notes !== undefined ? file.notes : lokal.notes,
+    ukuranSeragam: gabungProfilUkuranSeragam(file.ukuranSeragam, lokal.ukuranSeragam),
     panggilan: file.panggilan?.trim() || lokal.panggilan?.trim() || undefined,
     alias,
   })
@@ -778,6 +811,7 @@ function adopsi(lokal: Member, induk: Member, tokenBaru: () => string): Member {
     token: lokal.token?.trim() ? lokal.token : induk.token?.trim() || tokenBaru(),
     phone: lokal.phone?.trim() ? lokal.phone : induk.phone,
     notes: lokal.notes?.trim() ? lokal.notes : induk.notes,
+    ukuranSeragam: gabungProfilUkuranSeragam(induk.ukuranSeragam, lokal.ukuranSeragam),
     panggilan: panggilan || undefined,
     alias,
     createdAt: Math.min(lokal.createdAt || Date.now(), induk.createdAt || Date.now()),
@@ -916,6 +950,9 @@ export interface RencanaGabung {
   drills: Drill[]
   riwayat: RiwayatSnapshot[]
   kemajuan: Kemajuan[]
+  countSheets?: CountSheet[]
+  inventaris?: ItemInventaris[]
+  logistikLomba?: ManifesLogistikLomba[]
   bentrok: string[]
   info: string[]
   jumlah: {
@@ -977,10 +1014,16 @@ export function rencanakanGabung(opts: {
   drills: Drill[]
   riwayat: RiwayatSnapshot[]
   kemajuan: Kemajuan[]
+  countSheets?: CountSheet[]
+  inventaris?: ItemInventaris[]
+  logistikLomba?: ManifesLogistikLomba[]
 }): RencanaGabung | null {
   if (opts.simpan.id === opts.buang.id) return null
   const peta = { [opts.buang.id]: opts.simpan.id }
   const setoranAwal = opts.setoran ?? []
+  const countSheetsAwal = opts.countSheets ?? []
+  const inventarisAwal = opts.inventaris ?? []
+  const logistikAwal = opts.logistikLomba ?? []
   const muatan: MuatanRujukan = {
     absensi: opts.absensi,
     evaluasi: opts.evaluasi,
@@ -990,6 +1033,9 @@ export function rencanakanGabung(opts: {
     drills: opts.drills,
     riwayat: opts.riwayat,
     kemajuan: opts.kemajuan,
+    countSheets: countSheetsAwal,
+    inventaris: inventarisAwal,
+    logistikLomba: logistikAwal,
   }
   const jumlah = hitungRujukan(opts.buang.id, muatan)
   const tulis = tulisUlangMuatan(muatan, peta)
@@ -1024,11 +1070,16 @@ export function rencanakanGabung(opts: {
   if (!isi.phone?.trim() && opts.buang.phone?.trim()) isi.phone = opts.buang.phone
   if (!isi.notes?.trim() && opts.buang.notes?.trim()) isi.notes = opts.buang.notes
   if (!isi.instrument?.trim() && opts.buang.instrument?.trim()) isi.instrument = opts.buang.instrument
+  const ukuranGabung = gabungProfilUkuranSeragam(isi.ukuranSeragam, opts.buang.ukuranSeragam)
+  if (ukuranGabung) isi.ukuranSeragam = ukuranGabung
 
   const sets = (tulis.data.sets ?? []).filter((s, i) => s !== opts.sets[i])
   const drills = (tulis.data.drills ?? []).filter((d, i) => d !== opts.drills[i])
   const riwayat = (tulis.data.riwayat ?? []).filter((s, i) => s !== opts.riwayat[i])
   const kemajuan = (tulis.data.kemajuan ?? []).filter((k, i) => k !== opts.kemajuan[i])
+  const countSheets = (tulis.data.countSheets ?? []).filter((c, i) => c !== countSheetsAwal[i])
+  const inventaris = (tulis.data.inventaris ?? []).filter((it, i) => it !== inventarisAwal[i])
+  const logistikLomba = (tulis.data.logistikLomba ?? []).filter((mf, i) => mf !== logistikAwal[i])
   const absensiAsli = new Map(opts.absensi.map((r) => [r.id, r]))
   const evaluasiAsli = new Map(opts.evaluasi.map((r) => [r.id, r]))
   const setoranAsli = new Map(setoranAwal.map((r) => [r.id, r]))
@@ -1048,6 +1099,9 @@ export function rencanakanGabung(opts: {
     drills,
     riwayat,
     kemajuan,
+    countSheets,
+    inventaris,
+    logistikLomba,
     bentrok,
     info,
     jumlah,

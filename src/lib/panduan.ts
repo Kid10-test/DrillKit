@@ -87,9 +87,9 @@ const LANGKAH: [string, string][] = [
 /** Isi tiap menu — mengikuti nama menu yang tampil di aplikasi. */
 const MENU: [string, string][] = [
   ['Dashboard', 'Ringkasan kehadiran, jadwal terdekat, komposisi tim, &amp; pintu <b>Buka berkas DrillKit</b>'],
-  ['Anggota', 'Nama resmi &amp; panggilan, impor CSV, gabung duplikat, cetak kartu QR absensi'],
+  ['Anggota', 'Data anggota, <b>Inventaris alat &amp; Berita Acara</b>, <b>Fitting seragam</b>, kartu QR'],
   ['Absensi &amp; Evaluasi', 'Scan QR / manual, tab <b>Rekap</b> laporan, <b>Evaluasi</b>, &amp; <b>Setoran hafalan</b>'],
-  ['Jadwal &amp; Lomba', 'Kalender/agenda latihan, seri berulang, .ics, &amp; <b>Run sheet hari lomba</b>'],
+  ['Jadwal &amp; Lomba', 'Kalender latihan, seri berulang, .ics, <b>Run sheet</b> &amp; <b>Manifes truk lomba</b>'],
   ['Drill &amp; Formasi', 'Editor formasi, bentuk cepat, FTL/Ripple/Hold, <b>Count Sheet Guard</b>, properti gerak, buku saku'],
   ['Musik &amp; Metronom', 'Metronom &amp; tempo map, tempo latihan, rekaman MP3, partitur &amp; cetak Lyre, penala'],
   ['Berbagi', 'Terbitkan paket grup / terkunci QR per anggota, log perubahan show, &amp; panduan anggota'],
@@ -346,7 +346,7 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
           : '<li>Pelatih juga mengirim berkas <i>.json</i>. Unduh berkasnya, tekan <b>Buka paket tim</b>, lalu pilih berkas itu dari folder Unduhan.</li>'
       }
       <li>Berkas <b>atas namamu</b> (mis. <i>DrillKit-Nama-Kode.json</i>) langsung mengenali namamu. Berkas <b>grup</b>: ketik nama atau kodemu di <b>Pilih namamu dulu</b> — cukup sekali. Salah nama? Tekan <b>Ganti nama</b>.</li>
-      <li><b>Absensi</b> dan <b>Catatan</b> hanya terisi dari berkas atas namamu (atau setelah memindai QR kunci pribadimu); berkas grup tidak memuat data pribadi siapa pun.</li>
+      <li><b>Absensi</b>, <b>Catatan</b>, serta <b>Alat &amp; Seragam Pinjamanku</b> hanya tampil dari berkas atas namamu (atau QR kunci pribadimu); berkas grup tidak memuat data pribadi siapa pun.</li>
     </ol>`)
 
   /* 3. Isi tiap tab */

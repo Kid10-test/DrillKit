@@ -9,7 +9,8 @@
  * Memisahkannya sengaja: jadwal untuk merencanakan, run sheet untuk
  * memeriksa hari H.
  */
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import type { Session } from '../db/types'
@@ -49,12 +50,20 @@ function formatTanggal(iso: string): string {
   return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+const muatPanelLogistikLomba = () => import('../components/lomba/PanelLogistikLomba')
+const PanelLogistikLombaLazy = lazy(() =>
+  muatPanelLogistikLomba().then((m) => ({ default: m.PanelLogistikLomba })),
+)
+
 export default function Lomba() {
   const toast = useToast()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabAktif = searchParams.get('tab') === 'logistik' ? 'logistik' : 'runsheet'
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
   const setlists = useLiveQuery(() => db.setlists.orderBy('updatedAt').reverse().toArray(), [], [])
   const songs = useLiveQuery(() => db.songs.toArray(), [], [])
   const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
+  const members = useLiveQuery(() => db.members.orderBy('name').toArray(), [], [])
 
   const [modeLomba, setModeLomba] = useState(false)
   const [tanggal, setTanggal] = useState<string | null>(null)
@@ -179,7 +188,7 @@ export default function Lomba() {
 
       <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <Card>
-          <Field label="Tanggal" hint="Run sheet disusun dari sesi pada tanggal ini">
+          <Field label="Tanggal" hint="Run sheet & manifes truk mengikuti tanggal ini">
             <input
               type="date"
               data-testid="pilih-tanggal"
@@ -189,9 +198,7 @@ export default function Lomba() {
             />
           </Field>
           <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-            Sesi dibuat & diubah di halaman <b>Jadwal</b>. Di sini Anda hanya
-            menautkan set list ke tiap penampilan, lalu memeriksa apakah isinya
-            muat di slotnya.
+            Sesi dibuat & diubah di halaman <b>Jadwal</b>. Di sini Anda menautkan set list ke tiap penampilan serta mengelola <b>Manifes Loading Truk 3-Tahap</b>.
           </p>
         </Card>
 
@@ -223,6 +230,59 @@ export default function Lomba() {
           </div>
         </Card>
       </div>
+
+      {/* #18 — Pengalih Tab: Run Sheet Hari Lomba | Manifes & Loading Truk */}
+      <div
+        className="mb-4 flex flex-wrap items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/70 p-1"
+        data-testid="tab-bar-lomba"
+      >
+        <button
+          type="button"
+          data-testid="tab-runsheet-lomba"
+          onClick={() => {
+            const next = new URLSearchParams(searchParams)
+            next.delete('tab')
+            setSearchParams(next, { replace: true })
+          }}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+            tabAktif === 'runsheet'
+              ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
+              : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
+          }`}
+        >
+          Run Sheet Hari Lomba ({run.baris.length})
+        </button>
+        <button
+          type="button"
+          data-testid="tab-manifes-lomba"
+          onMouseEnter={() => void muatPanelLogistikLomba()}
+          onClick={async () => {
+            await muatPanelLogistikLomba()
+            const next = new URLSearchParams(searchParams)
+            next.set('tab', 'logistik')
+            setSearchParams(next, { replace: true })
+          }}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+            tabAktif === 'logistik'
+              ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
+              : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
+          }`}
+        >
+          Manifes &amp; Loading Truk (3-Tahap)
+        </button>
+      </div>
+
+      {tabAktif === 'logistik' ? (
+        <Suspense fallback={<Card className="p-6 text-center text-xs text-slate-400">Memuat manifes logistik…</Card>}>
+          <PanelLogistikLombaLazy
+            tanggalAktif={tanggalAktif}
+            sesiAktif={(sessions ?? []).find((s) => s.date === tanggalAktif)}
+            namaTim={settings?.teamName || 'Unit Marching Band'}
+            members={members ?? []}
+          />
+        </Suspense>
+      ) : (
+      <>
 
       {run.peringatan.length > 0 && (
         <Card className="mb-4 border-amber-600/30">
@@ -256,6 +316,8 @@ export default function Lomba() {
             />
           ))}
         </div>
+      )}
+      </>
       )}
 
       {modeLomba && (

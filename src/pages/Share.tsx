@@ -22,6 +22,11 @@ import {
 import { IconDownload, IconLoop, IconShare, IconUpload } from '../components/Icons'
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
 import { TombolPanduanAnggota } from '../components/Panduan'
+import {
+  LABEL_KONDISI_INVENTARIS,
+  LABEL_STATUS_SERAGAM,
+  susunPetaPerlengkapanPerAnggota,
+} from '../lib/inventarisLogistik'
 import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
 import { kenaliBerkas, namaPaketGrup, namaZipAnggota } from '../lib/bukaBerkas'
 import { mintaPratinjau } from '../components/BukaBerkas'
@@ -90,6 +95,7 @@ function CoachExport() {
   const targetSetoran = useLiveQuery(() => db.targetSetoran.toArray(), [], [])
   const catatanSetoran = useLiveQuery(() => db.setoran.toArray(), [], [])
   const countSheets = useLiveQuery(() => db.countSheets.toArray(), [], [])
+  const inventaris = useLiveQuery(() => db.inventaris.toArray(), [], [])
   const riwayatLogPerubahan = useLiveQuery(() => db.logPerubahan.toArray(), [], [])
   const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
   const partiturItems = useLiveQuery(() => db.partiturBerkas.toArray(), [], [])
@@ -109,6 +115,8 @@ function CoachExport() {
   const [includeSetoran, setIncludeSetoran] = useState(true)
   /** #17 — lembar hitungan kerja alat Color Guard (Count Sheet). */
   const [includeCountSheets, setIncludeCountSheets] = useState(true)
+  /** #18 — alat inventaris pinjaman & ukuran seragam pribadi per anggota. */
+  const [includePerlengkapanPribadi, setIncludePerlengkapanPribadi] = useState(true)
   /** #15b — sertakan log perubahan show otomatis di paket anggota. */
   const [includeLogPerubahan, setIncludeLogPerubahan] = useState(true)
   const [catatanPerubahan, setCatatanPerubahan] = useState('')
@@ -273,6 +281,9 @@ function CoachExport() {
       targetSetoran: includeSetoran ? (targetSetoran ?? []) : [],
       setoran: includeSetoran ? (catatanSetoran ?? []) : [],
       countSheets: includeCountSheets ? (countSheets ?? []) : [],
+      perlengkapanPerAnggota: includePerlengkapanPribadi
+        ? susunPetaPerlengkapanPerAnggota(members ?? [], inventaris ?? [])
+        : undefined,
       perubahanPaket: sertakanLog ? ringkasanPerubahanAktif : undefined,
       attendance: includeAttendance ? (attendance ?? []) : [],
       // Catatan evaluasi — kini menghormati saklar, seperti jenis data lain.
@@ -559,6 +570,12 @@ function CoachExport() {
                 checked={includeSetoran}
                 onChange={setIncludeSetoran}
                 label={`Setoran hafalan (${catatanSetoran?.length ?? 0} catatan, ${targetSetoran?.length ?? 0} target)`}
+              />
+              <Toggle
+                testId="toggle-perlengkapan-pribadi"
+                checked={includePerlengkapanPribadi}
+                onChange={setIncludePerlengkapanPribadi}
+                label="Alat inventaris pinjaman & ukuran seragam milik anak sendiri"
               />
               {includeSongs && (rekamanItems?.length ?? 0) > 0 && (
                 <Toggle
@@ -1212,6 +1229,79 @@ function MemberView() {
           </p>
         </div>
       )}
+
+      {/* #18 — Kartu Pribadi: Alat Inventaris Pinjamanku & Ukuran Seragamku */}
+      {me && (() => {
+        const perlengkapanSaya =
+          dataTerkunci?.perlengkapanPribadi ??
+          (bundle.forMember === me.id ? bundle.perlengkapanPribadi : undefined)
+        if (!perlengkapanSaya) return null
+        const adaAlat = perlengkapanSaya.alatDipinjam.length > 0
+        const srg = perlengkapanSaya.ukuranSeragam
+        if (!adaAlat && !srg) return null
+        return (
+          <Card
+            data-testid="kartu-perlengkapan-anggota"
+            className="mb-4 border-emerald-800/40 bg-slate-900/70 p-3"
+          >
+            <h3 className="text-xs font-semibold text-emerald-300">
+              Alat Inventaris &amp; Seragam Pinjamanku
+            </h3>
+            {adaAlat && (
+              <div className="mt-2 space-y-1.5" data-testid="daftar-alat-pinjam-anggota">
+                {perlengkapanSaya.alatDipinjam.map((al, i) => (
+                  <div
+                    key={`${al.kodeAset}-${i}`}
+                    className="rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 py-2 text-xs"
+                  >
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-200">
+                        {al.kodeAset}
+                      </span>
+                      <b className="text-slate-100">{al.nama}</b>
+                      {al.merekTipe ? <span className="text-slate-400">· {al.merekTipe}</span> : null}
+                      <span className="text-[11px] text-emerald-300">
+                        ({LABEL_KONDISI_INVENTARIS[al.kondisi]})
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-slate-400">
+                      {al.nomorSeri ? `No. Seri: ${al.nomorSeri}` : 'Tanpa nomor seri'}
+                      {al.kelengkapanPinjam ? ` · Kelengkapan: ${al.kelengkapanPinjam}` : ''}
+                      {al.tanggalPinjam ? ` · Pinjam: ${al.tanggalPinjam}` : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {srg && (
+              <div
+                data-testid="ringkasan-seragam-anggota"
+                className="mt-2 rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 py-2 text-xs text-slate-300"
+              >
+                <span className="font-semibold text-slate-200">Seragamku:</span>{' '}
+                Sepatu <b>{srg.sepatu || '—'}</b> · Jaket <b>{srg.jaketTunic || '—'}</b> · Bibber{' '}
+                <b>{srg.bibber || '—'}</b> · Shako <b>{srg.shakoTopi || '—'}</b>
+                {srg.kostumGuard ? (
+                  <>
+                    {' '}
+                    · Guard <b>{srg.kostumGuard}</b>
+                  </>
+                ) : null}
+                {srg.nomorSeriSeragam ? (
+                  <span className="ml-1.5 rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] text-amber-200">
+                    Seri {srg.nomorSeriSeragam}
+                  </span>
+                ) : null}
+                {srg.statusPinjam ? (
+                  <span className="ml-1.5 text-[11px] text-slate-400">
+                    ({LABEL_STATUS_SERAGAM[srg.statusPinjam]})
+                  </span>
+                ) : null}
+              </div>
+            )}
+          </Card>
+        )
+      })()}
 
       {/*
         Tab — enam buah, dan ukurannya harus Muat di HP.

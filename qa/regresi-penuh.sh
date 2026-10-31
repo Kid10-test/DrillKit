@@ -127,9 +127,10 @@ bash bangun-logika.sh || exit 1
 # penuh menjadi 125 rangkaian.
 
 # Gelombang 3 v1.2.1 (#17) — menambahkan `count-sheet-logika` & `count-sheet`
-# (editor Count Sheet Color Guard terikat set & birama, cetak A4 & buku saku A5
-# hex murni, sorot hitungan sinkron di Mode Anggota, serta keutuhan rujukan)
-# sehingga total regresi penuh menjadi 127 rangkaian.
+# #18 (v1.2.2): ditambah inventaris-logistik-logika dan inventaris-logistik
+# (buku induk inventaris & servis, Berita Acara A4 hex, fitting & kembali
+# seragam, manifes truk lomba 3-tahap, serta pagar privasi anggota)
+# sehingga total regresi penuh menjadi 129 rangkaian.
 
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika grid-patok-logika uji-situs uji-rilis uji-lapangan \
@@ -141,11 +142,11 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet inventaris-logistik \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill m1-penggaris-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman m6-drill-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \

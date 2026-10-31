@@ -50,6 +50,7 @@ function TombolPanduanDasbor() {
   )
 }
 import { namaTampil } from '../lib/namaAnggota'
+import { ringkasInventaris, ringkasManifesLogistik } from '../lib/inventarisLogistik'
 import { hitungRingkasanSetoranTim } from '../lib/setoran'
 import {
   sectionDot,
@@ -74,6 +75,15 @@ export default function Dashboard() {
   const attendance = useLiveQuery(() => db.attendance.toArray(), [], [])
   const targetSetoran = useLiveQuery(() => db.targetSetoran.toArray(), [], [])
   const catatanSetoran = useLiveQuery(() => db.setoran.toArray(), [], [])
+  const inventaris = useLiveQuery(() => db.inventaris.toArray(), [], [])
+  const daftarManifes = useLiveQuery(() => db.logistikLomba.toArray(), [], [])
+
+  const ringkasanInv = ringkasInventaris(inventaris)
+  const jmlAsetButuhPerhatian = ringkasanInv.perluServis + ringkasanInv.rusak
+  const jmlBarangBelumKembali = daftarManifes.reduce(
+    (acc, m) => acc + ringkasManifesLogistik(m).belumKembaliMerah.length,
+    0,
+  )
 
   const active = members.filter((m) => m.active)
   const today = todayISO()
@@ -179,6 +189,46 @@ export default function Dashboard() {
       <div className="mb-4">
         <PengingatJadwal sessions={sessions} prefix="ingat-coach" />
       </div>
+
+      {/* #18 — pengingat kesiapan inventaris & barang lomba belum kembali ke gudang */}
+      {(jmlAsetButuhPerhatian > 0 || jmlBarangBelumKembali > 0) && (
+        <Card
+          data-testid="pengingat-inventaris-logistik"
+          className="mb-4 border-amber-600/40 bg-amber-950/20 p-3"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="space-y-0.5 text-amber-100">
+              {jmlBarangBelumKembali > 0 && (
+                <p className="font-semibold text-rose-300">
+                  • {jmlBarangBelumKembali} barang manifes lomba tercatat belum kembali ke gudang!
+                </p>
+              )}
+              {jmlAsetButuhPerhatian > 0 && (
+                <p>
+                  • {jmlAsetButuhPerhatian} aset inventaris butuh perawatan ({ringkasanInv.perluServis}{' '}
+                  perlu servis, {ringkasanInv.rusak} rusak).
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {jmlAsetButuhPerhatian > 0 && (
+                <Link to="/anggota?tab=inventaris">
+                  <Button size="sm" variant="ghost">
+                    Cek Inventaris
+                  </Button>
+                </Link>
+              )}
+              {jmlBarangBelumKembali > 0 && (
+                <Link to="/lomba?tab=logistik">
+                  <Button size="sm" variant="danger">
+                    Cek Manifes Pulang
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* #7 — satu pintu untuk semua berkas DrillKit */}
       <Card className="mb-4" data-testid="kartu-buka-berkas">

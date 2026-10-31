@@ -321,6 +321,10 @@ export function catatanCsvSatuArah(teks: string): string | null {
   ) {
     return `CSV laporan kehadiran. ${ekor}`
   }
+  // CSV ukuran seragam (#18 — ekspor ke vendor penjahit).
+  if (punya.has('jaket / tunic') && punya.has('no. seri seragam')) {
+    return `CSV ukuran & distribusi seragam. ${ekor}`
+  }
   return null
 }
 
@@ -683,6 +687,8 @@ export const TABEL_BACKUP: { kolom: string; label: string }[] = [
   { kolom: 'setoran', label: 'Setoran hafalan' },
   { kolom: 'logPerubahan', label: 'Log perubahan show' },
   { kolom: 'countSheets', label: 'Count sheet Guard' },
+  { kolom: 'inventaris', label: 'Inventaris alat' },
+  { kolom: 'logistikLomba', label: 'Manifes logistik lomba' },
 ]
 
 /**
@@ -720,6 +726,8 @@ export const TABEL_DATA: { kolom: string; label: string }[] = [
   { kolom: 'targetSetoran', label: 'Target setoran' },
   { kolom: 'setoran', label: 'Setoran hafalan' },
   { kolom: 'countSheet', label: 'Count sheet Guard' },
+  { kolom: 'inventaris', label: 'Inventaris alat' },
+  { kolom: 'logistikLomba', label: 'Manifes logistik lomba' },
 ]
 
 /** Ringkas isi berkas data pilihan (dipakai pratinjau pintu baru). */
