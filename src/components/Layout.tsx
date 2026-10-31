@@ -120,6 +120,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [bukaLaciHp])
 
   const pakaiLaciHp = nav.length > 5
+  // Di Mode Anggota hanya ada 1 rute (`/berbagi`), jadi bilah bawah HP
+  // dengan satu tombol "Tim" tidak punya fungsi pindah halaman dan justru
+  // memakan ruang bawah layar ponsel.
+  const tampilkanNavBawahHp = nav.length > 1
   const navUtamaHp = useMemo(
     () => (pakaiLaciHp ? nav.filter((n) => RUTE_UTAMA_HP.has(n.to)) : nav),
     [nav, pakaiLaciHp],
@@ -198,7 +202,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="mt-auto px-3 pt-4">
           <KioskButton full />
           <p className="pt-3 text-[11px] leading-relaxed text-slate-600">
-            DrillKit v1.1.2 · rilis{' '}
+            DrillKit v1.2.0 · rilis{' '}
             <span data-testid="cap-build-singkat">{capBuildSingkat()}</span> — data tersimpan di
             perangkat ini, tetap jalan offline.
           </p>
@@ -206,7 +210,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Konten */}
-      <main className="pb-24 lg:pl-60 lg:pb-10">
+      <main className={cx(tampilkanNavBawahHp ? 'pb-28' : 'pb-10', 'lg:pl-60 lg:pb-10')}>
         {showFrameNotice && (
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 pt-4 sm:px-6">
             <div className="flex w-full items-start gap-3 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-xs text-sky-100">
@@ -276,10 +280,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* #12b — Laci menu lainnya (HP mode pelatih) */}
-      {pakaiLaciHp && bukaLaciHp && (
+      {tampilkanNavBawahHp && pakaiLaciHp && bukaLaciHp && (
         <div
           data-kiosk-allow
-          className="no-print fixed inset-0 z-50 flex flex-col justify-end lg:hidden"
+          className="no-print fixed inset-0 z-40 flex flex-col justify-end lg:hidden"
         >
           <div
             data-kiosk-allow
@@ -334,52 +338,54 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Bottom nav (mobile) */}
-      <nav
-        data-kiosk-allow
-        data-testid="nav-bawah-hp"
-        className="no-print fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-900/95 backdrop-blur lg:hidden"
-      >
-        <div className="flex items-stretch px-1 pb-[env(safe-area-inset-bottom)]">
-          {navUtamaHp.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              onClick={() => setBukaLaciHp(false)}
-              className={({ isActive }) =>
-                cx(
-                  'flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-medium transition',
-                  isActive ? 'text-emerald-400' : 'text-slate-400',
-                )
-              }
-            >
-              <item.icon size={20} />
-              <span className="max-w-full truncate">{item.short}</span>
-            </NavLink>
-          ))}
-          {pakaiLaciHp && (
-            <button
-              type="button"
-              data-kiosk-allow
-              data-testid="tombol-menu-lainnya"
-              aria-expanded={bukaLaciHp}
-              aria-controls="laci-menu-lainnya"
-              aria-label="Menu lainnya"
-              onClick={() => setBukaLaciHp((v) => !v)}
-              className={cx(
-                'relative flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-medium transition',
-                bukaLaciHp || aktifDiLaci ? 'text-emerald-400' : 'text-slate-400',
-              )}
-            >
-              <IkonLainnya size={20} />
-              <span className="max-w-full truncate">
-                {aktifDiLaci && itemAktif ? itemAktif.short : 'Lainnya'}
-              </span>
-            </button>
-          )}
-        </div>
-      </nav>
+      {/* Bottom nav (mobile — hanya saat ada >1 rute menu) */}
+      {tampilkanNavBawahHp && (
+        <nav
+          data-kiosk-allow
+          data-testid="nav-bawah-hp"
+          className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-slate-800 bg-slate-900/95 backdrop-blur lg:hidden"
+        >
+          <div className="flex items-stretch px-1 pb-[env(safe-area-inset-bottom)]">
+            {navUtamaHp.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                onClick={() => setBukaLaciHp(false)}
+                className={({ isActive }) =>
+                  cx(
+                    'flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-medium transition',
+                    isActive ? 'text-emerald-400' : 'text-slate-400',
+                  )
+                }
+              >
+                <item.icon size={20} />
+                <span className="max-w-full truncate">{item.short}</span>
+              </NavLink>
+            ))}
+            {pakaiLaciHp && (
+              <button
+                type="button"
+                data-kiosk-allow
+                data-testid="tombol-menu-lainnya"
+                aria-expanded={bukaLaciHp}
+                aria-controls="laci-menu-lainnya"
+                aria-label="Menu lainnya"
+                onClick={() => setBukaLaciHp((v) => !v)}
+                className={cx(
+                  'relative flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-medium transition',
+                  bukaLaciHp || aktifDiLaci ? 'text-emerald-400' : 'text-slate-400',
+                )}
+              >
+                <IkonLainnya size={20} />
+                <span className="max-w-full truncate">
+                  {aktifDiLaci && itemAktif ? itemAktif.short : 'Lainnya'}
+                </span>
+              </button>
+            )}
+          </div>
+        </nav>
+      )}
 
       {/* #7 — pratinjau "Buka berkas DrillKit" + seret berkas ke jendela.
           Satu-satunya pasangan di seluruh aplikasi: tombol mana pun (baru

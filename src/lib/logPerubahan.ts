@@ -128,6 +128,15 @@ export function cicipKeadaanShow(k: KeadaanAcuanShow): string {
       step: d.field?.step,
       customStepYd: d.field?.customStepYd,
       songId: d.songId ?? '',
+      markers: (d.markers ?? []).map((mk) => ({
+        id: mk.id,
+        label: mk.label,
+        x: Math.round(mk.x * 100),
+        y: Math.round(mk.y * 100),
+        rotasi: mk.rotasi ?? 0,
+        kruIds: mk.kruIds ?? [],
+        perSet: mk.perSet ?? {},
+      })),
     }))
 
   const sets = [...(k.sets ?? [])]
@@ -139,6 +148,10 @@ export function cicipKeadaanShow(k: KeadaanAcuanShow): string {
       name: s.name,
       counts: s.counts,
       gerak: s.gerak?.jalur ?? 'lurus',
+      jalanCount: s.gerak?.jalanCount ?? 0,
+      ripple: s.gerak?.ripple ?? null,
+      kelompok: s.gerak?.kelompok ?? [],
+      visual: s.visual ?? null,
       pts: Object.entries(s.points ?? {})
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([id, p]) => `${id}:${Math.round(p.x * 100)},${Math.round(p.y * 100)}`),
@@ -283,6 +296,13 @@ function bandingkanSatuDrill(
       teks: `Tempo dasar drill berubah ${dLama.tempo} → ${dBaru.tempo} BPM`,
     })
   }
+  if (JSON.stringify(dLama.markers ?? []) !== JSON.stringify(dBaru.markers ?? [])) {
+    butir.push({
+      kategori: 'drill',
+      subjek,
+      teks: `Penanda / properti panggung diperbarui (${(dBaru.markers ?? []).length} properti)`,
+    })
+  }
 
   const urutLama = [...setLama].sort((a, b) => a.order - b.order)
   const urutBaru = [...setBaru].sort((a, b) => a.order - b.order)
@@ -362,6 +382,25 @@ function bandingkanSatuDrill(
         kategori: 'drill',
         subjek,
         teks: `Set ${label}: jalur gerak berubah ${gerakLama} → ${gerakBaru}`,
+      })
+    }
+    const koreoLama = JSON.stringify({
+      vis: sl.visual ?? null,
+      mh: sl.gerak?.jalanCount ?? 0,
+      rp: sl.gerak?.ripple ?? null,
+      klp: sl.gerak?.kelompok ?? [],
+    })
+    const koreoBaru = JSON.stringify({
+      vis: sb.visual ?? null,
+      mh: sb.gerak?.jalanCount ?? 0,
+      rp: sb.gerak?.ripple ?? null,
+      klp: sb.gerak?.kelompok ?? [],
+    })
+    if (koreoLama !== koreoBaru) {
+      butir.push({
+        kategori: 'drill',
+        subjek,
+        teks: `Set ${label}: koreografi visual / jalur kelompok diperbarui`,
       })
     }
   }

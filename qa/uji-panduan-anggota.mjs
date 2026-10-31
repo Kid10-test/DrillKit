@@ -93,9 +93,21 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
 {
   const baca = (f) => fs.readFileSync(path.join(AKAR, f), 'utf8')
   const sumber = [
-    'src/pages/Share.tsx', 'src/components/PengingatJadwal.tsx', 'src/components/TunerDrone.tsx',
-    'src/components/PilihMode.tsx', 'src/components/ModePerangkat.tsx', 'src/pages/Music.tsx', 'src/App.tsx', 'index.html',
-    'src/components/ModalRekamanLagu.tsx', 'src/components/PanelPartitur.tsx', 'src/components/LayarPartitur.tsx',
+    'src/pages/Share.tsx',
+    'src/components/share/TabAnggotaJadwal.tsx',
+    'src/components/share/TabAnggotaKonten.tsx',
+    'src/components/PengingatJadwal.tsx',
+    'src/components/TunerDrone.tsx',
+    'src/components/PilihMode.tsx',
+    'src/components/ModePerangkat.tsx',
+    'src/pages/Music.tsx',
+    'src/components/musik/EditorBirama.tsx',
+    'src/components/musik/ModalLagu.tsx',
+    'src/App.tsx',
+    'index.html',
+    'src/components/ModalRekamanLagu.tsx',
+    'src/components/PanelPartitur.tsx',
+    'src/components/LayarPartitur.tsx',
   ].map(baca).join('\n').replace(/&amp;/g, '&')
   const LABEL = [
     'Saya anggota', 'Ambil materi dari situs', 'Buka paket tim', 'Ganti paket', 'Ganti nama',

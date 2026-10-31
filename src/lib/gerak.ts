@@ -1,22 +1,30 @@
-import type { GerakSet } from '../db/types'
+import type {
+  DrillSet,
+  GerakKelompok,
+  GerakSet,
+  JenisSimbolVisual,
+} from '../db/types'
 
 /**
- * DD2 — Jalur & pembagian gerak antar set.
+ * DD2 & #16 — Jalur, pembagian gerak, FTL, Move+Hold, Ripple, & simbol visual.
  *
- * Modul ini sengaja terpisah supaya **editor**, **presenter**, dan **gambar
- * jejak** memakai hitungan yang sama persis — kalau salah satu diubah, semuanya
- * ikut. (Pelajaran dari DD1: dua hitungan terpisah pernah membuat koordinat
- * dan gambar patok tidak sejalan.)
- *
- * Sejarah singkat: sebelum DD2, animasi cuma `translate(vx * p, vy * p)` —
- * pemain meluncur lurus dengan kecepatan konstan dari awal sampai akhir.
+ * Modul ini sengaja terpisah supaya **editor**, **presenter**, **mode anggota**,
+ * dan **gambar jejak / buku saku** memakai hitungan yang sama persis — kalau
+ * salah satu diubah, semuanya ikut.
  */
 
 /**
  * Pengaturan gerak yang sudah dilengkapi nilai bawaan.
- * `putar` sengaja tetap opsional — tidak ada putaran kalau tidak diatur.
+ * Kolom lanjutan (`putar`, `jalanCount`, `ripple`, `kelompok`) tetap opsional.
  */
-export type GerakLengkap = Required<Omit<GerakSet, 'putar'>> & { putar?: GerakSet['putar'] }
+export type GerakLengkap = Required<
+  Omit<GerakSet, 'putar' | 'jalanCount' | 'ripple' | 'kelompok'>
+> & {
+  putar?: GerakSet['putar']
+  jalanCount?: GerakSet['jalanCount']
+  ripple?: GerakSet['ripple']
+  kelompok?: GerakSet['kelompok']
+}
 
 /** Nilai bawaan gerak: lurus, rata, tanpa tunda, tanpa putaran. */
 export const GERAK_DEFAULT: GerakLengkap = {
@@ -105,23 +113,117 @@ export function tundaFraksi(
   return Math.min(0.9, Math.max(0, d / c))
 }
 
+/** Cari sub-kelompok gerak tempat pemain ini terdaftar (bila ada). */
+export function kelompokPemain(
+  g: Pick<GerakSet, 'kelompok'> | undefined,
+  memberId: string | undefined,
+): GerakKelompok | undefined {
+  if (!g?.kelompok?.length || !memberId) return undefined
+  return g.kelompok.find((k) => k.memberIds.includes(memberId))
+}
+
+/** Label gelombang Ripple (0 -> 'A', 1 -> 'B', ..., 25 -> 'Z', 26 -> '27'). */
+export function labelGelombangRipple(indeks: number): string {
+  const n = Math.max(0, Math.floor(indeks))
+  if (n < 26) return String.fromCharCode(65 + n)
+  return String(n + 1)
+}
+
 /**
  * Progres gerak **pemain ini** pada progres waktu set `p` (0..1).
  *
- * Section yang ditunda tetap diam sampai tundanya habis, lalu bergerak lebih
- * cepat dan **tiba bersamaan** dengan yang lain di akhir — itulah yang
- * diharapkan pada "mulai bertahap" di lapangan.
+ * Mendukung gabungan mulus dari:
+ * - `tunda` mulai per section (DD2),
+ * - `ripple` gelombang per pemain (`#16`: mode `kejar` maupun `bertahap`),
+ * - `jalanCount` pembagian *Move + Hold* (`#16`: mis. Jalan 12 + Hold 4),
+ * - override `mudah` & `jalanCount` per sub-kelompok (`GerakKelompok`).
  */
 export function progresPemain(
   p: number,
   g: GerakLengkap,
   sectionId: string | undefined,
   counts: number,
+  memberId?: string,
 ): number {
-  const d = tundaFraksi(g, sectionId, counts)
-  if (d <= 0) return ease(p, g.mudah)
-  const lokal = (p - d) / (1 - d)
-  return ease(Math.min(1, Math.max(0, lokal)), g.mudah)
+  const pJepit = Math.min(1, Math.max(0, p))
+  const totalCount = Math.max(1, counts)
+  const klp = kelompokPemain(g, memberId)
+  const mudahEfektif = klp?.mudah ?? g.mudah
+
+  // Hitungan jalan efektif (Move + Hold)
+  const rawJalan = klp?.jalanCount ?? g.jalanCount
+  const adaHold = typeof rawJalan === 'number' && rawJalan > 0 && rawJalan < totalCount
+  const jalanCount = adaHold ? rawJalan : totalCount
+
+  // Hitungan tunda gabungan (section + gelombang ripple per pemain)
+  const tundaSeksiCount = sectionId ? Math.max(0, g.tunda[sectionId] ?? 0) : 0
+  const gelRipple =
+    memberId && g.ripple && typeof g.ripple.urutan?.[memberId] === 'number'
+      ? Math.max(0, g.ripple.urutan[memberId])
+      : 0
+  const tundaRippleCount = g.ripple ? gelRipple * Math.max(0, g.ripple.selangCount || 0) : 0
+  const totalTundaCount = tundaSeksiCount + tundaRippleCount
+
+  if (g.ripple?.mode === 'bertahap' && tundaRippleCount > 0) {
+    // Mode bertahap: tiap gelombang bergerak sepanjang durasi `jalanCount`
+    // (atau sisa count yang tersedia agar tetap tiba <= akhir set).
+    const mulai = Math.min(totalCount * 0.9, totalTundaCount)
+    const durasi = Math.max(totalCount * 0.1, Math.min(jalanCount, totalCount - mulai))
+    const mulaiF = mulai / totalCount
+    const akhirF = (mulai + durasi) / totalCount
+    if (pJepit <= mulaiF) return 0
+    if (pJepit >= akhirF) return 1
+    return ease((pJepit - mulaiF) / (akhirF - mulaiF), mudahEfektif)
+  }
+
+  // Mode bawaan ('kejar') + Move + Hold:
+  // Seluruh pemain selesai bergerak pada `akhirF = jalanCount / totalCount`
+  // lalu diam (Hold) di titik tujuan sampai akhir set.
+  const akhirF = Math.min(1, Math.max(0.05, jalanCount / totalCount))
+  const dF = Math.min(akhirF * 0.9, Math.max(0, totalTundaCount / totalCount))
+  if (pJepit <= dF) return 0
+  if (pJepit >= akhirF) return 1
+  const lokal = (pJepit - dF) / Math.max(1e-6, akhirF - dF)
+  return ease(Math.min(1, Math.max(0, lokal)), mudahEfektif)
+}
+
+/**
+ * #16 — Jumlah hitungan bergerak efektif yang tersedia bagi seorang pemain,
+ * setelah memotong fase *Hold* (`jalanCount`), `tunda` per seksi, serta
+ * gelombang `ripple` per pemain.
+ *
+ * Bila set tidak memakai `jalanCount`, `ripple`, maupun `kelompok`, hasilnya
+ * identik 100% dengan rumus lama `counts * (1 - tundaFraksi(g, sectionId, counts))`.
+ */
+export function countEfektifPemain(
+  g: GerakLengkap,
+  sectionId: string | undefined,
+  counts: number,
+  memberId?: string,
+): number {
+  const totalCount = Math.max(0, counts)
+  if (totalCount <= 0) return 0
+  const klp = kelompokPemain(g, memberId)
+  const rawJalan = klp?.jalanCount ?? g.jalanCount
+  const adaHold = typeof rawJalan === 'number' && rawJalan > 0 && rawJalan < totalCount
+  const jalanCount = adaHold ? rawJalan : totalCount
+
+  const tundaSeksiCount = sectionId ? Math.max(0, g.tunda[sectionId] ?? 0) : 0
+  const gelRipple =
+    memberId && g.ripple && typeof g.ripple.urutan?.[memberId] === 'number'
+      ? Math.max(0, g.ripple.urutan[memberId])
+      : 0
+  const tundaRippleCount = g.ripple ? gelRipple * Math.max(0, g.ripple.selangCount || 0) : 0
+  const totalTundaCount = tundaSeksiCount + tundaRippleCount
+
+  if (g.ripple?.mode === 'bertahap' && tundaRippleCount > 0) {
+    const mulai = Math.min(totalCount * 0.9, totalTundaCount)
+    return Math.max(totalCount * 0.1, Math.min(jalanCount, totalCount - mulai))
+  }
+
+  const akhirF = Math.min(1, Math.max(0.05, jalanCount / totalCount))
+  const dF = Math.min(akhirF * 0.9, Math.max(0, totalTundaCount / totalCount))
+  return Math.max(totalCount * 0.05, (akhirF - dF) * totalCount)
 }
 
 /** Label siap tampil untuk pilihan pembagian kecepatan. */
@@ -300,4 +402,205 @@ export function pathBusur(
     bagian.push(`${i === 1 ? 'M' : 'L'} ${x.toFixed(3)} ${y.toFixed(3)}`)
   }
   return bagian.join(' ')
+}
+
+/* -------------------------------------------------------------------------- */
+/*  #16 — Follow-the-Leader (FTL), Jalur Sub-Kelompok, & Simbol Visual        */
+/* -------------------------------------------------------------------------- */
+
+export interface JalurPoliFtl {
+  /** Titik-titik simpul berurutan dalam ruang yang diminta (yard atau SVG) */
+  titik: { x: number; y: number }[]
+  /** Jarak kumulatif dari titik[0] ke titik[i] */
+  kumulatif: number[]
+  /** Total panjang lintasan */
+  totalPanjang: number
+}
+
+/**
+ * Bangun lintasan berantai *Follow-the-Leader* (FTL) untuk seluruh anggota
+ * sebuah `GerakKelompok` (`jalur === 'ftl'`).
+ *
+ * Cara kerjanya mengikuti praktik marching band nyata:
+ * - Anggota indeks `0` adalah **Pemimpin Barisan (Leader)**: ia berjalan dari
+ *   `awal[leader]` langsung ke `akhir[leader]`.
+ * - Pengikut ke-`k` (`k >= 1`) mulai dari `awal[k]`, menapak berurutan melewati
+ *   jejak rekan di depannya `awal[k-1] -> ... -> awal[0]`, lalu menyusuri jalur
+ *   pemimpin menuju titik akhirnya `akhir[k]`.
+ * - Dengan parameterisasi panjang busur (`kumulatif`), kecepatan langkah tetap
+ *   merata sepanjang jejak ular/rantai dan dijamin tepat berada di `awal[k]`
+ *   saat `t = 0` serta `akhir[k]` saat `t = 1`.
+ */
+export function bangunPetaFtl(
+  kelompok: Pick<GerakKelompok, 'memberIds' | 'jalur'>[],
+  awal: Record<string, { x: number; y: number }>,
+  akhir: Record<string, { x: number; y: number }>,
+): Map<string, JalurPoliFtl> {
+  const peta = new Map<string, JalurPoliFtl>()
+  for (const klp of kelompok) {
+    if (klp.jalur !== 'ftl' || klp.memberIds.length < 2) continue
+    const aktif = klp.memberIds.filter((id) => awal[id] && akhir[id])
+    if (aktif.length < 2) continue
+
+    for (let k = 0; k < aktif.length; k++) {
+      const id = aktif[k]
+      const simpul: { x: number; y: number }[] = []
+      // Susuri titik awal dari pengikut k maju ke pemimpin 0
+      for (let j = k; j >= 0; j--) {
+        const pt = awal[aktif[j]]
+        if (!simpul.length || Math.hypot(pt.x - simpul[simpul.length - 1].x, pt.y - simpul[simpul.length - 1].y) > 1e-5) {
+          simpul.push({ x: pt.x, y: pt.y })
+        }
+      }
+      // Lalu menuju titik akhir pemain ini (mengikuti koridor barisan pemimpin)
+      const ptAkhir = akhir[id]
+      if (!simpul.length || Math.hypot(ptAkhir.x - simpul[simpul.length - 1].x, ptAkhir.y - simpul[simpul.length - 1].y) > 1e-5) {
+        simpul.push({ x: ptAkhir.x, y: ptAkhir.y })
+      }
+      if (simpul.length < 2) continue
+
+      const kumulatif = [0]
+      let total = 0
+      for (let s = 1; s < simpul.length; s++) {
+        total += Math.hypot(simpul[s].x - simpul[s - 1].x, simpul[s].y - simpul[s - 1].y)
+        kumulatif.push(total)
+      }
+      peta.set(id, { titik: simpul, kumulatif, totalPanjang: total })
+    }
+  }
+  return peta
+}
+
+/** Hitung perpindahan `[dx, dy]` relatif terhadap `titik[0]` pada progres `t` (0..1). */
+export function deltaPoliFtl(poli: JalurPoliFtl, t: number): [number, number] {
+  const { titik, kumulatif, totalPanjang } = poli
+  if (titik.length < 2 || totalPanjang < 1e-6) return [0, 0]
+  const p = Math.min(1, Math.max(0, t))
+  if (p <= 0) return [0, 0]
+  if (p >= 1) {
+    const akhir = titik[titik.length - 1]
+    return [akhir.x - titik[0].x, akhir.y - titik[0].y]
+  }
+  const target = p * totalPanjang
+  let seg = 0
+  while (seg < kumulatif.length - 2 && kumulatif[seg + 1] < target) {
+    seg++
+  }
+  const d0 = kumulatif[seg]
+  const d1 = kumulatif[seg + 1]
+  const lokal = d1 > d0 ? (target - d0) / (d1 - d0) : 0
+  const x = titik[seg].x + (titik[seg + 1].x - titik[seg].x) * lokal
+  const y = titik[seg].y + (titik[seg + 1].y - titik[seg].y) * lokal
+  return [x - titik[0].x, y - titik[0].y]
+}
+
+/** Atribut `d` SVG `<path>` untuk menggambar lintasan FTL di kanvas lapangan. */
+export function pathPoliFtl(poli: JalurPoliFtl): string {
+  return poli.titik
+    .map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(3)} ${pt.y.toFixed(3)}`)
+    .join(' ')
+}
+
+/** Katalog simbol instruksi visual / tanduk / koreografi (#16.3). */
+export const DAFTAR_SIMBOL_VISUAL: {
+  id: JenisSimbolVisual
+  ikon: string
+  kodeCetak: string
+  label: string
+}[] = [
+  { id: 'horn_up', ikon: '🎺↑', kodeCetak: 'HU', label: 'Horn Up' },
+  { id: 'horn_down', ikon: '🎺↓', kodeCetak: 'HD', label: 'Horn Down' },
+  { id: 'horn_snap', ikon: '⚡', kodeCetak: 'HS', label: 'Horn Snap' },
+  { id: 'mark_time', ikon: '👣', kodeCetak: 'MT', label: 'Mark Time' },
+  { id: 'halt', ikon: '✋', kodeCetak: 'HALT', label: 'Halt / Berhenti Tegas' },
+  { id: 'lunge', ikon: '🦵', kodeCetak: 'LNG', label: 'Lunge' },
+  { id: 'hadap_depan', ikon: '👁', kodeCetak: 'FRT', label: 'Hadap Penonton' },
+  { id: 'choreo', ikon: '✨', kodeCetak: 'CHR', label: 'Choreo / Body Visual' },
+]
+
+export function infoSimbolVisual(id: JenisSimbolVisual) {
+  return DAFTAR_SIMBOL_VISUAL.find((s) => s.id === id) ?? DAFTAR_SIMBOL_VISUAL[0]
+}
+
+/**
+ * Ringkas instruksi koreografi pada sebuah `DrillSet` (Move+Hold, Ripple,
+ * FTL/jalur sub-kelompok, dan Simbol Visual) untuk ditampilkan di:
+ * - **Dot Sheet & Buku Saku** (hemat ruang, murni teks/hex),
+ * - **Mode Anggota** (kartu petunjuk di bawah kanvas formasi),
+ * - **DrillPresenter** (bilah status atas saat latihan).
+ */
+export function ringkasKoreografiSet(
+  set: Pick<DrillSet, 'counts' | 'gerak' | 'visual'> | undefined,
+  opsi?: { memberId?: string; sectionId?: string; padat?: boolean },
+): string[] {
+  if (!set) return []
+  const butir: string[] = []
+  const g = set.gerak
+  const klp = kelompokPemain(g, opsi?.memberId)
+  const counts = Math.max(0, set.counts || 0)
+
+  // 1. Pembagian Move + Hold
+  const jalanCount = klp?.jalanCount ?? g?.jalanCount
+  if (counts > 0 && typeof jalanCount === 'number' && jalanCount > 0 && jalanCount < counts) {
+    const holdCount = counts - jalanCount
+    butir.push(
+      opsi?.padat
+        ? `Jln ${jalanCount}+Hold ${holdCount}`
+        : `Jalan ${jalanCount} + Hold ${holdCount}`,
+    )
+  }
+
+  // 2. Gelombang Ripple
+  if (g?.ripple && g.ripple.selangCount > 0) {
+    const memberId = opsi?.memberId
+    if (memberId && typeof g.ripple.urutan?.[memberId] === 'number') {
+      const gel = g.ripple.urutan[memberId]
+      const huruf = labelGelombangRipple(gel)
+      const tunda = gel * g.ripple.selangCount
+      butir.push(
+        opsi?.padat
+          ? `Rpl ${huruf}${tunda > 0 ? `(+${tunda})` : ''}`
+          : `Ripple ${huruf}${tunda > 0 ? ` (mulai hit. +${tunda})` : ' (gelombang 1)'}`,
+      )
+    } else if (!memberId && Object.keys(g.ripple.urutan ?? {}).length > 0) {
+      butir.push(`Ripple tiap ${g.ripple.selangCount} hit.`)
+    }
+  }
+
+  // 3. Jalur sub-kelompok / Follow-the-Leader (FTL)
+  if (klp) {
+    if (klp.jalur === 'ftl') {
+      const urutan = klp.memberIds.indexOf(opsi?.memberId ?? '')
+      butir.push(
+        opsi?.padat
+          ? `FTL#${urutan + 1}`
+          : urutan === 0
+            ? `FTL (${klp.nama} · Pemimpin)`
+            : `FTL (${klp.nama} · urut #${urutan + 1})`,
+      )
+    } else if (!opsi?.padat) {
+      butir.push(`Kelompok ${klp.nama}: ${klp.jalur === 'lengkung' ? 'Melengkung' : 'Lurus'}`)
+    }
+  } else if (!opsi?.memberId && g?.kelompok?.some((k) => k.jalur === 'ftl')) {
+    const jmlFtl = g.kelompok.filter((k) => k.jalur === 'ftl').length
+    butir.push(`FTL (${jmlFtl} barisan)`)
+  }
+
+  // 4. Simbol Visual / Tanduk / Koreografi
+  const vis = set.visual
+  if (vis && (vis.simbol?.length || vis.catatan?.trim())) {
+    const berlaku =
+      !vis.seksi?.length || !opsi?.sectionId || vis.seksi.includes(opsi.sectionId)
+    if (berlaku) {
+      for (const sId of vis.simbol ?? []) {
+        const info = infoSimbolVisual(sId)
+        butir.push(opsi?.padat ? `[${info.kodeCetak}] ${info.label}` : `${info.ikon} ${info.label}`)
+      }
+      if (vis.catatan?.trim()) {
+        butir.push(vis.catatan.trim())
+      }
+    }
+  }
+
+  return butir
 }

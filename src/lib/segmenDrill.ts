@@ -38,7 +38,17 @@ import type { TempoLatihan } from './tempoLatihan'
 import { labelBirama } from './birama'
 import { createTempoTimeline } from './tempoTimeline'
 import type { TempoTimeline, TempoTimelineSegment } from './tempoTimeline'
-import { kendaliJalur, cocokPutaran, deltaBusur, gerakOf, progresPemain, titikJalur } from './gerak'
+import {
+  bangunPetaFtl,
+  cocokPutaran,
+  deltaBusur,
+  deltaPoliFtl,
+  gerakOf,
+  kelompokPemain,
+  kendaliJalur,
+  progresPemain,
+  titikJalur,
+} from './gerak'
 
 /**
  * Lagu dalam bentuk yang dibutuhkan penggaris (tanpa mengimpor tipe Song).
@@ -487,6 +497,9 @@ export function pecahSet(r: PermintaanPecah): HasilPecah | null {
   const porsi = Math.min(1 - 1e-6, Math.max(1e-6, r.porsi ?? di / counts))
   /** Parameter jalur untuk pemain tanpa tunda — dipakai menurunkan bentuk jalur. */
   const porsiJalur = progresPemain(porsi, g, undefined, counts)
+  const petaFtl = g.kelompok?.length
+    ? bangunPetaFtl(g.kelompok, r.points, r.tujuan)
+    : new Map()
 
   const tengah: Record<string, DrillPoint> = {}
   let jumlahK1 = 0
@@ -500,12 +513,18 @@ export function pecahSet(r: PermintaanPecah): HasilPecah | null {
       tengah[id] = { ...p }
       continue
     }
-    const t = progresPemain(porsi, g, r.seksi?.(id), counts)
+    const t = progresPemain(porsi, g, r.seksi?.(id), counts, id)
     const dx = q.x - p.x
     const dy = q.y - p.y
+    const ftl = petaFtl.get(id)
+    const klp = kelompokPemain(g, id)
     let ox = 0
     let oy = 0
-    if (putar && cocokPutaran(p.x, p.y, q.x, q.y, putar.pusat, putar.sudut, geser)) {
+    if (ftl) {
+      ;[ox, oy] = deltaPoliFtl(ftl, t)
+    } else if (klp) {
+      ;[ox, oy] = titikJalur(t, dx, dy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
+    } else if (putar && cocokPutaran(p.x, p.y, q.x, q.y, putar.pusat, putar.sudut, geser)) {
       ;[ox, oy] = deltaBusur(t, p.x, p.y, putar.pusat, putar.sudut, geser)
     } else {
       ;[ox, oy] = titikJalur(t, dx, dy, g.jalur === 'lengkung' ? g.lengkung : 0)
@@ -542,7 +561,24 @@ export function pecahSet(r: PermintaanPecah): HasilPecah | null {
 
   // Bentuk dasar tiap bagian: jalur, kelengkungan, pembagian kecepatan, dan
   // tunda per section diwarisi apa adanya — yang berubah hanya parameternya.
-  const dasar: GerakSet = { ...(r.gerak ?? {}), jalur: g.jalur, lengkung: g.lengkung, mudah: g.mudah }
+  // #16 — `jalanCount` disesuaikan ke rentang bagian pertama dan kedua agar
+  // tidak melebihi panjang hitungan hasil pecahan.
+  const dasarTanpaJalan: GerakSet = {
+    ...(r.gerak ?? {}),
+    jalur: g.jalur,
+    lengkung: g.lengkung,
+    mudah: g.mudah,
+  }
+  delete dasarTanpaJalan.jalanCount
+  const adaHoldAsli =
+    typeof g.jalanCount === 'number' && g.jalanCount > 0 && g.jalanCount < counts
+  const jalanK1 = adaHoldAsli && g.jalanCount! < di ? g.jalanCount! : undefined
+  const jalanK2 =
+    adaHoldAsli && g.jalanCount! > di && g.jalanCount! - di < counts - di
+      ? g.jalanCount! - di
+      : undefined
+  const dasarK1: GerakSet = jalanK1 ? { ...dasarTanpaJalan, jalanCount: jalanK1 } : dasarTanpaJalan
+  const dasarK2: GerakSet = jalanK2 ? { ...dasarTanpaJalan, jalanCount: jalanK2 } : { ...dasarTanpaJalan }
 
   if (putar) {
     /*
@@ -560,7 +596,7 @@ export function pecahSet(r: PermintaanPecah): HasilPecah | null {
     return {
       tengah,
       gerakPertama: {
-        ...dasar,
+        ...dasarK1,
         putar: {
           pusat: putar.pusat,
           sudut: putar.sudut * porsiJalur,
@@ -568,7 +604,7 @@ export function pecahSet(r: PermintaanPecah): HasilPecah | null {
         },
       },
       gerakKedua: {
-        ...dasar,
+        ...dasarK2,
         putar: {
           pusat: pusatTengah,
           sudut: putar.sudut * (1 - porsiJalur),
@@ -582,19 +618,19 @@ export function pecahSet(r: PermintaanPecah): HasilPecah | null {
     }
   }
 
-  const buatLengkung = (lengkungBaru: number | null): GerakSet => {
+  const buatLengkung = (dasarBagian: GerakSet, lengkungBaru: number | null): GerakSet => {
     if (lengkungBaru !== null && Number.isFinite(lengkungBaru)) {
       // Dibatasi ±1,5: di luar itu kurvanya menekuk sampai menyilang dirinya
       // sendiri, dan itu bukan lagi bentuk yang dimaksud pemakainya.
-      return { ...dasar, jalur: 'lengkung', lengkung: Math.max(-1.5, Math.min(1.5, lengkungBaru)) }
+      return { ...dasarBagian, jalur: 'lengkung', lengkung: Math.max(-1.5, Math.min(1.5, lengkungBaru)) }
     }
-    return dasar
+    return dasarBagian
   }
 
   return {
     tengah,
-    gerakPertama: buatLengkung(bobotK1 > 0 ? jumlahK1 / bobotK1 : null),
-    gerakKedua: buatLengkung(bobotK2 > 0 ? jumlahK2 / bobotK2 : null),
+    gerakPertama: buatLengkung(dasarK1, bobotK1 > 0 ? jumlahK1 / bobotK1 : null),
+    gerakKedua: buatLengkung(dasarK2, bobotK2 > 0 ? jumlahK2 / bobotK2 : null),
     hitunganPertama: di,
     hitunganKedua: counts - di,
   }

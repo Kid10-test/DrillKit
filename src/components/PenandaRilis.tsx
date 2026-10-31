@@ -24,7 +24,7 @@ export default function PenandaRilis() {
   return (
     <div
       data-testid="penanda-rilis-baru"
-      className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-3"
+      className="fixed inset-x-0 bottom-16 z-[60] flex justify-center px-3 pb-3 lg:bottom-0"
     >
       <div className="w-full max-w-md rounded-xl border border-sky-500/40 bg-slate-900/95 px-4 py-3 shadow-lg shadow-black/40 backdrop-blur">
         <p className="text-sm font-semibold text-sky-300">Ada versi baru DrillKit</p>

@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cx } from '../lib/utils'
 
 /* --------------------------------- Toast -------------------------------- */
@@ -26,7 +27,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastCtx.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[100] flex flex-col items-center gap-2 px-4 sm:bottom-6">
+      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[250] flex flex-col items-center gap-2 px-4 sm:bottom-6">
         {items.map((t) => (
           <div
             key={t.id}
@@ -248,6 +249,13 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 
 /* --------------------------------- Modal --------------------------------- */
 
+/**
+ * Tumpukan penutup modal aktif supaya menekan `Escape` saat ada modal berlapis
+ * (mis. `DotSheetModal` + `Pratinjau hasil cetak`) hanya menutup modal paling
+ * atas, bukan menutup keduanya sekaligus.
+ */
+const tumpukanModal: (() => void)[] = []
+
 export function Modal({
   open,
   onClose,
@@ -266,34 +274,34 @@ export function Modal({
   /** M1 — penanda untuk pengujian; diletakkan di panel dalam modal. */
   testId?: string
 }) {
-  /**
-   * `onClose` disimpan di ref supaya efek ini **tidak perlu dipasang ulang**
-   * setiap kali induknya render ulang. Dulu efeknya bergantung pada
-   * `onClose` (fungsi baru tiap render) — setiap render ulang, listener
-   * Escape dilepas lalu dipasang lagi, dan kalau kebetulan ada tombol Escape
-   * yang masuk di sela itu, tekanannya hilang (modal baru menutup pada
-   * tekanan kedua). Dengan ref, listener terpasang sekali selama modal
-   * terbuka, jadi Escape selalu diterima.
-   */
   const closeRef = useRef(onClose)
   closeRef.current = onClose
   useEffect(() => {
     if (!open) return
+    const tutupIni = () => closeRef.current()
+    tumpukanModal.push(tutupIni)
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeRef.current()
+      if (e.key === 'Escape' && tumpukanModal[tumpukanModal.length - 1] === tutupIni) {
+        e.stopImmediatePropagation()
+        tutupIni()
+      }
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      const i = tumpukanModal.lastIndexOf(tutupIni)
+      if (i >= 0) tumpukanModal.splice(i, 1)
+    }
   }, [open])
 
   if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+  const konten = (
+    <div className="no-print fixed inset-0 z-[220] flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
       <div className="absolute inset-0" onClick={onClose} />
       <div
         data-testid={testId}
         className={cx(
-          'relative max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-slate-800 bg-slate-900 shadow-2xl sm:rounded-2xl',
+          'relative max-h-[92vh] max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl border border-slate-800 bg-slate-900 shadow-2xl sm:rounded-2xl',
           wide ? 'sm:max-w-3xl' : 'sm:max-w-lg',
         )}
       >
@@ -317,17 +325,18 @@ export function Modal({
           bawah sekali. Tanpa ruang ini, tombol di akhir isi — misalnya
           "Tambah segmen" di editor lagu — tidak bisa diklik.
         */}
-        <div className={cx('space-y-4 px-5 pt-4', footer ? 'pb-20' : 'pb-4')}>
+        <div className={cx('space-y-4 px-5 pt-4', footer ? 'pb-20' : 'pb-[max(1rem,env(safe-area-inset-bottom))]')}>
           {children}
         </div>
         {footer && (
-          <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-800 bg-slate-900/95 px-5 py-3.5 backdrop-blur">
+          <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-800 bg-slate-900/95 px-5 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] backdrop-blur">
             {footer}
           </div>
         )}
       </div>
     </div>
   )
+  return typeof document !== 'undefined' ? createPortal(konten, document.body) : konten
 }
 
 export function ConfirmButton({

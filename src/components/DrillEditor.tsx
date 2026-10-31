@@ -14,6 +14,7 @@ import type {
   Facing,
   FieldMarker,
   GerakSet,
+  InstruksiVisualSet,
   Member,
 } from '../db/types'
 import {
@@ -53,14 +54,11 @@ import {
   ukurTitik,
 } from '../lib/field'
 import {
-  AMBANG,
   ambangEfektif,
-  TINGKAT_LABEL,
   TINGKAT_WARNA,
   analisisPerpindahan,
   rasioLengkung,
   setTerberat,
-  tingkatLangkahDari,
 } from '../lib/analitik'
 import {
   cerminTitik,
@@ -70,23 +68,36 @@ import {
   skalaTitik,
 } from '../lib/massa'
 import {
-  JALUR_LABEL,
-  MUDAH_LABEL,
+  OPSI_BENTUK_BAWAAN,
+  susunBentukCepat,
+  type OpsiBentukCepat,
+} from '../lib/bentukFormasi'
+import { apakahPropertiBergerak, penandaEfektifPadaSet } from '../lib/propertiGerak'
+import {
   type GerakLengkap,
+  bangunPetaFtl,
   cocokPutaran,
+  countEfektifPemain,
   deltaBusur,
+  deltaPoliFtl,
   gerakOf,
+  kelompokPemain,
+  pathPoliFtl,
   progresPemain,
   titikJalur,
   turunkanPusatAkhir,
 } from '../lib/gerak'
+import { PenggarisMusikDrill } from './drill/PenggarisMusikDrill'
+import { PanelAnalitikGerak } from './drill/PanelAnalitikGerak'
+import { PanelAlatFormasi } from './drill/PanelAlatFormasi'
+import { PanelGerakSet } from './drill/PanelGerakSet'
 import { downloadHtmlFile, esc, printHtml, printShell } from '../lib/print'
 import { Metronom, klikUntukDrill } from '../lib/metronome'
 import { PemutarRekaman } from '../lib/rekaman'
-import { dariBeatsLama, formatWaktu, labelBirama } from '../lib/birama'
+import { dariBeatsLama, labelBirama } from '../lib/birama'
 import { daftarTempo, petakanSetKeMusik, tempoSet } from '../lib/gabungMusik'
 // #5 sisa — penggaris drill × segmen lagu, bantuan hitungan, pecah/gabung set.
-import { bantuanSet, fmtAngka, fmtBirama, gabungGerak, petaPenggaris, pecahSet } from '../lib/segmenDrill'
+import { bantuanSet, gabungGerak, petaPenggaris, pecahSet } from '../lib/segmenDrill'
 // #11d — sorot birama partitur pendamping sinkron animasi/scrubber drill.
 import { biramaPadaProgresSet, hitungPetaSetKeBirama, hitunganPadaBirama } from '../lib/partiturFrasa'
 import { useFrasaLatihan } from '../hooks/useFrasaLatihan'
@@ -368,6 +379,12 @@ export function Editor({
   const [jarakGeser, setJarakGeser] = useState(4)
   /** DD4 — sekalian pasang jalur busur supaya jarak antar pemain tetap terjaga. */
   const [ikutBusur, setIkutBusur] = useState(true)
+  /** #16.2 — pengaturan generator bentuk cepat & saklar pratinjau langsung di kanvas. */
+  const [opsiBentuk, setOpsiBentukState] = useState<OpsiBentukCepat>(OPSI_BENTUK_BAWAAN)
+  const [pratinjauBentukAktif, setPratinjauBentukAktif] = useState(false)
+  function ubahOpsiBentuk(patch: Partial<OpsiBentukCepat>) {
+    setOpsiBentukState((s) => ({ ...s, ...patch }))
+  }
   /** DD6 — pemain yang sedang dibuka panel detailnya. */
   const [detailId, setDetailId] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -496,6 +513,8 @@ export function Editor({
 
   /** A7 — penanda lapangan milik drill ini (drill lama belum punya → []). */
   const markers = useMemo(() => drill?.markers ?? [], [drill?.markers])
+  const markersRef = useRef(markers)
+  markersRef.current = markers
 
   /** Simpan daftar penanda ke database drill. */
   const simpanPenanda = useCallback(
@@ -591,6 +610,13 @@ export function Editor({
     const baru: GerakLengkap = { ...gerakSet, ...patch }
     set.gerak = baru
     db.sets.update(set.id, { gerak: baru })
+    forceRender()
+  }
+  /** #16.3 — simpan simbol visual/tanduk untuk set yang sedang aktif. */
+  function simpanVisual(vis: InstruksiVisualSet | undefined) {
+    if (!set) return
+    set.visual = vis
+    db.sets.update(set.id, { visual: vis })
     forceRender()
   }
   /**
@@ -724,12 +750,23 @@ export function Editor({
     const mode = timpa?.mode ?? drill.setelanLangkah?.mode ?? 'tetap'
     if (mode === 'menyesuaikan') {
       const k = timpa?.langkahPerCount ?? drill.setelanLangkah?.langkahPerCount ?? 1
-      return Math.max(1, Math.round((set?.counts ?? 0) * k))
+      const cAktif = countEfektifPemain(gerakSet, seksiMember.get(id), set?.counts ?? 0, id)
+      return Math.max(1, Math.round(cAktif * k))
     }
+    const lurus = (drill.setelanJarak ?? 'jalur') === 'lurus'
+    if (!lurus && set && nextSet && gerakSet.kelompok?.some((k) => k.jalur === 'ftl' && k.memberIds.includes(id))) {
+      const petaYd = bangunPetaFtl(gerakSet.kelompok, set.points, nextSet.points)
+      const ftlYd = petaYd.get(id)
+      if (ftlYd && ftlYd.totalPanjang > 0) return Math.max(1, Math.round(ftlYd.totalPanjang / sYd))
+    }
+    const klp = kelompokPemain(gerakSet, id)
     // 31e — sama dengan analitik: `lurus` mengabaikan kelengkungan.
-    const rasio =
-      (drill.setelanJarak ?? 'jalur') === 'lurus'
-        ? 1
+    const rasio = lurus
+      ? 1
+      : klp
+        ? klp.jalur === 'lengkung'
+          ? rasioLengkung(klp.lengkung ?? 0.4)
+          : 1
         : gerakSet.jalur === 'lengkung'
           ? rasioLengkung(gerakSet.lengkung ?? 0)
           : 1
@@ -818,16 +855,32 @@ export function Editor({
     await db.drills.update(drill.id, { updatedAt: Date.now() })
   }
 
+  async function bersihkanKeyframeSetPenanda(idSetDihapus: string) {
+    if (!markers.some((m) => m.perSet && idSetDihapus in m.perSet)) return
+    const bersih = markers.map((m) => {
+      if (!m.perSet || !(idSetDihapus in m.perSet)) return m
+      const perSetBaru = { ...m.perSet }
+      delete perSetBaru[idSetDihapus]
+      return {
+        ...m,
+        perSet: Object.keys(perSetBaru).length ? perSetBaru : undefined,
+      }
+    })
+    await simpanPenanda(bersih)
+  }
+
   async function removeSet() {
     if (!set || sets.length <= 1) return
     // 1a — difoto dulu: menghapus set bersama semua titiknya adalah
     // kehilangan yang paling sering disesali, dan paling sering baru
     // disadari besoknya.
     await foto(drill.id, 'sebelum-hapus-set')
-    await db.sets.delete(set.id)
+    const idHapus = set.id
+    await db.sets.delete(idHapus)
+    await bersihkanKeyframeSetPenanda(idHapus)
     // K3 — centang untuk set ini tidak ada gunanya lagi.
-    await hapusTandaSet(drill.id, set.id)
-    const rest = sets.filter((s) => s.id !== set.id)
+    await hapusTandaSet(drill.id, idHapus)
+    const rest = sets.filter((s) => s.id !== idHapus)
     await Promise.all(rest.map((s, i) => (s.order === i ? null : db.sets.update(s.id, { order: i }))))
     setIdx(Math.max(0, idx - 1))
     toast.push('Set dihapus', 'info')
@@ -934,8 +987,10 @@ export function Editor({
     const counts = Math.max(1, Math.floor(set.counts)) + Math.max(1, Math.floor(nextSet.counts))
     const gerak = gabungGerak(set.gerak, nextSet.gerak)
     await db.sets.update(set.id, { counts, gerak })
-    await db.sets.delete(nextSet.id)
-    await hapusTandaSet(drill.id, nextSet.id)
+    const idLeleh = nextSet.id
+    await db.sets.delete(idLeleh)
+    await bersihkanKeyframeSetPenanda(idLeleh)
+    await hapusTandaSet(drill.id, idLeleh)
     await Promise.all(sets.slice(idx + 2).map((s, i) => db.sets.update(s.id, { order: idx + 1 + i })))
     await db.drills.update(drill.id, { updatedAt: Date.now() })
     setPecahTerbuka(false)
@@ -1178,6 +1233,47 @@ export function Editor({
   const busurMasuk = petaBusur(prevSet, set)
   const busurRef = useRef(busurKeluar)
   busurRef.current = busurKeluar
+
+  /** #16.1 — peta lintasan Follow-the-Leader (FTL) dalam satuan gambar SVG. */
+  const ftlKeluar = useMemo(() => {
+    if (!set || !nextSet || !gerakSet.kelompok?.length) return new Map()
+    const awalSvg: Record<string, { x: number; y: number }> = {}
+    const akhirSvg: Record<string, { x: number; y: number }> = {}
+    for (const [id, pt] of Object.entries(set.points)) {
+      awalSvg[id] = { x: sx(pt.x), y: sy(pt.y) }
+    }
+    for (const [id, pt] of Object.entries(nextSet.points)) {
+      akhirSvg[id] = { x: sx(pt.x), y: sy(pt.y) }
+    }
+    return bangunPetaFtl(gerakSet.kelompok, awalSvg, akhirSvg)
+  }, [set, nextSet, gerakSet.kelompok, sx, sy])
+  const ftlRef = useRef(ftlKeluar)
+  ftlRef.current = ftlKeluar
+
+  /** #16.2 — pratinjau langsung bentuk cepat di kanvas sebelum diterapkan. */
+  const pratinjauTitikBentuk = useMemo(() => {
+    if (!pratinjauBentukAktif || !set) return null
+    const ids = selected.length
+      ? selected.filter((id) => visibleIds.has(id))
+      : Object.keys(set.points).filter((id) => visibleIds.has(id))
+    if (!ids.length) return null
+    return susunBentukCepat(ids, set.points, f, { ...opsiBentuk, snap: view.snap })
+  }, [pratinjauBentukAktif, set, selected, visibleIds, f, opsiBentuk, view.snap])
+
+  function terapkanBentukCepat() {
+    if (!set) return
+    const ids = selected.length
+      ? selected.filter((id) => visibleIds.has(id))
+      : Object.keys(set.points).filter((id) => visibleIds.has(id))
+    if (!ids.length) return
+    snapshot()
+    const hasil = susunBentukCepat(ids, set.points, f, { ...opsiBentuk, snap: view.snap })
+    const pts = { ...set.points, ...hasil }
+    set.points = pts
+    writePoints(pts)
+    setPratinjauBentukAktif(false)
+    toast.push(`${ids.length} titik disusun ke bentuk baru`)
+  }
   /** Versi ref (dipakai handler marquee yang dipasang sekali). */
   const geomRef = useRef({ sx, sy })
   geomRef.current = { sx, sy }
@@ -1715,16 +1811,23 @@ export function Editor({
         const ikut = seksiAnimasi === 'all' || seksiMember.get(id) === seksiAnimasi
         if (!ikut || p <= 0) g.removeAttribute('transform')
         else {
-          // DD2/DD4 — hitungan yang sama dengan animasi: tunda per section,
-          // pembagian kecepatan, lalu posisi di jalur lurus/melengkung/busur.
-          const t = progresPemain(p, gr, seksiMember.get(id), countsScrub)
+          // DD2/DD4/#16 — hitungan yang sama dengan animasi: tunda per section,
+          // ripple, Move+Hold, FTL, jalur sub-kelompok, atau busur.
+          const t = progresPemain(p, gr, seksiMember.get(id), countsScrub, id)
+          const ftl = ftlRef.current.get(id)
+          const klp = kelompokPemain(gr, id)
           const bs = busurKeluar.get(id)
-          const [tx, ty] = bs
-            ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser ?? { x: 0, y: 0 })
-            : titikJalur(t, vx, vy, lengkungScrub)
+          const [tx, ty] = ftl
+            ? deltaPoliFtl(ftl, t)
+            : klp
+              ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
+              : bs
+                ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser ?? { x: 0, y: 0 })
+                : titikJalur(t, vx, vy, lengkungScrub)
           g.setAttribute('transform', `translate(${tx} ${ty})`)
         }
       }
+      setProgress(p)
       tulisCount(p)
       segarkanBiramaDrill(idx, p)
 
@@ -1783,6 +1886,7 @@ export function Editor({
     dotRefs.current.forEach((g) => {
       if (g.hasAttribute('transform')) g.removeAttribute('transform')
     })
+    setProgress(0)
     tulisCount(0)
     segarkanBiramaDrill(idx, 0)
   }, [tulisCount, segarkanBiramaDrill, idx])
@@ -1855,14 +1959,23 @@ export function Editor({
           if (g.hasAttribute('transform')) g.removeAttribute('transform')
           continue
         }
-        // DD2 — progres tiap pemain (tunda per section & pembagian kecepatan),
-        // lalu posisinya pada jalur lurus, melengkung, atau busur putaran.
-        const t = progresPemain(p, gr, seksiMember.get(id), counts)
+        // DD2/#16 — progres tiap pemain (tunda per section, ripple, Move+Hold),
+        // lalu posisinya pada FTL, sub-kelompok, busur, atau jalur utama.
+        const t = progresPemain(p, gr, seksiMember.get(id), counts, id)
+        const ftl = ftlRef.current.get(id)
+        const klp = kelompokPemain(gr, id)
         const bs = busurRef.current.get(id)
-        const [tx, ty] = bs
-          ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser ?? { x: 0, y: 0 })
-          : titikJalur(t, vx, vy, lengkung)
+        const [tx, ty] = ftl
+          ? deltaPoliFtl(ftl, t)
+          : klp
+            ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
+            : bs
+              ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser ?? { x: 0, y: 0 })
+              : titikJalur(t, vx, vy, lengkung)
         g.setAttribute('transform', `translate(${tx} ${ty})`)
+      }
+      if (markersRef.current.some(apakahPropertiBergerak)) {
+        setProgress(p)
       }
       tulisCount(p)
       segarkanBiramaDrill(idx, p)
@@ -2304,8 +2417,14 @@ export function Editor({
             >
               <FieldSurface f={f} VW={VW} VH={VH} sx={sx} sy={sy} />
 
-              {/* A7 — penanda bebas: digambar di bawah titik pemain. */}
-              {view.penanda && <MarkerLayer markers={markers} sx={sx} sy={sy} />}
+              {/* A7 & #16.4 — penanda bebas & properti bergerak: digambar di bawah titik pemain. */}
+              {view.penanda && (
+                <MarkerLayer
+                  markers={penandaEfektifPadaSet(markers, sets, idx, progress)}
+                  sx={sx}
+                  sy={sy}
+                />
+              )}
 
               {/* Kotak pilih (marquee) — digambar langsung saat menyeret di area kosong */}
               <rect
@@ -2383,21 +2502,41 @@ export function Editor({
                             panah={view.panah ? 'url(#dk-panah-masuk)' : undefined}
                           />
                         )}
-                        {/* tujuan: ke set berikutnya */}
-                        {ada(q) && (
-                          <Jejak
-                            nama="keluar"
-                            x1={x}
-                            y1={y}
-                            x2={sx(q!.x)}
-                            y2={sy(q!.y)}
-                            lengkung={gerakSet.jalur === 'lengkung' ? gerakSet.lengkung : 0}
-                            warna={warnaJalur(id)}
-                            opacity={view.analitik ? 0.95 : 0.75}
-                            busur={busurKeluar.get(id)}
-                            panah={view.panah ? 'url(#dk-panah-keluar)' : undefined}
-                          />
-                        )}
+                        {/* tujuan: ke set berikutnya (FTL, sub-kelompok, busur, atau jalur utama) */}
+                        {ada(q) &&
+                          (ftlKeluar.get(id) ? (
+                            <path
+                              data-testid={`jejak-ftl-${id}`}
+                              d={pathPoliFtl(ftlKeluar.get(id)!)}
+                              fill="none"
+                              stroke="#38bdf8"
+                              strokeWidth={0.32}
+                              strokeDasharray="1.1 0.6"
+                              opacity={0.9}
+                              markerEnd={view.panah ? 'url(#dk-panah-keluar)' : undefined}
+                            />
+                          ) : (
+                            <Jejak
+                              nama="keluar"
+                              x1={x}
+                              y1={y}
+                              x2={sx(q!.x)}
+                              y2={sy(q!.y)}
+                              lengkung={
+                                kelompokPemain(gerakSet, id)
+                                  ? kelompokPemain(gerakSet, id)!.jalur === 'lengkung'
+                                    ? (kelompokPemain(gerakSet, id)!.lengkung ?? 0.4)
+                                    : 0
+                                  : gerakSet.jalur === 'lengkung'
+                                    ? gerakSet.lengkung
+                                    : 0
+                              }
+                              warna={warnaJalur(id)}
+                              opacity={view.analitik ? 0.95 : 0.75}
+                              busur={kelompokPemain(gerakSet, id) ? undefined : busurKeluar.get(id)}
+                              panah={view.panah ? 'url(#dk-panah-keluar)' : undefined}
+                            />
+                          ))}
                         {/*
                           DD9 — tapak langkah di sepanjang jejak keluar.
                           Hanya untuk **pemain terpilih**: satu formasi 40 orang
@@ -2459,6 +2598,25 @@ export function Editor({
                     )
                   })}
               </g>
+
+              {/* #16.2 — Pratinjau langsung generator bentuk cepat di kanvas */}
+              {pratinjauTitikBentuk && (
+                <g data-testid="pratinjau-bentuk-kanvas" style={{ pointerEvents: 'none' }}>
+                  {Object.entries(pratinjauTitikBentuk).map(([id, pt]) => (
+                    <circle
+                      key={`prv-${id}`}
+                      cx={sx(pt.x)}
+                      cy={sy(pt.y)}
+                      r={uk(0.95)}
+                      fill="#fbbf24"
+                      fillOpacity={0.22}
+                      stroke="#fbbf24"
+                      strokeWidth={uk(0.2)}
+                      strokeDasharray="0.7 0.5"
+                    />
+                  ))}
+                </g>
+              )}
 
               {/* Titik pemain */}
               {Object.entries(set?.points ?? {}).map(([id, p]) => {
@@ -2670,121 +2828,18 @@ export function Editor({
             </div>
           </div>
 
-          {/* #5 sisa — penggaris musik × drill: satu penggaris hitungan, dua baris.
-              Baris atas = segmen lagu, baris bawah = set drill; keduanya dalam
-              satuan yang sama (hitungan), supaya mencocokkan tidak lagi menebak
-              dari birama. Di HP penggarisnya bisa digeser ke samping. */}
+          {/* #5 sisa & #12c — penggaris musik × drill */}
           {lagu && penggaris && penggaris.set.length > 0 && (
-            <div className="border-t border-slate-800 px-3 py-2" data-testid="penggaris-drill">
-              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <span className="text-[11px] font-medium text-slate-300">
-                  Garis waktu <b className="text-emerald-300">{lagu.title}</b>
-                  <span className="ml-1 text-slate-500">— segmen lagu × set drill, dalam hitungan</span>
-                </span>
-                <div className="flex items-center gap-2">
-                  {lagu.partitur && (
-                    <button
-                      type="button"
-                      data-kiosk-allow
-                      data-testid="drill-tombol-partitur"
-                      onClick={() => setPartiturDrillTerbuka((v) => !v)}
-                      className={cx(
-                        'rounded-md border px-2 py-0.5 text-[10px] font-semibold transition',
-                        partiturDrillTerbuka
-                          ? 'border-emerald-500/60 bg-emerald-600/20 text-emerald-200'
-                          : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800',
-                      )}
-                    >
-                      {partiturDrillTerbuka ? 'Tutup partitur' : 'Buka partitur'}
-                    </button>
-                  )}
-                  <span className="text-[10px] tabular-nums text-slate-500" data-testid="penggaris-ringkas">
-                    {penggaris.totalHitungan} hitungan · {formatWaktu(penggaris.totalDetik)}
-                  </span>
-                </div>
-              </div>
-              <div className="scroll-thin overflow-x-auto pb-1" data-testid="penggaris-gulir">
-                <div className="min-w-max space-y-1">
-                  {/* Baris segmen: nama, tempo, rentang hitungan & birama. */}
-                  <div className="flex items-stretch gap-1" data-testid="penggaris-baris-segmen">
-                    {penggaris.segmen.map((b) => (
-                      <button
-                        key={`g${b.index}`}
-                        type="button"
-                        data-kiosk-allow
-                        data-testid={`penggaris-segmen-${b.index}`}
-                        onClick={() => keHitungan(b.mulai)}
-                        style={{ width: lebarBlok(b.hitungan) }}
-                        title={
-                          `Segmen ${b.label} · ${b.luncur ? `${fmtAngka(b.bpm)} → ${fmtAngka(b.bpmAkhir)}` : fmtAngka(b.bpm)} BPM · ` +
-                          `hitungan ${fmtAngka(b.mulai + 1)}–${fmtAngka(b.akhir)} · ` +
-                          `birama ${fmtBirama(b.mulaiBirama)}–${fmtBirama(b.akhirBirama)} · ketuk untuk melompat`
-                        }
-                        className="shrink-0 rounded-md border border-sky-800/50 bg-sky-950/30 px-2 py-1 text-left transition hover:border-sky-600/60 hover:bg-sky-950/50"
-                      >
-                        <span className="block truncate text-[11px] font-medium text-sky-200">
-                          {b.dasar ? 'Awal lagu' : b.label}
-                        </span>
-                        <span className="block truncate text-[9px] tabular-nums text-slate-400">
-                          {b.luncur ? `${fmtAngka(b.bpm)}→${fmtAngka(b.bpmAkhir)}` : fmtAngka(b.bpm)} BPM ·{' '}
-                          {fmtAngka(b.mulai + 1)}–{fmtAngka(b.akhir)} · br {fmtBirama(b.mulaiBirama)}–{fmtBirama(b.akhirBirama)}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  {/* Baris set: rentang hitungan & birama, plus tanda ⚡. */}
-                  <div className="flex items-stretch gap-1" data-testid="penggaris-baris-set">
-                    {penggaris.set.map((b) => (
-                      <button
-                        key={`s${b.index}`}
-                        type="button"
-                        data-kiosk-allow
-                        data-testid={`penggaris-set-${b.index}`}
-                        onClick={() => keHitungan(b.mulai)}
-                        style={{ width: lebarBlok(b.hitungan) }}
-                        title={
-                          `${b.nama} · ${fmtAngka(b.mulai + 1)}–${fmtAngka(b.akhir)} hitungan · ` +
-                          `birama ${fmtBirama(b.mulaiBirama)}–${fmtBirama(b.akhirBirama)} · ${fmtAngka(b.bpm)} BPM` +
-                          (b.keterangan.length ? ` · ${b.keterangan.join(' · ')}` : '')
-                        }
-                        className={cx(
-                          'shrink-0 rounded-md border px-2 py-1 text-left transition',
-                          b.index === idx
-                            ? 'border-emerald-600/60 bg-emerald-600/15 text-emerald-200'
-                            : 'border-slate-800 bg-slate-900/40 text-slate-300 hover:bg-slate-800/60',
-                        )}
-                      >
-                        <span className="flex items-center gap-1 text-[11px] font-medium">
-                          <span className="truncate">{b.nama}</span>
-                          {(b.lintasTempo || b.lintasSukat) && (
-                            <span
-                              data-testid={`penggaris-lintas-${b.index}`}
-                              className="shrink-0 text-amber-300"
-                              title={b.keterangan.join(' · ')}
-                            >
-                              ⚡
-                            </span>
-                          )}
-                        </span>
-                        <span className="block truncate text-[9px] tabular-nums text-slate-400">
-                          {fmtAngka(b.mulai + 1)}–{fmtAngka(b.akhir)} · birama {fmtBirama(b.mulaiBirama)}–
-                          {fmtBirama(b.akhirBirama)}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {catatanLintas.length > 0 && (
-                <ul className="mt-1 space-y-0.5 text-[10px] leading-snug text-amber-300/90" data-testid="penggaris-catatan">
-                  {catatanLintas.map((c) => (
-                    <li key={`c${c.index}`} data-testid={`penggaris-catatan-${c.index}`}>
-                      ⚡ <b>{c.nama}</b>: {c.teks}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <PenggarisMusikDrill
+              lagu={lagu}
+              penggaris={penggaris}
+              idxAktif={idx}
+              partiturDrillTerbuka={partiturDrillTerbuka}
+              onTogglePartitur={() => setPartiturDrillTerbuka((v) => !v)}
+              keHitungan={keHitungan}
+              lebarBlok={lebarBlok}
+              catatanLintas={catatanLintas}
+            />
           )}
 
           {/* #11d — Partitur pendamping lapangan: sorot birama aktif sinkron saat drill berjalan / digeser */}
@@ -3152,196 +3207,24 @@ export function Editor({
                 )}
               </div>
 
-              {/* DD2 — cara pemain berpindah ke set berikutnya */}
-              {set && nextSet && (
-                <div className="mt-3 border-t border-slate-800 pt-3">
-                  <label className="mb-1.5 block text-[11px] font-medium text-slate-400">
-                    Gerakan ke set berikutnya
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="mb-1 block text-[11px] text-slate-500">Bentuk jalur</label>
-                      <Select
-                        value={gerakSet.jalur}
-                        onChange={(e) => simpanGerak({ jalur: e.target.value as 'lurus' | 'lengkung' })}
-                      >
-                        {(Object.keys(JALUR_LABEL) as ('lurus' | 'lengkung')[]).map((k) => (
-                          <option key={k} value={k}>
-                            {JALUR_LABEL[k]}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] text-slate-500">
-                        Pembagian kecepatan
-                      </label>
-                      <Select
-                        value={gerakSet.mudah}
-                        onChange={(e) =>
-                          simpanGerak({ mudah: e.target.value as GerakLengkap['mudah'] })
-                        }
-                      >
-                        {(Object.keys(MUDAH_LABEL) as GerakLengkap['mudah'][]).map((k) => (
-                          <option key={k} value={k}>
-                            {MUDAH_LABEL[k]}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
-                  </div>
-
-                  {gerakSet.jalur === 'lengkung' && (
-                    <div className="mt-2">
-                      <label className="mb-1 block text-[11px] text-slate-500">
-                        Lengkungan: {Math.round(gerakSet.lengkung * 100)}%
-                      </label>
-                      <input
-                        type="range"
-                        min={-100}
-                        max={100}
-                        step={25}
-                        value={Math.round(gerakSet.lengkung * 100)}
-                        onChange={(e) => simpanGerak({ lengkung: Number(e.target.value) / 100 })}
-                        className="w-full accent-sky-500"
-                        aria-label="Lengkungan jalur"
-                      />
-                    </div>
-                  )}
-
-                  {/* DD4 — busur putaran: jarak antar pemain tetap terjaga */}
-                  {gerakSet.jalur === 'busur' && (
-                    <div className="mt-2 space-y-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-24 shrink-0 text-[11px] text-slate-500">Sudut putar</span>
-                        <Input
-                          type="number"
-                          step={15}
-                          value={gerakSet.putar?.sudut ?? 0}
-                          onChange={(e) => ubahPutar({ sudut: Number(e.target.value) })}
-                        />
-                        <span className="shrink-0 text-[11px] text-slate-500">derajat</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-24 shrink-0 text-[11px] text-slate-500">
-                          Pusat putaran
-                        </span>
-                        <Input
-                          type="number"
-                          step={0.25}
-                          value={pusatPutar.x}
-                          onChange={(e) => ubahPutar({ x: Number(e.target.value) })}
-                          aria-label="Pusat putaran, sumbu x (langkah)"
-                        />
-                        <Input
-                          type="number"
-                          step={0.25}
-                          value={pusatPutar.y}
-                          onChange={(e) => ubahPutar({ y: Number(e.target.value) })}
-                          aria-label="Pusat putaran, sumbu y (langkah)"
-                        />
-                      </div>
-
-                      {/* putar-jalan — lingkaran ikut berjalan */}
-                      <label className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                        <input
-                          type="checkbox"
-                          className="accent-sky-500"
-                          checked={pusatAkhirPutar !== null}
-                          onChange={(e) =>
-                            e.target.checked
-                              ? ubahPutar({ x2: pusatPutar.x, y2: pusatPutar.y })
-                              : hapusPusatAkhir()
-                          }
-                          data-testid="putar-jalan-aktif"
-                        />
-                        Lingkaran ikut berjalan (pusatnya berpindah)
-                      </label>
-
-                      {pusatAkhirPutar && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-24 shrink-0 text-[11px] text-slate-500">
-                            Berpindah ke
-                          </span>
-                          <Input
-                            type="number"
-                            step={0.25}
-                            value={pusatAkhirPutar.x}
-                            onChange={(e) => ubahPutar({ x2: Number(e.target.value) })}
-                            aria-label="Pusat putaran berpindah ke, sumbu x (langkah)"
-                            data-testid="putar-jalan-x2"
-                          />
-                          <Input
-                            type="number"
-                            step={0.25}
-                            value={pusatAkhirPutar.y}
-                            onChange={(e) => ubahPutar({ y2: Number(e.target.value) })}
-                            aria-label="Pusat putaran berpindah ke, sumbu y (langkah)"
-                            data-testid="putar-jalan-y2"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="shrink-0 px-2 py-1 text-[11px]"
-                            onClick={hitungPusatAkhir}
-                            data-testid="putar-jalan-hitung"
-                          >
-                            Hitung
-                          </Button>
-                        </div>
-                      )}
-
-                      <p className="text-[10px] leading-snug text-slate-500" data-testid="putar-jalan-keterangan">
-                        {busurKeluar.size} dari {Object.keys(set.points).length} pemain mengikuti
-                        busur ini — sisanya tetap jalur lurus/melengkung karena perpindahannya tidak
-                        cocok dengan putaran ini. Pusat diukur dalam langkah dari titik tengah
-                        lapangan.
-                        {pusatAkhirPutar && (
-                          <>
-                            {' '}
-                            Lingkaran berputar sambil pusatnya bergeser dari {pusatPutar.x},{' '}
-                            {pusatPutar.y} ke {pusatAkhirPutar.x}, {pusatAkhirPutar.y} — jadi
-                            bentuk formasi tetap utuh sementara seluruh blok terbawa maju.
-                            Pemain di sisi luar menempuh jarak lebih jauh dalam hitungan yang
-                            sama, dan itu wajar: begitulah kenyataannya di lapangan.
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="mt-2">
-                    <label className="mb-1 block text-[11px] text-slate-500">
-                      Tunda mulai per section (count)
-                    </label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {seksiUnik.map((sc) => (
-                        <div key={sc} className="flex items-center gap-1.5">
-                          <span className="w-14 shrink-0 truncate text-[11px] text-slate-400">
-                            {sectionLabel(sc)}
-                          </span>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={gerakSet.tunda[sc] ?? 0}
-                            onChange={(e) =>
-                              simpanGerak({
-                                tunda: {
-                                  ...gerakSet.tunda,
-                                  [sc]: Math.max(0, Number(e.target.value)),
-                                },
-                              })
-                            }
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
-                      Section yang ditunda diam beberapa count lebih dulu, lalu <b>mengejar</b>{' '}
-                      supaya tetap tiba bersamaan di akhir.
-                    </p>
-                  </div>
-                </div>
+              {/* DD2 & #16 — koreografi visual, FTL/sub-kelompok, Move+Hold, Ripple, & jalur */}
+              {set && (
+                <PanelGerakSet
+                  set={set}
+                  adaSetBerikut={Boolean(nextSet)}
+                  gerakSet={gerakSet}
+                  simpanGerak={simpanGerak}
+                  simpanVisual={simpanVisual}
+                  pusatPutar={pusatPutar}
+                  pusatAkhirPutar={pusatAkhirPutar}
+                  ubahPutar={ubahPutar}
+                  hapusPusatAkhir={hapusPusatAkhir}
+                  hitungPusatAkhir={hitungPusatAkhir}
+                  jumlahIkutBusur={busurKeluar.size}
+                  seksiUnik={seksiUnik}
+                  selectedIds={selected}
+                  rosterById={rosterById}
+                />
               )}
             </div>
           )}
@@ -3496,146 +3379,28 @@ export function Editor({
           </div>
         </Card>
 
-        {/* --------------------- DD4 — Alat gerak massa ---------------------- */}
-        <Card>
-          <h2 className="mb-2 text-sm font-semibold text-slate-200">Alat gerak massa</h2>
-          <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
-            {selected.length
-              ? `${selected.length} titik dipilih — perubahan hanya berlaku pada titik itu.`
-              : 'Tidak ada titik dipilih — perubahan berlaku untuk SEMUA pemain di set ini.'}
-          </p>
-
-          <div className="space-y-2.5">
-            {/* Putar */}
-            <div>
-              <label className="mb-1 block text-[11px] font-medium text-slate-400">Putar blok</label>
-              <div className="grid grid-cols-3 gap-1.5">
-                <Select
-                  value={String(sudutPutar)}
-                  onChange={(e) => setSudutPutar(Number(e.target.value))}
-                  className="py-1 text-xs"
-                >
-                  {[15, 30, 45, 90].map((d) => (
-                    <option key={d} value={d}>
-                      {d}°
-                    </option>
-                  ))}
-                </Select>
-                <Button size="sm" disabled={!bisaPutarSkala} onClick={() => putarBlok(-sudutPutar)}>
-                  ↺ Kiri
-                </Button>
-                <Button size="sm" disabled={!bisaPutarSkala} onClick={() => putarBlok(sudutPutar)}>
-                  Kanan ↻
-                </Button>
-              </div>
-              <label className="mt-1.5 flex items-start gap-1.5 text-[10px] leading-snug text-slate-400">
-                <input
-                  type="checkbox"
-                  checked={ikutBusur}
-                  onChange={(e) => setIkutBusur(e.target.checked)}
-                  className="mt-0.5 accent-sky-500"
-                />
-                <span>
-                  Ikuti busur — pemain mengitari titik tengahnya, bukan memotong lewat
-                  tali busur (tanpa ini formasi mengkerut di tengah jalan)
-                </span>
-              </label>
-              <p className="mt-1 text-[10px] leading-snug text-slate-500">
-                {bisaPutarSkala
-                  ? 'Mengitari titik tengah blok. Putaran 90° ikut memutar arah hadap.'
-                  : 'Perlu minimal 2 titik — kosongkan pilihan supaya berlaku untuk seluruh formasi.'}
-              </p>
-            </div>
-
-            {/* Kembang-kempis */}
-            <div>
-              <label className="mb-1 block text-[11px] font-medium text-slate-400">
-                Kembang-kempis
-              </label>
-              <div className="grid grid-cols-3 gap-1.5">
-                <Select
-                  value={String(persenSkala)}
-                  onChange={(e) => setPersenSkala(Number(e.target.value))}
-                  className="py-1 text-xs"
-                >
-                  {[5, 10, 25].map((d) => (
-                    <option key={d} value={d}>
-                      {d}%
-                    </option>
-                  ))}
-                </Select>
-                <Button
-                  size="sm"
-                  disabled={!bisaPutarSkala}
-                  onClick={() => ubahUkuran(1 - persenSkala / 100)}
-                >
-                  Kecilkan
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={!bisaPutarSkala}
-                  onClick={() => ubahUkuran(1 + persenSkala / 100)}
-                >
-                  Besarkan
-                </Button>
-              </div>
-              <p className="mt-1 text-[10px] leading-snug text-slate-500">
-                {bisaPutarSkala
-                  ? 'Mengembang atau mengempis dari titik tengah blok.'
-                  : 'Perlu minimal 2 titik — kosongkan pilihan supaya berlaku untuk seluruh formasi.'}
-              </p>
-            </div>
-
-            {/* Cermin */}
-            <div>
-              <label className="mb-1 block text-[11px] font-medium text-slate-400">Cermin</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <Button size="sm" onClick={() => cerminBlok('x')}>
-                  Kiri ⇄ Kanan
-                </Button>
-                <Button size="sm" onClick={() => cerminBlok('y')}>
-                  Depan ⇄ Belakang
-                </Button>
-              </div>
-              <p className="mt-1 text-[10px] leading-snug text-slate-500">
-                Dicerminkan terhadap garis tengah lapangan; arah hadap ikut tercermin.
-              </p>
-            </div>
-
-            {/* Geser */}
-            <div>
-              <label className="mb-1 block text-[11px] font-medium text-slate-400">Geser blok</label>
-              <div className="mb-1.5 flex items-center gap-1.5">
-                <Select
-                  value={String(jarakGeser)}
-                  onChange={(e) => setJarakGeser(Number(e.target.value))}
-                  className="w-20 py-1 text-xs"
-                >
-                  {[1, 2, 4, 8].map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </Select>
-                <span className="text-[11px] text-slate-500">langkah sekali tekan</span>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <Button size="sm" onClick={() => geserBlok('y', -1)}>
-                  Ke depan
-                </Button>
-                <Button size="sm" onClick={() => geserBlok('y', 1)}>
-                  Ke belakang
-                </Button>
-                <Button size="sm" onClick={() => geserBlok('x', 1)}>
-                  Ke Side 1
-                </Button>
-                <Button size="sm" onClick={() => geserBlok('x', -1)}>
-                  Ke Side 2
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Card>
+        {/* --------------------- DD4 & #16.2 — Alat gerak massa & bentuk ---------------------- */}
+        <PanelAlatFormasi
+          selectedCount={selected.length}
+          bisaPutarSkala={bisaPutarSkala}
+          sudutPutar={sudutPutar}
+          setSudutPutar={setSudutPutar}
+          ikutBusur={ikutBusur}
+          setIkutBusur={setIkutBusur}
+          putarBlok={putarBlok}
+          persenSkala={persenSkala}
+          setPersenSkala={setPersenSkala}
+          ubahUkuran={ubahUkuran}
+          cerminBlok={cerminBlok}
+          jarakGeser={jarakGeser}
+          setJarakGeser={setJarakGeser}
+          geserBlok={geserBlok}
+          opsiBentuk={opsiBentuk}
+          setOpsiBentuk={ubahOpsiBentuk}
+          pratinjauAktif={pratinjauBentukAktif}
+          setPratinjauAktif={setPratinjauBentukAktif}
+          onTerapkanBentuk={terapkanBentukCepat}
+        />
 
         <PenandaPanel
           markers={markers}
@@ -3645,151 +3410,21 @@ export function Editor({
           petik={petik}
           setPetik={setPetik}
           onSimpan={simpanPenanda}
+          setAktif={set ? { id: set.id, name: set.name } : undefined}
+          roster={roster}
         />
 
-        {/* --------------------- DD3 — Analitik gerakan ---------------------- */}
+        {/* --------------------- DD3 & #12c — Analitik gerakan ---------------------- */}
         {set && nextSet && (
-          <Card>
-            <h2 className="mb-2 text-sm font-semibold text-slate-200">Analitik gerakan</h2>
-            <Toggle
-              checked={view.analitik}
-              onChange={(v) => ubah('analitik', v)}
-              label="Warnai jejak menurut kesulitan"
-            />
-
-            {analisis.daftar.length === 0 ? (
-              <p className="mt-2 text-[11px] text-slate-500">
-                Belum ada perpindahan yang bisa dihitung pada set ini.
-              </p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                <div className="grid grid-cols-3 gap-1.5 text-center">
-                  <div className="rounded bg-slate-800/60 p-1.5">
-                    <div className="text-[15px] font-semibold text-slate-100">
-                      {Math.round(analisis.rata)}
-                    </div>
-                    <div className="text-[10px] leading-tight text-slate-500">
-                      rata² langkah/menit
-                    </div>
-                  </div>
-                  <div
-                    className="rounded bg-slate-800/60 p-1.5"
-                    data-testid="analitik-langkah-terjauh"
-                  >
-                    <div className="text-[15px] font-semibold text-slate-100">
-                      {Math.round(analisis.terjauh?.jarakLangkah ?? 0)}
-                    </div>
-                    <div className="text-[10px] leading-tight text-slate-500">langkah terjauh</div>
-                  </div>
-                  <div
-                    className="rounded bg-slate-800/60 p-1.5"
-                    data-testid="analitik-paling-cepat"
-                  >
-                    <div
-                      className="text-[15px] font-semibold"
-                      style={{ color: TINGKAT_WARNA[analisis.tercepat?.tingkat ?? 'nyaman'] }}
-                    >
-                      {Math.round(analisis.tercepat?.langkahPerMenit ?? 0)}
-                    </div>
-                    <div className="text-[10px] leading-tight text-slate-500">paling cepat</div>
-                  </div>
-                </div>
-
-                <div>
-                  {analisis.seksi.map((sc) => (
-                    <div key={sc.seksi} className="mb-1">
-                      <div className="flex items-center justify-between text-[11px] text-slate-400">
-                        <span className="truncate">{sc.label}</span>
-                        <span className="shrink-0">
-                          {Math.round(sc.rata)} lk/mnt · terberat {Math.round(sc.terberat)}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 h-1.5 overflow-hidden rounded bg-slate-800">
-                        <div
-                          className="h-full rounded"
-                          style={{
-                            width: `${Math.min(100, (sc.rata / Math.max(1, ambang.perMenit.mustahil)) * 100)}%`,
-                            // Warna memakai tingkat gabungan: section yang
-                            // pelan tapi langkahnya raksasa tetap merah.
-                            background: TINGKAT_WARNA[sc.tingkatAkhir],
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Ukuran langkah — dulu tidak pernah tampil di analitik,
-                    padahal buku saku mencetaknya. Inilah sumber kejutannya. */}
-                <div
-                  className="flex items-center justify-between rounded bg-slate-800/60 px-2 py-1.5 text-[11px]"
-                  data-testid="analitik-ukuran-langkah"
-                >
-                  <span className="text-slate-400">Langkah terbesar</span>
-                  <span
-                    className="font-semibold"
-                    style={{
-                      color: TINGKAT_WARNA[
-                        tingkatLangkahDari(analisis.langkahTerbesarInci, ambang.inci)
-                      ],
-                    }}
-                  >
-                    {Math.round(analisis.langkahTerbesarInci * 10) / 10}&Prime; ·{' '}
-                    {TINGKAT_LABEL[tingkatLangkahDari(analisis.langkahTerbesarInci, ambang.inci)]}
-                  </span>
-                </div>
-
-                {terberat && (
-                  <p className="text-[11px] text-slate-400">
-                    Set terberat di drill ini: <b className="text-slate-200">{terberat.nama}</b> (set{' '}
-                    {terberat.urutan}) — rata² {Math.round(terberat.rata)} langkah/menit.
-                  </p>
-                )}
-
-                {analisis.peringatan.length > 0 ? (
-                  <div className="rounded border border-amber-600/40 bg-amber-950/30 p-2">
-                    <p className="mb-1 text-[11px] font-medium text-amber-300">
-                      {analisis.peringatan.length} gerakan berat / mustahil
-                    </p>
-                    <ul className="space-y-0.5" data-testid="analitik-peringatan">
-                      {analisis.peringatan.slice(0, 8).map((d) => (
-                        <li key={d.id} className="flex items-center justify-between gap-2 text-[11px]">
-                          <span className="truncate text-slate-300">
-                            {rosterById.get(d.id) ? <NamaTampil anggota={rosterById.get(d.id)!} /> : d.nama}
-                          </span>
-                          <span className="shrink-0" style={{ color: TINGKAT_WARNA[d.tingkatAkhir] }}>
-                            {/* Sebut yang bermasalah: kecepatan, ukuran
-                                langkah, atau keduanya. Tanpa ini pembaca tidak
-                                tahu apa yang mesti diperbaiki. */}
-                            {d.tingkatAkhir === d.tingkatLangkah && d.tingkatAkhir === d.tingkat
-                              ? `${Math.round(d.langkahPerMenit)} lk/mnt · ${Math.round(d.ukuranLangkahInci)}\u2033`
-                              : d.tingkatAkhir === d.tingkatLangkah
-                                ? `${Math.round(d.ukuranLangkahInci)}\u2033 langkah`
-                                : `${Math.round(d.langkahPerMenit)} lk/mnt`}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    {analisis.peringatan.length > 8 && (
-                      <p className="mt-1 text-[10px] text-slate-500">
-                        …dan {analisis.peringatan.length - 8} pemain lainnya
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-emerald-400">
-                    Semua gerakan masih nyaman atau sekadar agak padat.
-                  </p>
-                )}
-
-                <p className="text-[11px] leading-relaxed text-slate-500">
-                  Ambang: nyaman ≤ {AMBANG.padat} · padat ≤ {AMBANG.berat} · berat ≤ {AMBANG.mustahil} ·
-                  mustahil &gt; {AMBANG.mustahil} langkah/menit. Dihitung dari tempo {drill.tempo} BPM
-                  dan {drill.beatsPerCount} ketuk/hitungan.
-                </p>
-              </div>
-            )}
-          </Card>
+          <PanelAnalitikGerak
+            drill={drill}
+            nyalaAnalitik={view.analitik}
+            onToggleAnalitik={(v) => ubah('analitik', v)}
+            analisis={analisis}
+            ambang={ambang}
+            terberat={terberat}
+            rosterById={rosterById}
+          />
         )}
 
         <Card>

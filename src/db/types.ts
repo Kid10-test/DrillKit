@@ -482,6 +482,48 @@ export interface Simpanan {
   at: number
 }
 
+export type JenisSimbolVisual =
+  | 'horn_up'
+  | 'horn_down'
+  | 'horn_snap'
+  | 'mark_time'
+  | 'halt'
+  | 'lunge'
+  | 'hadap_depan'
+  | 'choreo'
+
+export interface InstruksiVisualSet {
+  simbol: JenisSimbolVisual[]
+  /** Catatan singkat visual/koreografi untuk set ini (opsional) */
+  catatan?: string
+  /** Jika diisi, hanya berlaku untuk seksi yang disebut; kosong = semua seksi */
+  seksi?: string[]
+}
+
+export interface GerakKelompok {
+  id: string
+  nama: string
+  /** Urutan pemain dalam kelompok ini (pada FTL, indeks 0 adalah pemimpin barisan) */
+  memberIds: string[]
+  /** Gaya jalur khusus sub-kelompok ini */
+  jalur: 'lurus' | 'lengkung' | 'ftl'
+  /** Derajat kelengkungan (-1..1) bila jalur === 'lengkung' */
+  lengkung?: number
+  /** Pembagian kecepatan khusus sub-kelompok (opsional) */
+  mudah?: 'rata' | 'halus' | 'mulaiPelan' | 'akhirPelan'
+  /** Hitungan jalan sebelum Hold khusus kelompok ini (opsional) */
+  jalanCount?: number
+}
+
+export interface RippleGerak {
+  /** Selang hitungan antar gelombang ripple (mis. 1 atau 2 count) */
+  selangCount: number
+  /** key = memberId, nilai = nomor gelombang 0-based (0 = A, 1 = B, 2 = C, ...) */
+  urutan: Record<string, number>
+  /** 'kejar' = semua tiba bersama di akhir; 'bertahap' = durasi jalan tiap gelombang sama */
+  mode?: 'kejar' | 'bertahap'
+}
+
 export interface DrillSet {
   id: string
   drillId: string
@@ -492,7 +534,7 @@ export interface DrillSet {
   notes?: string
   /** key = memberId */
   points: Record<string, DrillPoint>
-  /** DD2 — cara pemain berpindah KE set berikutnya. Kosong = lurus & rata. */
+  /** DD2 & #16 — cara pemain berpindah KE set berikutnya. Kosong = lurus & rata. */
   gerak?: GerakSet
   /**
    * DD10b — cara langkah dihitung **per pemain** untuk perpindahan yang
@@ -500,6 +542,8 @@ export interface DrillSet {
    * bawaan drill.
    */
   langkah?: Record<string, SetelanLangkah>
+  /** #16 — simbol visual / tanduk / koreografi yang dicetak di buku saku & tampil di HP anggota */
+  visual?: InstruksiVisualSet
   createdAt: number
 }
 
@@ -590,6 +634,16 @@ export interface GerakSet {
    * bersamaan di akhir.
    */
   tunda?: Record<string, number>
+  /**
+   * #16 — Pembagian Move + Hold di dalam satu set tanpa wajib memecah set.
+   * Misal set 16 count dengan `jalanCount: 12` berarti pemain bergerak pada
+   * hitungan 1–12 lalu Hold diam di posisi tujuan pada hitungan 13–16.
+   */
+  jalanCount?: number
+  /** #16 — Penugasan gelombang Ripple per pemain (grup A/B/C/D atau berurutan 1..N) */
+  ripple?: RippleGerak
+  /** #16 — Override jalur per sub-kelompok pemain (termasuk Follow-the-Leader / FTL) */
+  kelompok?: GerakKelompok[]
 }
 
 /**
@@ -598,6 +652,15 @@ export interface GerakSet {
  * di semua set layaknya garis lapangan.
  */
 export type MarkerKind = 'titik' | 'kotak' | 'garis' | 'panah' | 'teks'
+
+export interface PosisiPenandaSet {
+  x: number
+  y: number
+  x2?: number
+  y2?: number
+  /** Sudut rotasi dalam derajat (bawaan 0) */
+  rotasi?: number
+}
 
 export interface FieldMarker {
   id: string
@@ -613,6 +676,16 @@ export interface FieldMarker {
   warna: string
   /** jari-jari titik dalam yard (khusus jenis 'titik') */
   r?: number
+  /** #16 — sudut rotasi dasar dalam derajat (bawaan 0) */
+  rotasi?: number
+  /** #16 — daftar memberId kru pendorong / penanggung jawab properti */
+  kruIds?: string[]
+  /**
+   * #16 — Posisi & sudut rotasi per `setId` untuk properti bergerak (Moving Props).
+   * Set yang belum memiliki entri mewarisi posisi set sebelumnya yang memiliki entri
+   * (atau posisi dasar x, y, x2, y2, rotasi).
+   */
+  perSet?: Record<string, PosisiPenandaSet>
 }
 
 export interface Drill {
