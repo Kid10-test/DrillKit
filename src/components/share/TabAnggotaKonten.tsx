@@ -22,6 +22,8 @@ import {
   titikJalur,
 } from "../../lib/gerak"
 import { apakahPropertiBergerak, penandaEfektifPadaSet, tugasKruPropertiAnggota } from "../../lib/propertiGerak"
+import { countSheetUntukAnggota } from "../../lib/countSheet"
+import { KartuCountSheetFormasiAnggota } from "../musik/PanelCountSheetSinkron"
 import {
   LABEL_JENJANG_SETORAN,
   LABEL_KATEGORI_SETORAN,
@@ -84,6 +86,14 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
   const dotRefs = useRef(new Map<string, SVGGElement>())
   const rafRef = useRef(0)
   const [progresProp, setProgresProp] = useState(0)
+  const countSheetsAnggota = useMemo(
+    () => (drill ? countSheetUntukAnggota(bundle.countSheets ?? [], me, { drillId: drill.id }) : []),
+    [bundle.countSheets, me, drill],
+  )
+  const laguDrill = useMemo(
+    () => (drill?.songId ? (bundle.songs ?? []).find((s) => s.id === drill.songId) ?? null : null),
+    [bundle.songs, drill?.songId],
+  )
 
   /**
    * Animasi perpindahan ke set berikutnya. Sama seperti mode presenter: titik
@@ -112,7 +122,8 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
     const lengkung = gr.jalur === 'lengkung' ? gr.lengkung : 0
     const petaFtl = gr.kelompok?.length ? bangunPetaFtl(gr.kelompok, awalSvg, akhirSvg) : new Map()
     const seksiMap = new Map(members.map((m) => [m.id, m.section]))
-    const adaPropGerak = (drill.markers ?? []).some(apakahPropertiBergerak)
+    const adaPropGerak =
+      (drill.markers ?? []).some(apakahPropertiBergerak) || countSheetsAnggota.length > 0
     const loop = () => {
       const p = Math.min(1, (performance.now() - t0) / total)
       for (const [id, vx, vy] of vec) {
@@ -143,7 +154,7 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
       cancelAnimationFrame(rafRef.current)
       for (const [id] of vec) dotRefs.current.get(id)?.removeAttribute('transform')
     }
-  }, [playing, set, nextSet, drill, members])
+  }, [playing, set, nextSet, drill, members, countSheetsAnggota.length])
 
   const gantiSet = (arah: number) => {
     setPlaying(false)
@@ -387,6 +398,21 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
           <p className="text-sm text-slate-400">Kamu tidak ada di set ini (mungkin istirahat/prop).</p>
         )}
       </Card>
+
+      {countSheetsAnggota.length > 0 && (
+        <KartuCountSheetFormasiAnggota
+          sheets={countSheetsAnggota}
+          drill={drill}
+          sets={sets}
+          setAktif={set}
+          progresSet={progresProp}
+          sedangMain={playing}
+          me={me}
+          namaTim={bundle.team?.teamName}
+          sections={bundle.team?.sections}
+          song={laguDrill}
+        />
+      )}
     </div>
   )
 }

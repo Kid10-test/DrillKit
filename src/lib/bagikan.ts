@@ -103,6 +103,7 @@ export function paketAnggota(b: ShareBundle, memberId: string): ShareBundle {
     partiturPaket: tersaring.partiturPaket,
     members: b.members.map(bersihkanAnggota),
     targetSetoran: dikenal ? (b.targetSetoran ?? []) : [],
+    countSheets: dikenal ? (b.countSheets ?? []) : [],
     attendance: dikenal ? b.attendance.filter((a) => a.memberId === memberId) : [],
     memberNotes: dikenal ? (b.memberNotes ?? []).filter((n) => n.memberId === memberId) : [],
     setoran: dikenal ? (b.setoran ?? []).filter((s) => s.memberId === memberId) : [],

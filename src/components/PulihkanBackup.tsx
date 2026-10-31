@@ -141,6 +141,7 @@ export async function tulisMuatanBackup(
       db.targetSetoran,
       db.setoran,
       db.logPerubahan,
+      db.countSheets,
     ],
     async () => {
       if (diubah.members?.length) await db.members.bulkPut(diubah.members)
@@ -156,6 +157,7 @@ export async function tulisMuatanBackup(
       if (diubah.targetSetoran?.length) await db.targetSetoran.bulkPut(diubah.targetSetoran)
       if (diubah.setoran?.length) await db.setoran.bulkPut(diubah.setoran)
       if (diubah.logPerubahan?.length) await db.logPerubahan.bulkPut(diubah.logPerubahan)
+      if (diubah.countSheets?.length) await db.countSheets.bulkPut(diubah.countSheets)
     },
   )
   if (diubah.settings) await db.settings.put({ ...diubah.settings, key: 'team' })
@@ -245,6 +247,7 @@ export function AlurPulihkanBackup({
         targetSetoran,
         setoran,
         logPerubahan,
+        countSheets,
         partiturBerkas,
       ] = await Promise.all([
         db.members.toArray(),
@@ -260,6 +263,7 @@ export function AlurPulihkanBackup({
         db.targetSetoran.toArray(),
         db.setoran.toArray(),
         db.logPerubahan.toArray(),
+        db.countSheets.toArray(),
         db.partiturBerkas.toArray(),
       ])
       if (!hidup) return
@@ -278,6 +282,7 @@ export function AlurPulihkanBackup({
         targetSetoran: kunci(targetSetoran),
         setoran: kunci(setoran),
         logPerubahan: kunci(logPerubahan),
+        countSheets: kunci(countSheets),
         partiturBerkas: kunci(partiturBerkas),
       })
       const baris = susunSaran(Array.isArray(data.members) ? data.members : [], members)
@@ -354,7 +359,7 @@ export function AlurPulihkanBackup({
       {idLokal == null ? (
         <p className="text-xs text-slate-500">Menghitung isi backup…</p>
       ) : (
-        <ul className="space-y-1" data-testid={`${testId}-isi`}>
+        <ul className="max-h-56 space-y-1 overflow-y-auto pr-1" data-testid={`${testId}-isi`}>
           {ringkas.baris.map((b) => (
             <li
               key={b.label}

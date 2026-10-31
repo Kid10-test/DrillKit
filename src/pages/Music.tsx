@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import type {
   BiramaPola,
+  CountSheet,
   Drill,
   DrillSet,
   HitungMundur,
@@ -89,6 +90,9 @@ import { useSettings } from '../hooks/useSettings'
 import { DEFAULT_SECTIONS, cx, uid } from '../lib/utils'
 import { EditorBirama } from "../components/musik/EditorBirama"
 import { asumsiHitungan, blankSong, petaPanjang, SongModal } from "../components/musik/ModalLagu"
+import { PanelCountSheetMusik } from "../components/musik/PanelCountSheetSinkron"
+import { countSheetUntukAnggota } from "../lib/countSheet"
+import type { PropsModalCountSheet } from "../components/drill/ModalCountSheet"
 /* -------------------------------- Halaman ---------------------------------- */
 
 /**
@@ -109,6 +113,7 @@ export default function Music({
   namaTimPaket,
   drillsPaket,
   setsPaket,
+  countSheetsPaket,
 }: {
   hanyaPutar?: boolean
   anggotaAktif?: Member | null
@@ -116,10 +121,22 @@ export default function Music({
   namaTimPaket?: string
   drillsPaket?: Drill[]
   setsPaket?: DrillSet[]
+  countSheetsPaket?: CountSheet[]
 } = {}) {
   const toast = useToast()
   const settings = useSettings()
   const songs = useLiveQuery(() => db.songs.orderBy('title').toArray(), [], [])
+  const countSheetsLokal = useLiveQuery(() => db.countSheets.toArray(), [], [])
+  const [modalCsOpen, setModalCsOpen] = useState(false)
+  const [KompModalCs, setKompModalCs] = useState<React.ComponentType<PropsModalCountSheet> | null>(null)
+
+  async function bukaModalCsMusik() {
+    if (!KompModalCs) {
+      const mod = await import('../components/drill/ModalCountSheet')
+      setKompModalCs(() => mod.default)
+    }
+    setModalCsOpen(true)
+  }
   const [bpm, setBpm] = useState(120)
   const [beats, setBeats] = useState(4)
   const [subdiv, setSubdiv] = useState(1)
@@ -1847,6 +1864,49 @@ export default function Music({
         )}
       </div>
 
+      {/* #17 — Panel Count Sheet Color Guard Sinkron (tampil bagi Guard di Mode Anggota & Pelatih) */}
+      {(() => {
+        const sumberCs = hanyaPutar ? (countSheetsPaket ?? []) : (countSheetsLokal ?? [])
+        const idDrillLagu = song
+          ? new Set((semuaDrill ?? []).filter((d) => d.songId === song.id).map((d) => d.id))
+          : null
+        const semuaCocokAnggota = countSheetUntukAnggota(
+          sumberCs,
+          hanyaPutar ? anggotaAktif : null,
+        )
+        const cocokLagu = song
+          ? semuaCocokAnggota.filter(
+              (cs) =>
+                cs.songId === song.id ||
+                (!cs.songId && !!cs.drillId && idDrillLagu!.has(cs.drillId)),
+            )
+          : hanyaPutar
+            ? semuaCocokAnggota
+            : []
+        if (cocokLagu.length === 0 && hanyaPutar) return null
+        return (
+          <PanelCountSheetMusik
+            sheets={cocokLagu}
+            song={song ?? null}
+            biramaAktif={measure}
+            ketukDalamBirama={running && aktif?.tahap !== 'hitung' ? (aktif?.beat ?? 0) + 1 : 1}
+            ketukPerBirama={barTampil.beats || meterBerjalan.kelompok.length || 4}
+            sedangMain={running && aktif?.tahap !== 'hitung'}
+            sedangHitungMundur={aktif?.tahap === 'hitung'}
+            hanyaPutar={hanyaPutar}
+            onBukaEditor={!hanyaPutar ? () => void bukaModalCsMusik() : undefined}
+            onLoncatBirama={(dari, sampai, label) => {
+              const f = susunFrasaTerurut(dari, sampai, 1, label)
+              setUlangBagian(f, song ?? null)
+              setMulaiDari(f.dari)
+              setMeasure(f.dari)
+              setHabis(false)
+              if (running) loncatKeSegmen(f.dari)
+            }}
+          />
+        )
+      })()}
+
       {/* M3 & #11d — set list: urutan lagu, lencana frasa, & tautan frasa ↔ set drill */}
       <KartuSetList
         daftar={daftarSetList ?? []}
@@ -1958,6 +2018,16 @@ export default function Music({
         onUpdateSong={handleUpdateRekaman}
         hanyaPutar={hanyaPutar}
       />
+
+      {KompModalCs && !hanyaPutar && (
+        <KompModalCs
+          open={modalCsOpen}
+          onClose={() => setModalCsOpen(false)}
+          songAwal={song ?? null}
+          namaTim={namaTimPaket ?? settings?.teamName ?? 'Tim'}
+          sections={sectionsPaket ?? settings?.sections ?? DEFAULT_SECTIONS}
+        />
+      )}
     </div>
   )
 }

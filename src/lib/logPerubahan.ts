@@ -20,6 +20,7 @@
  */
 import type {
   ButirPerubahanShow,
+  CountSheet,
   Drill,
   DrillSet,
   FieldConfig,
@@ -40,6 +41,7 @@ export const LABEL_KATEGORI_PERUBAHAN: Record<KategoriPerubahanShow, string> = {
   lagu: 'Lagu',
   jadwal: 'Jadwal',
   target: 'Target Setoran',
+  count_sheet: 'Count Sheet Guard',
 }
 
 const AMBANG_GESER_LANGKAH = 0.5
@@ -68,6 +70,7 @@ export function ekstrakKeadaanShow(sumber: {
   songs?: Song[]
   sessions?: Session[]
   targetSetoran?: TargetSetoran[]
+  countSheets?: CountSheet[]
 }): KeadaanAcuanShow {
   return {
     dibuatAt: sumber.dibuatAt ?? Date.now(),
@@ -86,6 +89,10 @@ export function ekstrakKeadaanShow(sumber: {
     })),
     sessions: (sumber.sessions ?? []).map((s) => ({ ...s })),
     targetSetoran: (sumber.targetSetoran ?? []).map((t) => ({ ...t })),
+    countSheets: (sumber.countSheets ?? []).map((cs) => ({
+      ...cs,
+      blok: (cs.blok ?? []).map((bl) => ({ ...bl })),
+    })),
   }
 }
 
@@ -102,6 +109,7 @@ export function ekstrakKeadaanDariPaket(bundle: ShareBundle): KeadaanAcuanShow {
     songs: bundle.songs ?? [],
     sessions: bundle.sessions ?? [],
     targetSetoran: bundle.targetSetoran ?? [],
+    countSheets: bundle.countSheets ?? [],
   })
 }
 
@@ -177,7 +185,27 @@ export function cicipKeadaanShow(k: KeadaanAcuanShow): string {
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((t) => `${t.id}:${t.judul}:${t.biramaDari ?? 0}-${t.biramaSampai ?? 0}:${t.tenggat ?? ''}:${(t.sections ?? []).join(',')}`)
 
-  return fnv1a(JSON.stringify({ drills, sets, songs, sessions, targets }))
+  const countSheets = [...(k.countSheets ?? [])]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((cs) => ({
+      id: cs.id,
+      judul: cs.judul,
+      seksi: cs.seksi,
+      alat: cs.alatUtama,
+      memberIds: cs.memberIds ?? [],
+      blok: (cs.blok ?? []).map((b) => ({
+        id: b.id,
+        label: b.labelBagian,
+        c: b.counts,
+        alat: b.alat,
+        tek: b.teknik,
+        ak: b.aksenCount ?? [],
+        tk: b.tangkapCount ?? [],
+        tgn: b.posisiTangan ?? '',
+      })),
+    }))
+
+  return fnv1a(JSON.stringify({ drills, sets, songs, sessions, targets, countSheets }))
 }
 
 /* --------------------- Pemformat Label & Rentang Kode --------------------- */
@@ -730,6 +758,75 @@ export function bandingkanKeadaanShow(
         kategori: 'target',
         subjek,
         teks: `Rentang birama target diperbarui ke ${tb.biramaDari ?? '—'}–${tb.biramaSampai ?? tb.biramaDari ?? '—'}`,
+        seksiTerdampak,
+      })
+    }
+  }
+
+  // 5. Lembar Hitungan Color Guard / Count Sheet (#17)
+  const petaKodeAnggota = new Map<string, string>(
+    (baru.members ?? [])
+      .map((m): readonly [string, string] => [m.id, (m.code || '').trim()])
+      .filter(([, c]) => !!c),
+  )
+  const csLamaById = new Map((lama.countSheets ?? []).map((cs) => [cs.id, cs]))
+  for (const csBaru of baru.countSheets ?? []) {
+    const csLama = csLamaById.get(csBaru.id)
+    const subjek = csBaru.judul
+    const kodeTerdampak =
+      csBaru.memberIds && csBaru.memberIds.length > 0
+        ? csBaru.memberIds.map((id) => petaKodeAnggota.get(id)).filter((c): c is string => !!c)
+        : undefined
+    const seksiTerdampak = [csBaru.seksi || 'guard']
+
+    if (!csLama) {
+      butir.push({
+        kategori: 'count_sheet',
+        subjek,
+        teks: `Count Sheet baru ditambahkan (${(csBaru.blok ?? []).length} blok hitungan)`,
+        kodeTerdampak,
+        seksiTerdampak,
+      })
+      continue
+    }
+
+    const blokLamaMap = new Map((csLama.blok ?? []).map((b) => [b.id, b]))
+    const blokBerubah: string[] = []
+    for (const bl of csBaru.blok ?? []) {
+      const blLama = blokLamaMap.get(bl.id)
+      if (!blLama) {
+        blokBerubah.push(bl.labelBagian)
+        continue
+      }
+      const sigLama = JSON.stringify([
+        blLama.counts,
+        blLama.alat,
+        blLama.teknik,
+        blLama.aksenCount ?? [],
+        blLama.tangkapCount ?? [],
+        blLama.posisiTangan ?? '',
+      ])
+      const sigBaru = JSON.stringify([
+        bl.counts,
+        bl.alat,
+        bl.teknik,
+        bl.aksenCount ?? [],
+        bl.tangkapCount ?? [],
+        bl.posisiTangan ?? '',
+      ])
+      if (sigLama !== sigBaru) blokBerubah.push(bl.labelBagian)
+    }
+
+    if (blokBerubah.length > 0 || (csLama.blok ?? []).length !== (csBaru.blok ?? []).length) {
+      const contoh = blokBerubah.slice(0, 3).join(', ')
+      const sisa = blokBerubah.length > 3 ? ` (+${blokBerubah.length - 3} lainnya)` : ''
+      butir.push({
+        kategori: 'count_sheet',
+        subjek,
+        teks: contoh
+          ? `Kerja alat diperbarui pada ${contoh}${sisa}`
+          : `Susunan blok Count Sheet diperbarui (${(csBaru.blok ?? []).length} blok)`,
+        kodeTerdampak,
         seksiTerdampak,
       })
     }

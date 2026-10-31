@@ -5,6 +5,8 @@
 
 /** Dot sheet A4 & buku saku lipat per pemain (pratinjau + unduh + cetak). */
 import { useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../db/db'
 import { namaTampil } from '../lib/namaAnggota'
 import { useModeNama } from './NamaTampil'
 import type {
@@ -28,6 +30,7 @@ import {
 import { barisPenandaCetak } from './FieldMarkers'
 import { ringkasKoreografiSet } from '../lib/gerak'
 import { tugasKruPropertiAnggota } from '../lib/propertiGerak'
+import { ringkasKerjaGuardPadaSet } from '../lib/countSheet'
 
 import {
   coordText as coorTextSafe,
@@ -171,6 +174,13 @@ export function DotSheetModal({
   const [sertakanArah, setSertakanArah] = useState(true)
   /** DD10b — sertakan kolom "ukuran langkah" di kertas. */
   const [sertakanUkuran, setSertakanUkuran] = useState(true)
+  /** #17 — sertakan ringkasan kerja alat Count Sheet bagi anggota Guard. */
+  const [sertakanGuard, setSertakanGuard] = useState(true)
+  const countSheets = useLiveQuery(
+    () => db.countSheets.where('drillId').equals(drill.id).toArray(),
+    [drill.id],
+    [],
+  )
   /** HTML hasil cetak yang ditampilkan langsung di dalam aplikasi */
   const [preview, setPreview] = useState<string | null>(null)
 
@@ -222,6 +232,9 @@ export function DotSheetModal({
           sectionId: m.section,
           padat: compact,
         })
+        if (sertakanGuard && countSheets.length > 0) {
+          isyarat.push(...ringkasKerjaGuardPadaSet(countSheets, set.id, m))
+        }
         if (compact) {
           const ekorVisual = isyarat.length
             ? ` <span class="isyarat-visual">· ${esc(isyarat.join(' '))}</span>`
@@ -630,6 +643,22 @@ export function DotSheetModal({
           berubah-ubah.
         </span>
       </label>
+      {countSheets.length > 0 && (
+        <label className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-400">
+          <input
+            type="checkbox"
+            data-testid="centang-dot-guard"
+            checked={sertakanGuard}
+            onChange={(e) => setSertakanGuard(e.target.checked)}
+            className="mt-0.5 accent-sky-500"
+          />
+          <span>
+            <b className="text-slate-300">Sertakan kerja alat Count Sheet Guard</b> — menyisipkan
+            ringkasan alat, teknik, aksen (▲), dan tangkapan (★) langsung pada baris set bagi
+            anggota Color Guard.
+          </span>
+        </label>
+      )}
       <Field label="Catatan di kertas" hint="opsional">
         <Textarea
           value={notes}

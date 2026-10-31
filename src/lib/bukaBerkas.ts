@@ -682,6 +682,7 @@ export const TABEL_BACKUP: { kolom: string; label: string }[] = [
   { kolom: 'targetSetoran', label: 'Target setoran' },
   { kolom: 'setoran', label: 'Setoran hafalan' },
   { kolom: 'logPerubahan', label: 'Log perubahan show' },
+  { kolom: 'countSheets', label: 'Count sheet Guard' },
 ]
 
 /**
@@ -718,6 +719,7 @@ export const TABEL_DATA: { kolom: string; label: string }[] = [
   { kolom: 'evaluasi', label: 'Evaluasi' },
   { kolom: 'targetSetoran', label: 'Target setoran' },
   { kolom: 'setoran', label: 'Setoran hafalan' },
+  { kolom: 'countSheet', label: 'Count sheet Guard' },
 ]
 
 /** Ringkas isi berkas data pilihan (dipakai pratinjau pintu baru). */

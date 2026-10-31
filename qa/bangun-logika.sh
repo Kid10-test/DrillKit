@@ -119,6 +119,8 @@ rakit src/lib/logPerubahan.ts    logPerubahan
 # #16 — koreografi visual lanjut: generator bentuk cepat & properti bergerak.
 rakit src/lib/bentukFormasi.ts   bentukFormasi
 rakit src/lib/propertiGerak.ts   propertiGerak
+# #17 — lembar hitungan Color Guard (Count Sheet) & buku saku visual hex murni.
+rakit src/lib/countSheet.ts      countSheet
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.
