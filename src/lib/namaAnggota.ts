@@ -22,6 +22,7 @@
 import type {
   AttendanceRecord,
   CatatanSetoran,
+  CountSheet,
   Drill,
   DrillSet,
   Evaluasi,
@@ -517,6 +518,11 @@ export function tulisUlangRiwayat(
 }
 
 /** Bentuk longgar: backup memakai nama Inggris, berkas data memakai Indonesia. */
+export function tulisUlangCountSheet(cs: CountSheet, peta: Record<string, string>): CountSheet {
+  if (!cs.memberIds?.length || !cs.memberIds.some((id) => id in peta)) return cs
+  return { ...cs, memberIds: tulisUlangRoster(cs.memberIds, peta) }
+}
+
 export interface MuatanRujukan {
   anggota?: Member[]
   members?: Member[]
@@ -532,6 +538,8 @@ export interface MuatanRujukan {
   drills?: Drill[]
   kemajuan?: Kemajuan[]
   riwayat?: RiwayatSnapshot[]
+  countSheet?: CountSheet[]
+  countSheets?: CountSheet[]
 }
 
 export function tulisUlangMuatan<T extends MuatanRujukan>(
@@ -610,6 +618,12 @@ export function tulisUlangMuatan<T extends MuatanRujukan>(
       bentrok.push(...h.bentrok)
       return h.snap
     })
+  }
+  if (out.countSheet) {
+    out.countSheet = out.countSheet.map((cs) => tulisUlangCountSheet(cs, peta))
+  }
+  if (out.countSheets) {
+    out.countSheets = out.countSheets.map((cs) => tulisUlangCountSheet(cs, peta))
   }
   return { data: out, bentrok, absensiHapus, evaluasiHapus, setoranHapus }
 }

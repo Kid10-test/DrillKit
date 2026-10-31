@@ -20,6 +20,7 @@ import type {
   TargetSetoran,
   CatatanSetoran,
   ItemLogPerubahan,
+  CountSheet,
 } from './types'
 
 /**
@@ -68,6 +69,8 @@ export class DrillKitDB extends Dexie {
   setoran!: Table<CatatanSetoran, string>
   /** #15b — riwayat acuan & ringkasan perubahan show (I1). */
   logPerubahan!: Table<ItemLogPerubahan, string>
+  /** #17 — lembar hitungan kerja alat Color Guard (Count Sheet). */
+  countSheets!: Table<CountSheet, string>
 
   constructor() {
     super('drillkit')
@@ -119,6 +122,10 @@ export class DrillKitDB extends Dexie {
     // #15b — riwayat acuan & log perubahan show (penambahan murni v12).
     this.version(12).stores({
       logPerubahan: 'id, dibuatAt',
+    })
+    // #17 — lembar hitungan Color Guard / Count Sheet (penambahan murni v13).
+    this.version(13).stores({
+      countSheets: 'id, drillId, songId, seksi, updatedAt',
     })
   }
 }

@@ -1266,6 +1266,10 @@ export interface ShareBundle {
    * sebelumnya (publik tim, 0 data privat anggota).
    */
   perubahanPaket?: RingkasanPerubahanPaket
+  /**
+   * #17 — daftar lembar hitungan Color Guard (*count sheet*) tim (publik tim).
+   */
+  countSheets?: CountSheet[]
   attendance: AttendanceRecord[]
   /** Catatan evaluasi per anggota (opsional — paket lama belum punya) */
   memberNotes?: MemberNote[]
@@ -1292,15 +1296,15 @@ export interface ShareBundle {
 
 /* ------------------ #15b — Log Perubahan Show (I1) ----------------------- */
 
-export type KategoriPerubahanShow = 'drill' | 'lagu' | 'jadwal' | 'target'
+export type KategoriPerubahanShow = 'drill' | 'lagu' | 'jadwal' | 'target' | 'count_sheet'
 
 /**
  * Satu butir perubahan show berbahasa manusia untuk ditampilkan kepada pelatih
  * maupun anggota pada kartu "Apa yang berubah di paket ini".
  *
  * Pagar privasi keras: struktur ini HANYA memuat perubahan formasi, lagu,
- * jadwal, atau target setoran tim — tidak pernah memuat nilai evaluasi,
- * absensi, telepon, token QR, maupun catatan pribadi anggota.
+ * jadwal, target setoran, atau count sheet tim — tidak pernah memuat nilai
+ * evaluasi, absensi, telepon, token QR, maupun catatan pribadi anggota.
  */
 export interface ButirPerubahanShow {
   kategori: KategoriPerubahanShow
@@ -1334,6 +1338,7 @@ export interface KeadaanAcuanShow {
   songs: Song[]
   sessions: Session[]
   targetSetoran: TargetSetoran[]
+  countSheets?: CountSheet[]
 }
 
 /**
@@ -1348,4 +1353,89 @@ export interface ItemLogPerubahan {
   ringkasan: RingkasanPerubahanPaket
   keadaanSesudah: KeadaanAcuanShow
 }
+
+/* --------- #17 — Lembar Hitungan Color Guard (Count Sheet) --------------- */
+
+export type AlatGuard =
+  | 'flag'
+  | 'rifle'
+  | 'sabre'
+  | 'swing_flag'
+  | 'air_blade'
+  | 'dance'
+  | 'prop'
+
+export type ArahHadapGuard =
+  | 'depan'
+  | 'belakang'
+  | 'sisi_1'
+  | 'sisi_2'
+  | 'serong_depan_1'
+  | 'serong_depan_2'
+  | 'bebas'
+
+/**
+ * Satu blok kerja alat pada Lembar Hitungan Color Guard (*Count Sheet*).
+ *
+ * Umumnya berupa blok 8-hitungan (*8-counts*) atau mengikuti panjang satu
+ * `DrillSet` (mis. Set 1 dibagi menjadi blok 1–8 dan 9–16, atau 1 blok 16-count),
+ * serta terikat opsional ke rentang birama lagu untuk sorotan otomatis.
+ */
+export interface BlokCountSheet {
+  id: string
+  /** Urutan 0-based di dalam CountSheet. */
+  urutan: number
+  /** Tautan opsional ke `DrillSet.id` bila lembar ini terikat ke suatu drill. */
+  setId?: string
+  /** Pergeseran hitungan 0-based di dalam `DrillSet` (mis. 0 untuk 1–8, 8 untuk 9–16). */
+  offsetDalamSet?: number
+  /** Label bagian/frasa, mis. "Set 1 (1–8)" atau "Intro A". */
+  labelBagian: string
+  /** Panjang blok dalam hitungan (lazimnya 8). */
+  counts: number
+  /** Birama awal 1-based inklusif (otomatis dari lagu/drill atau diisi manual). */
+  biramaDari?: number
+  /** Birama akhir 1-based inklusif. */
+  biramaSampai?: number
+  /** Jenis alat yang dimainkan pada blok ini (mendukung ganti alat di tengah lagu). */
+  alat: AlatGuard
+  /** Ringkasan teknik kerja alat (mis. "Drop Spin 1–6, Prep 7, Toss 45 di 8"). */
+  teknik: string
+  /** Hitungan 1-based di dalam `1..counts` yang menjadi aksen / *release* / *hit*. */
+  aksenCount?: number[]
+  /** Hitungan 1-based di dalam `1..counts` yang menjadi tangkapan (*catch*). */
+  tangkapCount?: number[]
+  /** Rincian per-hitungan opsional (`1..counts` -> teks kerja spesifik). */
+  detailPerCount?: Record<number, string>
+  /** Arah hadap tubuh/alat selama blok ini. */
+  arahHadap?: ArahHadapGuard
+  /** Catatan posisi tangan / pegangan (*tab, cheater, strap, flat*). */
+  posisiTangan?: string
+  /** Catatan ekspresi / staging tambahan. */
+  catatan?: string
+}
+
+/**
+ * Satu Lembar Hitungan Color Guard (*Count Sheet*) di IndexedDB (`db.countSheets`, v13).
+ */
+export interface CountSheet {
+  id: string
+  judul: string
+  /** Id drill terkait (opsional — mengikat blok ke Set & koordinat titik). */
+  drillId?: string
+  /** Id lagu terkait (opsional — mengikat blok ke birama & sorotan metronom/rekaman). */
+  songId?: string
+  /** Id seksi utama yang memakai lembar ini (bawaan `'guard'`). */
+  seksi: string
+  /** Alat utama pada lembar ini (dipakai bawaan saat menambah blok baru). */
+  alatUtama: AlatGuard
+  /** Bila diisi, lembar hanya berlaku untuk daftar anggota sub-kelompok ini (mis. *Rifle Line*). */
+  memberIds?: string[]
+  /** Catatan umum persiapan alat/panggung (mis. tempat parkir *flag* cadangan). */
+  catatanUmum?: string
+  blok: BlokCountSheet[]
+  createdAt: number
+  updatedAt: number
+}
+
 

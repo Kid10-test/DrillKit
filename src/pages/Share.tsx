@@ -89,6 +89,7 @@ function CoachExport() {
   const memberNotes = useLiveQuery(() => db.memberNotes.toArray(), [], [])
   const targetSetoran = useLiveQuery(() => db.targetSetoran.toArray(), [], [])
   const catatanSetoran = useLiveQuery(() => db.setoran.toArray(), [], [])
+  const countSheets = useLiveQuery(() => db.countSheets.toArray(), [], [])
   const riwayatLogPerubahan = useLiveQuery(() => db.logPerubahan.toArray(), [], [])
   const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
   const partiturItems = useLiveQuery(() => db.partiturBerkas.toArray(), [], [])
@@ -106,6 +107,8 @@ function CoachExport() {
   const [includeNotes, setIncludeNotes] = useState(true)
   /** #14 — target & capaian setoran hafalan pribadi per anggota. */
   const [includeSetoran, setIncludeSetoran] = useState(true)
+  /** #17 — lembar hitungan kerja alat Color Guard (Count Sheet). */
+  const [includeCountSheets, setIncludeCountSheets] = useState(true)
   /** #15b — sertakan log perubahan show otomatis di paket anggota. */
   const [includeLogPerubahan, setIncludeLogPerubahan] = useState(true)
   const [catatanPerubahan, setCatatanPerubahan] = useState('')
@@ -153,6 +156,7 @@ function CoachExport() {
         songs: includeSongs ? (songs ?? []) : [],
         sessions: includeSchedule ? (sessions ?? []) : [],
         targetSetoran: includeSetoran ? (targetSetoran ?? []) : [],
+        countSheets: includeCountSheets ? (countSheets ?? []) : [],
       }),
     [
       settings?.defaultField,
@@ -162,10 +166,12 @@ function CoachExport() {
       songs,
       sessions,
       targetSetoran,
+      countSheets,
       includeDrills,
       includeSongs,
       includeSchedule,
       includeSetoran,
+      includeCountSheets,
     ],
   )
 
@@ -266,6 +272,7 @@ function CoachExport() {
       partiturPaket: Object.keys(partiturTerpilih).length > 0 ? partiturTerpilih : undefined,
       targetSetoran: includeSetoran ? (targetSetoran ?? []) : [],
       setoran: includeSetoran ? (catatanSetoran ?? []) : [],
+      countSheets: includeCountSheets ? (countSheets ?? []) : [],
       perubahanPaket: sertakanLog ? ringkasanPerubahanAktif : undefined,
       attendance: includeAttendance ? (attendance ?? []) : [],
       // Catatan evaluasi — kini menghormati saklar, seperti jenis data lain.
@@ -357,7 +364,9 @@ function CoachExport() {
     includeSongs,
     includePartitur,
     includeSetoran,
+    includeCountSheets,
     targetSetoran,
+    countSheets,
     petaPartiturSiap,
   ])
 
@@ -413,6 +422,12 @@ function CoachExport() {
                 label={`Partitur lagu siap baca — disaring per instrumen di berkas per anggota (${jmlPartiturSiap})`}
               />
             )}
+            <Toggle
+              testId="toggle-count-sheet"
+              checked={includeCountSheets}
+              onChange={setIncludeCountSheets}
+              label={`Lembar hitungan Color Guard / Count Sheet (${countSheets?.length ?? 0})`}
+            />
           </div>
 
           {/* #15b (I1) — Log Perubahan Show Otomatis */}
@@ -1245,6 +1260,7 @@ function MemberView() {
           namaTimPaket={bundle.team?.teamName}
           drillsPaket={bundle.drills}
           setsPaket={bundle.sets}
+          countSheetsPaket={bundle.countSheets}
         />
       ) : !me ? (
         <EmptyState title="Pilih nama di atas" desc="Supaya DrillKit tahu formasi dan absensi siapa yang ditampilkan." />

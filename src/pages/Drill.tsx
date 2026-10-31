@@ -28,6 +28,7 @@ import {
 } from '../components/Icons'
 
 import { hapusKemajuan } from '../lib/kemajuan'
+import { salinCountSheetUntukDrillBaru } from '../lib/countSheet'
 import {
   uid,
 } from '../lib/utils'
@@ -97,9 +98,34 @@ export default function DrillPage() {
 
   async function duplicateDrill(d: Drill) {
     const newId = uid('d_')
-    await db.drills.put({ ...d, id: newId, name: `${d.name} (salinan)`, createdAt: Date.now(), updatedAt: Date.now() })
     const old = await db.sets.where('drillId').equals(d.id).toArray()
-    await db.sets.bulkPut(old.map((s) => ({ ...s, id: uid('set_'), drillId: newId })))
+    const petaIdSet: Record<string, string> = {}
+    const setsBaru = old.map((s) => {
+      const idBaru = uid('set_')
+      petaIdSet[s.id] = idBaru
+      return { ...s, id: idBaru, drillId: newId }
+    })
+    const markersBaru = d.markers?.map((m) => {
+      if (!m.perSet) return { ...m }
+      const perSetBaru: NonNullable<typeof m.perSet> = {}
+      for (const [idLama, kf] of Object.entries(m.perSet)) {
+        if (petaIdSet[idLama]) perSetBaru[petaIdSet[idLama]] = { ...kf }
+      }
+      return { ...m, perSet: Object.keys(perSetBaru).length ? perSetBaru : undefined }
+    })
+    await db.drills.put({
+      ...d,
+      id: newId,
+      name: `${d.name} (salinan)`,
+      markers: markersBaru,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+    await db.sets.bulkPut(setsBaru)
+    const csLama = await db.countSheets.where('drillId').equals(d.id).toArray()
+    if (csLama.length) {
+      await db.countSheets.bulkPut(salinCountSheetUntukDrillBaru(csLama, newId, petaIdSet))
+    }
     setDrillId(newId)
     toast.push('Drill disalin')
   }
@@ -112,6 +138,8 @@ export default function DrillPage() {
     await db.drills.delete(d.id)
     const ids = await db.sets.where('drillId').equals(d.id).primaryKeys()
     await db.sets.bulkDelete(ids)
+    const csIds = await db.countSheets.where('drillId').equals(d.id).primaryKeys()
+    if (csIds.length) await db.countSheets.bulkDelete(csIds)
     // K3 — kemajuan latihan ikut lenyap; kalau tidak, ia jadi yatim selamanya.
     await hapusKemajuan(d.id)
     setDrillId('')

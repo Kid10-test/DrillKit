@@ -98,11 +98,12 @@ function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void 
     case 'evaluasi': berkas.evaluasi = daftar as never; break
     case 'targetSetoran': berkas.targetSetoran = daftar as never; break
     case 'setoran': berkas.setoran = daftar as never; break
+    case 'countSheet': berkas.countSheet = daftar as never; break
   }
 }
 
 /** Jenis yang bisa dipilih **satu per satu** (daftarnya pendek). */
-const JENIS_PILIH: JenisData[] = ['lagu', 'setlist', 'drill']
+const JENIS_PILIH: JenisData[] = ['lagu', 'setlist', 'drill', 'countSheet']
 
 export default function Data() {
   const [searchParams] = useSearchParams()
@@ -122,6 +123,7 @@ export default function Data() {
   const evaluasi = useLiveQuery(() => db.evaluasi.toArray(), [], [])
   const targetSetoran = useLiveQuery(() => db.targetSetoran.toArray(), [], [])
   const setoran = useLiveQuery(() => db.setoran.toArray(), [], [])
+  const countSheet = useLiveQuery(() => db.countSheets.toArray(), [], [])
 
   const sumber: Record<JenisData, unknown[]> = useMemo(
     () => ({
@@ -137,8 +139,9 @@ export default function Data() {
       evaluasi,
       targetSetoran,
       setoran,
+      countSheet,
     }),
-    [anggota, jadwal, absensi, lagu, setlist, drill, set, kemajuan, catatan, evaluasi, targetSetoran, setoran],
+    [anggota, jadwal, absensi, lagu, setlist, drill, set, kemajuan, catatan, evaluasi, targetSetoran, setoran, countSheet],
   )
 
   // #7 — titipan CSV dari pintu baru: bukakan tab CSV-nya sekalian.
@@ -171,6 +174,7 @@ export default function Data() {
       evaluasi: kunci(evaluasi),
       targetSetoran: kunci(targetSetoran),
       setoran: kunci(setoran),
+      countSheet: kunci(countSheet),
     }
   }, [sumber])
 
@@ -597,6 +601,7 @@ function AlurPindah({
           db.evaluasi,
           db.targetSetoran,
           db.setoran,
+          db.countSheets,
         ],
         async () => {
           if (b.anggota?.length) await db.members.bulkPut(b.anggota)
@@ -611,6 +616,7 @@ function AlurPindah({
           if (b.evaluasi?.length) await db.evaluasi.bulkPut(b.evaluasi)
           if (b.targetSetoran?.length) await db.targetSetoran.bulkPut(b.targetSetoran)
           if (b.setoran?.length) await db.setoran.bulkPut(b.setoran)
+          if (b.countSheet?.length) await db.countSheets.bulkPut(b.countSheet)
         },
       )
       setMenunggu(null)
@@ -723,7 +729,7 @@ function AlurPindah({
 
                 {bisa && pilihJenis.has(j) && n > 0 && (
                   <div className="ml-6 mt-1 max-h-44 space-y-0.5 overflow-y-auto border-l border-slate-800 pl-3">
-                    {(sumber[j] as { id: string; name?: string; title?: string }[]).map((e) => (
+                    {(sumber[j] as { id: string; name?: string; title?: string; judul?: string }[]).map((e) => (
                       <label
                         key={e.id}
                         className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-slate-800/50"
@@ -735,7 +741,7 @@ function AlurPindah({
                           onChange={() => jugEntitas(e.id)}
                           className="h-3.5 w-3.5 accent-emerald-500"
                         />
-                        <span className="truncate text-slate-300">{e.name ?? e.title ?? e.id}</span>
+                        <span className="truncate text-slate-300">{e.name ?? e.title ?? e.judul ?? e.id}</span>
                       </label>
                     ))}
                   </div>

@@ -20,9 +20,10 @@
  */
 
 import { DEFAULT_FIELD, db } from '../db/db'
-import type { Drill, DrillSet, Member, Song } from '../db/types'
+import type { CountSheet, Drill, DrillSet, Member, Song } from '../db/types'
 import { uid } from './utils'
 import { namaShow } from './bukaBerkas'
+import { salinCountSheetUntukDrillBaru } from './countSheet'
 
 /** Penanda format berkas — dipakai untuk menolak berkas yang salah. */
 const FORMAT = 'drillkit-show'
@@ -39,6 +40,8 @@ export interface BerkasShow {
   sets: DrillSet[]
   songs: Song[]
   members: Member[]
+  /** #17 — lembar hitungan Color Guard yang tertaut ke drill ini (opsional). */
+  countSheets?: CountSheet[]
 }
 
 /** Pilihan saat mengimpor berkas show. */
@@ -67,6 +70,7 @@ export async function susunBerkasShow(drillId: string, namaTim: string): Promise
   const sets = await db.sets.where('drillId').equals(drillId).toArray()
   const songs = await db.songs.toArray()
   const members = await db.members.toArray()
+  const countSheets = await db.countSheets.where('drillId').equals(drillId).toArray()
   return {
     format: FORMAT,
     versi: VERSI,
@@ -77,6 +81,7 @@ export async function susunBerkasShow(drillId: string, namaTim: string): Promise
     drill,
     sets: sets.sort((a, b) => a.order - b.order),
     songs,
+    ...(countSheets.length ? { countSheets } : {}),
   }
 }
 
@@ -196,6 +201,10 @@ export async function imporShow(data: BerkasShow, mode: ModeImpor): Promise<Hasi
       updatedAt: Date.now(),
     })
     await db.sets.bulkPut(sets)
+    if (data.countSheets?.length) {
+      const petaObj = Object.fromEntries(petaIdSet.entries())
+      await db.countSheets.bulkPut(salinCountSheetUntukDrillBaru(data.countSheets, drillId, petaObj))
+    }
     return { drillId, nama, setDitulis: sets.length, setDihapus: 0, anggotaBaru: anggotaBaru.length, laguBaru }
   }
 
@@ -221,6 +230,11 @@ export async function imporShow(data: BerkasShow, mode: ModeImpor): Promise<Hasi
       .sort((a, b) => a.order - b.order)
       .map((s, i) => ({ ...s, drillId, order: i, points: { ...s.points } }))
     await db.sets.bulkPut(sets)
+    if (data.countSheets?.length) {
+      const lamaCs = await db.countSheets.where('drillId').equals(drillId).primaryKeys()
+      if (lamaCs.length) await db.countSheets.bulkDelete(lamaCs)
+      await db.countSheets.bulkPut(data.countSheets.map((cs) => ({ ...cs, drillId })))
+    }
     return { drillId, nama: data.drill.name, setDitulis: sets.length, setDihapus: dihapus.length, anggotaBaru: anggotaBaru.length, laguBaru }
   }
 
@@ -241,6 +255,9 @@ export async function imporShow(data: BerkasShow, mode: ModeImpor): Promise<Hasi
       })
     })
   await db.sets.bulkPut(masuk)
+  if (data.countSheets?.length) {
+    await db.countSheets.bulkPut(data.countSheets.map((cs) => ({ ...cs, drillId })))
+  }
   return {
     drillId,
     nama: data.drill.name,

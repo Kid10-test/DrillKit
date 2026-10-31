@@ -406,6 +406,7 @@ export function gabungPembaruan(
     ...baru,
     songs: gabungLagu(baru.songs ?? [], lama?.songs, laguLokal),
     targetSetoran: baru.targetSetoran ?? lama?.targetSetoran,
+    countSheets: baru.countSheets ?? lama?.countSheets,
     perubahanPaket,
     attendance: lama?.attendance ?? [],
     memberNotes: lama?.memberNotes ?? [],
@@ -516,11 +517,11 @@ export async function susunTerkunci(
   const terkunci: DataTerkunci = {}
   const tanpaKunci: string[] = []
 
-  // #13a & #15b — `partiturPaket` dan `perubahanPaket` sudah tercantum sekali di
-  // bagian terbuka `grup` (`paket.json`), jadi tidak dienkripsi berulang per anggota.
+  // #13a, #15b, & #17 — `partiturPaket`, `perubahanPaket`, dan `countSheets` sudah
+  // tercantum sekali di bagian terbuka `grup` (`paket.json`), jadi tidak dienkripsi berulang.
   const tanpaLampiranPartitur: ShareBundle =
-    b.partiturPaket || b.perubahanPaket
-      ? { ...b, partiturPaket: undefined, perubahanPaket: undefined }
+    b.partiturPaket || b.perubahanPaket || b.countSheets
+      ? { ...b, partiturPaket: undefined, perubahanPaket: undefined, countSheets: undefined }
       : b
 
   for (const m of b.members) {

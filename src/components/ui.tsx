@@ -301,11 +301,11 @@ export function Modal({
       <div
         data-testid={testId}
         className={cx(
-          'relative max-h-[92vh] max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl border border-slate-800 bg-slate-900 shadow-2xl sm:rounded-2xl',
+          'relative flex max-h-[92vh] max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-slate-800 bg-slate-900 shadow-2xl sm:rounded-2xl',
           wide ? 'sm:max-w-3xl' : 'sm:max-w-lg',
         )}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900/95 px-5 py-3.5 backdrop-blur">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900/95 px-5 py-3.5 backdrop-blur">
           <h3 className="text-base font-semibold text-slate-100">{title}</h3>
           <button
             data-kiosk-allow
@@ -319,17 +319,11 @@ export function Modal({
             </svg>
           </button>
         </div>
-        {/*
-          Ruang bawah ekstra kalau ada footer: footer-nya menempel
-          (`sticky bottom-0`) dan menutupi apa pun yang berada di
-          bawah sekali. Tanpa ruang ini, tombol di akhir isi — misalnya
-          "Tambah segmen" di editor lagu — tidak bisa diklik.
-        */}
-        <div className={cx('space-y-4 px-5 pt-4', footer ? 'pb-20' : 'pb-[max(1rem,env(safe-area-inset-bottom))]')}>
+        <div className={cx('min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pt-4', footer ? 'pb-4' : 'pb-[max(1rem,env(safe-area-inset-bottom))]')}>
           {children}
         </div>
         {footer && (
-          <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-800 bg-slate-900/95 px-5 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] backdrop-blur">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-slate-800 bg-slate-900/95 px-5 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] backdrop-blur">
             {footer}
           </div>
         )}

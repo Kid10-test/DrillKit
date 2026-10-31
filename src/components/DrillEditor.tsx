@@ -74,6 +74,11 @@ import {
 } from '../lib/bentukFormasi'
 import { apakahPropertiBergerak, penandaEfektifPadaSet } from '../lib/propertiGerak'
 import {
+  bersihkanSetIdCountSheet,
+  sinkronkanCountSheetSaatPecahSet,
+} from '../lib/countSheet'
+import type { PropsModalCountSheet } from './drill/ModalCountSheet'
+import {
   type GerakLengkap,
   bangunPetaFtl,
   cocokPutaran,
@@ -236,6 +241,22 @@ export function Editor({
   const [tukarCsv, setTukarCsv] = useState(false)
   /** #10 — jendela impor drill Pyware (CSV lembar koordinat). */
   const [imporPyware, setImporPyware] = useState(false)
+  /** #17 — jendela Count Sheet Color Guard (dimuat malas sebelum dibuka). */
+  const [countSheetOpen, setCountSheetOpen] = useState(false)
+  const [KompModalCountSheet, setKompModalCountSheet] = useState<React.ComponentType<PropsModalCountSheet> | null>(null)
+  const countSheetsDrill = useLiveQuery(
+    () => db.countSheets.where('drillId').equals(drill.id).toArray(),
+    [drill.id],
+    [],
+  )
+
+  async function bukaCountSheet() {
+    if (!KompModalCountSheet) {
+      const mod = await import('./drill/ModalCountSheet')
+      setKompModalCountSheet(() => mod.default)
+    }
+    setCountSheetOpen(true)
+  }
 
   /**
    * #7 → #10: pintu "Buka berkas DrillKit" menitipkan CSV Pyware lalu pindah
@@ -878,6 +899,14 @@ export function Editor({
     const idHapus = set.id
     await db.sets.delete(idHapus)
     await bersihkanKeyframeSetPenanda(idHapus)
+    if (countSheetsDrill?.length) {
+      await Promise.all(
+        countSheetsDrill.map((cs) => {
+          const bersih = bersihkanSetIdCountSheet(cs, idHapus)
+          return bersih !== cs ? db.countSheets.put(bersih) : null
+        }),
+      )
+    }
     // K3 — centang untuk set ini tidak ada gunanya lagi.
     await hapusTandaSet(drill.id, idHapus)
     const rest = sets.filter((s) => s.id !== idHapus)
@@ -968,6 +997,19 @@ export function Editor({
     }
     await db.sets.update(set.id, { counts: hasil.hitunganPertama, gerak: hasil.gerakPertama })
     await db.sets.put(baru)
+    if (countSheetsDrill?.length) {
+      await Promise.all(
+        countSheetsDrill.map((cs) => {
+          const disinkron = sinkronkanCountSheetSaatPecahSet(
+            cs,
+            set.id,
+            { id: set.id, name: set.name, counts: hasil.hitunganPertama },
+            { id: baru.id, name: baru.name, counts: hasil.hitunganKedua },
+          )
+          return disinkron !== cs ? db.countSheets.put(disinkron) : null
+        }),
+      )
+    }
     // Geser nomor urut set sesudahnya supaya pecahannya benar-benar tersisip.
     await Promise.all(sets.slice(idx + 1).map((s, i) => db.sets.update(s.id, { order: idx + 2 + i })))
     await db.drills.update(drill.id, { updatedAt: Date.now() })
@@ -990,6 +1032,14 @@ export function Editor({
     const idLeleh = nextSet.id
     await db.sets.delete(idLeleh)
     await bersihkanKeyframeSetPenanda(idLeleh)
+    if (countSheetsDrill?.length) {
+      await Promise.all(
+        countSheetsDrill.map((cs) => {
+          const bersih = bersihkanSetIdCountSheet(cs, idLeleh)
+          return bersih !== cs ? db.countSheets.put(bersih) : null
+        }),
+      )
+    }
     await hapusTandaSet(drill.id, idLeleh)
     await Promise.all(sets.slice(idx + 2).map((s, i) => db.sets.update(s.id, { order: idx + 1 + i })))
     await db.drills.update(drill.id, { updatedAt: Date.now() })
@@ -2378,7 +2428,7 @@ export function Editor({
               </Button>
             </div>
 
-            <div className="ml-auto flex items-center gap-1">
+            <div className="ml-auto flex flex-wrap items-center gap-1">
               <Button size="sm" variant="ghost" onClick={exportPNG} title="Unduh PNG">
                 <IconDownload size={14} />
               </Button>
@@ -2399,6 +2449,15 @@ export function Editor({
                 data-testid="tombol-pyware"
               >
                 Pyware
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void bukaCountSheet()}
+                title="Lembar Hitungan Color Guard (Count Sheet)"
+                data-testid="tombol-count-sheet"
+              >
+                Guard{countSheetsDrill?.length ? ` (${countSheetsDrill.length})` : ''}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setDotSheet(true)} title="Kartu/dot sheet per pemain">
                 <IconPrinter size={14} /> Kartu
@@ -3578,6 +3637,19 @@ export function Editor({
         sets={sets}
         roster={roster}
       />
+
+      {KompModalCountSheet && (
+        <KompModalCountSheet
+          open={countSheetOpen}
+          onClose={() => setCountSheetOpen(false)}
+          drill={drill}
+          sets={sets}
+          roster={roster}
+          songAwal={lagu ?? null}
+          namaTim={settings?.teamName ?? 'Tim'}
+          sections={settings?.sections ?? []}
+        />
+      )}
 
       <ShortcutHelp open={bantuan} onClose={() => setBantuan(false)} />
 

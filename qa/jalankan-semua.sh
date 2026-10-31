@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Beberapa blok supaya satu blok tidak melewati batas waktu satu perintah.
-# Daftarnya sama persis dengan regresi-penuh.sh (125 rangkaian) — bila menambah
+# Daftarnya sama persis dengan regresi-penuh.sh (127 rangkaian) — bila menambah
 # rangkaian di sana, tambahkan juga di sini.
 # Hasilnya ditulis ke berkas supaya bisa dipantau selagi berjalan.
 set -u
@@ -17,7 +17,7 @@ bash regresi.sh "$BASE" \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika \
   >> "$LOG" 2>&1
 
 echo "== BLOK 2: mode anggota, kios, & situs ==" >> "$LOG"
@@ -35,7 +35,7 @@ echo "== BLOK 3: berkas, jadwal, lomba, Pyware, partitur, & portabel ==" >> "$LO
 bash regresi.sh "$BASE" \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
   kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data \
-  pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut \
+  pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet \
   >> "$LOG" 2>&1
 
 echo "== BLOK 4: musik, metronom, tempo latihan, & rekaman ==" >> "$LOG"

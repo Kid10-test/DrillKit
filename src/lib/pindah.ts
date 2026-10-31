@@ -25,6 +25,7 @@
 import type {
   AttendanceRecord,
   CatatanSetoran,
+  CountSheet,
   Drill,
   DrillSet,
   Evaluasi,
@@ -50,6 +51,7 @@ export type JenisData =
   | 'evaluasi'
   | 'targetSetoran'
   | 'setoran'
+  | 'countSheet'
 
 export const URUTAN_JENIS_DATA: JenisData[] = [
   'anggota',
@@ -64,6 +66,7 @@ export const URUTAN_JENIS_DATA: JenisData[] = [
   'evaluasi',
   'targetSetoran',
   'setoran',
+  'countSheet',
 ]
 
 export const LABEL_JENIS_DATA: Record<JenisData, string> = {
@@ -79,6 +82,7 @@ export const LABEL_JENIS_DATA: Record<JenisData, string> = {
   evaluasi: 'Evaluasi anggota',
   targetSetoran: 'Target setoran',
   setoran: 'Setoran hafalan',
+  countSheet: 'Count sheet Guard',
 }
 
 export interface MetaSetoranSeksi {
@@ -117,6 +121,7 @@ export interface BerkasPindah {
   evaluasi?: Evaluasi[]
   targetSetoran?: TargetSetoran[]
   setoran?: CatatanSetoran[]
+  countSheet?: CountSheet[]
 }
 
 /** Ambil daftar entitas sebuah jenis. Kosong kalau tidak ada. */
@@ -139,6 +144,7 @@ function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void 
     case 'evaluasi': berkas.evaluasi = daftar as Evaluasi[]; break
     case 'targetSetoran': berkas.targetSetoran = daftar as TargetSetoran[]; break
     case 'setoran': berkas.setoran = daftar as CatatanSetoran[]; break
+    case 'countSheet': berkas.countSheet = daftar as CountSheet[]; break
   }
 }
 
@@ -302,6 +308,31 @@ const ATURAN: AturanRujukan[] = [
       e.memberId = (v as string | undefined) ?? ''
     },
   },
+  {
+    sumber: 'countSheet',
+    target: 'drill',
+    baca: (e: CountSheet) => e.drillId,
+    tulis: (e: CountSheet, v) => {
+      e.drillId = (v as string | undefined) ?? undefined
+    },
+  },
+  {
+    sumber: 'countSheet',
+    target: 'lagu',
+    baca: (e: CountSheet) => e.songId,
+    tulis: (e: CountSheet, v) => {
+      e.songId = (v as string | undefined) ?? undefined
+    },
+  },
+  {
+    sumber: 'countSheet',
+    target: 'anggota',
+    baca: (e: CountSheet) => e.memberIds,
+    tulis: (e: CountSheet, v) => {
+      const sah = v as string[] | undefined
+      e.memberIds = sah?.length ? sah : undefined
+    },
+  },
 ]
 
 /** Id yang tersedia untuk sebuah jenis: gabungan berkas & perangkat. */
@@ -459,6 +490,22 @@ export function putusRujukan(
     }
   }
 
+  // #17 — Saring rujukan `blok[].setId` di dalam `countSheet` bila set-nya tidak ikut.
+  const idSetSah = kumpulkanId(berkas, yangAda, 'set')
+  const daftarCs = ambil(hasil, 'countSheet') as CountSheet[]
+  for (const cs of daftarCs) {
+    if (!cs.blok?.length) continue
+    let csBerubah = false
+    const blokBaru = cs.blok.map((bl) => {
+      if (!bl.setId || idSetSah.has(bl.setId)) return bl
+      csBerubah = true
+      putus.push({ jenis: 'countSheet', id: cs.id, kolom: 'set formasi', nilai: bl.setId })
+      const { setId: _s, offsetDalamSet: _o, ...sisa } = bl
+      return sisa
+    })
+    if (csBerubah) cs.blok = blokBaru
+  }
+
   return { berkas: hasil, putus }
 }
 
@@ -477,6 +524,9 @@ function kolomRujukan(sumber: JenisData, target: JenisData): string {
     'targetSetoran>lagu': 'lagu',
     'setoran>targetSetoran': 'target setoran',
     'setoran>anggota': 'anggota',
+    'countSheet>drill': 'drill',
+    'countSheet>lagu': 'lagu',
+    'countSheet>anggota': 'anggota',
   }
   return peta[`${sumber}>${target}`] ?? target
 }
