@@ -102,11 +102,15 @@ function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void 
     case 'inventaris': berkas.inventaris = daftar as never; break
     case 'logistikLomba': berkas.logistikLomba = daftar as never; break
     case 'penilaianLomba': berkas.penilaianLomba = daftar as never; break
+    case 'audisi': berkas.audisi = daftar as never; break
+    case 'medisAnggota': berkas.medisAnggota = daftar as never; break
+    case 'kasIuran': berkas.kasIuran = daftar as never; break
+    case 'arsipMusim': berkas.arsipMusim = daftar as never; break
   }
 }
 
 /** Jenis yang bisa dipilih **satu per satu** (daftarnya pendek). */
-const JENIS_PILIH: JenisData[] = ['lagu', 'setlist', 'drill', 'countSheet', 'logistikLomba', 'penilaianLomba']
+const JENIS_PILIH: JenisData[] = ['lagu', 'setlist', 'drill', 'countSheet', 'logistikLomba', 'penilaianLomba', 'arsipMusim']
 
 export default function Data() {
   const [searchParams] = useSearchParams()
@@ -130,6 +134,10 @@ export default function Data() {
   const inventaris = useLiveQuery(() => db.inventaris.toArray(), [], [])
   const logistikLomba = useLiveQuery(() => db.logistikLomba.toArray(), [], [])
   const penilaianLomba = useLiveQuery(() => db.penilaianLomba.toArray(), [], [])
+  const audisi = useLiveQuery(() => db.audisi.toArray(), [], [])
+  const medisAnggota = useLiveQuery(() => db.medisAnggota.toArray(), [], [])
+  const kasIuran = useLiveQuery(() => db.kasIuran.toArray(), [], [])
+  const arsipMusim = useLiveQuery(() => db.arsipMusim.toArray(), [], [])
 
   const sumber: Record<JenisData, unknown[]> = useMemo(
     () => ({
@@ -149,6 +157,10 @@ export default function Data() {
       inventaris,
       logistikLomba,
       penilaianLomba,
+      audisi,
+      medisAnggota,
+      kasIuran,
+      arsipMusim,
     }),
     [
       anggota,
@@ -167,6 +179,10 @@ export default function Data() {
       inventaris,
       logistikLomba,
       penilaianLomba,
+      audisi,
+      medisAnggota,
+      kasIuran,
+      arsipMusim,
     ],
   )
 
@@ -520,6 +536,10 @@ function AlurPindah({
       inventarisDb,
       logistikLombaDb,
       penilaianLombaDb,
+      audisiDb,
+      medisAnggotaDb,
+      kasIuranDb,
+      arsipMusimDb,
     ] = await Promise.all([
       db.members.toArray(),
       db.sessions.toArray(),
@@ -537,6 +557,10 @@ function AlurPindah({
       db.inventaris.toArray(),
       db.logistikLomba.toArray(),
       db.penilaianLomba.toArray(),
+      db.audisi.toArray(),
+      db.medisAnggota.toArray(),
+      db.kasIuran.toArray(),
+      db.arsipMusim.toArray(),
     ])
     const yangAdaSegar: YangAda = {
       anggota: kunci(anggotaLokal),
@@ -555,6 +579,10 @@ function AlurPindah({
       inventaris: kunci(inventarisDb),
       logistikLomba: kunci(logistikLombaDb),
       penilaianLomba: kunci(penilaianLombaDb),
+      audisi: kunci(audisiDb),
+      medisAnggota: kunci(medisAnggotaDb),
+      kasIuran: kunci(kasIuranDb),
+      arsipMusim: kunci(arsipMusimDb),
     }
     const masuk = hasil.berkas.anggota ?? []
     const baris = susunSaran(masuk, anggotaLokal)
@@ -643,6 +671,10 @@ function AlurPindah({
           db.inventaris,
           db.logistikLomba,
           db.penilaianLomba,
+          db.audisi,
+          db.medisAnggota,
+          db.kasIuran,
+          db.arsipMusim,
         ],
         async () => {
           if (b.anggota?.length) await db.members.bulkPut(b.anggota)
@@ -661,6 +693,10 @@ function AlurPindah({
           if (b.inventaris?.length) await db.inventaris.bulkPut(b.inventaris)
           if (b.logistikLomba?.length) await db.logistikLomba.bulkPut(b.logistikLomba)
           if (b.penilaianLomba?.length) await db.penilaianLomba.bulkPut(b.penilaianLomba)
+          if (b.audisi?.length) await db.audisi.bulkPut(b.audisi)
+          if (b.medisAnggota?.length) await db.medisAnggota.bulkPut(b.medisAnggota)
+          if (b.kasIuran?.length) await db.kasIuran.bulkPut(b.kasIuran)
+          if (b.arsipMusim?.length) await db.arsipMusim.bulkPut(b.arsipMusim)
         },
       )
       setMenunggu(null)
@@ -773,7 +809,7 @@ function AlurPindah({
 
                 {bisa && pilihJenis.has(j) && n > 0 && (
                   <div className="ml-6 mt-1 max-h-44 space-y-0.5 overflow-y-auto border-l border-slate-800 pl-3">
-                    {(sumber[j] as { id: string; name?: string; title?: string; judul?: string }[]).map((e) => (
+                    {(sumber[j] as { id: string; name?: string; title?: string; judul?: string; namaMusim?: string }[]).map((e) => (
                       <label
                         key={e.id}
                         className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-slate-800/50"
@@ -785,7 +821,7 @@ function AlurPindah({
                           onChange={() => jugEntitas(e.id)}
                           className="h-3.5 w-3.5 accent-emerald-500"
                         />
-                        <span className="truncate text-slate-300">{e.name ?? e.title ?? e.judul ?? e.id}</span>
+                        <span className="truncate text-slate-300">{e.name ?? e.title ?? e.judul ?? e.namaMusim ?? e.id}</span>
                       </label>
                     ))}
                   </div>

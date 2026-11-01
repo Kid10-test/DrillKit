@@ -7,7 +7,7 @@ import {
   type Ambil,
   type HasilPeriksa,
 } from '../lib/situs'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { db } from '../db/db'
 import type { TeamSettings } from '../db/types'
 import { seedDemoData, wipeAllData } from '../db/seed'
@@ -33,6 +33,12 @@ import { PREDIKAT_BAKU, rapikanPredikat, teksAmbangPredikat } from '../lib/lapor
 import { KioskPinCard } from '../components/KioskLock'
 import KartuPanduan from '../components/Panduan'
 import { bacaTampilan, langgananTampilan, ubahTampilan } from '../lib/tampilan'
+
+const PanelArsipMusimLazy = lazy(() =>
+  import('../components/pengaturan/PanelArsipMusim').then((m) => ({
+    default: m.PanelArsipMusim,
+  })),
+)
 import type { Tampilan } from '../lib/tampilan'
 import { PilihModeNama } from '../components/PilihModeNama'
 import { KartuTerbit } from '../components/KartuTerbit'
@@ -723,6 +729,19 @@ export default function Settings() {
             </>
           )}
         </Card>
+
+        {/* #21c — Arsip Lintas-Musim & Season Rollover */}
+        <div className="lg:col-span-2">
+          <Suspense
+            fallback={
+              <Card className="p-4 text-xs text-slate-400">
+                Memuat arsip lintas-musim…
+              </Card>
+            }
+          >
+            <PanelArsipMusimLazy namaTim={form.teamName || 'Unit Marching Band'} />
+          </Suspense>
+        </div>
       </div>
 
       <Modal open={confirmWipe} onClose={() => setConfirmWipe(false)} title="Konfirmasi">

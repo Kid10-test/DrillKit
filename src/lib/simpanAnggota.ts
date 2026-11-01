@@ -12,17 +12,20 @@ import type { RencanaGabung } from './namaAnggota'
 import type { HasilCocok } from './namaAnggota'
 import type {
   AttendanceRecord,
+  CalonAudisi,
   CatatanSetoran,
   CountSheet,
   Drill,
   DrillSet,
   Evaluasi,
   ItemInventaris,
+  KartuMedisAnggota,
   Kemajuan,
   ManifesLogistikLomba,
   Member,
   MemberNote,
   RiwayatSnapshot,
+  TransaksiKasIuran,
 } from '../db/types'
 
 const TABEL = [
@@ -38,6 +41,9 @@ const TABEL = [
   db.countSheets,
   db.inventaris,
   db.logistikLomba,
+  db.audisi,
+  db.medisAnggota,
+  db.kasIuran,
 ]
 
 export async function simpanAnggota(tulis: Member[], hapus: string[]): Promise<void> {
@@ -66,12 +72,17 @@ export async function simpanRencana(r: {
   countSheets?: CountSheet[]
   inventaris?: ItemInventaris[]
   logistikLomba?: ManifesLogistikLomba[]
+  audisi?: CalonAudisi[]
+  medisAnggota?: KartuMedisAnggota[]
+  medisAnggotaHapus?: string[]
+  kasIuran?: TransaksiKasIuran[]
 }): Promise<void> {
   const hapusAnggota = (r.anggotaHapus ?? []).filter((id) => !(r.anggotaTulis ?? []).some((m) => m.id === id))
   await db.transaction('rw', TABEL, async () => {
     if (r.absensiHapus?.length) await db.attendance.bulkDelete(r.absensiHapus)
     if (r.evaluasiHapus?.length) await db.evaluasi.bulkDelete(r.evaluasiHapus)
     if (r.setoranHapus?.length) await db.setoran.bulkDelete(r.setoranHapus)
+    if (r.medisAnggotaHapus?.length) await db.medisAnggota.bulkDelete(r.medisAnggotaHapus)
     if (r.absensi?.length) await db.attendance.bulkPut(r.absensi)
     if (r.evaluasi?.length) await db.evaluasi.bulkPut(r.evaluasi)
     if (r.setoran?.length) await db.setoran.bulkPut(r.setoran)
@@ -83,6 +94,9 @@ export async function simpanRencana(r: {
     if (r.countSheets?.length) await db.countSheets.bulkPut(r.countSheets)
     if (r.inventaris?.length) await db.inventaris.bulkPut(r.inventaris)
     if (r.logistikLomba?.length) await db.logistikLomba.bulkPut(r.logistikLomba)
+    if (r.audisi?.length) await db.audisi.bulkPut(r.audisi)
+    if (r.medisAnggota?.length) await db.medisAnggota.bulkPut(r.medisAnggota)
+    if (r.kasIuran?.length) await db.kasIuran.bulkPut(r.kasIuran)
     if (hapusAnggota.length) await db.members.bulkDelete(hapusAnggota)
     if (r.anggotaTulis?.length) await db.members.bulkPut(r.anggotaTulis)
   })
@@ -106,6 +120,10 @@ export async function simpanGabung(r: RencanaGabung): Promise<void> {
     countSheets: r.countSheets,
     inventaris: r.inventaris,
     logistikLomba: r.logistikLomba,
+    audisi: r.audisi,
+    medisAnggota: r.medisAnggota,
+    medisAnggotaHapus: r.medisAnggotaHapus,
+    kasIuran: r.kasIuran,
   })
 }
 
@@ -132,6 +150,9 @@ export async function muatUntukGabung() {
     countSheets,
     inventaris,
     logistikLomba,
+    audisi,
+    medisAnggota,
+    kasIuran,
   ] = await Promise.all([
     db.attendance.toArray(),
     db.evaluasi.toArray(),
@@ -144,6 +165,9 @@ export async function muatUntukGabung() {
     db.countSheets.toArray(),
     db.inventaris.toArray(),
     db.logistikLomba.toArray(),
+    db.audisi.toArray(),
+    db.medisAnggota.toArray(),
+    db.kasIuran.toArray(),
   ])
   return {
     absensi,
@@ -157,6 +181,9 @@ export async function muatUntukGabung() {
     countSheets,
     inventaris,
     logistikLomba,
+    audisi,
+    medisAnggota,
+    kasIuran,
   }
 }
 

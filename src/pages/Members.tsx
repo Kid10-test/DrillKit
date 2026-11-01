@@ -53,8 +53,26 @@ const PanelBukuInventarisLazy = lazy(() =>
 const PanelSeragamFittingLazy = lazy(() =>
   muatPanelInventarisSeragam().then((m) => ({ default: m.PanelSeragamFitting })),
 )
+const muatPanelAudisi = () => import('../components/anggota/PanelAudisi')
+const PanelAudisiLazy = lazy(() =>
+  muatPanelAudisi().then((m) => ({ default: m.PanelAudisi })),
+)
+const muatPanelDispensasiMedis = () => import('../components/anggota/PanelDispensasiMedis')
+const PanelDispensasiMedisLazy = lazy(() =>
+  muatPanelDispensasiMedis().then((m) => ({ default: m.PanelDispensasiMedis })),
+)
+const muatPanelKasIuran = () => import('../components/anggota/PanelKasIuran')
+const PanelKasIuranLazy = lazy(() =>
+  muatPanelKasIuran().then((m) => ({ default: m.PanelKasIuran })),
+)
 
-type TabHalamanAnggota = 'anggota' | 'inventaris' | 'seragam'
+type TabHalamanAnggota =
+  | 'anggota'
+  | 'audisi'
+  | 'inventaris'
+  | 'seragam'
+  | 'administrasi'
+  | 'kas'
 
 export default function Members() {
   const toast = useToast()
@@ -62,10 +80,17 @@ export default function Members() {
   const [searchParams, setSearchParams] = useSearchParams()
   const tabUrl = searchParams.get('tab')
   const tabAktif: TabHalamanAnggota =
-    tabUrl === 'inventaris' || tabUrl === 'seragam' ? tabUrl : 'anggota'
+    tabUrl === 'audisi' ||
+    tabUrl === 'inventaris' ||
+    tabUrl === 'seragam' ||
+    tabUrl === 'administrasi' ||
+    tabUrl === 'kas'
+      ? tabUrl
+      : 'anggota'
   const members = useLiveQuery(() => db.members.orderBy('name').toArray(), [], [])
   const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
   const jmlInventaris = useLiveQuery(() => db.inventaris.count(), [], 0)
+  const jmlAudisi = useLiveQuery(() => db.audisi.count(), [], 0)
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Section | 'all'>('all')
   const [showInactive, setShowInactive] = useState(false)
@@ -128,10 +153,20 @@ export default function Members() {
   async function remove(m: Member) {
     await db.transaction(
       'rw',
-      [db.members, db.attendance, db.inventaris, db.logistikLomba, db.countSheets],
+      [
+        db.members,
+        db.attendance,
+        db.inventaris,
+        db.logistikLomba,
+        db.countSheets,
+        db.medisAnggota,
+        db.audisi,
+        db.kasIuran,
+      ],
       async () => {
         await db.members.delete(m.id)
         await db.attendance.where('memberId').equals(m.id).delete()
+        await db.medisAnggota.delete(m.id)
         const dipinjam = await db.inventaris.where('pemegangId').equals(m.id).toArray()
         for (const it of dipinjam) {
           await db.inventaris.update(it.id, {
@@ -139,6 +174,14 @@ export default function Members() {
             tanggalPinjam: undefined,
             targetKembali: undefined,
           })
+        }
+        const calonTertaut = await db.audisi.where('memberIdTertaut').equals(m.id).toArray()
+        for (const c of calonTertaut) {
+          await db.audisi.update(c.id, { memberIdTertaut: undefined })
+        }
+        const txKas = await db.kasIuran.where('memberId').equals(m.id).toArray()
+        for (const tx of txKas) {
+          await db.kasIuran.update(tx.id, { memberId: undefined })
         }
         const semuaManifes = await db.logistikLomba.toArray()
         for (const mf of semuaManifes) {
@@ -286,7 +329,7 @@ export default function Members() {
         }}
       />
 
-      {/* #18 — Pengalih Tab: Daftar Anggota | Inventaris Alat | Seragam & Fitting */}
+      {/* #18 + #21 — Pengalih Tab: Daftar Anggota | Audisi | Inventaris Alat | Seragam | Dispensasi & Medis | Buku Kas */}
       <div
         className="mb-4 flex flex-wrap items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/70 p-1"
         data-testid="tab-bar-anggota"
@@ -294,8 +337,11 @@ export default function Members() {
         {(
           [
             { id: 'anggota', label: `Daftar Anggota (${members.filter((m) => m.active === 1).length})`, testId: 'tab-daftar-anggota' },
+            { id: 'audisi', label: `Audisi & Seleksi (${jmlAudisi})`, testId: 'tab-audisi-anggota' },
             { id: 'inventaris', label: `Inventaris Alat (${jmlInventaris})`, testId: 'tab-inventaris-alat' },
             { id: 'seragam', label: 'Seragam & Fitting', testId: 'tab-seragam-fitting' },
+            { id: 'administrasi', label: 'Dispensasi & Medis', testId: 'tab-administrasi-medis' },
+            { id: 'kas', label: 'Buku Kas & Iuran', testId: 'tab-kas-iuran' },
           ] as const
         ).map((tb) => {
           const aktif = tabAktif === tb.id
@@ -305,10 +351,16 @@ export default function Members() {
               type="button"
               data-testid={tb.testId}
               onMouseEnter={() => {
-                if (tb.id !== 'anggota') void muatPanelInventarisSeragam()
+                if (tb.id === 'inventaris' || tb.id === 'seragam') void muatPanelInventarisSeragam()
+                else if (tb.id === 'audisi') void muatPanelAudisi()
+                else if (tb.id === 'administrasi') void muatPanelDispensasiMedis()
+                else if (tb.id === 'kas') void muatPanelKasIuran()
               }}
               onClick={async () => {
-                if (tb.id !== 'anggota') await muatPanelInventarisSeragam()
+                if (tb.id === 'inventaris' || tb.id === 'seragam') await muatPanelInventarisSeragam()
+                else if (tb.id === 'audisi') await muatPanelAudisi()
+                else if (tb.id === 'administrasi') await muatPanelDispensasiMedis()
+                else if (tb.id === 'kas') await muatPanelKasIuran()
                 const next = new URLSearchParams(searchParams)
                 if (tb.id === 'anggota') next.delete('tab')
                 else next.set('tab', tb.id)
@@ -326,7 +378,15 @@ export default function Members() {
         })}
       </div>
 
-      {tabAktif === 'inventaris' ? (
+      {tabAktif === 'audisi' ? (
+        <Suspense fallback={<Card className="p-6 text-center text-xs text-slate-400">Memuat panel audisi &amp; seleksi…</Card>}>
+          <PanelAudisiLazy
+            namaTim={settings?.teamName || 'Unit Marching Band'}
+            members={members}
+            sections={settings?.sections}
+          />
+        </Suspense>
+      ) : tabAktif === 'inventaris' ? (
         <Suspense fallback={<Card className="p-6 text-center text-xs text-slate-400">Memuat buku inventaris…</Card>}>
           <PanelBukuInventarisLazy
             members={members}
@@ -338,6 +398,17 @@ export default function Members() {
       ) : tabAktif === 'seragam' ? (
         <Suspense fallback={<Card className="p-6 text-center text-xs text-slate-400">Memuat daftar seragam &amp; fitting…</Card>}>
           <PanelSeragamFittingLazy members={members} namaTim={settings?.teamName || 'Unit Marching Band'} />
+        </Suspense>
+      ) : tabAktif === 'administrasi' ? (
+        <Suspense fallback={<Card className="p-6 text-center text-xs text-slate-400">Memuat generator surat dispensasi &amp; kartu medis…</Card>}>
+          <PanelDispensasiMedisLazy members={members} settings={settings} />
+        </Suspense>
+      ) : tabAktif === 'kas' ? (
+        <Suspense fallback={<Card className="p-6 text-center text-xs text-slate-400">Memuat buku kas &amp; iuran TC…</Card>}>
+          <PanelKasIuranLazy
+            namaTim={settings?.teamName || 'Unit Marching Band'}
+            members={members}
+          />
         </Suspense>
       ) : (
       <>
@@ -560,6 +631,26 @@ function MemberModal({
             <option value="1">Aktif</option>
             <option value="0">Nonaktif</option>
           </Select>
+        </Field>
+        <Field label="Asal Sekolah / Fakultas" hint="untuk surat dispensasi">
+          <Input
+            value={m.instansiAsal ?? ''}
+            onChange={(e) => setM({ ...m, instansiAsal: e.target.value || undefined })}
+            placeholder="Mis. SMA Negeri 3 / Fak. Teknik"
+          />
+        </Field>
+        <Field label="Kelas / Jurusan" hint="opsional">
+          <Input
+            value={m.kelasJurusan ?? ''}
+            onChange={(e) => setM({ ...m, kelasJurusan: e.target.value || undefined })}
+            placeholder="Mis. XI MIPA 2"
+          />
+        </Field>
+        <Field label="NIS / NIM / ID" hint="opsional">
+          <Input
+            value={m.nomorInduk ?? ''}
+            onChange={(e) => setM({ ...m, nomorInduk: e.target.value || undefined })}
+          />
         </Field>
       </div>
       <Field label="Catatan" hint="opsional">

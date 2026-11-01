@@ -691,6 +691,10 @@ export const TABEL_BACKUP: { kolom: string; label: string }[] = [
   { kolom: 'logistikLomba', label: 'Manifes logistik lomba' },
   { kolom: 'penilaianLomba', label: 'Simulasi penilaian juri' },
   { kolom: 'judgeTapeAudio', label: 'Rekaman suara Judge Tape' },
+  { kolom: 'audisi', label: 'Calon audisi anggota' },
+  { kolom: 'medisAnggota', label: 'Kartu medis darurat' },
+  { kolom: 'kasIuran', label: 'Buku kas & iuran TC' },
+  { kolom: 'arsipMusim', label: 'Arsip lintas-musim' },
 ]
 
 /**
@@ -731,6 +735,10 @@ export const TABEL_DATA: { kolom: string; label: string }[] = [
   { kolom: 'inventaris', label: 'Inventaris alat' },
   { kolom: 'logistikLomba', label: 'Manifes logistik lomba' },
   { kolom: 'penilaianLomba', label: 'Simulasi penilaian juri' },
+  { kolom: 'audisi', label: 'Calon audisi anggota' },
+  { kolom: 'medisAnggota', label: 'Kartu medis darurat' },
+  { kolom: 'kasIuran', label: 'Buku kas & iuran TC' },
+  { kolom: 'arsipMusim', label: 'Arsip lintas-musim' },
 ]
 
 /** Ringkas isi berkas data pilihan (dipakai pratinjau pintu baru). */

@@ -25,6 +25,10 @@ import type {
   ManifesLogistikLomba,
   PenilaianLomba,
   JudgeTapeAudioItem,
+  CalonAudisi,
+  KartuMedisAnggota,
+  TransaksiKasIuran,
+  ArsipMusim,
 } from './types'
 
 /**
@@ -83,6 +87,14 @@ export class DrillKitDB extends Dexie {
   penilaianLomba!: Table<PenilaianLomba, string>
   /** #20 — berkas biner rekaman suara Judge Tape (Blob terpisah, id = penilaianId). */
   judgeTapeAudio!: Table<JudgeTapeAudioItem, string>
+  /** #21a — daftar calon anggota & lembar penilaian seleksi audisi (Open Recruitment). */
+  audisi!: Table<CalonAudisi, string>
+  /** #21b — kartu medis & kontak darurat anggota (pagar privasi keras pelatih/medis). */
+  medisAnggota!: Table<KartuMedisAnggota, string>
+  /** #21c — buku kas & catatan cicilan/iuran kegiatan/TC anggota. */
+  kasIuran!: Table<TransaksiKasIuran, string>
+  /** #21c — arsip lintas-musim baca-saja (Season Rollover). */
+  arsipMusim!: Table<ArsipMusim, string>
 
   constructor() {
     super('drillkit')
@@ -148,6 +160,13 @@ export class DrillKitDB extends Dexie {
     this.version(15).stores({
       penilaianLomba: 'id, tanggal, skema, sessionId, drillId, songId, updatedAt',
       judgeTapeAudio: 'id, penilaianId, updatedAt',
+    })
+    // #21 — audisi anggota baru, kartu medis darurat, buku kas/iuran TC, & arsip musim (penambahan murni v16).
+    this.version(16).stores({
+      audisi: 'id, status, minatSeksi1, tahunAngkatan, memberIdTertaut, updatedAt',
+      medisAnggota: 'id, memberId, golonganDarah, updatedAt',
+      kasIuran: 'id, tanggal, jenis, kategoriProgram, memberId, updatedAt',
+      arsipMusim: 'id, tahunMusim, tanggalArsip, createdAt',
     })
   }
 }

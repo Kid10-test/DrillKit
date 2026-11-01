@@ -36,7 +36,14 @@ import { saringPartiturPaketUntukAnggota } from './partiturPaket'
  * - `phone` — nomor telepon pribadi anggota.
  * - `notes` — catatan pelatih tentang anggota itu, untuk pelatih sendiri.
  */
-export type KolomRahasia = 'token' | 'phone' | 'notes' | 'ukuranSeragam'
+export type KolomRahasia =
+  | 'token'
+  | 'phone'
+  | 'notes'
+  | 'ukuranSeragam'
+  | 'instansiAsal'
+  | 'kelasJurusan'
+  | 'nomorInduk'
 
 /**
  * Anggota tanpa kolom rahasianya.
@@ -49,9 +56,20 @@ export type KolomRahasia = 'token' | 'phone' | 'notes' | 'ukuranSeragam'
  * #18 — `ukuranSeragam` juga dibuang dari daftar umum `members` supaya ukuran
  * tubuh & nomor seri seragam anggota lain tidak ikut terbaca di berkas grup/rekan;
  * milik penerima sendiri dikirim khusus lewat `perlengkapanPribadi`.
+ * #21b — `instansiAsal`, `kelasJurusan`, dan `nomorInduk` (NIS/NIM) khusus
+ * keperluan surat dispensasi pelatih, ikut dibuang dari daftar umum.
  */
 export function bersihkanAnggota(m: Member): Member {
-  const { token: _token, phone: _phone, notes: _notes, ukuranSeragam: _ukuranSeragam, ...sisa } = m
+  const {
+    token: _token,
+    phone: _phone,
+    notes: _notes,
+    ukuranSeragam: _ukuranSeragam,
+    instansiAsal: _instansiAsal,
+    kelasJurusan: _kelasJurusan,
+    nomorInduk: _nomorInduk,
+    ...sisa
+  } = m
   return { ...sisa, token: '' } as Member
 }
 
@@ -67,13 +85,17 @@ export function bersihkanAnggota(m: Member): Member {
  * mentah (mis. hasil backup) diteruskan ke `paketGrup`/`paketAnggota`, kunci
  * rahasia seperti `penilaianLomba` & `judgeTapeAudio` (#20) dijamin terbuang.
  */
-function kupasDataKhususStaf(b: ShareBundle): ShareBundle {
+export function kupasDataKhususStaf(b: ShareBundle): ShareBundle {
   const salin = { ...(b as unknown as Record<string, unknown>) }
   delete salin.penilaianLomba
   delete salin.judgeTapeAudio
   delete salin.inventaris
   delete salin.logistikLomba
   delete salin.evaluasi
+  delete salin.audisi
+  delete salin.medisAnggota
+  delete salin.kasIuran
+  delete salin.arsipMusim
   return salin as unknown as ShareBundle
 }
 

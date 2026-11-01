@@ -254,6 +254,6 @@ export function cetakAtauUnduhLembarParade(data: DataCetakParade): 'cetak' | 'un
   const html = bangunHtmlLembarParade(data)
   if (printHtml(html)) return 'cetak'
   const slug = data.judulDrill.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'parade'
-  downloadHtmlFile(`komando-kirab-${slug}.html`, html)
+  downloadHtmlFile(html, `komando-kirab-${slug}.html`)
   return 'unduh'
 }
