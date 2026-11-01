@@ -44,6 +44,25 @@ const cek = (nama, syarat, keterangan = '') => {
   else gagal.push(`${nama}${keterangan ? ' — ' + keterangan : ''}`)
 }
 
+await p.evaluateOnNewDocument(() => {
+  const asli = Date.now()
+  const d = new Date(asli)
+  const mnt = d.getHours() * 60 + d.getMinutes()
+  if (mnt < 100 || mnt >= 22 * 60 + 20) {
+    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 10, 0, 0).getTime()
+    const selisih = target - asli
+    const AsliDate = Date
+    // eslint-disable-next-line no-global-assign
+    Date = class extends AsliDate {
+      constructor(...args) {
+        super(...(args.length === 0 ? [AsliDate.now() + selisih] : args))
+      }
+      static now() {
+        return AsliDate.now() + selisih
+      }
+    }
+  }
+})
 await p.goto(BASE, { waitUntil: 'networkidle2' })
 await lewatSambutan(p)
 await wait(1500)

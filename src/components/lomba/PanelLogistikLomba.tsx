@@ -43,14 +43,17 @@ export function PanelLogistikLomba({
     [semuaManifes, tanggalAktif],
   )
 
-  // Draf sinkron via useRef + useState agar centang 3-tahap beruntun bebas race Dexie
+  // Draf sinkron via useRef + useState agar centang 3-tahap & ketikan cepat bebas race Dexie
   const [draf, setDraf] = useState<ManifesLogistikLomba | null>(null)
   const drafRef = useRef<ManifesLogistikLomba | null>(null)
+  const sedangMenulisRef = useRef(0)
 
   useEffect(() => {
+    // Abaikan pantulan sementara useLiveQuery saat tulis lokal pada tanggal yang sama masih berjalan
+    if (sedangMenulisRef.current > 0 && drafRef.current?.tanggal === tanggalAktif) return
     drafRef.current = manifesDb
     setDraf(manifesDb)
-  }, [manifesDb])
+  }, [manifesDb, tanggalAktif])
 
   const [namaButirBaru, setNamaButirBaru] = useState('')
   const [jmlButirBaru, setJmlButirBaru] = useState('1')
@@ -60,11 +63,16 @@ export function PanelLogistikLomba({
   async function simpanManifes(berikut: ManifesLogistikLomba) {
     const rapi: ManifesLogistikLomba = {
       ...berikut,
-      updatedAt: Date.now(),
+      updatedAt: Math.max(Date.now(), (drafRef.current?.updatedAt ?? 0) + 1),
     }
     drafRef.current = rapi
     setDraf(rapi)
-    await db.logistikLomba.put(rapi)
+    sedangMenulisRef.current += 1
+    try {
+      await db.logistikLomba.put(rapi)
+    } finally {
+      sedangMenulisRef.current = Math.max(0, sedangMenulisRef.current - 1)
+    }
   }
 
   async function buatManifesBaru(pakaiInventaris: boolean) {
@@ -393,6 +401,7 @@ export function PanelLogistikLomba({
         <div className="grid gap-2 sm:grid-cols-6">
           <Input
             data-testid="input-butir-manifes-baru"
+            aria-label="Nama barang manifes baru"
             value={namaButirBaru}
             onChange={(e) => setNamaButirBaru(e.target.value)}
             onKeyDown={(e) => {
@@ -403,6 +412,7 @@ export function PanelLogistikLomba({
           />
           <Select
             data-testid="pilih-kategori-manifes-baru"
+            aria-label="Kategori barang manifes baru"
             value={katButirBaru}
             onChange={(e) => setKatButirBaru(e.target.value as KategoriInventaris)}
             className="text-xs"
@@ -417,6 +427,7 @@ export function PanelLogistikLomba({
             type="number"
             min={1}
             data-testid="input-jml-manifes-baru"
+            aria-label="Jumlah barang manifes baru"
             value={jmlButirBaru}
             onChange={(e) => setJmlButirBaru(e.target.value)}
             placeholder="Jml"
@@ -536,6 +547,7 @@ export function PanelLogistikLomba({
                     <button
                       type="button"
                       title="Hapus baris dari manifes"
+                      aria-label={`Hapus ${b.nama} dari manifes`}
                       onClick={() =>
                         void simpanManifes({
                           ...draf,

@@ -512,6 +512,9 @@ function AlurPindah({
       evaluasiDb,
       targetSetoranDb,
       setoranDb,
+      countSheetDb,
+      inventarisDb,
+      logistikLombaDb,
     ] = await Promise.all([
       db.members.toArray(),
       db.sessions.toArray(),
@@ -525,6 +528,9 @@ function AlurPindah({
       db.evaluasi.toArray(),
       db.targetSetoran.toArray(),
       db.setoran.toArray(),
+      db.countSheets.toArray(),
+      db.inventaris.toArray(),
+      db.logistikLomba.toArray(),
     ])
     const yangAdaSegar: YangAda = {
       anggota: kunci(anggotaLokal),
@@ -539,6 +545,9 @@ function AlurPindah({
       evaluasi: kunci(evaluasiDb),
       targetSetoran: kunci(targetSetoranDb),
       setoran: kunci(setoranDb),
+      countSheet: kunci(countSheetDb),
+      inventaris: kunci(inventarisDb),
+      logistikLomba: kunci(logistikLombaDb),
     }
     const masuk = hasil.berkas.anggota ?? []
     const baris = susunSaran(masuk, anggotaLokal)

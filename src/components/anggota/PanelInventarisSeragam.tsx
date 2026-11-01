@@ -265,6 +265,7 @@ export function PanelBukuInventaris({
             <IconSearch size={15} className="pointer-events-none absolute top-2.5 left-3 text-slate-500" />
             <Input
               data-testid="cari-inventaris"
+              aria-label="Cari aset inventaris"
               value={cari}
               onChange={(e) => setCari(e.target.value)}
               placeholder="Cari kode aset, seri, merek, atau peminjam…"
@@ -273,6 +274,7 @@ export function PanelBukuInventaris({
           </div>
           <Select
             data-testid="filter-kategori-inv"
+            aria-label="Filter kategori inventaris"
             value={filterKategori}
             onChange={(e) => setFilterKategori(e.target.value as KategoriInventaris | 'semua')}
             className="text-xs"
@@ -286,6 +288,7 @@ export function PanelBukuInventaris({
           </Select>
           <Select
             data-testid="filter-kondisi-inv"
+            aria-label="Filter kondisi inventaris"
             value={filterKondisi}
             onChange={(e) => setFilterKondisi(e.target.value as KondisiInventaris | 'semua' | 'dipinjam')}
             className="text-xs"

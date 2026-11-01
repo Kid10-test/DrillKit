@@ -49,8 +49,11 @@ const info = await p.evaluate(async () => {
   const r = await new Promise((res) => { const q = indexedDB.open('drillkit'); q.onsuccess = () => res(q.result) })
   const skrg = new Date()
   const iso = `${skrg.getFullYear()}-${String(skrg.getMonth() + 1).padStart(2, '0')}-${String(skrg.getDate()).padStart(2, '0')}`
+  // Jaga agar rentang jam(-20)..jam(100) tidak pernah melintasi tengah malam (22:20–00:20)
+  const mntAman = Math.min(21 * 60 + 30, Math.max(60, skrg.getHours() * 60 + skrg.getMinutes()))
+  const jangkar = new Date(skrg.getFullYear(), skrg.getMonth(), skrg.getDate(), 0, mntAman, 0)
   const jam = (mnt) => {
-    const d = new Date(skrg.getTime() + mnt * 60000)
+    const d = new Date(jangkar.getTime() + mnt * 60000)
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
   const tx = r.transaction(['sessions'], 'readwrite')

@@ -126,18 +126,39 @@ export default function Members() {
   }
 
   async function remove(m: Member) {
-    await db.transaction('rw', [db.members, db.attendance, db.inventaris], async () => {
-      await db.members.delete(m.id)
-      await db.attendance.where('memberId').equals(m.id).delete()
-      const dipinjam = await db.inventaris.where('pemegangId').equals(m.id).toArray()
-      for (const it of dipinjam) {
-        await db.inventaris.update(it.id, {
-          pemegangId: undefined,
-          tanggalPinjam: undefined,
-          targetKembali: undefined,
-        })
-      }
-    })
+    await db.transaction(
+      'rw',
+      [db.members, db.attendance, db.inventaris, db.logistikLomba, db.countSheets],
+      async () => {
+        await db.members.delete(m.id)
+        await db.attendance.where('memberId').equals(m.id).delete()
+        const dipinjam = await db.inventaris.where('pemegangId').equals(m.id).toArray()
+        for (const it of dipinjam) {
+          await db.inventaris.update(it.id, {
+            pemegangId: undefined,
+            tanggalPinjam: undefined,
+            targetKembali: undefined,
+          })
+        }
+        const semuaManifes = await db.logistikLomba.toArray()
+        for (const mf of semuaManifes) {
+          if (mf.butir?.some((b) => b.penanggungJawabId === m.id)) {
+            await db.logistikLomba.update(mf.id, {
+              butir: mf.butir.map((b) =>
+                b.penanggungJawabId === m.id ? { ...b, penanggungJawabId: undefined } : b,
+              ),
+            })
+          }
+        }
+        const semuaCs = await db.countSheets.toArray()
+        for (const cs of semuaCs) {
+          if (cs.memberIds?.includes(m.id)) {
+            const sisa = cs.memberIds.filter((id) => id !== m.id)
+            await db.countSheets.update(cs.id, { memberIds: sisa.length ? sisa : undefined })
+          }
+        }
+      },
+    )
     toast.push(`${m.name} dihapus`, 'info')
   }
 
