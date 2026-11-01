@@ -279,6 +279,7 @@ export default function Settings() {
               <Button
                 key={p.id}
                 size="sm"
+                data-testid={`preset-lapangan-${p.id}`}
                 variant={activePreset(form.defaultField) === p.id ? 'primary' : 'soft'}
                 onClick={() =>
                   patch({
@@ -288,6 +289,8 @@ export default function Settings() {
                       gridTampil: 1,
                       subgridTampil: 0,
                       subgridYd: undefined,
+                      warna: 'hijau',
+                      parade: undefined,
                       hashTampil: p.config.hash && p.config.hash !== 'none' ? 1 : 0,
                       ...p.config,
                     },

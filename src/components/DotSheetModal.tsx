@@ -33,11 +33,13 @@ import { tugasKruPropertiAnggota } from '../lib/propertiGerak'
 import { ringkasKerjaGuardPadaSet } from '../lib/countSheet'
 
 import {
+  apakahModeParade,
   coordText as coorTextSafe,
   panahArah,
   patokOf,
   stepYd,
 } from '../lib/field'
+import { posisiSafBanjarAnggota } from '../lib/parade'
 import {
   TINGKAT_WARNA,
   type MetrikPemain,
@@ -232,6 +234,12 @@ export function DotSheetModal({
           sectionId: m.section,
           padat: compact,
         })
+        if (apakahModeParade(drill.field)) {
+          const posPrd = posisiSafBanjarAnggota(set.points, m.id, drill.field)
+          if (posPrd) {
+            isyarat.unshift(`Saf ${posPrd.nomorSaf} · Bjr ${posPrd.nomorBanjar}`)
+          }
+        }
         if (sertakanGuard && countSheets.length > 0) {
           isyarat.push(...ringkasKerjaGuardPadaSet(countSheets, set.id, m))
         }

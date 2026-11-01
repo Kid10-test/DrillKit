@@ -292,6 +292,39 @@ export type SatuanTampilLapangan = 'yd' | 'm' | 'langkah'
 /** Satuan jarak antarpatok (langkah mengikuti `step`, yard/meter ukuran fisik). */
 export type SatuanJarakPatok = 'langkah' | 'yard' | 'meter'
 
+/** Arah gerak defile barisan kirab di layar (`kiri-ke-kanan` = menuju kanan layar, `kanan-ke-kiri` = menuju kiri layar). */
+export type ArahDefileParade = 'kiri-ke-kanan' | 'kanan-ke-kiri'
+
+/** Sisi jalan tempat Panggung Kehormatan / Tribun VIP & Juri berdiri (`depan` = tepi bawah/penonton, `belakang` = tepi atas). */
+export type SisiPanggungKehormatan = 'depan' | 'belakang'
+
+/**
+ * Pengaturan Mode Kirab / *Street Parade* (#19) pada `FieldConfig`.
+ * 100% aditif & kompatibel mundur: tidak ada atau `aktif: 0` = lapangan biasa.
+ */
+export interface ParadeConfig {
+  /** 1 = mode kanvas Jalan Raya / Kirab aktif, 0 = nonaktif */
+  aktif: number
+  /** Lebar bahu jalan / garis tepi steril di tiap sisi dalam meter (bawaan 0.5 m) */
+  bahuJalanM?: number
+  /** 1 = gambar garis marka putus-putus tengah jalan raya (bawaan 1) */
+  markaTengah?: number
+  /** Arah gerak barisan defile di sepanjang jalan (bawaan `'kiri-ke-kanan'`) */
+  arahDefile?: ArahDefileParade
+  /** 1 = tampilkan zona Panggung Kehormatan / Tribun VIP & Juri (bawaan 1) */
+  panggungAktif?: number
+  /** Posisi tengah Panggung Kehormatan dalam meter dari titik tengah koridor (0 = tengah, positif ke kanan defile) */
+  posisiPanggungM?: number
+  /** Panjang bentang zona penghormatan / panggung VIP dalam meter (bawaan 16 m) */
+  panjangPanggungM?: number
+  /** Sisi jalan tempat Panggung Kehormatan berada (bawaan `'depan'`) */
+  sisiPanggung?: SisiPanggungKehormatan
+  /** Label tribun kehormatan pada kanvas & cetakan */
+  labelPanggung?: string
+  /** Panjang total rute kirab dalam meter untuk kalkulator kecepatan & napas (bawaan 1500 m) */
+  panjangRuteM?: number
+}
+
 export interface FieldConfig {
   /** lebar lapangan (yard), default 53.33 */
   widthYd: number
@@ -341,6 +374,11 @@ export interface FieldConfig {
    * lapangan). Bisa diperkecil kalau formasi terasa sesak.
    */
   ukuranTitik?: number
+  /**
+   * Mode Kirab / *Street Parade* (#19) — koridor jalan raya, garis tepi/marka,
+   * arah defile, dan zona Panggung Kehormatan / Juri.
+   */
+  parade?: ParadeConfig
 }
 
 /**

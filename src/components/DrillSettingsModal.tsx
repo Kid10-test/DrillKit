@@ -208,6 +208,7 @@ export function DrillSettingsModal({
             <Button
               key={p.id}
               size="sm"
+              data-testid={`preset-lapangan-${p.id}`}
               variant={activePreset(d.field) === p.id ? 'primary' : 'soft'}
               onClick={() =>
                 setD({
@@ -218,6 +219,8 @@ export function DrillSettingsModal({
                     gridTampil: 1,
                     subgridTampil: 0,
                     subgridYd: undefined,
+                    warna: 'hijau',
+                    parade: undefined,
                     hashTampil: p.config.hash && p.config.hash !== 'none' ? 1 : 0,
                     ...p.config,
                   },

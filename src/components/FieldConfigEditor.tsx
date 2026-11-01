@@ -7,11 +7,14 @@
  */
 
 import type {
+  ArahDefileParade,
   FieldConfig,
   HashPreset,
+  ParadeConfig,
   PatokConfig,
   SatuanJarakPatok,
   SatuanTampilLapangan,
+  SisiPanggungKehormatan,
   StepPreset,
 } from '../db/types'
 import { FieldSurface } from './FieldSurface'
@@ -23,11 +26,13 @@ import {
 } from './ui'
 import {
   HASH_LABEL,
+  M_TO_YD,
   STEP_LABEL,
   TEBAL_GARIS_GRID,
   WARNA_GARIS_GRID,
   WARNA_LAPANGAN,
   YD_TO_M,
+  apakahModeParade,
   coordText,
   daftarPatok,
   dariSatuanTampil,
@@ -37,6 +42,7 @@ import {
   hurufPatok,
   keSatuanTampil,
   namaSatuanLapangan,
+  paradeOf,
   patokOf,
   satuanLapanganOf,
   singkatanSatuanLapangan,
@@ -98,6 +104,10 @@ export function FieldConfigEditor({
   // DD1 & #9 — sistem patok cara Indonesia + opsi Tanpa patok.
   const p = patokOf(f)
   const gantiPatok = (q: Partial<PatokConfig>) => patch({ patok: { ...p, ...q } })
+  // #19 — Mode Kirab / Street Parade
+  const prd = paradeOf(f)
+  const modeParade = apakahModeParade(f)
+  const gantiParade = (q: Partial<ParadeConfig>) => patch({ parade: { ...prd, ...q } })
   /** Hitung jumlah patok walaupun gambarnya sedang disembunyikan. */
   const fHitung = { ...f, patok: { ...p, tampil: 1, tampilGaris: 1, tampilLabel: 1 } }
   const jmlHuruf = daftarPatok(fHitung, p.sumbuHuruf).length
@@ -173,7 +183,7 @@ export function FieldConfigEditor({
           >
             {daftarGarisUtama.length} garis grid
             {subgridOn ? ` · ${daftarGarisSub.length} subgrid` : ''} ·{' '}
-            {p.aktif === 1 ? `Patok ${jmlHuruf}×${jmlT}` : 'Tanpa patok'}
+            {modeParade ? `Parade VIP ${prd.panjangPanggungM} m` : p.aktif === 1 ? `Patok ${jmlHuruf}×${jmlT}` : 'Tanpa patok'}
           </span>
         </div>
         <div className="overflow-hidden rounded border border-slate-800 bg-slate-950 p-1.5">
@@ -731,6 +741,167 @@ export function FieldConfigEditor({
                 </span>
               </p>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* #19 — Mode Kirab / Street Parade & Zona Panggung Kehormatan */}
+      <div
+        data-testid="panel-konfigurasi-parade"
+        className="rounded-lg border border-amber-500/30 bg-slate-950/50 p-3 sm:col-span-2"
+      >
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <Toggle
+            label="Mode Jalan Raya / Kirab (Street Parade)"
+            checked={modeParade}
+            onChange={(nyala) => {
+              if (nyala) {
+                patch({
+                  satuan: 'm',
+                  endZoneYd: 0,
+                  hash: 'none',
+                  showLabels: 0,
+                  warna: f.warna === 'hijau' || !f.warna ? 'aspal' : f.warna,
+                  patok: { ...p, aktif: 0 },
+                  parade: { ...prd, aktif: 1 },
+                })
+              } else {
+                patch({ parade: { ...prd, aktif: 0 } })
+              }
+            }}
+          />
+          <div className="flex flex-wrap gap-1">
+            {[6, 8, 12].map((lebarM) => (
+              <button
+                key={lebarM}
+                type="button"
+                data-testid={`lebar-jalan-cepat-${lebarM}m`}
+                onClick={() =>
+                  patch({
+                    widthYd: lebarM * M_TO_YD,
+                    lengthYd: (lebarM === 6 ? 50 : lebarM === 8 ? 60 : 75) * M_TO_YD,
+                    endZoneYd: 0,
+                    gridYd: 5 * M_TO_YD,
+                    hash: 'none',
+                    showLabels: 0,
+                    satuan: 'm',
+                    warna: 'aspal',
+                    patok: { ...p, aktif: 0 },
+                    parade: {
+                      ...prd,
+                      aktif: 1,
+                      bahuJalanM: lebarM === 6 ? 0.4 : lebarM === 8 ? 0.5 : 0.75,
+                      panjangPanggungM: lebarM === 6 ? 12 : lebarM === 8 ? 16 : 20,
+                    },
+                  })
+                }
+                className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20"
+              >
+                Jalan {lebarM} m
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mb-2 text-[11px] leading-relaxed text-slate-400">
+          Mengubah kanvas menjadi koridor jalan aspal memanjang lengkap garis tepi bahu jalan, marka putus-putus tengah, arah defile, dan <b>Zona Panggung Kehormatan / Juri</b>. Contoh koordinat: <b className="text-amber-200">{contohTengah}</b>.
+        </p>
+
+        {modeParade && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <Field label="Arah gerak barisan defile">
+              <Select
+                data-testid="pilih-arah-defile"
+                value={prd.arahDefile}
+                onChange={(e) => gantiParade({ arahDefile: e.target.value as ArahDefileParade })}
+              >
+                <option value="kiri-ke-kanan">Kiri → Kanan layar</option>
+                <option value="kanan-ke-kiri">Kanan → Kiri layar</option>
+              </Select>
+            </Field>
+            <Field label="Lebar bahu jalan tiap tepi (m)" hint="ruang steril trotoar/penonton">
+              <Input
+                data-testid="kolom-bahu-jalan"
+                type="number"
+                step="0.1"
+                min={0}
+                max={3}
+                value={prd.bahuJalanM}
+                onChange={(e) =>
+                  gantiParade({ bahuJalanM: angkaAman(e.target.value, prd.bahuJalanM, 0) })
+                }
+              />
+            </Field>
+            <Field label="Marka putus-putus tengah jalan">
+              <Select
+                data-testid="pilih-marka-tengah"
+                value={prd.markaTengah}
+                onChange={(e) => gantiParade({ markaTengah: Number(e.target.value) })}
+              >
+                <option value={1}>Tampilkan marka as jalan</option>
+                <option value={0}>Sembunyikan marka tengah</option>
+              </Select>
+            </Field>
+            <Field label="Zona Panggung Kehormatan / Juri">
+              <Select
+                data-testid="pilih-panggung-vip"
+                value={prd.panggungAktif}
+                onChange={(e) => gantiParade({ panggungAktif: Number(e.target.value) })}
+              >
+                <option value={1}>Tampilkan zona panggung VIP</option>
+                <option value={0}>Tanpa panggung kehormatan</option>
+              </Select>
+            </Field>
+            {prd.panggungAktif === 1 && (
+              <>
+                <Field label="Sisi jalan Panggung VIP">
+                  <Select
+                    data-testid="pilih-sisi-panggung"
+                    value={prd.sisiPanggung}
+                    onChange={(e) =>
+                      gantiParade({ sisiPanggung: e.target.value as SisiPanggungKehormatan })
+                    }
+                  >
+                    <option value="depan">Tepi Depan (bawah layar / penonton utama)</option>
+                    <option value="belakang">Tepi Belakang (atas layar / seberang)</option>
+                  </Select>
+                </Field>
+                <Field label="Bentang zona penghormatan (m)">
+                  <Input
+                    data-testid="kolom-panjang-panggung"
+                    type="number"
+                    step="1"
+                    min={4}
+                    value={prd.panjangPanggungM}
+                    onChange={(e) =>
+                      gantiParade({
+                        panjangPanggungM: angkaAman(e.target.value, prd.panjangPanggungM, 4),
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Posisi tengah Panggung VIP (m)" hint="0 = tepat di tengah segmen jalan">
+                  <Input
+                    data-testid="kolom-posisi-panggung"
+                    type="number"
+                    step="1"
+                    value={prd.posisiPanggungM}
+                    onChange={(e) => {
+                      const n = Number(e.target.value)
+                      if (e.target.value.trim() !== '' && Number.isFinite(n)) {
+                        gantiParade({ posisiPanggungM: n })
+                      }
+                    }}
+                  />
+                </Field>
+                <Field label="Label Panggung Kehormatan">
+                  <Input
+                    data-testid="kolom-label-panggung"
+                    value={prd.labelPanggung}
+                    onChange={(e) => gantiParade({ labelPanggung: e.target.value })}
+                  />
+                </Field>
+              </>
+            )}
           </div>
         )}
       </div>

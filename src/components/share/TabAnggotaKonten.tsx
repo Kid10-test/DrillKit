@@ -36,7 +36,8 @@ import {
   urutkanTargetSetoran,
 } from "../../lib/setoran"
 import { sectionDot, STATUS_META, daysFromToday, formatDateLong, pct, todayISO } from "../../lib/utils"
-import { coordText, facingDeg, stepYd, ukurTitik } from "../../lib/field"
+import { apakahModeParade, coordText, facingDeg, stepYd, ukurTitik } from "../../lib/field"
+import { posisiSafBanjarAnggota } from "../../lib/parade"
 import { acakUrutan, bangunSoal, nilaiTebakan, TOLERANSI_LANGKAH, type NilaiTebakan } from "../../lib/kuis"
 
 
@@ -289,9 +290,9 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
                   )}
                   <text
                     x={sx(p.x)}
-                    y={sy(p.y) + 0.45}
+                    y={sy(p.y) + (apakahModeParade(f) ? uk(0.45) : 0.45)}
                     textAnchor="middle"
-                    fontSize={mine ? 1.6 : 1.1}
+                    fontSize={apakahModeParade(f) ? uk(mine ? 1.8 : 1.25) : mine ? 1.6 : 1.1}
                     fill="#0b1120"
                     style={{ fontWeight: 700 }}
                   >
@@ -337,6 +338,29 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
         )}
         {myPoint ? (
           <>
+            {apakahModeParade(f) && (() => {
+              const infoPrd = set ? posisiSafBanjarAnggota(set.points, me.id, f) : null
+              if (!infoPrd) return null
+              const ketVip =
+                infoPrd.statusVip === 'di_zona_vip'
+                  ? `Tepat di Zona Panggung VIP (${infoPrd.labelSisiVip})`
+                  : infoPrd.statusVip === 'sebelum_vip'
+                    ? `${String(Math.abs(infoPrd.jarakKeTengahVipM)).replace('.', ',')} m sebelum tengah Panggung VIP (${infoPrd.labelSisiVip})`
+                    : infoPrd.statusVip === 'setelah_vip'
+                      ? `${String(Math.abs(infoPrd.jarakKeTengahVipM)).replace('.', ',')} m melewati Panggung VIP`
+                      : 'Mode Jalan Raya / Kirab'
+              return (
+                <div
+                  data-testid="info-parade-anggota"
+                  className="mb-2.5 flex flex-wrap items-center justify-between gap-1.5 rounded-lg border border-amber-600/40 bg-amber-950/30 px-3 py-2 text-xs text-amber-100"
+                >
+                  <span className="font-semibold text-amber-300">
+                    Barisan Kirab: Saf {infoPrd.nomorSaf} dari {infoPrd.totalSaf} · Banjar {infoPrd.nomorBanjar}
+                  </span>
+                  <span className="text-[11px] text-amber-200/90">{ketVip}</span>
+                </div>
+              )
+            })()}
             <p className="rounded-lg bg-slate-950/60 px-3 py-2.5 font-mono text-sm text-emerald-300">
               {coordText(myPoint.x, myPoint.y, f)}
             </p>
