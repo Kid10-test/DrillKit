@@ -1,6 +1,7 @@
 import type {
   FieldConfig,
   HashPreset,
+  ParadeConfig,
   PatokConfig,
   SatuanTampilLapangan,
   StepPreset,
@@ -69,22 +70,70 @@ export const WARNA_LAPANGAN: { id: string; label: string; rumput: string; zona: 
   { id: 'abu', label: 'Abu-abu (GOR)', rumput: '#3f3f46', zona: '#333338' },
   { id: 'coklat', label: 'Cokelat (tanah)', rumput: '#5c3a21', zona: '#4a2f1b' },
   { id: 'ungu', label: 'Ungu', rumput: '#4c1d95', zona: '#3b157a' },
+  { id: 'aspal', label: 'Aspal hitam (jalan raya)', rumput: '#1e293b', zona: '#0f172a' },
 ]
+
+/**
+ * Pengaturan bawaan Mode Kirab / *Street Parade* (#19).
+ * `aktif: 0` berarti kanvas tetap memakai lapangan biasa.
+ */
+export const PARADE_DEFAULT: Required<ParadeConfig> = {
+  aktif: 0,
+  bahuJalanM: 0.5,
+  markaTengah: 1,
+  arahDefile: 'kiri-ke-kanan',
+  panggungAktif: 1,
+  posisiPanggungM: 0,
+  panjangPanggungM: 16,
+  sisiPanggung: 'depan',
+  labelPanggung: 'PANGGUNG KEHORMATAN / JURI',
+  panjangRuteM: 1500,
+}
+
+/** Pengaturan parade yang sudah dinormalisasi (aman untuk `FieldConfig` lama). */
+export function paradeOf(f: FieldConfig): Required<ParadeConfig> {
+  const p = f.parade
+  if (!p) return { ...PARADE_DEFAULT }
+  const bahu = Number(p.bahuJalanM)
+  const posVip = Number(p.posisiPanggungM)
+  const pjgVip = Number(p.panjangPanggungM)
+  const pjgRute = Number(p.panjangRuteM)
+  return {
+    aktif: p.aktif === 1 ? 1 : 0,
+    bahuJalanM: Number.isFinite(bahu) && bahu >= 0 ? Math.min(bahu, 4) : PARADE_DEFAULT.bahuJalanM,
+    markaTengah: p.markaTengah === 0 ? 0 : 1,
+    arahDefile: p.arahDefile === 'kanan-ke-kiri' ? 'kanan-ke-kiri' : 'kiri-ke-kanan',
+    panggungAktif: p.panggungAktif === 0 ? 0 : 1,
+    posisiPanggungM: Number.isFinite(posVip) ? posVip : 0,
+    panjangPanggungM: Number.isFinite(pjgVip) && pjgVip >= 2 ? pjgVip : PARADE_DEFAULT.panjangPanggungM,
+    sisiPanggung: p.sisiPanggung === 'belakang' ? 'belakang' : 'depan',
+    labelPanggung: p.labelPanggung?.trim() ? p.labelPanggung.trim() : PARADE_DEFAULT.labelPanggung,
+    panjangRuteM: Number.isFinite(pjgRute) && pjgRute >= 50 ? pjgRute : PARADE_DEFAULT.panjangRuteM,
+  }
+}
+
+/** Apakah lapangan sedang berada dalam Mode Kirab / *Street Parade* (#19). */
+export function apakahModeParade(f: FieldConfig): boolean {
+  return f.parade?.aktif === 1
+}
 
 /**
  * Pengali ukuran titik pemain.
  *
  * Ukurannya mengikuti **panjang lapangan** dengan acuan lapangan DCI
- * (120 yard termasuk end zone). Tanpa ini, titik berukuran tetap 1,15 yard
- * akan tampak jauh lebih besar di layar pada lapangan kecil (mis. GOR
- * 40 × 20 m) karena skala gambarnya membesar.
+ * (120 yard termasuk end zone). Pada koridor **Jalan Parade** yang sempit
+ * memanjang (mis. 60 × 8 m), ukuran titik juga dibatasi mengikuti lebar
+ * jalan (`widthYd / 24`) supaya 4–8 banjar pemain tidak saling menumpuk.
  *
  * Nilainya dibatasi 0,2–2× supaya lapangan yang sangat kecil atau sangat
  * besar tidak menghasilkan titik yang aneh.
  */
 export function skalaTitik(f: FieldConfig): number {
   const panjang = f.lengthYd + f.endZoneYd * 2
-  const dasar = Math.min(2, Math.max(0.2, panjang / 120))
+  const proporsiDasar = apakahModeParade(f)
+    ? Math.min(panjang / 120, Math.max(0.24, f.widthYd / 24))
+    : panjang / 120
+  const dasar = Math.min(2, Math.max(0.2, proporsiDasar))
   return dasar * (f.ukuranTitik ?? 1)
 }
 
@@ -143,7 +192,10 @@ export function tebalGarisGrid(f: FieldConfig): number {
  */
 export function skalaGarisLapangan(f: FieldConfig): number {
   const panjang = Math.max(4, (Number.isFinite(f.lengthYd) ? f.lengthYd : 100) + Math.max(0, f.endZoneYd || 0) * 2)
-  const proporsi = Math.min(1.35, Math.max(0.55, panjang / 120))
+  const acuan = apakahModeParade(f)
+    ? Math.min(panjang / 120, Math.max(0.35, f.widthYd / 26))
+    : panjang / 120
+  const proporsi = Math.min(1.35, Math.max(0.35, acuan))
   return proporsi * tebalGarisGrid(f)
 }
 
@@ -289,21 +341,93 @@ export const FIELD_PRESETS: {
       patok: { ...PATOK_DEFAULT, aktif: 0 },
     },
   },
+  {
+    id: 'parade-6m',
+    label: 'Jalan Parade 6 m',
+    hint: '50 × 6 m · jalan sempit kabupaten/desa · marka tengah & Panggung VIP 12 m',
+    config: {
+      widthYd: 6 * M_TO_YD,
+      lengthYd: 50 * M_TO_YD,
+      endZoneYd: 0,
+      gridYd: 5 * M_TO_YD,
+      hash: 'none',
+      showLabels: 0,
+      satuan: 'm',
+      warna: 'aspal',
+      patok: { ...PATOK_DEFAULT, aktif: 0 },
+      parade: {
+        ...PARADE_DEFAULT,
+        aktif: 1,
+        bahuJalanM: 0.4,
+        panjangPanggungM: 12,
+      },
+    },
+  },
+  {
+    id: 'parade-8m',
+    label: 'Jalan Parade 8 m',
+    hint: '60 × 8 m · jalan kota standar Street Parade PDBI · Panggung VIP 16 m',
+    config: {
+      widthYd: 8 * M_TO_YD,
+      lengthYd: 60 * M_TO_YD,
+      endZoneYd: 0,
+      gridYd: 5 * M_TO_YD,
+      hash: 'none',
+      showLabels: 0,
+      satuan: 'm',
+      warna: 'aspal',
+      patok: { ...PATOK_DEFAULT, aktif: 0 },
+      parade: {
+        ...PARADE_DEFAULT,
+        aktif: 1,
+        bahuJalanM: 0.5,
+        panjangPanggungM: 16,
+      },
+    },
+  },
+  {
+    id: 'parade-12m',
+    label: 'Jalan Protokol 12 m',
+    hint: '75 × 12 m · jalan raya protokol lebar kirab HUT · Panggung VIP 20 m',
+    config: {
+      widthYd: 12 * M_TO_YD,
+      lengthYd: 75 * M_TO_YD,
+      endZoneYd: 0,
+      gridYd: 5 * M_TO_YD,
+      hash: 'none',
+      showLabels: 0,
+      satuan: 'm',
+      warna: 'aspal',
+      patok: { ...PATOK_DEFAULT, aktif: 0 },
+      parade: {
+        ...PARADE_DEFAULT,
+        aktif: 1,
+        bahuJalanM: 0.75,
+        panjangPanggungM: 20,
+      },
+    },
+  },
 ]
 
 /** Preset yang sedang aktif (untuk menandai tombol), atau null kalau custom. */
 /**
  * Samakan bentuk pengaturan sebelum dibandingkan, supaya `FieldConfig` lama
- * yang belum punya `satuan`/`patok` tetap dikenali sebagai preset yang sama.
+ * yang belum punya `satuan`/`patok`/`parade` tetap dikenali sebagai preset yang sama.
  */
 function kanonPreset(c: Record<string, unknown>): Record<string, unknown> {
   const patokNorm = JSON.stringify({ ...PATOK_DEFAULT, ...((c.patok as object) ?? {}) })
+  const paradeObj = c.parade as ParadeConfig | undefined
+  const paradeNorm =
+    paradeObj && paradeObj.aktif === 1
+      ? JSON.stringify({ ...PARADE_DEFAULT, ...paradeObj })
+      : '0'
   const hashVal = c.hash as string | undefined
   const sat = c.satuan === 'm' ? 'm' : c.satuan === 'langkah' ? 'langkah' : 'yd'
   return {
     ...c,
     satuan: sat,
     patok: patokNorm,
+    parade: paradeNorm,
     garis: c.garis ?? 1,
     warna: c.warna ?? 'hijau',
     ukuranTitik: c.ukuranTitik ?? 1,
@@ -455,6 +579,36 @@ export function describe(x: number, y: number, f: FieldConfig): Coord {
 }
 
 /**
+ * Koordinat jalan raya untuk Mode Kirab / *Street Parade* (#19), mis:
+ * `"Defile +8,0 m · Depan As 2 lkh"` atau `"Defile 0,0 m · As Jalan"`.
+ *
+ * - Sumbu membujur diukur searah gerak defile dari titik tengah `0 m`
+ *   (positif = lebih maju ke arah kepala defile, negatif = di belakang titik tengah).
+ * - Sumbu melintang diukur dari **As Jalan** (`y = 0`) dalam langkah menuju
+ *   tepi **Depan** (sisi penonton/bawah layar) atau **Belakang** (seberang jalan/atas layar).
+ */
+export function coordParade(x: number, y: number, f: FieldConfig): string {
+  const p = paradeOf(f)
+  const s = stepYd(f)
+  // Konvensi kanvas: x > 0 = kiri layar, x < 0 = kanan layar.
+  // Bila arah defile kiri-ke-kanan, maju menuju -x => jarak maju = -x * YD_TO_M.
+  const tandaMaju = p.arahDefile === 'kanan-ke-kiri' ? 1 : -1
+  const majuM = x * tandaMaju * YD_TO_M
+  const bulatM = Math.round(majuM * 10) / 10
+  const teksMaju =
+    Math.abs(bulatM) < 0.05
+      ? 'Defile 0,0 m'
+      : `Defile ${bulatM > 0 ? '+' : '−'}${Math.abs(bulatM).toFixed(1).replace('.', ',')} m`
+
+  const langkahDariAs = Math.round((Math.abs(y) / s) * 4) / 4
+  if (langkahDariAs === 0) return `${teksMaju} · As Jalan`
+  // Konvensi kanvas: y < 0 = sisi depan (penonton/bawah), y > 0 = sisi belakang (atas).
+  const arahTepi = y < 0 ? 'Depan As' : 'Belakang As'
+  const teksLangkah = String(langkahDariAs).replace('.', ',')
+  return `${teksMaju} · ${arahTepi} ${teksLangkah} lkh`
+}
+
+/**
  * Baris koordinat siap cetak, mis: "S1 · YL45 +1.5 · FH +2.75"
  * Format: sisi · garis yard (jarak dalam langkah dari garis tersebut) ·
  *         referensi hash/sideline (jarak dalam langkah, + = ke arah belakang).
@@ -462,6 +616,8 @@ export function describe(x: number, y: number, f: FieldConfig): Coord {
 export function coordText(x: number, y: number, f: FieldConfig): string {
   // DD1 — kalau tim memakai patok, koordinat ditulis dengan patok.
   if (patokOf(f).aktif === 1) return coordPatok(x, y, f)
+  // #19 — kalau Mode Kirab / Street Parade aktif, tulis koordinat jalan raya.
+  if (apakahModeParade(f)) return coordParade(x, y, f)
   const c = describe(x, y, f)
   const yl = c.fromYardLineSteps === 0 ? `YL${c.yardLine}` : `YL${c.yardLine} ${fmtStep(c.fromYardLineSteps)}`
   const hn = c.hashRef === 'front hash' ? 'FH' : c.hashRef === 'back hash' ? 'BH' : c.hashRef === 'front sideline' ? 'FSL' : 'BSL'

@@ -90,7 +90,7 @@ const MENU: [string, string][] = [
   ['Anggota', 'Data anggota, <b>Inventaris alat &amp; Berita Acara</b>, <b>Fitting seragam</b>, kartu QR'],
   ['Absensi &amp; Evaluasi', 'Scan QR / manual, tab <b>Rekap</b> laporan, <b>Evaluasi</b>, &amp; <b>Setoran hafalan</b>'],
   ['Jadwal &amp; Lomba', 'Kalender latihan, seri berulang, .ics, <b>Run sheet</b> &amp; <b>Manifes truk lomba</b>'],
-  ['Drill &amp; Formasi', 'Editor formasi, bentuk cepat, FTL/Ripple/Hold, <b>Count Sheet Guard</b>, properti gerak, buku saku'],
+  ['Drill &amp; Formasi', 'Editor formasi, <b>Mode Kirab/Parade</b>, FTL/Ripple, <b>Count Sheet Guard</b>, buku saku'],
   ['Musik &amp; Metronom', 'Metronom &amp; tempo map, tempo latihan, rekaman MP3, partitur &amp; cetak Lyre, penala'],
   ['Berbagi', 'Terbitkan paket grup / terkunci QR per anggota, log perubahan show, &amp; panduan anggota'],
   ['Impor &amp; ekspor data', '<b>Buka berkas DrillKit</b>, 1-klik <b>Kirim/gabung setoran seksi</b>, &amp; ekspor pilihan'],
@@ -264,7 +264,7 @@ function tabAnggota(): [string, string][] {
     ],
     [
       'Formasi',
-      'Posisimu (titik <b>emas</b>) di tiap set. Tombol <b>‹ ›</b> pindah set; tertulis koordinat, jumlah langkah, asal &amp; tujuan, serta kerja alat Guard. <b>Putar perpindahan</b> menunjukkan gerakannya.',
+      'Posisimu (titik <b>emas</b>) di tiap set. Tombol <b>‹ ›</b> pindah set; tertulis koordinat (termasuk <b>Saf × Banjar</b> di Mode Kirab), langkah, &amp; kerja Guard. <b>Putar perpindahan</b> menunjukkan gerakannya.',
     ],
     [
       'Kuis',

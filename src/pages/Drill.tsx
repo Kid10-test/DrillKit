@@ -29,6 +29,8 @@ import {
 
 import { hapusKemajuan } from '../lib/kemajuan'
 import { salinCountSheetUntukDrillBaru } from '../lib/countSheet'
+import { M_TO_YD, PARADE_DEFAULT, PATOK_DEFAULT, apakahModeParade } from '../lib/field'
+import { susunBarisanParade } from '../lib/parade'
 import {
   uid,
 } from '../lib/utils'
@@ -96,6 +98,54 @@ export default function DrillPage() {
     toast.push('Drill baru dibuat')
   }
 
+  async function createParadeDrill() {
+    if (!settings) return
+    const roster = (members ?? []).filter((m) => m.active)
+    const fieldParade = {
+      ...settings.defaultField,
+      widthYd: 8 * M_TO_YD,
+      lengthYd: 60 * M_TO_YD,
+      endZoneYd: 0,
+      gridYd: 5 * M_TO_YD,
+      hash: 'none' as const,
+      showLabels: 0,
+      satuan: 'm' as const,
+      warna: 'aspal',
+      patok: { ...PATOK_DEFAULT, aktif: 0 },
+      parade: {
+        ...PARADE_DEFAULT,
+        aktif: 1,
+        bahuJalanM: 0.5,
+        panjangPanggungM: 16,
+      },
+    }
+    const d: Drill = {
+      id: uid('d_'),
+      name: `Kirab / Parade ${(drills?.length ?? 0) + 1}`,
+      showTitle: 'Street Parade',
+      field: fieldParade,
+      tempo: 116,
+      beatsPerCount: 1,
+      rosterIds: roster.map((m) => m.id),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    await db.drills.put(d)
+    const susun = susunBarisanParade(roster, fieldParade)
+    await db.sets.put({
+      id: uid('set_'),
+      drillId: d.id,
+      order: 0,
+      name: 'Set 1 (Defile)',
+      counts: 16,
+      points: susun.points,
+      notes: `Barisan pokok kirab ${susun.kesesuaianJalan.jumlahBanjar} banjar × ${susun.jumlahSaf} saf`,
+      createdAt: Date.now(),
+    })
+    setDrillId(d.id)
+    toast.push('Drill Kirab / Street Parade dibuat dengan susunan Banjar × Saf')
+  }
+
   async function duplicateDrill(d: Drill) {
     const newId = uid('d_')
     const old = await db.sets.where('drillId').equals(d.id).toArray()
@@ -157,9 +207,14 @@ export default function DrillPage() {
           title="Belum ada drill"
           desc="Satu drill = satu show/penampilan. Di dalamnya bisa ada banyak set formasi yang saling berhubungan."
           action={
-            <Button variant="primary" onClick={createDrill}>
-              <IconPlus size={16} /> Buat drill
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="primary" onClick={createDrill}>
+                <IconPlus size={16} /> Buat drill
+              </Button>
+              <Button variant="soft" data-testid="buat-drill-parade" onClick={createParadeDrill}>
+                <IconPlus size={16} /> Buat drill Kirab / Parade
+              </Button>
+            </div>
           }
         />
       </div>
@@ -176,12 +231,15 @@ export default function DrillPage() {
             <Select value={drillId} onChange={(e) => setDrillId(e.target.value)} className="w-40 sm:w-52">
               {drills.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name}
+                  {apakahModeParade(d.field) ? `[Kirab] ${d.name}` : d.name}
                 </option>
               ))}
             </Select>
             <Button onClick={createDrill}>
               <IconPlus size={16} /> Baru
+            </Button>
+            <Button variant="soft" data-testid="buat-drill-parade" onClick={createParadeDrill} title="Buat drill Mode Kirab / Street Parade jalan raya">
+              <IconPlus size={16} /> Kirab
             </Button>
             <Button onClick={() => duplicateDrill(drill)}>
               Salin

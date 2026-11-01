@@ -46,6 +46,7 @@ import { useTempoLatihan } from '../hooks/useTempoLatihan'
 import { labelLatihan, latihanAktif, lajuRekaman, terapkanLatihan } from '../lib/tempoLatihan'
 
 import {
+  apakahModeParade,
   coordText as coorTextSafe,
   facingDeg,
   patokOf,
@@ -78,6 +79,7 @@ import {
   sinkronkanCountSheetSaatPecahSet,
 } from '../lib/countSheet'
 import type { PropsModalCountSheet } from './drill/ModalCountSheet'
+import type { ModalParadeProps } from './drill/ModalParade'
 import {
   type GerakLengkap,
   bangunPetaFtl,
@@ -256,6 +258,18 @@ export function Editor({
       setKompModalCountSheet(() => mod.default)
     }
     setCountSheetOpen(true)
+  }
+
+  /** #19 — jendela Studio Mode Kirab / Street Parade (dimuat malas saat dibuka). */
+  const [paradeOpen, setParadeOpen] = useState(false)
+  const [KompModalParade, setKompModalParade] = useState<React.ComponentType<ModalParadeProps> | null>(null)
+
+  async function bukaParade() {
+    if (!KompModalParade) {
+      const mod = await import('./drill/ModalParade')
+      setKompModalParade(() => mod.default)
+    }
+    setParadeOpen(true)
   }
 
   /**
@@ -2452,6 +2466,15 @@ export function Editor({
               </Button>
               <Button
                 size="sm"
+                variant={apakahModeParade(f) ? 'soft' : 'ghost'}
+                onClick={() => void bukaParade()}
+                title="Mode Kirab / Street Parade — Banjar × Saf, Tikungan 90°, Display Panggung VIP & Kalkulator Rute"
+                data-testid="tombol-parade"
+              >
+                {apakahModeParade(f) ? 'Parade ●' : 'Parade'}
+              </Button>
+              <Button
+                size="sm"
                 variant="ghost"
                 onClick={() => void bukaCountSheet()}
                 title="Lembar Hitungan Color Guard (Count Sheet)"
@@ -3648,6 +3671,65 @@ export function Editor({
           songAwal={lagu ?? null}
           namaTim={settings?.teamName ?? 'Tim'}
           sections={settings?.sections ?? []}
+        />
+      )}
+
+      {KompModalParade && (
+        <KompModalParade
+          open={paradeOpen}
+          onClose={() => setParadeOpen(false)}
+          namaTim={settings?.teamName ?? 'Tim'}
+          judulDrill={drill.name}
+          namaSetAktif={set?.name ?? 'Set 1'}
+          tempoDrill={drill.tempo}
+          field={f}
+          pointsAktif={set?.points ?? {}}
+          members={roster}
+          laguTertaut={lagu ?? null}
+          onUbahField={async (fieldBaru) => {
+            await db.drills.update(drill.id, { field: fieldBaru, updatedAt: Date.now() })
+          }}
+          onTerapkanPointsSetAktif={async (pointsBaru, catatanRingkas) => {
+            if (!set) return
+            snapshot()
+            await db.sets.update(set.id, {
+              points: pointsBaru,
+              notes: set.notes ? set.notes : catatanRingkas,
+            })
+            await db.drills.update(drill.id, { updatedAt: Date.now() })
+          }}
+          onTambahRangkaianSet={async (setsBaru, fieldOpsional) => {
+            if (!setsBaru.length) return
+            const posisiSisip = set ? idx + 1 : sets.length
+            // Pastikan set aktif punya counts > 0 agar perpindahan menuju set baru berjalan mulus
+            if (set && (!set.counts || set.counts <= 0)) {
+              await db.sets.update(set.id, { counts: 8 })
+            }
+            const sekarang = Date.now()
+            const entitasBaru: DrillSet[] = setsBaru.map((sb, i) => ({
+              id: uid('set_'),
+              drillId: drill.id,
+              order: posisiSisip + i,
+              name: `Set ${posisiSisip + i + 1} (${sb.nameSuffix})`,
+              counts: sb.counts,
+              points: sb.points,
+              notes: sb.notes,
+              gerak: sb.gerak,
+              visual: sb.visual,
+              createdAt: sekarang + i,
+            }))
+            await Promise.all(
+              sets
+                .slice(posisiSisip)
+                .map((sLama, i) => db.sets.update(sLama.id, { order: posisiSisip + entitasBaru.length + i })),
+            )
+            await db.sets.bulkPut(entitasBaru)
+            await db.drills.update(drill.id, {
+              ...(fieldOpsional ? { field: fieldOpsional } : {}),
+              updatedAt: Date.now(),
+            })
+            setIdx(posisiSisip)
+          }}
         />
       )}
 

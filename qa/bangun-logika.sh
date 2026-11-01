@@ -124,6 +124,9 @@ rakit src/lib/countSheet.ts      countSheet
 # #18 — manajemen inventaris alat, fitting seragam, & manifes logistik hari lomba.
 rakit src/lib/inventarisLogistik.ts      inventarisLogistik
 rakit src/lib/inventarisLogistikCetak.ts inventarisLogistikCetak
+# #19 — Mode Kirab / Street Parade: susunan Banjar × Saf, tikungan 90°, VIP, & kalkulator rute.
+rakit src/lib/parade.ts                  parade
+rakit src/lib/paradeCetak.ts             paradeCetak
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.
