@@ -201,6 +201,10 @@ function TubuhData({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => vo
         inventaris,
         logistikLomba,
         penilaianLomba,
+        audisi,
+        medisAnggota,
+        kasIuran,
+        arsipMusim,
       ] = await Promise.all([
         db.members.toArray(),
         db.sessions.toArray(),
@@ -218,6 +222,10 @@ function TubuhData({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => vo
         db.inventaris.toArray(),
         db.logistikLomba.toArray(),
         db.penilaianLomba.toArray(),
+        db.audisi.toArray(),
+        db.medisAnggota.toArray(),
+        db.kasIuran.toArray(),
+        db.arsipMusim.toArray(),
       ])
       if (!hidup) return
       setIdLokal({
@@ -237,6 +245,10 @@ function TubuhData({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => vo
         inventaris: kunci(inventaris),
         logistikLomba: kunci(logistikLomba),
         penilaianLomba: kunci(penilaianLomba),
+        audisi: kunci(audisi),
+        medisAnggota: kunci(medisAnggota),
+        kasIuran: kunci(kasIuran),
+        arsipMusim: kunci(arsipMusim),
       })
     })()
     return () => {

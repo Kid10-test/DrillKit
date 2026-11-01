@@ -68,6 +68,15 @@ export interface Member {
    * dikirim khusus kepada pemiliknya sendiri lewat `perlengkapanPribadi`.
    */
   ukuranSeragam?: ProfilUkuranSeragam
+  /**
+   * #21b — Asal sekolah / fakultas / instansi anggota untuk pengelompokan otomatis
+   * Surat Izin / Dispensasi resmi (dikupas oleh `bersihkanAnggota` di paket umum).
+   */
+  instansiAsal?: string
+  /** #21b — Kelas / jurusan / program studi (mis. "XI MIPA 2" / "Teknik Sipil 2024"). */
+  kelasJurusan?: string
+  /** #21b — Nomor induk siswa/mahasiswa/pegawai (NIS/NIM/NIP, opsional, privat). */
+  nomorInduk?: string
   /** Token acak untuk QR absensi — jadi tidak bisa ditebak */
   token: string
   createdAt: number
@@ -1182,6 +1191,18 @@ export interface TeamSettings {
    * dari HP pelatih kedua memberi predikat yang sama untuk angka yang sama.
    */
   ambangPredikat?: AmbangPredikat
+  /** #21b — Pengaturan Kop Surat & Penanda Tangan Resmi Unit (opsional). */
+  kopSurat?: KopSuratUnit
+}
+
+export interface KopSuratUnit {
+  namaInstansiInduk?: string
+  alamatSekretariat?: string
+  kontakResmi?: string
+  namaPembina?: string
+  jabatanPembina?: string
+  nipPembina?: string
+  namaKetuaUnit?: string
 }
 
 /**
@@ -1765,6 +1786,170 @@ export interface JudgeTapeAudioItem {
   hash: string
   updatedAt: number
 }
+
+/* ------ #21 — Audisi Anggota Baru, Administrasi Unit (Dispensasi, Medis, Kas TC), & Arsip Musim ------ */
+
+export type StatusCalonAudisi = 'terdaftar' | 'dinilai' | 'diterima' | 'cadangan' | 'ditolak'
+
+export interface NilaiTesAudisi {
+  /** Ketepatan ketukan & tepuk ritme (0–100) */
+  ritmik: number
+  /** Kepekaan tinggi-rendah nada / musikalitas dasar (0–100) */
+  kepekaanNada: number
+  /** Postur tubuh, keseimbangan, & langkah baris dasar (0–100) */
+  posturLangkah: number
+  /** Koordinasi motorik tangan / alat / tiup dasar (0–100) */
+  koordinasiAlat: number
+}
+
+/**
+ * Data Calon Anggota pada Seleksi / *Open Recruitment* (`db.audisi`, Dexie v16).
+ *
+ * **Pagar privasi keras:** seluruh data & skor audisi khusus panitia/pelatih,
+ * tidak pernah masuk ke `ShareBundle` maupun `terbit.ts`.
+ */
+export interface CalonAudisi {
+  id: string
+  nama: string
+  panggilan?: string
+  instansiAsal?: string
+  kelasJurusan?: string
+  nomorInduk?: string
+  telepon?: string
+  minatSeksi1: Section
+  minatInstrumen1?: string
+  minatSeksi2?: Section
+  minatInstrumen2?: string
+  tahunAngkatan: number
+  nilai?: NilaiTesAudisi
+  penguji?: string
+  catatanPenguji?: string
+  status: StatusCalonAudisi
+  /** Seksi penempatan final saat dinyatakan diterima */
+  seksiDiterima?: Section
+  instrumenDiterima?: string
+  /** Terisi otomatis saat tombol "1-Klik Luluskan ke Anggota Aktif" ditekan */
+  memberIdTertaut?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export type GolonganDarah =
+  | '-'
+  | 'A'
+  | 'B'
+  | 'AB'
+  | 'O'
+  | 'A+'
+  | 'A-'
+  | 'B+'
+  | 'B-'
+  | 'AB+'
+  | 'AB-'
+  | 'O+'
+  | 'O-'
+
+/**
+ * Kartu Medis & Kontak Darurat Anggota (`db.medisAnggota`, Dexie v16, `id` = `memberId`).
+ *
+ * **PAGAR PRIVASI KERAS MUTLAK:** data kesehatan & nomor darurat wali HANYA untuk
+ * pelatih/tim medis lapangan — **TIDAK PERNAH** disertakan ke `ShareBundle` / `terbit.ts`.
+ */
+export interface KartuMedisAnggota {
+  /** Kunci utama sama dengan `memberId` */
+  id: string
+  memberId: string
+  golonganDarah: GolonganDarah
+  alergiMakanan?: string
+  alergiObat?: string
+  /** Mis. "Asma ringan (picu udara dingin)", "Cedera pergelangan kaki kanan" */
+  riwayatMedis?: string
+  /** Mis. "Inhaler salbutamol di kantong luar tas pribadi" */
+  obatPribadi?: string
+  kontakDaruratNama: string
+  kontakDaruratHubungan?: string
+  kontakDaruratTelepon: string
+  nomorAsuransi?: string
+  catatanDarurat?: string
+  updatedAt: number
+}
+
+export type JenisTransaksiKas = 'iuran_anggota' | 'pemasukan_umum' | 'pengeluaran'
+
+/**
+ * Catatan Buku Kas & Iuran Kegiatan/TC (`db.kasIuran`, Dexie v16).
+ *
+ * **Pagar privasi keras:** buku kas & rekap tunggakan keseluruhan tim tidak pernah
+ * disertakan ke `ShareBundle` maupun `terbit.ts`.
+ */
+export interface TransaksiKasIuran {
+  id: string
+  /** Tanggal transaksi YYYY-MM-DD */
+  tanggal: string
+  jenis: JenisTransaksiKas
+  /** Nama program/pos, mis. "Iuran TC Kejuaraan", "Kas Rutin Bulanan", "Transportasi Lomba" */
+  kategoriProgram: string
+  /** Target lunas per anggota untuk program ini (Rp), dipakai menghitung sisa tunggakan */
+  targetPerAnggota?: number
+  /** Wajib terisi bila `jenis === 'iuran_anggota'` */
+  memberId?: string
+  /** Nominal positif dalam Rupiah (mis. 150000) */
+  nominal: number
+  metode?: 'tunai' | 'transfer'
+  nomorKwitansi: string
+  penerimaOleh?: string
+  keterangan?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface RingkasanStatistikMusim {
+  jmlAnggotaAktif: number
+  jmlSesi: number
+  rataKehadiranPersen: number
+  jmlLagu: number
+  jmlDrill: number
+  skorPuncakSimulasi: number | null
+  saldoAkhirKas: number
+  daftarRepertoar: string[]
+  daftarDrill: string[]
+}
+
+/**
+ * Dokumen Arsip Lintas-Musim Baca-Saja (`db.arsipMusim`, Dexie v16).
+ * Membekukan seluruh rekam jejak operasional 1 musim kejuaraan sebelum *Season Rollover*.
+ */
+export interface ArsipMusim {
+  id: string
+  namaMusim: string
+  tahunMusim: string
+  tanggalArsip: string
+  catatanPenutup?: string
+  ringkasan: RingkasanStatistikMusim
+  /** Salinan beku seluruh tabel operasional musim tersebut (baca-saja / dapat dipulihkan) */
+  muatanMusim: {
+    membersSnapshot: Member[]
+    sessions: Session[]
+    attendance: AttendanceRecord[]
+    drills: Drill[]
+    sets: DrillSet[]
+    songs: Song[]
+    setlists: SetList[]
+    kemajuan: Kemajuan[]
+    memberNotes: MemberNote[]
+    evaluasi: Evaluasi[]
+    targetSetoran: TargetSetoran[]
+    setoran: CatatanSetoran[]
+    logPerubahan: ItemLogPerubahan[]
+    countSheets: CountSheet[]
+    logistikLomba: ManifesLogistikLomba[]
+    penilaianLomba: PenilaianLomba[]
+    kasIuran: TransaksiKasIuran[]
+    audisi: CalonAudisi[]
+  }
+  createdAt: number
+}
+
 
 
 

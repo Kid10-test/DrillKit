@@ -320,7 +320,7 @@ export function cetakAtauUnduhRekapPenilaian(data: DataCetakPenilaianJuri): 'cet
   if (printHtml(html)) return 'cetak'
   const slug =
     penilaianSlug(data.penilaian.judul) || `rekap-juri-${data.penilaian.tanggal}`
-  downloadHtmlFile(`caption-recap-${slug}.html`, html)
+  downloadHtmlFile(html, `caption-recap-${slug}.html`)
   return 'unduh'
 }
 

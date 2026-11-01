@@ -87,14 +87,14 @@ const LANGKAH: [string, string][] = [
 /** Isi tiap menu — mengikuti nama menu yang tampil di aplikasi. */
 const MENU: [string, string][] = [
   ['Dashboard', 'Ringkasan kehadiran, jadwal terdekat, komposisi tim, &amp; pintu <b>Buka berkas DrillKit</b>'],
-  ['Anggota', 'Data anggota, <b>Inventaris alat &amp; Berita Acara</b>, <b>Fitting seragam</b>, kartu QR'],
+  ['Anggota', 'Data anggota, <b>Audisi</b>, <b>Inventaris &amp; seragam</b>, <b>Dispensasi &amp; medis</b>, <b>Kas</b>, QR'],
   ['Absensi &amp; Evaluasi', 'Scan QR / manual, tab <b>Rekap</b> laporan, <b>Evaluasi</b>, &amp; <b>Setoran hafalan</b>'],
   ['Jadwal &amp; Lomba', 'Kalender, .ics, <b>Run sheet</b>, <b>Manifes truk</b>, &amp; <b>Simulasi juri/Judge Tape</b>'],
   ['Drill &amp; Formasi', 'Editor formasi, <b>Mode Kirab/Parade</b>, FTL/Ripple, <b>Count Sheet Guard</b>, buku saku'],
   ['Musik &amp; Metronom', 'Metronom &amp; tempo map, tempo latihan, rekaman MP3, partitur &amp; cetak Lyre, penala'],
   ['Berbagi', 'Terbitkan paket grup / terkunci QR per anggota, log perubahan show, &amp; panduan anggota'],
   ['Impor &amp; ekspor data', '<b>Buka berkas DrillKit</b>, 1-klik <b>Kirim/gabung setoran seksi</b>, &amp; ekspor pilihan'],
-  ['Pengaturan', 'Profil tim, lapangan (yard/meter &amp; patok), PIN pelatih/kios, backup &amp; pulihkan'],
+  ['Pengaturan', 'Profil tim, lapangan (yard/meter), PIN pelatih/kios, backup/pulihkan, &amp; <b>Arsip musim</b>'],
 ]
 
 /** Empat macet yang paling sering — beserta jalan keluarnya. */

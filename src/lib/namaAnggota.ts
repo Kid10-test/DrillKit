@@ -21,18 +21,21 @@
 
 import type {
   AttendanceRecord,
+  CalonAudisi,
   CatatanSetoran,
   CountSheet,
   Drill,
   DrillSet,
   Evaluasi,
   ItemInventaris,
+  KartuMedisAnggota,
   Kemajuan,
   ManifesLogistikLomba,
   Member,
   MemberNote,
   MemberRole,
   RiwayatSnapshot,
+  TransaksiKasIuran,
 } from '../db/types'
 import { gabungCatatanSetoran, idCatatanSetoran } from './setoran'
 import { gabungProfilUkuranSeragam } from './inventarisLogistik'
@@ -564,6 +567,9 @@ export interface MuatanRujukan {
   countSheets?: CountSheet[]
   inventaris?: ItemInventaris[]
   logistikLomba?: ManifesLogistikLomba[]
+  audisi?: CalonAudisi[]
+  medisAnggota?: KartuMedisAnggota[]
+  kasIuran?: TransaksiKasIuran[]
 }
 
 export function tulisUlangMuatan<T extends MuatanRujukan>(
@@ -654,6 +660,45 @@ export function tulisUlangMuatan<T extends MuatanRujukan>(
   }
   if (out.logistikLomba) {
     out.logistikLomba = out.logistikLomba.map((mf) => tulisUlangLogistikLomba(mf, peta))
+  }
+  if (out.audisi) {
+    out.audisi = out.audisi.map((c) =>
+      c.memberIdTertaut && c.memberIdTertaut in peta
+        ? { ...c, memberIdTertaut: peta[c.memberIdTertaut] }
+        : c,
+    )
+  }
+  if (out.kasIuran) {
+    out.kasIuran = out.kasIuran.map((t) =>
+      t.memberId && t.memberId in peta ? { ...t, memberId: peta[t.memberId] } : t,
+    )
+  }
+  if (out.medisAnggota) {
+    const perTarget = new Map<string, KartuMedisAnggota>()
+    for (const k of out.medisAnggota) {
+      const targetId = k.memberId in peta ? peta[k.memberId] : k.memberId
+      const geser: KartuMedisAnggota =
+        targetId !== k.memberId ? { ...k, id: targetId, memberId: targetId } : k
+      const sudah = perTarget.get(targetId)
+      if (!sudah) {
+        perTarget.set(targetId, geser)
+      } else {
+        perTarget.set(targetId, {
+          ...sudah,
+          golonganDarah: sudah.golonganDarah !== '-' ? sudah.golonganDarah : geser.golonganDarah,
+          alergiMakanan: sudah.alergiMakanan || geser.alergiMakanan,
+          alergiObat: sudah.alergiObat || geser.alergiObat,
+          riwayatMedis: sudah.riwayatMedis || geser.riwayatMedis,
+          obatPribadi: sudah.obatPribadi || geser.obatPribadi,
+          kontakDaruratNama: sudah.kontakDaruratNama || geser.kontakDaruratNama,
+          kontakDaruratHubungan: sudah.kontakDaruratHubungan || geser.kontakDaruratHubungan,
+          kontakDaruratTelepon: sudah.kontakDaruratTelepon || geser.kontakDaruratTelepon,
+          nomorAsuransi: sudah.nomorAsuransi || geser.nomorAsuransi,
+          catatanDarurat: sudah.catatanDarurat || geser.catatanDarurat,
+        })
+      }
+    }
+    out.medisAnggota = [...perTarget.values()]
   }
   return { data: out, bentrok, absensiHapus, evaluasiHapus, setoranHapus }
 }
@@ -953,6 +998,10 @@ export interface RencanaGabung {
   countSheets?: CountSheet[]
   inventaris?: ItemInventaris[]
   logistikLomba?: ManifesLogistikLomba[]
+  audisi?: CalonAudisi[]
+  medisAnggota?: KartuMedisAnggota[]
+  medisAnggotaHapus?: string[]
+  kasIuran?: TransaksiKasIuran[]
   bentrok: string[]
   info: string[]
   jumlah: {
@@ -1017,6 +1066,9 @@ export function rencanakanGabung(opts: {
   countSheets?: CountSheet[]
   inventaris?: ItemInventaris[]
   logistikLomba?: ManifesLogistikLomba[]
+  audisi?: CalonAudisi[]
+  medisAnggota?: KartuMedisAnggota[]
+  kasIuran?: TransaksiKasIuran[]
 }): RencanaGabung | null {
   if (opts.simpan.id === opts.buang.id) return null
   const peta = { [opts.buang.id]: opts.simpan.id }
@@ -1024,6 +1076,9 @@ export function rencanakanGabung(opts: {
   const countSheetsAwal = opts.countSheets ?? []
   const inventarisAwal = opts.inventaris ?? []
   const logistikAwal = opts.logistikLomba ?? []
+  const audisiAwal = opts.audisi ?? []
+  const medisAwal = opts.medisAnggota ?? []
+  const kasAwal = opts.kasIuran ?? []
   const muatan: MuatanRujukan = {
     absensi: opts.absensi,
     evaluasi: opts.evaluasi,
@@ -1036,6 +1091,9 @@ export function rencanakanGabung(opts: {
     countSheets: countSheetsAwal,
     inventaris: inventarisAwal,
     logistikLomba: logistikAwal,
+    audisi: audisiAwal,
+    medisAnggota: medisAwal,
+    kasIuran: kasAwal,
   }
   const jumlah = hitungRujukan(opts.buang.id, muatan)
   const tulis = tulisUlangMuatan(muatan, peta)
@@ -1070,6 +1128,9 @@ export function rencanakanGabung(opts: {
   if (!isi.phone?.trim() && opts.buang.phone?.trim()) isi.phone = opts.buang.phone
   if (!isi.notes?.trim() && opts.buang.notes?.trim()) isi.notes = opts.buang.notes
   if (!isi.instrument?.trim() && opts.buang.instrument?.trim()) isi.instrument = opts.buang.instrument
+  if (!isi.instansiAsal?.trim() && opts.buang.instansiAsal?.trim()) isi.instansiAsal = opts.buang.instansiAsal
+  if (!isi.kelasJurusan?.trim() && opts.buang.kelasJurusan?.trim()) isi.kelasJurusan = opts.buang.kelasJurusan
+  if (!isi.nomorInduk?.trim() && opts.buang.nomorInduk?.trim()) isi.nomorInduk = opts.buang.nomorInduk
   const ukuranGabung = gabungProfilUkuranSeragam(isi.ukuranSeragam, opts.buang.ukuranSeragam)
   if (ukuranGabung) isi.ukuranSeragam = ukuranGabung
 
@@ -1080,6 +1141,15 @@ export function rencanakanGabung(opts: {
   const countSheets = (tulis.data.countSheets ?? []).filter((c, i) => c !== countSheetsAwal[i])
   const inventaris = (tulis.data.inventaris ?? []).filter((it, i) => it !== inventarisAwal[i])
   const logistikLomba = (tulis.data.logistikLomba ?? []).filter((mf, i) => mf !== logistikAwal[i])
+  const audisi = (tulis.data.audisi ?? []).filter((a, i) => a !== audisiAwal[i])
+  const kasIuran = (tulis.data.kasIuran ?? []).filter((t, i) => t !== kasAwal[i])
+  const medisAnggotaHapus = medisAwal
+    .filter((k) => k.memberId === opts.buang.id || k.id === opts.buang.id)
+    .map((k) => k.id)
+  const medisAnggota =
+    medisAnggotaHapus.length > 0
+      ? (tulis.data.medisAnggota ?? []).filter((k) => k.memberId === opts.simpan.id)
+      : []
   const absensiAsli = new Map(opts.absensi.map((r) => [r.id, r]))
   const evaluasiAsli = new Map(opts.evaluasi.map((r) => [r.id, r]))
   const setoranAsli = new Map(setoranAwal.map((r) => [r.id, r]))
@@ -1102,6 +1172,10 @@ export function rencanakanGabung(opts: {
     countSheets,
     inventaris,
     logistikLomba,
+    audisi,
+    medisAnggota,
+    medisAnggotaHapus,
+    kasIuran,
     bentrok,
     info,
     jumlah,
@@ -1123,6 +1197,12 @@ export function rencanakanInduk(opts: {
   drills: Drill[]
   riwayat: RiwayatSnapshot[]
   kemajuan: Kemajuan[]
+  countSheets?: CountSheet[]
+  inventaris?: ItemInventaris[]
+  logistikLomba?: ManifesLogistikLomba[]
+  audisi?: CalonAudisi[]
+  medisAnggota?: KartuMedisAnggota[]
+  kasIuran?: TransaksiKasIuran[]
 }): {
   absensi: AttendanceRecord[]
   absensiHapus: string[]
@@ -1135,9 +1215,22 @@ export function rencanakanInduk(opts: {
   drills: Drill[]
   riwayat: RiwayatSnapshot[]
   kemajuan: Kemajuan[]
+  countSheets: CountSheet[]
+  inventaris: ItemInventaris[]
+  logistikLomba: ManifesLogistikLomba[]
+  audisi: CalonAudisi[]
+  medisAnggota: KartuMedisAnggota[]
+  medisAnggotaHapus: string[]
+  kasIuran: TransaksiKasIuran[]
   bentrok: string[]
 } {
   const setoranAwal = opts.setoran ?? []
+  const countSheetsAwal = opts.countSheets ?? []
+  const inventarisAwal = opts.inventaris ?? []
+  const logistikAwal = opts.logistikLomba ?? []
+  const audisiAwal = opts.audisi ?? []
+  const medisAwal = opts.medisAnggota ?? []
+  const kasAwal = opts.kasIuran ?? []
   const tulis = tulisUlangMuatan(
     {
       absensi: opts.absensi,
@@ -1148,6 +1241,12 @@ export function rencanakanInduk(opts: {
       drills: opts.drills,
       riwayat: opts.riwayat,
       kemajuan: opts.kemajuan,
+      countSheets: countSheetsAwal,
+      inventaris: inventarisAwal,
+      logistikLomba: logistikAwal,
+      audisi: audisiAwal,
+      medisAnggota: medisAwal,
+      kasIuran: kasAwal,
     },
     opts.hasil.peta,
   )
@@ -1156,6 +1255,14 @@ export function rencanakanInduk(opts: {
     return (baru ?? []).filter((r) => peta.get(r.id) !== r.memberId)
   }
   const setoranAsli = new Map(setoranAwal.map((r) => [r.id, r]))
+  const targetMedisBerubah = new Set(
+    medisAwal
+      .filter((k) => k.memberId in opts.hasil.peta && opts.hasil.peta[k.memberId] !== k.memberId)
+      .map((k) => opts.hasil.peta[k.memberId]),
+  )
+  const medisAnggotaHapus = medisAwal
+    .filter((k) => k.memberId in opts.hasil.peta && opts.hasil.peta[k.memberId] !== k.memberId)
+    .map((k) => k.id)
   return {
     absensi: bedaId(tulis.data.absensi, opts.absensi),
     absensiHapus: tulis.absensiHapus,
@@ -1168,6 +1275,13 @@ export function rencanakanInduk(opts: {
     drills: (tulis.data.drills ?? []).filter((r, i) => r !== opts.drills[i]),
     riwayat: (tulis.data.riwayat ?? []).filter((r, i) => r !== opts.riwayat[i]),
     kemajuan: (tulis.data.kemajuan ?? []).filter((r, i) => r !== opts.kemajuan[i]),
+    countSheets: (tulis.data.countSheets ?? []).filter((r, i) => r !== countSheetsAwal[i]),
+    inventaris: (tulis.data.inventaris ?? []).filter((r, i) => r !== inventarisAwal[i]),
+    logistikLomba: (tulis.data.logistikLomba ?? []).filter((r, i) => r !== logistikAwal[i]),
+    audisi: (tulis.data.audisi ?? []).filter((r, i) => r !== audisiAwal[i]),
+    medisAnggota: (tulis.data.medisAnggota ?? []).filter((k) => targetMedisBerubah.has(k.memberId)),
+    medisAnggotaHapus,
+    kasIuran: (tulis.data.kasIuran ?? []).filter((r, i) => r !== kasAwal[i]),
     bentrok: tulis.bentrok,
   }
 }

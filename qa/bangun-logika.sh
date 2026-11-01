@@ -131,6 +131,9 @@ rakit src/lib/paradeCetak.ts             paradeCetak
 rakit src/lib/penilaianJuri.ts           penilaianJuri
 rakit src/lib/penilaianJuriCetak.ts      penilaianJuriCetak
 rakit src/lib/judgeTapeZip.ts            judgeTapeZip
+# #21 — Audisi Anggota Baru, Surat Dispensasi, Kartu Medis AES-256-GCM, Buku Kas, & Arsip Musim.
+rakit src/lib/administrasiUnit.ts        administrasiUnit
+rakit src/lib/administrasiUnitCetak.ts   administrasiUnitCetak
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.

@@ -23,13 +23,16 @@
  * Sengaja murni (tidak menyentuh Dexie, React, atau DOM).
  */
 import type {
+  ArsipMusim,
   AttendanceRecord,
+  CalonAudisi,
   CatatanSetoran,
   CountSheet,
   Drill,
   DrillSet,
   Evaluasi,
   ItemInventaris,
+  KartuMedisAnggota,
   Kemajuan,
   ManifesLogistikLomba,
   Member,
@@ -39,6 +42,7 @@ import type {
   SetList,
   Song,
   TargetSetoran,
+  TransaksiKasIuran,
 } from '../db/types'
 
 export type JenisData =
@@ -58,6 +62,10 @@ export type JenisData =
   | 'inventaris'
   | 'logistikLomba'
   | 'penilaianLomba'
+  | 'audisi'
+  | 'medisAnggota'
+  | 'kasIuran'
+  | 'arsipMusim'
 
 export const URUTAN_JENIS_DATA: JenisData[] = [
   'anggota',
@@ -76,6 +84,10 @@ export const URUTAN_JENIS_DATA: JenisData[] = [
   'inventaris',
   'logistikLomba',
   'penilaianLomba',
+  'audisi',
+  'medisAnggota',
+  'kasIuran',
+  'arsipMusim',
 ]
 
 export const LABEL_JENIS_DATA: Record<JenisData, string> = {
@@ -95,6 +107,10 @@ export const LABEL_JENIS_DATA: Record<JenisData, string> = {
   inventaris: 'Inventaris alat',
   logistikLomba: 'Manifes logistik lomba',
   penilaianLomba: 'Simulasi penilaian juri',
+  audisi: 'Calon audisi anggota',
+  medisAnggota: 'Kartu medis darurat',
+  kasIuran: 'Buku kas & iuran TC',
+  arsipMusim: 'Arsip lintas-musim',
 }
 
 export interface MetaSetoranSeksi {
@@ -137,6 +153,10 @@ export interface BerkasPindah {
   inventaris?: ItemInventaris[]
   logistikLomba?: ManifesLogistikLomba[]
   penilaianLomba?: PenilaianLomba[]
+  audisi?: CalonAudisi[]
+  medisAnggota?: KartuMedisAnggota[]
+  kasIuran?: TransaksiKasIuran[]
+  arsipMusim?: ArsipMusim[]
 }
 
 /** Ambil daftar entitas sebuah jenis. Kosong kalau tidak ada. */
@@ -163,6 +183,10 @@ function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void 
     case 'inventaris': berkas.inventaris = daftar as ItemInventaris[]; break
     case 'logistikLomba': berkas.logistikLomba = daftar as ManifesLogistikLomba[]; break
     case 'penilaianLomba': berkas.penilaianLomba = daftar as PenilaianLomba[]; break
+    case 'audisi': berkas.audisi = daftar as CalonAudisi[]; break
+    case 'medisAnggota': berkas.medisAnggota = daftar as KartuMedisAnggota[]; break
+    case 'kasIuran': berkas.kasIuran = daftar as TransaksiKasIuran[]; break
+    case 'arsipMusim': berkas.arsipMusim = daftar as ArsipMusim[]; break
   }
 }
 
@@ -391,6 +415,22 @@ const ATURAN: AturanRujukan[] = [
       e.songId = (v as string | undefined) || undefined
     },
   },
+  {
+    sumber: 'audisi',
+    target: 'anggota',
+    baca: (e: CalonAudisi) => e.memberIdTertaut,
+    tulis: (e: CalonAudisi, v) => {
+      e.memberIdTertaut = (v as string | undefined) || undefined
+    },
+  },
+  {
+    sumber: 'kasIuran',
+    target: 'anggota',
+    baca: (e: TransaksiKasIuran) => e.memberId,
+    tulis: (e: TransaksiKasIuran, v) => {
+      e.memberId = (v as string | undefined) || undefined
+    },
+  },
 ]
 
 /** Id yang tersedia untuk sebuah jenis: gabungan berkas & perangkat. */
@@ -602,6 +642,18 @@ export function putusRujukan(
     if (pnBerubah) pn.catatanWaktu = catatanBaru
   }
 
+  // #21b — Kartu medis dikunci oleh id anggota (`id === memberId`). Bila
+  // anggotanya tidak ada di berkas maupun perangkat, buang baris yatimnya.
+  const daftarMedis = ambil(hasil, 'medisAnggota') as KartuMedisAnggota[]
+  if (daftarMedis.length) {
+    const medisSah: KartuMedisAnggota[] = []
+    for (const km of daftarMedis) {
+      if (km.memberId && idAnggotaSah.has(km.memberId)) medisSah.push(km)
+      else putus.push({ jenis: 'medisAnggota', id: km.id ?? '', kolom: 'anggota', nilai: km.memberId ?? '' })
+    }
+    if (medisSah.length !== daftarMedis.length) hasil.medisAnggota = medisSah
+  }
+
   return { berkas: hasil, putus }
 }
 
@@ -628,6 +680,9 @@ function kolomRujukan(sumber: JenisData, target: JenisData): string {
     'penilaianLomba>jadwal': 'sesi simulasi',
     'penilaianLomba>drill': 'drill',
     'penilaianLomba>lagu': 'lagu',
+    'audisi>anggota': 'anggota tertaut',
+    'medisAnggota>anggota': 'anggota',
+    'kasIuran>anggota': 'anggota pembayar',
   }
   return peta[`${sumber}>${target}`] ?? target
 }

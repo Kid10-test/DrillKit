@@ -57,7 +57,7 @@ Pemeriksaan menyeluruh terhadap build produksi `v1.0.0` (`8bf02bd`) mencatat gar
 | **#18** | Inventaris Alat, Seragam (*Uniform Fitting*), & Manifes Logistik Lomba | `v1.2.2` | Sedang–Besar | **Selesai (`v1.2.2`)** — Buku induk aset & servis, Berita Acara A4 hex, fitting/kembali seragam, manifes truk 3-tahap, & kartu pribadi anggota | Tersambung ke `Members`, `Lomba`, `Share` |
 | **#19** | Mode Kirab / *Street Parade* & *Display* Jalan Raya | `v1.2.3` | Sedang | **Selesai (`v1.2.3`)** — Kanvas jalan raya (`6/8/12 m`) + Panggung VIP hex, barisan Banjar × Saf, tikungan 90°, & kalkulator rute | Melanjutkan `field.ts` (`#9`) |
 | **#20** | Simulasi Penilaian Juri (*Caption Recap*) & *Judge Tape* Berpenanda Waktu | `v2.0.0` | Sedang–Besar | **Selesai (`v2.0.0`)** — Templat kejuaraan 100 poin + *Box 1–5*, *Judge Tape* audio/teks tertaut Set & Birama, kurva tren SVG, & cetak A4 hex | Tersambung ke `Lomba`, `Drill`, `Song` |
-| **#21** | Audisi Anggota Baru, Administrasi Unit (Dispensasi, Medis, Kas TC), & Arsip Musim | `v2.0` | Besar | Seleksi angkatan baru, cetak surat izin resmi, kartu medis darurat, kas, & arsip musim | Menyempurnakan siklus tahunan tim |
+| **#21** | Audisi Anggota Baru, Administrasi Unit (Dispensasi, Medis, Kas TC), & Arsip Musim | `v2.1.0` | Besar | **Selesai (`v2.1.0`)** — Audisi *Open Recruitment* + 1-klik promosi, surat dispensasi A4 per instansi, kartu medis AES-256-GCM berpagar privasi keras, buku kas & kwitansi, serta *Season Rollover* | Menyempurnakan siklus tahunan tim (100% peta jalan tuntas) |
 
 ---
 
@@ -146,21 +146,21 @@ Pemeriksaan menyeluruh terhadap build produksi `v1.0.0` (`8bf02bd`) mencatat gar
   3. **Grafik Tren Skor Multi-Simulasi & Cetak A4 Resmi (`penilaianJuriCetak.ts` — Selesai):** Kurva pertumbuhan skor SVG hex murni dari simulasi pertama hingga H-1 lomba, cetak/unduh lembar A4 resmi bebas `oklch()`/`color-mix()`, dukungan penuh Backup ZIP (`judgetape/`) & Pusat Data, serta pagar privasi keras (dijamin tidak pernah bocor ke `ShareBundle` maupun `terbit.ts`).
 * **Ukuran:** Sedang–Besar.
 
-#### `#21` — Audisi Anggota Baru, Administrasi Unit (Surat Dispensasi, Medis, Kas TC), & Arsip Musim
+#### `#21` — Audisi Anggota Baru, Administrasi Unit (Surat Dispensasi, Medis, Kas TC), & Arsip Musim *(Selesai di `v2.1.0`)*
 * **Masalah yang diselesaikan:** Melengkapi kebutuhan manajerial pengurus unit marching band Indonesia sepanjang satu siklus kepengurusan penuh dari penerimaan anggota baru hingga penutupan musim.
-* **Ruang lingkup pengerjaan:**
-  1. **Modul Audisi & Seleksi (*Open Recruitment*):** Daftar *Calon Anggota* terpisah dari anggota aktif, pilihan minat seksi ke-1/ke-2, lembar penilaian tes audisi (*ritmik, kepekaan nada, postur & langkah, koordinasi alat*), peringkat per peminatan, dan tombol **1-Klik Luluskan ke Anggota Aktif**.
-  2. **Generator Surat Izin / Dispensasi Resmi (Cetak A4 Hex):** Simpan data asal kelas/jurusan/fakultas/instansi anggota dan kop surat unit; pilih rentang tanggal TC/lomba dan peserta → hasilkan dokumen surat izin kolektif (otomatis dikelompokkan per sekolah/fakultas tujuan) siap cetak/simpan PDF tanpa server.
-  3. **Kartu Medis & Kontak Darurat (Khusus Pelatih/Tim Medis):** Catatan golongan darah, alergi makanan/obat, riwayat asma/cedera, dan nomor darurat orang tua/wali yang siap dibuka cepat secara offline saat insiden di lapangan. **Pagar privasi keras:** data medis dijamin **tidak pernah** dimasukkan ke `ShareBundle` maupun `terbit.ts`.
-  4. **Buku Kas & Iuran Kegiatan/TC Sederhana:** Pencatatan iuran wajib/cicilan anggota (kas rutin, konsumsi TC, transportasi lomba) beserta rekap tunggakan dan cetak kartu bukti bayar offline.
-  5. **Arsip Lintas-Musim (*Season Rollover*):** Bekukan seluruh jadwal, absensi, drill, lagu, evaluasi, dan skor simulasi satu musim kejuaraan ke dalam berkas/ruang **Arsip Musim** baca-saja, lalu mulai musim baru secara bersih dengan tetap mempertahankan anggota aktif & inventaris alat.
-* **Ukuran:** Besar (dapat dipecah menjadi `#21a` Audisi, `#21b` Dispensasi & Medis, `#21c` Kas & Arsip Musim saat akan dikerjakan).
+* **Ruang lingkup pengerjaan & hasil aktual (`v2.1.0` — menuntaskan 100% Peta Jalan `v2`):**
+  1. **Modul Audisi & Seleksi (*Open Recruitment* — `#21a` Selesai):** Store Dexie `v16` (`audisi`), `PanelAudisi.tsx`, dan mesin murni `administrasiUnit.ts` memisahkan calon pendaftar dari anggota aktif, mendukung pilihan minat seksi ke-1/ke-2, penilaian 4 aspek (*ritmik, kepekaan nada, postur & langkah, koordinasi alat*), peringkat otomatis per seksi, cetak A4 hex, serta tombol **1-Klik Luluskan ke Anggota Aktif** anti-duplikasi.
+  2. **Generator Surat Izin / Dispensasi Resmi Cetak A4 Hex (`#21b` Selesai):** Menyimpan asal sekolah/fakultas/instansi, kelas/jurusan, NIS/NIM anggota serta kop surat & pembina unit (`settings.kopSurat`), lalu otomatis mengelompokkan peserta per instansi tujuan menjadi halaman surat resmi A4 terpisah (`page-break-after: always`) bebas `oklch()`/`color-mix()`.
+  3. **Kartu Medis & Kontak Darurat Berpagar Privasi Keras (`#21b` Selesai):** Store `medisAnggota` mencatat golongan darah, alergi makanan/obat, riwayat asma/cedera, obat pribadi, dan nomor darurat wali untuk akses cepat luring di lapangan, dilengkapi ekspor/impor terenkripsi kata sandi **PBKDF2-SHA256 + AES-256-GCM** WebCrypto standar serta cetak Lembar Siaga Medis A4 hex. **Pagar privasi keras:** data medis & asal sekolah/NIS dijamin dikupas tuntas dari `ShareBundle` maupun `terbit.ts`.
+  4. **Buku Kas & Iuran Kegiatan/TC + Kwitansi Offline (`#21c` Selesai):** Store `kasIuran` dan `PanelKasIuran.tsx` mencatat iuran/cicilan anggota, pemasukan umum, dan pengeluaran operasional beserta matriks status `LUNAS` / `CICILAN` / `BELUM`, cetak kwitansi A5 hex bernomor otomatis, dan rekap buku kas A4 hex.
+  5. **Arsip Lintas-Musim / *Season Rollover* (`#21c` Selesai):** Store `arsipMusim` dan `PanelArsipMusim.tsx` membekukan repertoar lagu, drill/kirab, jadwal, presensi, buku kas, dan skor puncak simulasi juri satu musim kejuaraan ke ruang arsip baca-saja (lengkap cetak Piagam Musim A4 hex, unduh JSON, & tombol Muat Ulang), lalu membersihkan meja kerja musim baru **tanpa menghapus** anggota aktif, inventaris alat/seragam, kartu medis, maupun pengaturan unit.
+* **Ukuran:** Besar.
 
 ---
 
 ## 5. Peta Dampak Skema IndexedDB (`Dexie`) & Pagar Privasi Berkas
 
-Saat `v1.0.0`, `src/db/db.ts` berada pada **versi 10** (`16` tabel/store), dan per `v2.0.0` (`#20`) berada pada **versi 15** (`24` tabel/store: `+ targetSetoran`, `+ setoran`, `+ logPerubahan`, `+ countSheets`, `+ inventaris`, `+ logistikLomba`, `+ penilaianLomba`, `+ judgeTapeAudio`). Agar seluruh data pengguna dijamin aman tanpa risiko hilang saat *upgrade*, pengembangan `#12`–`#21` wajib mematuhi aturan migrasi **tambah-murni (*additive-only*)**:
+Saat `v1.0.0`, `src/db/db.ts` berada pada **versi 10** (`16` tabel/store), dan per `v2.1.0` (`#21`) berada pada **versi 16** (`28` tabel/store: `+ targetSetoran`, `+ setoran`, `+ logPerubahan`, `+ countSheets`, `+ inventaris`, `+ logistikLomba`, `+ penilaianLomba`, `+ judgeTapeAudio`, `+ audisi`, `+ medisAnggota`, `+ kasIuran`, `+ arsipMusim`). Agar seluruh data pengguna dijamin aman tanpa risiko hilang saat *upgrade*, pengembangan `#12`–`#21` mematuhi aturan migrasi **tambah-murni (*additive-only*)**:
 
 | Rancangan | Perubahan Store Dexie (`v11+`) | Ikut Backup Lengkap ZIP? | Ikut Paket Anggota (`.dkp` / `ShareBundle`)? | Catatan Privasi & Ukuran |
 | :--- | :--- | :---: | :--- | :--- |
@@ -173,7 +173,7 @@ Saat `v1.0.0`, `src/db/db.ts` berada pada **versi 10** (`16` tabel/store), dan p
 | **`#18`** | `v14`: `+ inventaris`, `+ logistikLomba` + ukuran seragam opsional *(Selesai)* | Ya | Hanya info alat/seragam milik penerima sendiri (`perlengkapanPribadi`) | Daftar aset keseluruhan & ukuran rekan lain dikupas dari paket |
 | **`#19`** | Preset & opsi `FieldConfig` baru (`parade`) *(Selesai)* | Ya | **Ya** (mengikuti data drill + info Saf × Banjar di HP anggota) | Kompatibel mundur 100% dengan `field.ts` (tetap Dexie `v14`) |
 | **`#20`** | `v15`: `+ penilaianLomba`, `+ judgeTapeAudio` (Blob) *(Selesai)* | Ya (JSON + folder `judgetape/` di ZIP) | **Tidak** (khusus evaluasi staf pelatih) | Rekaman suara diisolasi di store Blob terpisah |
-| **`#21`** | `+ audisi`, `+ medisAnggota`, `+ kasIuran`, `+ arsipMusim` | Ya (dengan opsi sandi/terpisah untuk medis) | **TIDAK PERNAH** untuk medis, nilai audisi, & kas keseluruhan | Pagar privasi diuji dengan asersi otomatis di `qa/` |
+| **`#21`** | `v16`: `+ audisi`, `+ medisAnggota`, `+ kasIuran`, `+ arsipMusim` *(Selesai)* | Ya (dengan opsi sandi AES-256-GCM terpisah untuk medis) | **TIDAK PERNAH** untuk medis, nilai audisi, kas, arsip musim, & asal sekolah/NIS | Pagar privasi diuji dengan asersi otomatis di `qa/` |
 
 ---
 

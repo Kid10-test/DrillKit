@@ -608,7 +608,7 @@ export function PanelPenilaianJuri({
     const html = susunHtmlCetak()
     if (!html) return
     if (!printHtml(html)) {
-      downloadHtmlFile(`caption-recap-${slugify(draf?.judul || 'simulasi')}.html`, html)
+      downloadHtmlFile(html, `caption-recap-${slugify(draf?.judul || 'simulasi')}.html`)
       toast.push('Pop-up diblokir — berkas HTML A4 diunduh')
     }
   }
@@ -616,7 +616,7 @@ export function PanelPenilaianJuri({
   function unduhLembar() {
     const html = susunHtmlCetak()
     if (!html) return
-    downloadHtmlFile(`caption-recap-${slugify(draf?.judul || 'simulasi')}.html`, html)
+    downloadHtmlFile(html, `caption-recap-${slugify(draf?.judul || 'simulasi')}.html`)
     toast.push('Lembar Caption Recap A4 diunduh')
   }
 

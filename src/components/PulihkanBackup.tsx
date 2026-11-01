@@ -149,6 +149,10 @@ export async function tulisMuatanBackup(
       db.inventaris,
       db.logistikLomba,
       db.penilaianLomba,
+      db.audisi,
+      db.medisAnggota,
+      db.kasIuran,
+      db.arsipMusim,
     ],
     async () => {
       if (diubah.members?.length) await db.members.bulkPut(diubah.members)
@@ -168,6 +172,10 @@ export async function tulisMuatanBackup(
       if (diubah.inventaris?.length) await db.inventaris.bulkPut(diubah.inventaris)
       if (diubah.logistikLomba?.length) await db.logistikLomba.bulkPut(diubah.logistikLomba)
       if (diubah.penilaianLomba?.length) await db.penilaianLomba.bulkPut(diubah.penilaianLomba)
+      if (diubah.audisi?.length) await db.audisi.bulkPut(diubah.audisi)
+      if (diubah.medisAnggota?.length) await db.medisAnggota.bulkPut(diubah.medisAnggota)
+      if (diubah.kasIuran?.length) await db.kasIuran.bulkPut(diubah.kasIuran)
+      if (diubah.arsipMusim?.length) await db.arsipMusim.bulkPut(diubah.arsipMusim)
     },
   )
   if (diubah.settings) await db.settings.put({ ...diubah.settings, key: 'team' })
@@ -279,6 +287,10 @@ export function AlurPulihkanBackup({
         inventaris,
         logistikLomba,
         penilaianLomba,
+        audisi,
+        medisAnggota,
+        kasIuran,
+        arsipMusim,
         partiturBerkas,
         judgeTapeAudio,
       ] = await Promise.all([
@@ -299,6 +311,10 @@ export function AlurPulihkanBackup({
         db.inventaris.toArray(),
         db.logistikLomba.toArray(),
         db.penilaianLomba.toArray(),
+        db.audisi.toArray(),
+        db.medisAnggota.toArray(),
+        db.kasIuran.toArray(),
+        db.arsipMusim.toArray(),
         db.partiturBerkas.toArray(),
         db.judgeTapeAudio.toArray(),
       ])
@@ -322,6 +338,10 @@ export function AlurPulihkanBackup({
         inventaris: kunci(inventaris),
         logistikLomba: kunci(logistikLomba),
         penilaianLomba: kunci(penilaianLomba),
+        audisi: kunci(audisi),
+        medisAnggota: kunci(medisAnggota),
+        kasIuran: kunci(kasIuran),
+        arsipMusim: kunci(arsipMusim),
         partiturBerkas: kunci(partiturBerkas),
         judgeTapeAudio: kunci(judgeTapeAudio),
       })
