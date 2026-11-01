@@ -1664,5 +1664,108 @@ export interface ManifesLogistikLomba {
   updatedAt: number
 }
 
+/* ------ #20 — Simulasi Penilaian Juri (Caption Recap) & Judge Tape ------- */
+
+export type SkemaCaptionId =
+  | 'field_show'
+  | 'street_parade'
+  | 'indoor_winds'
+  | 'indoor_perc'
+  | 'indoor_guard'
+  | 'kustom'
+
+export type KelompokCaption = 'ge' | 'musik' | 'visual' | 'guard' | 'lainnya'
+
+export interface ButirSubCaption {
+  id: string
+  kelompok: KelompokCaption
+  /** Nama sub-caption, mis. "General Effect 1", "Music Brass", "Visual Proficiency", "Color Guard" */
+  label: string
+  /** Nama juri penilai sub-caption ini (opsional) */
+  namaJuri?: string
+  /** Skor maksimum komponen Repertoar / Komposisi / Konten (mis. 10) */
+  maksKomposisi: number
+  /** Nilai aktual Repertoar / Komposisi / Konten */
+  nilaiKomposisi: number
+  /** Skor maksimum komponen Pencapaian / Eksekusi / Penampilan (mis. 10) */
+  maksEksekusi: number
+  /** Nilai aktual Pencapaian / Eksekusi / Penampilan */
+  nilaiEksekusi: number
+  /** Pengali bobot ke total akhir (mis. 1.0 langsung, 0.5 dibagi dua seperti DCI Visual/Music) */
+  pengaliBobot: number
+  catatan?: string
+}
+
+export interface PenaltiLomba {
+  id: string
+  alasan: string
+  /** Angka pengurangan positif dalam poin (mis. 0.5 mengurangi 0,50 poin dari subtotal) */
+  poin: number
+}
+
+export interface PenandaJudgeTape {
+  id: string
+  /** Detik penampilan sejak awal run-through (mis. 42.5) */
+  detik: number
+  fokus: KelompokCaption | 'umum'
+  teks: string
+  /** Tautan ke Set formasi pada detik tersebut (opsional) */
+  setId?: string
+  labelSet?: string
+  /** Nomor birama lagu tertaut pada detik tersebut (1-based, opsional) */
+  birama?: number
+  /** Nomor hitungan di dalam set pada detik tersebut (1-based, opsional) */
+  hitunganSet?: number
+  tingkat?: 'biasa' | 'penting' | 'pujian'
+}
+
+/**
+ * Dokumen Simulasi Penilaian Juri (`db.penilaianLomba`, Dexie v15).
+ *
+ * **Pagar privasi keras:** dokumen evaluasi kejuaraan ini khusus staf pelatih/juri
+ * dan **tidak pernah** dimasukkan ke `ShareBundle` maupun `terbit.ts`.
+ */
+export interface PenilaianLomba {
+  id: string
+  judul: string
+  /** Tanggal simulasi YYYY-MM-DD */
+  tanggal: string
+  skema: SkemaCaptionId
+  sessionId?: string
+  drillId?: string
+  songId?: string
+  juriUtama?: string
+  captions: ButirSubCaption[]
+  penalti: PenaltiLomba[]
+  catatanWaktu: PenandaJudgeTape[]
+  rekamanJudgeTape?: {
+    namaFile: string
+    tipe: string
+    ukuran: number
+    durasiDetik: number
+    hash: string
+  }
+  catatanUmum?: string
+  createdAt: number
+  updatedAt: number
+}
+
+/**
+ * Store Blob terpisah untuk rekaman suara Judge Tape (`db.judgeTapeAudio`, Dexie v15).
+ * Kuncinya `id` = `penilaianId` agar `penilaianLomba` tetap JSON teks ringan.
+ */
+export interface JudgeTapeAudioItem {
+  id: string
+  penilaianId: string
+  blob: Blob
+  namaFile: string
+  tipe: string
+  ukuran: number
+  durasiDetik: number
+  hash: string
+  updatedAt: number
+}
+
+
 
 

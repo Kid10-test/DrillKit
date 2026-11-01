@@ -1764,6 +1764,10 @@ export default function Music({
                     <ConfirmButton
                       onConfirm={async () => {
                         await db.songs.delete(song.id)
+                        const penilaianTertaut = await db.penilaianLomba.where('songId').equals(song.id).toArray()
+                        for (const pn of penilaianTertaut) {
+                          await db.penilaianLomba.update(pn.id, { songId: undefined })
+                        }
                         setSelected('')
                         toast.push('Lagu dihapus', 'info')
                       }}

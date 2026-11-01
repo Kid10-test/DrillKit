@@ -34,6 +34,7 @@ import type {
   ManifesLogistikLomba,
   Member,
   MemberNote,
+  PenilaianLomba,
   Session,
   SetList,
   Song,
@@ -56,6 +57,7 @@ export type JenisData =
   | 'countSheet'
   | 'inventaris'
   | 'logistikLomba'
+  | 'penilaianLomba'
 
 export const URUTAN_JENIS_DATA: JenisData[] = [
   'anggota',
@@ -73,6 +75,7 @@ export const URUTAN_JENIS_DATA: JenisData[] = [
   'countSheet',
   'inventaris',
   'logistikLomba',
+  'penilaianLomba',
 ]
 
 export const LABEL_JENIS_DATA: Record<JenisData, string> = {
@@ -91,6 +94,7 @@ export const LABEL_JENIS_DATA: Record<JenisData, string> = {
   countSheet: 'Count sheet Guard',
   inventaris: 'Inventaris alat',
   logistikLomba: 'Manifes logistik lomba',
+  penilaianLomba: 'Simulasi penilaian juri',
 }
 
 export interface MetaSetoranSeksi {
@@ -132,6 +136,7 @@ export interface BerkasPindah {
   countSheet?: CountSheet[]
   inventaris?: ItemInventaris[]
   logistikLomba?: ManifesLogistikLomba[]
+  penilaianLomba?: PenilaianLomba[]
 }
 
 /** Ambil daftar entitas sebuah jenis. Kosong kalau tidak ada. */
@@ -157,6 +162,7 @@ function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void 
     case 'countSheet': berkas.countSheet = daftar as CountSheet[]; break
     case 'inventaris': berkas.inventaris = daftar as ItemInventaris[]; break
     case 'logistikLomba': berkas.logistikLomba = daftar as ManifesLogistikLomba[]; break
+    case 'penilaianLomba': berkas.penilaianLomba = daftar as PenilaianLomba[]; break
   }
 }
 
@@ -361,6 +367,30 @@ const ATURAN: AturanRujukan[] = [
       e.sessionId = (v as string | undefined) || undefined
     },
   },
+  {
+    sumber: 'penilaianLomba',
+    target: 'jadwal',
+    baca: (e: PenilaianLomba) => e.sessionId,
+    tulis: (e: PenilaianLomba, v) => {
+      e.sessionId = (v as string | undefined) || undefined
+    },
+  },
+  {
+    sumber: 'penilaianLomba',
+    target: 'drill',
+    baca: (e: PenilaianLomba) => e.drillId,
+    tulis: (e: PenilaianLomba, v) => {
+      e.drillId = (v as string | undefined) || undefined
+    },
+  },
+  {
+    sumber: 'penilaianLomba',
+    target: 'lagu',
+    baca: (e: PenilaianLomba) => e.songId,
+    tulis: (e: PenilaianLomba, v) => {
+      e.songId = (v as string | undefined) || undefined
+    },
+  },
 ]
 
 /** Id yang tersedia untuk sebuah jenis: gabungan berkas & perangkat. */
@@ -557,6 +587,21 @@ export function putusRujukan(
     if (mfBerubah) mf.butir = butirBaru
   }
 
+  // #20 — Saring rujukan `setId` di dalam `penilaianLomba.catatanWaktu[]`.
+  const daftarPenilaian = ambil(hasil, 'penilaianLomba') as PenilaianLomba[]
+  for (const pn of daftarPenilaian) {
+    if (!pn.catatanWaktu?.length) continue
+    let pnBerubah = false
+    const catatanBaru = pn.catatanWaktu.map((ct) => {
+      if (!ct.setId || idSetSah.has(ct.setId)) return ct
+      pnBerubah = true
+      putus.push({ jenis: 'penilaianLomba', id: pn.id, kolom: 'set formasi', nilai: ct.setId })
+      const { setId: _s, ...sisa } = ct
+      return sisa
+    })
+    if (pnBerubah) pn.catatanWaktu = catatanBaru
+  }
+
   return { berkas: hasil, putus }
 }
 
@@ -580,6 +625,9 @@ function kolomRujukan(sumber: JenisData, target: JenisData): string {
     'countSheet>anggota': 'anggota',
     'inventaris>anggota': 'peminjam',
     'logistikLomba>jadwal': 'sesi lomba',
+    'penilaianLomba>jadwal': 'sesi simulasi',
+    'penilaianLomba>drill': 'drill',
+    'penilaianLomba>lagu': 'lagu',
   }
   return peta[`${sumber}>${target}`] ?? target
 }

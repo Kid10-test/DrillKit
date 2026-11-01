@@ -127,6 +127,10 @@ rakit src/lib/inventarisLogistikCetak.ts inventarisLogistikCetak
 # #19 — Mode Kirab / Street Parade: susunan Banjar × Saf, tikungan 90°, VIP, & kalkulator rute.
 rakit src/lib/parade.ts                  parade
 rakit src/lib/paradeCetak.ts             paradeCetak
+# #20 — Simulasi Penilaian Juri (Caption Recap Sheet) & Judge Tape berpenanda waktu.
+rakit src/lib/penilaianJuri.ts           penilaianJuri
+rakit src/lib/penilaianJuriCetak.ts      penilaianJuriCetak
+rakit src/lib/judgeTapeZip.ts            judgeTapeZip
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.

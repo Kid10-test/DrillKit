@@ -56,7 +56,7 @@ Pemeriksaan menyeluruh terhadap build produksi `v1.0.0` (`8bf02bd`) mencatat gar
 | **#17** | Lembar Hitungan *Color Guard* (*Count Sheet*) & Buku Saku Visual | `v1.2.1` | Sedang | **Selesai (`v1.2.1`)** — Kerja alat *Guard* per *8-counts* sinkron birama/set, cetak A4/A5 hex, & Mode Anggota | Tersambung ke `Drill`, `Song`, `#13` |
 | **#18** | Inventaris Alat, Seragam (*Uniform Fitting*), & Manifes Logistik Lomba | `v1.2.2` | Sedang–Besar | **Selesai (`v1.2.2`)** — Buku induk aset & servis, Berita Acara A4 hex, fitting/kembali seragam, manifes truk 3-tahap, & kartu pribadi anggota | Tersambung ke `Members`, `Lomba`, `Share` |
 | **#19** | Mode Kirab / *Street Parade* & *Display* Jalan Raya | `v1.2.3` | Sedang | **Selesai (`v1.2.3`)** — Kanvas jalan raya (`6/8/12 m`) + Panggung VIP hex, barisan Banjar × Saf, tikungan 90°, & kalkulator rute | Melanjutkan `field.ts` (`#9`) |
-| **#20** | Simulasi Penilaian Juri (*Caption Recap*) & *Judge Tape* Berpenanda Waktu | `v2.0` | Sedang–Besar | Skor *caption* standar lomba, grafik *run-through*, & komentar suara tertaut set/bar | Tersambung ke `Lomba`, `Drill`, `Song` |
+| **#20** | Simulasi Penilaian Juri (*Caption Recap*) & *Judge Tape* Berpenanda Waktu | `v2.0.0` | Sedang–Besar | **Selesai (`v2.0.0`)** — Templat kejuaraan 100 poin + *Box 1–5*, *Judge Tape* audio/teks tertaut Set & Birama, kurva tren SVG, & cetak A4 hex | Tersambung ke `Lomba`, `Drill`, `Song` |
 | **#21** | Audisi Anggota Baru, Administrasi Unit (Dispensasi, Medis, Kas TC), & Arsip Musim | `v2.0` | Besar | Seleksi angkatan baru, cetak surat izin resmi, kartu medis darurat, kas, & arsip musim | Menyempurnakan siklus tahunan tim |
 
 ---
@@ -138,12 +138,12 @@ Pemeriksaan menyeluruh terhadap build produksi `v1.0.0` (`8bf02bd`) mencatat gar
 
 ### Gelombang 4 — Kejuaraan, Rekrutmen, Administrasi Unit, & Arsip Musim (`v2.0`)
 
-#### `#20` — Simulasi Penilaian Juri (*Caption Recap Sheet*) & *Judge Tape* Berpenanda Waktu
+#### `#20` — Simulasi Penilaian Juri (*Caption Recap Sheet*) & *Judge Tape* Berpenanda Waktu *(Selesai di `v2.0.0`)*
 * **Masalah yang diselesaikan:** Saat evaluasi *run-through* mingguan atau *preview show* mengundang juri tamu, komentar suara dan lembar angka *caption* masih terpisah dari garis waktu drill & musik.
-* **Ruang lingkup pengerjaan:**
-  1. **Templat *Caption Recap* Kejuaraan:** Pilih skema penilaian standar (*Field Show / GPMB / IDCA / DCI*, *Indoor Winds / Percussion / Guard*, atau kustom unit) lengkap dengan sub-caption (*Achievement* vs *Composition/Repertoire*, *General Effect*, *Music*, *Visual*, *Color Guard*, dan pengurangan *Penalties*).
-  2. **Perekam *Judge Tape* Tertaut Set & Birama:** Saat *run-through* diputar (atau direkam langsung di lapangan), juri/pelatih menekan rekam suara atau mengetik catatan cepat; setiap catatan otomatis ditempeli cap detik penampilan → dipetakan ke **Nomor Set & Nomor Birama** saat itu. Staf bisa memutar ulang komentar tepat pada set yang dimaksud.
-  3. **Grafik Tren Skor Simulasi Tim:** Pantau kenaikan skor tiap *caption* dari simulasi ke-1 hingga H-1 kejuaraan beserta cetak lembar rekap A4 resmi.
+* **Ruang lingkup pengerjaan & hasil aktual (`v2.0.0`):**
+  1. **Templat *Caption Recap* Kejuaraan (`src/lib/penilaianJuri.ts` — Selesai):** Enam skema mata lomba standar (*Field Show GPMB/IDCA/DCI*, *Street Parade PDBI*, *Indoor Winds*, *Indoor Percussion*, *Color Guard Contest*, dan *Skema Kustom Unit*) lengkap dengan sub-caption *Komposisi/Repertoire* vs *Eksekusi/Achievement*, pengali bobot, subtotal per kelompok (*GE*, *Music*, *Visual*, *Color Guard*), pengurangan penalti, serta klasifikasi otomatis **Box 1–5**.
+  2. **Studio *Judge Tape* Tertaut Set & Birama (`PanelPenilaianJuri.tsx` & `judgeTapeZip.ts` — Selesai):** Perekam mikrofon langsung (`MediaRecorder`), unggah berkas suara (`db.judgeTapeAudio` terpisah dari JSON teks), serta stopwatch *run-through* yang otomatis memetakan detik penampilan ke **Nomor Set, Hitungan Set, & Nomor Birama** lagu (`petakanDetikKeSetDanBirama`), lengkap dengan filter/putar ulang per set.
+  3. **Grafik Tren Skor Multi-Simulasi & Cetak A4 Resmi (`penilaianJuriCetak.ts` — Selesai):** Kurva pertumbuhan skor SVG hex murni dari simulasi pertama hingga H-1 lomba, cetak/unduh lembar A4 resmi bebas `oklch()`/`color-mix()`, dukungan penuh Backup ZIP (`judgetape/`) & Pusat Data, serta pagar privasi keras (dijamin tidak pernah bocor ke `ShareBundle` maupun `terbit.ts`).
 * **Ukuran:** Sedang–Besar.
 
 #### `#21` — Audisi Anggota Baru, Administrasi Unit (Surat Dispensasi, Medis, Kas TC), & Arsip Musim
@@ -160,7 +160,7 @@ Pemeriksaan menyeluruh terhadap build produksi `v1.0.0` (`8bf02bd`) mencatat gar
 
 ## 5. Peta Dampak Skema IndexedDB (`Dexie`) & Pagar Privasi Berkas
 
-Saat `v1.0.0`, `src/db/db.ts` berada pada **versi 10** (`16` tabel/store), dan per `v1.2.2` (`#18`) berada pada **versi 14** (`22` tabel/store: `+ targetSetoran`, `+ setoran`, `+ logPerubahan`, `+ countSheets`, `+ inventaris`, `+ logistikLomba`). Agar seluruh data pengguna dijamin aman tanpa risiko hilang saat *upgrade*, pengembangan `#12`–`#21` wajib mematuhi aturan migrasi **tambah-murni (*additive-only*)**:
+Saat `v1.0.0`, `src/db/db.ts` berada pada **versi 10** (`16` tabel/store), dan per `v2.0.0` (`#20`) berada pada **versi 15** (`24` tabel/store: `+ targetSetoran`, `+ setoran`, `+ logPerubahan`, `+ countSheets`, `+ inventaris`, `+ logistikLomba`, `+ penilaianLomba`, `+ judgeTapeAudio`). Agar seluruh data pengguna dijamin aman tanpa risiko hilang saat *upgrade*, pengembangan `#12`–`#21` wajib mematuhi aturan migrasi **tambah-murni (*additive-only*)**:
 
 | Rancangan | Perubahan Store Dexie (`v11+`) | Ikut Backup Lengkap ZIP? | Ikut Paket Anggota (`.dkp` / `ShareBundle`)? | Catatan Privasi & Ukuran |
 | :--- | :--- | :---: | :--- | :--- |
@@ -172,7 +172,7 @@ Saat `v1.0.0`, `src/db/db.ts` berada pada **versi 10** (`16` tabel/store), dan p
 | **`#17`** | `v13`: `+ countSheets` *(Selesai)* | Ya | **Ya** (tampil otomatis bagi seksi *Guard*) | Ringan (JSON teks murni) |
 | **`#18`** | `v14`: `+ inventaris`, `+ logistikLomba` + ukuran seragam opsional *(Selesai)* | Ya | Hanya info alat/seragam milik penerima sendiri (`perlengkapanPribadi`) | Daftar aset keseluruhan & ukuran rekan lain dikupas dari paket |
 | **`#19`** | Preset & opsi `FieldConfig` baru (`parade`) *(Selesai)* | Ya | **Ya** (mengikuti data drill + info Saf × Banjar di HP anggota) | Kompatibel mundur 100% dengan `field.ts` (tetap Dexie `v14`) |
-| **`#20`** | `+ penilaianLomba`, `+ judgeTapeAudio` (Blob) | Ya (JSON + folder `judgetape/` di ZIP) | **Tidak** (khusus evaluasi staf pelatih) | Rekaman suara diisolasi di store Blob terpisah |
+| **`#20`** | `v15`: `+ penilaianLomba`, `+ judgeTapeAudio` (Blob) *(Selesai)* | Ya (JSON + folder `judgetape/` di ZIP) | **Tidak** (khusus evaluasi staf pelatih) | Rekaman suara diisolasi di store Blob terpisah |
 | **`#21`** | `+ audisi`, `+ medisAnggota`, `+ kasIuran`, `+ arsipMusim` | Ya (dengan opsi sandi/terpisah untuk medis) | **TIDAK PERNAH** untuk medis, nilai audisi, & kas keseluruhan | Pagar privasi diuji dengan asersi otomatis di `qa/` |
 
 ---

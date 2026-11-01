@@ -62,9 +62,25 @@ export function bersihkanAnggota(m: Member): Member {
  * mendapat jadwal, materi, formasi, dan repertoar — yang memang milik
  * bersama.
  */
+/**
+ * Kupas paksa seluruh kunci internal staf pelatih agar seandainya objek muatan
+ * mentah (mis. hasil backup) diteruskan ke `paketGrup`/`paketAnggota`, kunci
+ * rahasia seperti `penilaianLomba` & `judgeTapeAudio` (#20) dijamin terbuang.
+ */
+function kupasDataKhususStaf(b: ShareBundle): ShareBundle {
+  const salin = { ...(b as unknown as Record<string, unknown>) }
+  delete salin.penilaianLomba
+  delete salin.judgeTapeAudio
+  delete salin.inventaris
+  delete salin.logistikLomba
+  delete salin.evaluasi
+  return salin as unknown as ShareBundle
+}
+
 export function paketGrup(b: ShareBundle): ShareBundle {
+  const dasar = kupasDataKhususStaf(b)
   return {
-    ...b,
+    ...dasar,
     members: b.members.map(bersihkanAnggota),
     attendance: [],
     memberNotes: [],
@@ -95,17 +111,18 @@ export function paketGrup(b: ShareBundle): ShareBundle {
  * kegagalan yang paling berbahaya karena ia tampak "berhasil".
  */
 export function paketAnggota(b: ShareBundle, memberId: string): ShareBundle {
-  const penerima = b.members.find((m) => m.id === memberId)
+  const dasar = kupasDataKhususStaf(b)
+  const penerima = dasar.members.find((m) => m.id === memberId)
   const dikenal = !!penerima
   // #13a — untuk berkas per anggota, saring partitur MusicXML agar hanya memuat
   // suara/seksi milik anggota penerima. Untuk `memberId` tak dikenal, jangan
   // bocorkan lampiran apa pun.
   const tersaring =
-    dikenal && penerima && b.partiturPaket
-      ? saringPartiturPaketUntukAnggota(b.partiturPaket, b.songs ?? [], penerima, b.team?.sections)
-      : { partiturPaket: undefined, songs: b.songs ?? [] }
+    dikenal && penerima && dasar.partiturPaket
+      ? saringPartiturPaketUntukAnggota(dasar.partiturPaket, dasar.songs ?? [], penerima, dasar.team?.sections)
+      : { partiturPaket: undefined, songs: dasar.songs ?? [] }
   return {
-    ...b,
+    ...dasar,
     songs: tersaring.songs,
     partiturPaket: tersaring.partiturPaket,
     members: b.members.map(bersihkanAnggota),

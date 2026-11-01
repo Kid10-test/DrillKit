@@ -20,6 +20,9 @@ import { bukaZip } from '../lib/zip'
 import type { PartiturPulih } from '../lib/partiturZip'
 export { ekstrakPartiturZip } from '../lib/partiturZip'
 export type { PartiturPulih } from '../lib/partiturZip'
+import type { JudgeTapePulih } from '../lib/judgeTapeZip'
+export { ekstrakJudgeTapeZip } from '../lib/judgeTapeZip'
+export type { JudgeTapePulih } from '../lib/judgeTapeZip'
 import {
   keputusanAwal,
   perluDitanya,
@@ -104,7 +107,8 @@ export async function tulisMuatanBackup(
   kep: Record<string, KeputusanCocok>,
   audio?: AudioPulih[],
   partitur: PartiturPulih[] = [],
-): Promise<{ bentrok: number; audio: number; partitur: number }> {
+  judgeTape: JudgeTapePulih[] = [],
+): Promise<{ bentrok: number; audio: number; partitur: number; judgeTape: number }> {
   const masuk = Array.isArray(data.members) ? (data.members as Member[]) : []
   const hasil = terapkanCocok({
     masuk,
@@ -144,6 +148,7 @@ export async function tulisMuatanBackup(
       db.countSheets,
       db.inventaris,
       db.logistikLomba,
+      db.penilaianLomba,
     ],
     async () => {
       if (diubah.members?.length) await db.members.bulkPut(diubah.members)
@@ -162,6 +167,7 @@ export async function tulisMuatanBackup(
       if (diubah.countSheets?.length) await db.countSheets.bulkPut(diubah.countSheets)
       if (diubah.inventaris?.length) await db.inventaris.bulkPut(diubah.inventaris)
       if (diubah.logistikLomba?.length) await db.logistikLomba.bulkPut(diubah.logistikLomba)
+      if (diubah.penilaianLomba?.length) await db.penilaianLomba.bulkPut(diubah.penilaianLomba)
     },
   )
   if (diubah.settings) await db.settings.put({ ...diubah.settings, key: 'team' })
@@ -199,7 +205,23 @@ export async function tulisMuatanBackup(
     })
     jmlPartitur += 1
   }
-  return { bentrok: bentrok.length, audio: jmlAudio, partitur: jmlPartitur }
+
+  let jmlJudgeTape = 0
+  for (const jt of judgeTape) {
+    await db.judgeTapeAudio.put({
+      id: jt.penilaianId,
+      penilaianId: jt.penilaianId,
+      blob: jt.blob,
+      namaFile: jt.namaFile,
+      tipe: jt.tipe,
+      ukuran: jt.ukuran,
+      durasiDetik: jt.durasiDetik,
+      hash: jt.hash,
+      updatedAt: Date.now(),
+    })
+    jmlJudgeTape += 1
+  }
+  return { bentrok: bentrok.length, audio: jmlAudio, partitur: jmlPartitur, judgeTape: jmlJudgeTape }
 }
 
 /**
@@ -213,6 +235,7 @@ export function AlurPulihkanBackup({
   data,
   audio = [],
   partitur = [],
+  judgeTape = [],
   namaBerkas,
   onSelesai,
   testId = 'pulih-backup',
@@ -220,6 +243,7 @@ export function AlurPulihkanBackup({
   data: Record<string, any>
   audio?: AudioPulih[]
   partitur?: PartiturPulih[]
+  judgeTape?: JudgeTapePulih[]
   namaBerkas?: string
   onSelesai?: () => void
   testId?: string
@@ -254,7 +278,9 @@ export function AlurPulihkanBackup({
         countSheets,
         inventaris,
         logistikLomba,
+        penilaianLomba,
         partiturBerkas,
+        judgeTapeAudio,
       ] = await Promise.all([
         db.members.toArray(),
         db.sessions.toArray(),
@@ -272,7 +298,9 @@ export function AlurPulihkanBackup({
         db.countSheets.toArray(),
         db.inventaris.toArray(),
         db.logistikLomba.toArray(),
+        db.penilaianLomba.toArray(),
         db.partiturBerkas.toArray(),
+        db.judgeTapeAudio.toArray(),
       ])
       if (!hidup) return
       setLokal(members)
@@ -293,7 +321,9 @@ export function AlurPulihkanBackup({
         countSheets: kunci(countSheets),
         inventaris: kunci(inventaris),
         logistikLomba: kunci(logistikLomba),
+        penilaianLomba: kunci(penilaianLomba),
         partiturBerkas: kunci(partiturBerkas),
+        judgeTapeAudio: kunci(judgeTapeAudio),
       })
       const baris = susunSaran(Array.isArray(data.members) ? data.members : [], members)
       setSaran(baris)
@@ -306,8 +336,16 @@ export function AlurPulihkanBackup({
   }, [])
 
   const ringkas = useMemo(
-    () => ringkasBackup({ ...data, partiturBerkas: partitur.map((p) => ({ id: p.songId })) }, idLokal ?? {}),
-    [data, idLokal, partitur],
+    () =>
+      ringkasBackup(
+        {
+          ...data,
+          partiturBerkas: partitur.map((p) => ({ id: p.songId })),
+          judgeTapeAudio: judgeTape.map((jt) => ({ id: jt.penilaianId })),
+        },
+        idLokal ?? {},
+      ),
+    [data, idLokal, partitur, judgeTape],
   )
   const tim = (data.settings as { teamName?: unknown } | undefined)?.teamName
   const tanggal =
@@ -326,13 +364,14 @@ export function AlurPulihkanBackup({
     }
     setSedang(true)
     try {
-      const h = await tulisMuatanBackup(data, lokal, keputusan, audio, partitur)
+      const h = await tulisMuatanBackup(data, lokal, keputusan, audio, partitur, judgeTape)
       const infoAudio = h.audio > 0 ? ` (+ ${h.audio} rekaman audio)` : ''
       const infoPartitur = h.partitur > 0 ? ` (+ ${h.partitur} partitur)` : ''
+      const infoJudgeTape = h.judgeTape > 0 ? ` (+ ${h.judgeTape} Judge Tape)` : ''
       toast.push(
         h.bentrok
-          ? `Backup dipulihkan · ${h.bentrok} bentrok dilaporkan${infoAudio}${infoPartitur}`
-          : `Backup dipulihkan${infoAudio}${infoPartitur}`,
+          ? `Backup dipulihkan · ${h.bentrok} bentrok dilaporkan${infoAudio}${infoPartitur}${infoJudgeTape}`
+          : `Backup dipulihkan${infoAudio}${infoPartitur}${infoJudgeTape}`,
       )
       onSelesai?.()
     } catch {
@@ -363,6 +402,11 @@ export function AlurPulihkanBackup({
         {partitur.length > 0 && (
           <>
             {' '}Termasuk <b>{partitur.length} berkas partitur</b> dari ZIP.
+          </>
+        )}
+        {judgeTape.length > 0 && (
+          <>
+            {' '}Termasuk <b>{judgeTape.length} rekaman Judge Tape</b> dari ZIP.
           </>
         )}
       </p>

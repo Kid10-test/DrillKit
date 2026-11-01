@@ -40,6 +40,11 @@
  *   **metadata**-nya (`Song.partitur`), bitanya ditangani lewat ZIP
  *   (`partitur/…` + `partitur/manifest.json`, pola `audio/` #6). Round-trip
  *   ZIP-nya diuji rangkaian `partitur-logika`.
+ * - `judgeTapeAudio` (20) — bita rekaman suara *Judge Tape* per simulasi
+ *   penilaian juri (`PenilaianLomba.rekamanJudgeTape` menyimpan metadatanya
+ *   di JSON `penilaianLomba`, sedangkan Blob suaranya dikemas di `judgetape/…`
+ *   + `judgetape/manifest.json` pada "Backup + rekaman (ZIP)", diuji utuh
+ *   di `penilaian-juri-logika` dan `penilaian-juri`).
  */
 import puppeteer from 'puppeteer'
 import { lewatSambutan } from './sambutan.mjs'
@@ -52,7 +57,15 @@ const UNDUH = path.join(QA, 'unduhan-lengkap')
 fs.rmSync(UNDUH, { recursive: true, force: true })
 fs.mkdirSync(UNDUH, { recursive: true })
 
-const DIKECUALIKAN = new Set(['settings', 'packages', 'simpanan', 'riwayat', 'rekamanAudio', 'partiturBerkas'])
+const DIKECUALIKAN = new Set([
+  'settings',
+  'packages',
+  'simpanan',
+  'riwayat',
+  'rekamanAudio',
+  'partiturBerkas',
+  'judgeTapeAudio',
+])
 
 const browser = await puppeteer.launch({
   args: ['--no-sandbox', '--disable-dev-shm-usage'],

@@ -50,8 +50,10 @@ import { mintaPratinjau } from '../components/BukaBerkas'
 import {
   AlurPulihkanBackup,
   ekstrakAudioZip,
+  ekstrakJudgeTapeZip,
   ekstrakPartiturZip,
   type AudioPulih,
+  type JudgeTapePulih,
   type PartiturPulih,
 } from '../components/PulihkanBackup'
 
@@ -110,6 +112,7 @@ export default function Settings() {
     data: Record<string, any>
     audio: AudioPulih[]
     partitur: PartiturPulih[]
+    judgeTape: JudgeTapePulih[]
     nama: string
   } | null>(null)
 
@@ -170,7 +173,8 @@ export default function Settings() {
       if (hasil.jenis === 'backup' || hasil.jenis === 'zip-backup') {
         const audio = hasil.jenis === 'zip-backup' ? ekstrakAudioZip(bita) : []
         const partitur = hasil.jenis === 'zip-backup' ? ekstrakPartiturZip(bita) : []
-        setPulihBackup({ data: (hasil.data ?? {}) as Record<string, any>, audio, partitur, nama: file.name })
+        const judgeTape = hasil.jenis === 'zip-backup' ? ekstrakJudgeTapeZip(bita) : []
+        setPulihBackup({ data: (hasil.data ?? {}) as Record<string, any>, audio, partitur, judgeTape, nama: file.name })
         return
       }
       if (hasil.jenis === 'paket' || hasil.jenis === 'zip-anggota') {
@@ -741,6 +745,7 @@ export default function Settings() {
             data={pulihBackup.data}
             audio={pulihBackup.audio}
             partitur={pulihBackup.partitur}
+            judgeTape={pulihBackup.judgeTape}
             namaBerkas={pulihBackup.nama}
             testId="pulih-backup"
             onSelesai={() => setPulihBackup(null)}

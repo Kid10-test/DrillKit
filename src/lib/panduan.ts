@@ -89,7 +89,7 @@ const MENU: [string, string][] = [
   ['Dashboard', 'Ringkasan kehadiran, jadwal terdekat, komposisi tim, &amp; pintu <b>Buka berkas DrillKit</b>'],
   ['Anggota', 'Data anggota, <b>Inventaris alat &amp; Berita Acara</b>, <b>Fitting seragam</b>, kartu QR'],
   ['Absensi &amp; Evaluasi', 'Scan QR / manual, tab <b>Rekap</b> laporan, <b>Evaluasi</b>, &amp; <b>Setoran hafalan</b>'],
-  ['Jadwal &amp; Lomba', 'Kalender latihan, seri berulang, .ics, <b>Run sheet</b> &amp; <b>Manifes truk lomba</b>'],
+  ['Jadwal &amp; Lomba', 'Kalender, .ics, <b>Run sheet</b>, <b>Manifes truk</b>, &amp; <b>Simulasi juri/Judge Tape</b>'],
   ['Drill &amp; Formasi', 'Editor formasi, <b>Mode Kirab/Parade</b>, FTL/Ripple, <b>Count Sheet Guard</b>, buku saku'],
   ['Musik &amp; Metronom', 'Metronom &amp; tempo map, tempo latihan, rekaman MP3, partitur &amp; cetak Lyre, penala'],
   ['Berbagi', 'Terbitkan paket grup / terkunci QR per anggota, log perubahan show, &amp; panduan anggota'],

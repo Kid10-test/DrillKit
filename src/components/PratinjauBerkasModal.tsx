@@ -25,7 +25,7 @@ import { cekBerkas, type BerkasShow } from '../lib/show'
 import { bacaPaket, perluPeringatan, ringkasanImpor, terapkanPaket } from '../lib/repertoar'
 import type { PaketRepertoar } from '../db/types'
 import { Button, useToast } from './ui'
-import { AlurPulihkanBackup, ekstrakAudioZip, ekstrakPartiturZip } from './PulihkanBackup'
+import { AlurPulihkanBackup, ekstrakAudioZip, ekstrakJudgeTapeZip, ekstrakPartiturZip } from './PulihkanBackup'
 import { AlurImporShow } from './ImporShow'
 import { titipBerkas, type PaketPratinjau } from './BukaBerkas'
 
@@ -105,6 +105,7 @@ export default function TubuhPratinjau({
           data={(hasil.data ?? {}) as Record<string, any>}
           audio={paket.bita ? ekstrakAudioZip(paket.bita) : []}
           partitur={paket.bita ? ekstrakPartiturZip(paket.bita) : []}
+          judgeTape={paket.bita ? ekstrakJudgeTapeZip(paket.bita) : []}
           namaBerkas={hasil.nama}
           testId="buka-pulih"
           onSelesai={onTutup}
@@ -199,6 +200,7 @@ function TubuhData({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => vo
         countSheet,
         inventaris,
         logistikLomba,
+        penilaianLomba,
       ] = await Promise.all([
         db.members.toArray(),
         db.sessions.toArray(),
@@ -215,6 +217,7 @@ function TubuhData({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => vo
         db.countSheets.toArray(),
         db.inventaris.toArray(),
         db.logistikLomba.toArray(),
+        db.penilaianLomba.toArray(),
       ])
       if (!hidup) return
       setIdLokal({
@@ -233,6 +236,7 @@ function TubuhData({ hasil, onTutup }: { hasil: BerkasDikenal; onTutup: () => vo
         countSheet: kunci(countSheet),
         inventaris: kunci(inventaris),
         logistikLomba: kunci(logistikLomba),
+        penilaianLomba: kunci(penilaianLomba),
       })
     })()
     return () => {

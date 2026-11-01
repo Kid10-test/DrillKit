@@ -191,6 +191,8 @@ export async function wipeAllData() {
       db.countSheets,
       db.inventaris,
       db.logistikLomba,
+      db.penilaianLomba,
+      db.judgeTapeAudio,
     ],
     async () => {
       await Promise.all([
@@ -210,6 +212,8 @@ export async function wipeAllData() {
         db.countSheets.clear(),
         db.inventaris.clear(),
         db.logistikLomba.clear(),
+        db.penilaianLomba.clear(),
+        db.judgeTapeAudio.clear(),
       ])
     },
   )
