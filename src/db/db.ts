@@ -23,6 +23,8 @@ import type {
   CountSheet,
   ItemInventaris,
   ManifesLogistikLomba,
+  PenilaianLomba,
+  JudgeTapeAudioItem,
 } from './types'
 
 /**
@@ -77,6 +79,10 @@ export class DrillKitDB extends Dexie {
   inventaris!: Table<ItemInventaris, string>
   /** #18 — manifes logistik & ceklis loading truk 3-tahap hari lomba. */
   logistikLomba!: Table<ManifesLogistikLomba, string>
+  /** #20 — lembar simulasi penilaian juri (Caption Recap Sheet) & catatan waktu Judge Tape. */
+  penilaianLomba!: Table<PenilaianLomba, string>
+  /** #20 — berkas biner rekaman suara Judge Tape (Blob terpisah, id = penilaianId). */
+  judgeTapeAudio!: Table<JudgeTapeAudioItem, string>
 
   constructor() {
     super('drillkit')
@@ -137,6 +143,11 @@ export class DrillKitDB extends Dexie {
     this.version(14).stores({
       inventaris: 'id, kodeAset, kategori, kondisi, pemegangId, updatedAt',
       logistikLomba: 'id, tanggal, sessionId, updatedAt',
+    })
+    // #20 — simulasi penilaian juri & rekaman suara Judge Tape (penambahan murni v15).
+    this.version(15).stores({
+      penilaianLomba: 'id, tanggal, skema, sessionId, drillId, songId, updatedAt',
+      judgeTapeAudio: 'id, penilaianId, updatedAt',
     })
   }
 }

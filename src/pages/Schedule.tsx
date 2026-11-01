@@ -194,12 +194,16 @@ export default function Schedule() {
   }
 
   async function remove(s: Session) {
-    await db.transaction('rw', [db.sessions, db.attendance, db.logistikLomba], async () => {
+    await db.transaction('rw', [db.sessions, db.attendance, db.logistikLomba, db.penilaianLomba], async () => {
       await db.sessions.delete(s.id)
       await db.attendance.where('sessionId').equals(s.id).delete()
       const manifesTertaut = await db.logistikLomba.where('sessionId').equals(s.id).toArray()
       for (const mf of manifesTertaut) {
         await db.logistikLomba.update(mf.id, { sessionId: undefined })
+      }
+      const penilaianTertaut = await db.penilaianLomba.where('sessionId').equals(s.id).toArray()
+      for (const pn of penilaianTertaut) {
+        await db.penilaianLomba.update(pn.id, { sessionId: undefined })
       }
     })
     toast.push('Jadwal dihapus', 'info')
@@ -209,13 +213,19 @@ export default function Schedule() {
     if (!s.seriId) return
     const r = rencanaHapusSeri(sessions ?? [], s.seriId, absensi ?? [], s.date)
     const setHapus = new Set(r.hapus)
-    await db.transaction('rw', [db.sessions, db.logistikLomba], async () => {
+    await db.transaction('rw', [db.sessions, db.logistikLomba, db.penilaianLomba], async () => {
       await db.sessions.bulkDelete(r.hapus)
       if (setHapus.size > 0) {
         const semuaManifes = await db.logistikLomba.toArray()
         for (const mf of semuaManifes) {
           if (mf.sessionId && setHapus.has(mf.sessionId)) {
             await db.logistikLomba.update(mf.id, { sessionId: undefined })
+          }
+        }
+        const semuaPenilaian = await db.penilaianLomba.toArray()
+        for (const pn of semuaPenilaian) {
+          if (pn.sessionId && setHapus.has(pn.sessionId)) {
+            await db.penilaianLomba.update(pn.id, { sessionId: undefined })
           }
         }
       }

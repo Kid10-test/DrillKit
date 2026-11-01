@@ -127,6 +127,7 @@ export async function buildBackupPayload() {
     countSheets,
     inventaris,
     logistikLomba,
+    penilaianLomba,
   ] = await Promise.all([
     db.members.toArray(),
     db.sessions.toArray(),
@@ -144,6 +145,7 @@ export async function buildBackupPayload() {
     db.countSheets.toArray(),
     db.inventaris.toArray(),
     db.logistikLomba.toArray(),
+    db.penilaianLomba.toArray(),
   ])
   return {
     format: 'drillkit-backup',
@@ -166,6 +168,7 @@ export async function buildBackupPayload() {
     countSheets,
     inventaris,
     logistikLomba,
+    penilaianLomba,
   }
 }
 
@@ -196,9 +199,10 @@ export async function downloadBackupZip(): Promise<BackupNote> {
   const payload = await buildBackupPayload()
   const text = JSON.stringify(payload, null, 2)
   const tanggal = new Date(payload.exportedAt)
-  const [audioItems, partiturItems] = await Promise.all([
+  const [audioItems, partiturItems, judgeTapeItems] = await Promise.all([
     db.rekamanAudio.toArray(),
     db.partiturBerkas.toArray(),
+    db.judgeTapeAudio.toArray(),
   ])
 
   const entries: EntriZip[] = [
@@ -207,6 +211,10 @@ export async function downloadBackupZip(): Promise<BackupNote> {
 
   const manifestAudio: Record<string, { songId: string; namaFile: string; durasi: number; hash: string }> = {}
   const manifestPartitur: Record<string, { songId: string; namaFile: string; tipe: 'musicxml' | 'pdf'; ukuran: number; hash: string }> = {}
+  const manifestJudgeTape: Record<
+    string,
+    { penilaianId: string; namaFile: string; tipe: string; ukuran: number; durasiDetik: number; hash: string }
+  > = {}
 
   for (const item of audioItems) {
     const ab = await item.blob.arrayBuffer()
@@ -249,6 +257,28 @@ export async function downloadBackupZip(): Promise<BackupNote> {
     entries.push({
       nama: 'partitur/manifest.json',
       isi: JSON.stringify(manifestPartitur, null, 2),
+    })
+  }
+
+  for (const item of judgeTapeItems) {
+    const ab = await item.blob.arrayBuffer()
+    const safeName = item.namaFile.replace(/[^\w.-]/g, '_')
+    const pathZip = `judgetape/${item.penilaianId}_${safeName}`
+    entries.push({ nama: pathZip, isi: new Uint8Array(ab) })
+    manifestJudgeTape[pathZip] = {
+      penilaianId: item.penilaianId,
+      namaFile: item.namaFile,
+      tipe: item.tipe,
+      ukuran: item.ukuran,
+      durasiDetik: item.durasiDetik,
+      hash: item.hash,
+    }
+  }
+
+  if (judgeTapeItems.length > 0) {
+    entries.push({
+      nama: 'judgetape/manifest.json',
+      isi: JSON.stringify(manifestJudgeTape, null, 2),
     })
   }
 

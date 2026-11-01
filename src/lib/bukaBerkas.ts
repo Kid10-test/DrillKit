@@ -689,6 +689,8 @@ export const TABEL_BACKUP: { kolom: string; label: string }[] = [
   { kolom: 'countSheets', label: 'Count sheet Guard' },
   { kolom: 'inventaris', label: 'Inventaris alat' },
   { kolom: 'logistikLomba', label: 'Manifes logistik lomba' },
+  { kolom: 'penilaianLomba', label: 'Simulasi penilaian juri' },
+  { kolom: 'judgeTapeAudio', label: 'Rekaman suara Judge Tape' },
 ]
 
 /**
@@ -728,6 +730,7 @@ export const TABEL_DATA: { kolom: string; label: string }[] = [
   { kolom: 'countSheet', label: 'Count sheet Guard' },
   { kolom: 'inventaris', label: 'Inventaris alat' },
   { kolom: 'logistikLomba', label: 'Manifes logistik lomba' },
+  { kolom: 'penilaianLomba', label: 'Simulasi penilaian juri' },
 ]
 
 /** Ringkas isi berkas data pilihan (dipakai pratinjau pintu baru). */

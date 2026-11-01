@@ -15,7 +15,7 @@
  * ini hanya menyajikan.
  */
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { NamaTampil, useModeNama } from '../components/NamaTampil'
 import { PanelSetoranHafalan } from '../components/PanelSetoranHafalan'
 import { namaTampil, bacaModeNama } from '../lib/namaAnggota'
@@ -120,16 +120,25 @@ export default function Evaluasi() {
         title="Evaluasi & kemajuan"
         subtitle="Nilai perkembangan 4 aspek berkala dan pantau matriks setoran hafalan tim"
         actions={
-          tabAktif === 'berkala' ? (
-            <Button
-              variant="primary"
-              data-testid="tambah-evaluasi"
-              onClick={() => setSunting({ memberId: baris[0]?.member.id ?? '', nama: baris[0] ? namaTampil(baris[0].member, bacaModeNama()) : '' })}
-              disabled={baris.length === 0}
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to="/lomba?tab=juri"
+              data-testid="pintasan-simulasi-juri"
+              className="inline-flex items-center rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-emerald-500/50 hover:text-emerald-200"
             >
-              <IconPlus size={16} /> Nilai anggota
-            </Button>
-          ) : undefined
+              Simulasi Juri &amp; Judge Tape →
+            </Link>
+            {tabAktif === 'berkala' && (
+              <Button
+                variant="primary"
+                data-testid="tambah-evaluasi"
+                onClick={() => setSunting({ memberId: baris[0]?.member.id ?? '', nama: baris[0] ? namaTampil(baris[0].member, bacaModeNama()) : '' })}
+                disabled={baris.length === 0}
+              >
+                <IconPlus size={16} /> Nilai anggota
+              </Button>
+            )}
+          </div>
         }
       />
 

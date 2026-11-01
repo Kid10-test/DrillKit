@@ -190,6 +190,13 @@ export default function DrillPage() {
     await db.sets.bulkDelete(ids)
     const csIds = await db.countSheets.where('drillId').equals(d.id).primaryKeys()
     if (csIds.length) await db.countSheets.bulkDelete(csIds)
+    const penilaianTertaut = await db.penilaianLomba.where('drillId').equals(d.id).toArray()
+    for (const pn of penilaianTertaut) {
+      await db.penilaianLomba.update(pn.id, {
+        drillId: undefined,
+        catatanWaktu: pn.catatanWaktu.map(({ setId: _s, ...sisa }) => sisa),
+      })
+    }
     // K3 — kemajuan latihan ikut lenyap; kalau tidak, ia jadi yatim selamanya.
     await hapusKemajuan(d.id)
     setDrillId('')

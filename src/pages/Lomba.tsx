@@ -55,10 +55,17 @@ const PanelLogistikLombaLazy = lazy(() =>
   muatPanelLogistikLomba().then((m) => ({ default: m.PanelLogistikLomba })),
 )
 
+const muatPanelPenilaianJuri = () => import('../components/lomba/PanelPenilaianJuri')
+const PanelPenilaianJuriLazy = lazy(() =>
+  muatPanelPenilaianJuri().then((m) => ({ default: m.PanelPenilaianJuri })),
+)
+
 export default function Lomba() {
   const toast = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
-  const tabAktif = searchParams.get('tab') === 'logistik' ? 'logistik' : 'runsheet'
+  const paramTab = searchParams.get('tab')
+  const tabAktif: 'runsheet' | 'logistik' | 'juri' =
+    paramTab === 'logistik' ? 'logistik' : paramTab === 'juri' ? 'juri' : 'runsheet'
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
   const setlists = useLiveQuery(() => db.setlists.orderBy('updatedAt').reverse().toArray(), [], [])
   const songs = useLiveQuery(() => db.songs.toArray(), [], [])
@@ -198,7 +205,7 @@ export default function Lomba() {
             />
           </Field>
           <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-            Sesi dibuat & diubah di halaman <b>Jadwal</b>. Di sini Anda menautkan set list ke tiap penampilan serta mengelola <b>Manifes Loading Truk 3-Tahap</b>.
+            Sesi dibuat & diubah di halaman <b>Jadwal</b>. Di sini Anda menautkan set list ke tiap penampilan, mengelola <b>Manifes Loading Truk 3-Tahap</b>, serta mencatat <b>Simulasi Penilaian Juri &amp; Judge Tape</b>.
           </p>
         </Card>
 
@@ -270,6 +277,24 @@ export default function Lomba() {
         >
           Manifes &amp; Loading Truk (3-Tahap)
         </button>
+        <button
+          type="button"
+          data-testid="tab-juri-lomba"
+          onMouseEnter={() => void muatPanelPenilaianJuri()}
+          onClick={async () => {
+            await muatPanelPenilaianJuri()
+            const next = new URLSearchParams(searchParams)
+            next.set('tab', 'juri')
+            setSearchParams(next, { replace: true })
+          }}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+            tabAktif === 'juri'
+              ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
+              : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
+          }`}
+        >
+          Simulasi Penilaian Juri &amp; Judge Tape
+        </button>
       </div>
 
       {tabAktif === 'logistik' ? (
@@ -279,6 +304,14 @@ export default function Lomba() {
             sesiAktif={(sessions ?? []).find((s) => s.date === tanggalAktif)}
             namaTim={settings?.teamName || 'Unit Marching Band'}
             members={members ?? []}
+          />
+        </Suspense>
+      ) : tabAktif === 'juri' ? (
+        <Suspense fallback={<Card className="p-6 text-center text-xs text-slate-400">Memuat simulasi penilaian juri…</Card>}>
+          <PanelPenilaianJuriLazy
+            tanggalAktif={tanggalAktif}
+            sesiAktif={(sessions ?? []).find((s) => s.date === tanggalAktif)}
+            namaTim={settings?.teamName || 'Unit Marching Band'}
           />
         </Suspense>
       ) : (
