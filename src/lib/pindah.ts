@@ -29,7 +29,9 @@ import type {
   Drill,
   DrillSet,
   Evaluasi,
+  ItemInventaris,
   Kemajuan,
+  ManifesLogistikLomba,
   Member,
   MemberNote,
   Session,
@@ -52,6 +54,8 @@ export type JenisData =
   | 'targetSetoran'
   | 'setoran'
   | 'countSheet'
+  | 'inventaris'
+  | 'logistikLomba'
 
 export const URUTAN_JENIS_DATA: JenisData[] = [
   'anggota',
@@ -67,6 +71,8 @@ export const URUTAN_JENIS_DATA: JenisData[] = [
   'targetSetoran',
   'setoran',
   'countSheet',
+  'inventaris',
+  'logistikLomba',
 ]
 
 export const LABEL_JENIS_DATA: Record<JenisData, string> = {
@@ -83,6 +89,8 @@ export const LABEL_JENIS_DATA: Record<JenisData, string> = {
   targetSetoran: 'Target setoran',
   setoran: 'Setoran hafalan',
   countSheet: 'Count sheet Guard',
+  inventaris: 'Inventaris alat',
+  logistikLomba: 'Manifes logistik lomba',
 }
 
 export interface MetaSetoranSeksi {
@@ -122,6 +130,8 @@ export interface BerkasPindah {
   targetSetoran?: TargetSetoran[]
   setoran?: CatatanSetoran[]
   countSheet?: CountSheet[]
+  inventaris?: ItemInventaris[]
+  logistikLomba?: ManifesLogistikLomba[]
 }
 
 /** Ambil daftar entitas sebuah jenis. Kosong kalau tidak ada. */
@@ -145,6 +155,8 @@ function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void 
     case 'targetSetoran': berkas.targetSetoran = daftar as TargetSetoran[]; break
     case 'setoran': berkas.setoran = daftar as CatatanSetoran[]; break
     case 'countSheet': berkas.countSheet = daftar as CountSheet[]; break
+    case 'inventaris': berkas.inventaris = daftar as ItemInventaris[]; break
+    case 'logistikLomba': berkas.logistikLomba = daftar as ManifesLogistikLomba[]; break
   }
 }
 
@@ -333,6 +345,22 @@ const ATURAN: AturanRujukan[] = [
       e.memberIds = sah?.length ? sah : undefined
     },
   },
+  {
+    sumber: 'inventaris',
+    target: 'anggota',
+    baca: (e: ItemInventaris) => e.pemegangId,
+    tulis: (e: ItemInventaris, v) => {
+      e.pemegangId = (v as string | undefined) || undefined
+    },
+  },
+  {
+    sumber: 'logistikLomba',
+    target: 'jadwal',
+    baca: (e: ManifesLogistikLomba) => e.sessionId,
+    tulis: (e: ManifesLogistikLomba, v) => {
+      e.sessionId = (v as string | undefined) || undefined
+    },
+  },
 ]
 
 /** Id yang tersedia untuk sebuah jenis: gabungan berkas & perangkat. */
@@ -506,6 +534,29 @@ export function putusRujukan(
     if (csBerubah) cs.blok = blokBaru
   }
 
+  // #18 — Saring rujukan `inventarisId` dan `penanggungJawabId` di dalam `logistikLomba.butir[]`.
+  const idInventarisSah = kumpulkanId(berkas, yangAda, 'inventaris')
+  const daftarManifes = ambil(hasil, 'logistikLomba') as ManifesLogistikLomba[]
+  for (const mf of daftarManifes) {
+    if (!mf.butir?.length) continue
+    let mfBerubah = false
+    const butirBaru = mf.butir.map((bt) => {
+      let salin = bt
+      if (bt.inventarisId && !idInventarisSah.has(bt.inventarisId)) {
+        mfBerubah = true
+        putus.push({ jenis: 'logistikLomba', id: mf.id, kolom: 'aset inventaris', nilai: bt.inventarisId })
+        salin = { ...salin, inventarisId: undefined }
+      }
+      if (bt.penanggungJawabId && !idAnggotaSah.has(bt.penanggungJawabId)) {
+        mfBerubah = true
+        putus.push({ jenis: 'logistikLomba', id: mf.id, kolom: 'penanggung jawab', nilai: bt.penanggungJawabId })
+        salin = { ...salin, penanggungJawabId: undefined }
+      }
+      return salin
+    })
+    if (mfBerubah) mf.butir = butirBaru
+  }
+
   return { berkas: hasil, putus }
 }
 
@@ -527,6 +578,8 @@ function kolomRujukan(sumber: JenisData, target: JenisData): string {
     'countSheet>drill': 'drill',
     'countSheet>lagu': 'lagu',
     'countSheet>anggota': 'anggota',
+    'inventaris>anggota': 'peminjam',
+    'logistikLomba>jadwal': 'sesi lomba',
   }
   return peta[`${sumber}>${target}`] ?? target
 }

@@ -411,6 +411,8 @@ export function gabungPembaruan(
     attendance: lama?.attendance ?? [],
     memberNotes: lama?.memberNotes ?? [],
     setoran: lama?.setoran ?? [],
+    perlengkapanPribadi: lama?.perlengkapanPribadi,
+    perlengkapanPerAnggota: undefined,
     forMember: lama?.forMember,
     namaPenerima: lama?.namaPenerima,
   }

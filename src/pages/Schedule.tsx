@@ -194,15 +194,32 @@ export default function Schedule() {
   }
 
   async function remove(s: Session) {
-    await db.sessions.delete(s.id)
-    await db.attendance.where('sessionId').equals(s.id).delete()
+    await db.transaction('rw', [db.sessions, db.attendance, db.logistikLomba], async () => {
+      await db.sessions.delete(s.id)
+      await db.attendance.where('sessionId').equals(s.id).delete()
+      const manifesTertaut = await db.logistikLomba.where('sessionId').equals(s.id).toArray()
+      for (const mf of manifesTertaut) {
+        await db.logistikLomba.update(mf.id, { sessionId: undefined })
+      }
+    })
     toast.push('Jadwal dihapus', 'info')
   }
 
   async function hapusSeriDari(s: Session) {
     if (!s.seriId) return
     const r = rencanaHapusSeri(sessions ?? [], s.seriId, absensi ?? [], s.date)
-    await db.sessions.bulkDelete(r.hapus)
+    const setHapus = new Set(r.hapus)
+    await db.transaction('rw', [db.sessions, db.logistikLomba], async () => {
+      await db.sessions.bulkDelete(r.hapus)
+      if (setHapus.size > 0) {
+        const semuaManifes = await db.logistikLomba.toArray()
+        for (const mf of semuaManifes) {
+          if (mf.sessionId && setHapus.has(mf.sessionId)) {
+            await db.logistikLomba.update(mf.id, { sessionId: undefined })
+          }
+        }
+      }
+    })
     setHapusSeri(null)
     toast.push(
       r.dipertahankan.length

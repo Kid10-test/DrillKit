@@ -13,10 +13,13 @@ import type { HasilCocok } from './namaAnggota'
 import type {
   AttendanceRecord,
   CatatanSetoran,
+  CountSheet,
   Drill,
   DrillSet,
   Evaluasi,
+  ItemInventaris,
   Kemajuan,
+  ManifesLogistikLomba,
   Member,
   MemberNote,
   RiwayatSnapshot,
@@ -32,6 +35,9 @@ const TABEL = [
   db.drills,
   db.riwayat,
   db.kemajuan,
+  db.countSheets,
+  db.inventaris,
+  db.logistikLomba,
 ]
 
 export async function simpanAnggota(tulis: Member[], hapus: string[]): Promise<void> {
@@ -57,6 +63,9 @@ export async function simpanRencana(r: {
   drills?: Drill[]
   riwayat?: RiwayatSnapshot[]
   kemajuan?: Kemajuan[]
+  countSheets?: CountSheet[]
+  inventaris?: ItemInventaris[]
+  logistikLomba?: ManifesLogistikLomba[]
 }): Promise<void> {
   const hapusAnggota = (r.anggotaHapus ?? []).filter((id) => !(r.anggotaTulis ?? []).some((m) => m.id === id))
   await db.transaction('rw', TABEL, async () => {
@@ -71,6 +80,9 @@ export async function simpanRencana(r: {
     if (r.drills?.length) await db.drills.bulkPut(r.drills)
     if (r.riwayat?.length) await db.riwayat.bulkPut(r.riwayat)
     if (r.kemajuan?.length) await db.kemajuan.bulkPut(r.kemajuan)
+    if (r.countSheets?.length) await db.countSheets.bulkPut(r.countSheets)
+    if (r.inventaris?.length) await db.inventaris.bulkPut(r.inventaris)
+    if (r.logistikLomba?.length) await db.logistikLomba.bulkPut(r.logistikLomba)
     if (hapusAnggota.length) await db.members.bulkDelete(hapusAnggota)
     if (r.anggotaTulis?.length) await db.members.bulkPut(r.anggotaTulis)
   })
@@ -91,6 +103,9 @@ export async function simpanGabung(r: RencanaGabung): Promise<void> {
     drills: r.drills,
     riwayat: r.riwayat,
     kemajuan: r.kemajuan,
+    countSheets: r.countSheets,
+    inventaris: r.inventaris,
+    logistikLomba: r.logistikLomba,
   })
 }
 
@@ -105,7 +120,19 @@ export async function muatJejakAnggota(): Promise<{ absensi: string[]; posisi: s
 }
 
 export async function muatUntukGabung() {
-  const [absensi, evaluasi, setoran, catatan, sets, drills, riwayat, kemajuan] = await Promise.all([
+  const [
+    absensi,
+    evaluasi,
+    setoran,
+    catatan,
+    sets,
+    drills,
+    riwayat,
+    kemajuan,
+    countSheets,
+    inventaris,
+    logistikLomba,
+  ] = await Promise.all([
     db.attendance.toArray(),
     db.evaluasi.toArray(),
     db.setoran.toArray(),
@@ -114,8 +141,23 @@ export async function muatUntukGabung() {
     db.drills.toArray(),
     db.riwayat.toArray(),
     db.kemajuan.toArray(),
+    db.countSheets.toArray(),
+    db.inventaris.toArray(),
+    db.logistikLomba.toArray(),
   ])
-  return { absensi, evaluasi, setoran, catatan, sets, drills, riwayat, kemajuan }
+  return {
+    absensi,
+    evaluasi,
+    setoran,
+    catatan,
+    sets,
+    drills,
+    riwayat,
+    kemajuan,
+    countSheets,
+    inventaris,
+    logistikLomba,
+  }
 }
 
 export type { HasilCocok }

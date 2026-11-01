@@ -99,11 +99,13 @@ function taruh(berkas: BerkasPindah, jenis: JenisData, daftar: unknown[]): void 
     case 'targetSetoran': berkas.targetSetoran = daftar as never; break
     case 'setoran': berkas.setoran = daftar as never; break
     case 'countSheet': berkas.countSheet = daftar as never; break
+    case 'inventaris': berkas.inventaris = daftar as never; break
+    case 'logistikLomba': berkas.logistikLomba = daftar as never; break
   }
 }
 
 /** Jenis yang bisa dipilih **satu per satu** (daftarnya pendek). */
-const JENIS_PILIH: JenisData[] = ['lagu', 'setlist', 'drill', 'countSheet']
+const JENIS_PILIH: JenisData[] = ['lagu', 'setlist', 'drill', 'countSheet', 'logistikLomba']
 
 export default function Data() {
   const [searchParams] = useSearchParams()
@@ -124,6 +126,8 @@ export default function Data() {
   const targetSetoran = useLiveQuery(() => db.targetSetoran.toArray(), [], [])
   const setoran = useLiveQuery(() => db.setoran.toArray(), [], [])
   const countSheet = useLiveQuery(() => db.countSheets.toArray(), [], [])
+  const inventaris = useLiveQuery(() => db.inventaris.toArray(), [], [])
+  const logistikLomba = useLiveQuery(() => db.logistikLomba.toArray(), [], [])
 
   const sumber: Record<JenisData, unknown[]> = useMemo(
     () => ({
@@ -140,8 +144,26 @@ export default function Data() {
       targetSetoran,
       setoran,
       countSheet,
+      inventaris,
+      logistikLomba,
     }),
-    [anggota, jadwal, absensi, lagu, setlist, drill, set, kemajuan, catatan, evaluasi, targetSetoran, setoran, countSheet],
+    [
+      anggota,
+      jadwal,
+      absensi,
+      lagu,
+      setlist,
+      drill,
+      set,
+      kemajuan,
+      catatan,
+      evaluasi,
+      targetSetoran,
+      setoran,
+      countSheet,
+      inventaris,
+      logistikLomba,
+    ],
   )
 
   // #7 — titipan CSV dari pintu baru: bukakan tab CSV-nya sekalian.
@@ -490,6 +512,9 @@ function AlurPindah({
       evaluasiDb,
       targetSetoranDb,
       setoranDb,
+      countSheetDb,
+      inventarisDb,
+      logistikLombaDb,
     ] = await Promise.all([
       db.members.toArray(),
       db.sessions.toArray(),
@@ -503,6 +528,9 @@ function AlurPindah({
       db.evaluasi.toArray(),
       db.targetSetoran.toArray(),
       db.setoran.toArray(),
+      db.countSheets.toArray(),
+      db.inventaris.toArray(),
+      db.logistikLomba.toArray(),
     ])
     const yangAdaSegar: YangAda = {
       anggota: kunci(anggotaLokal),
@@ -517,6 +545,9 @@ function AlurPindah({
       evaluasi: kunci(evaluasiDb),
       targetSetoran: kunci(targetSetoranDb),
       setoran: kunci(setoranDb),
+      countSheet: kunci(countSheetDb),
+      inventaris: kunci(inventarisDb),
+      logistikLomba: kunci(logistikLombaDb),
     }
     const masuk = hasil.berkas.anggota ?? []
     const baris = susunSaran(masuk, anggotaLokal)
@@ -602,6 +633,8 @@ function AlurPindah({
           db.targetSetoran,
           db.setoran,
           db.countSheets,
+          db.inventaris,
+          db.logistikLomba,
         ],
         async () => {
           if (b.anggota?.length) await db.members.bulkPut(b.anggota)
@@ -617,6 +650,8 @@ function AlurPindah({
           if (b.targetSetoran?.length) await db.targetSetoran.bulkPut(b.targetSetoran)
           if (b.setoran?.length) await db.setoran.bulkPut(b.setoran)
           if (b.countSheet?.length) await db.countSheets.bulkPut(b.countSheet)
+          if (b.inventaris?.length) await db.inventaris.bulkPut(b.inventaris)
+          if (b.logistikLomba?.length) await db.logistikLomba.bulkPut(b.logistikLomba)
         },
       )
       setMenunggu(null)

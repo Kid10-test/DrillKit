@@ -104,6 +104,8 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
     'src/components/musik/EditorBirama.tsx',
     'src/components/musik/ModalLagu.tsx',
     'src/components/musik/PanelCountSheetSinkron.tsx',
+    'src/components/anggota/PanelInventarisSeragam.tsx',
+    'src/components/lomba/PanelLogistikLomba.tsx',
     'src/App.tsx',
     'index.html',
     'src/components/ModalRekamanLagu.tsx',

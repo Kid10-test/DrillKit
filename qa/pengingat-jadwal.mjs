@@ -36,7 +36,8 @@ const TGL_HARI_INI = isoTanggal(new Date())
 const notifPada = new Date(Date.now() + 30 * 60000)
 const TGL_NOTIF = isoTanggal(notifPada)
 const JAM_NOTIF = isoJam(notifPada)
-const JAM_NOTIF_AKHIR = isoJam(new Date(Date.now() + 90 * 60000))
+const batasAkhirHari = new Date(notifPada.getFullYear(), notifPada.getMonth(), notifPada.getDate(), 23, 59)
+const JAM_NOTIF_AKHIR = isoJam(new Date(Math.min(Date.now() + 90 * 60000, batasAkhirHari.getTime())))
 
 const browser = await puppeteer.launch({
   args: ['--no-sandbox', '--disable-dev-shm-usage'],

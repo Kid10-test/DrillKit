@@ -21,6 +21,8 @@ import type {
   CatatanSetoran,
   ItemLogPerubahan,
   CountSheet,
+  ItemInventaris,
+  ManifesLogistikLomba,
 } from './types'
 
 /**
@@ -71,6 +73,10 @@ export class DrillKitDB extends Dexie {
   logPerubahan!: Table<ItemLogPerubahan, string>
   /** #17 — lembar hitungan kerja alat Color Guard (Count Sheet). */
   countSheets!: Table<CountSheet, string>
+  /** #18 — buku induk inventaris instrumen & perlengkapan tim. */
+  inventaris!: Table<ItemInventaris, string>
+  /** #18 — manifes logistik & ceklis loading truk 3-tahap hari lomba. */
+  logistikLomba!: Table<ManifesLogistikLomba, string>
 
   constructor() {
     super('drillkit')
@@ -126,6 +132,11 @@ export class DrillKitDB extends Dexie {
     // #17 — lembar hitungan Color Guard / Count Sheet (penambahan murni v13).
     this.version(13).stores({
       countSheets: 'id, drillId, songId, seksi, updatedAt',
+    })
+    // #18 — inventaris alat & manifes logistik hari lomba (penambahan murni v14).
+    this.version(14).stores({
+      inventaris: 'id, kodeAset, kategori, kondisi, pemegangId, updatedAt',
+      logistikLomba: 'id, tanggal, sessionId, updatedAt',
     })
   }
 }

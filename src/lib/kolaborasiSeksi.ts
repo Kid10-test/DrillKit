@@ -85,7 +85,7 @@ export function masukRentangSeksi(
 
 /** Bersihkan kolom rahasia anggota sebelum dikirim ke/dari asisten pelatih. */
 export function bersihkanAnggotaSeksi(m: Member): Member {
-  const { token: _t, phone: _p, notes: _n, ...sisa } = m
+  const { token: _t, phone: _p, notes: _n, ukuranSeragam: _u, ...sisa } = m
   return { ...sisa, token: '' } as Member
 }
 

@@ -60,6 +60,14 @@ export interface Member {
   active: number // 0 | 1 (IndexedDB tidak bisa index boolean)
   phone?: string
   notes?: string
+  /**
+   * #18 — Profil ukuran & status distribusi seragam pribadi anggota.
+   *
+   * **Pagar privasi:** kolom ini selalu dibuang oleh `bersihkanAnggota` pada
+   * `ShareBundle.members` (baik di berkas grup maupun berkas rekan), dan hanya
+   * dikirim khusus kepada pemiliknya sendiri lewat `perlengkapanPribadi`.
+   */
+  ukuranSeragam?: ProfilUkuranSeragam
   /** Token acak untuk QR absensi — jadi tidak bisa ditebak */
   token: string
   createdAt: number
@@ -1270,6 +1278,17 @@ export interface ShareBundle {
    * #17 — daftar lembar hitungan Color Guard (*count sheet*) tim (publik tim).
    */
   countSheets?: CountSheet[]
+  /**
+   * #18 — informasi alat inventaris & seragam pinjaman **khusus milik penerima paket**
+   * (kosong/`undefined` di berkas grup maupun untuk `memberId` asing).
+   */
+  perlengkapanPribadi?: PerlengkapanPribadiAnggota
+  /**
+   * #18 — peta sementara di memori pelatih saat merakit bundel per-anggota / terbitan
+   * terkunci. **Selalu dihapus (`undefined`)** oleh `paketGrup` maupun `paketAnggota`
+   * sebelum berkas ditulis ke JSON agar daftar aset keseluruhan tidak pernah bocor.
+   */
+  perlengkapanPerAnggota?: Record<string, PerlengkapanPribadiAnggota>
   attendance: AttendanceRecord[]
   /** Catatan evaluasi per anggota (opsional — paket lama belum punya) */
   memberNotes?: MemberNote[]
@@ -1437,5 +1456,175 @@ export interface CountSheet {
   createdAt: number
   updatedAt: number
 }
+
+/* ------ #18 — Inventaris Alat, Seragam (Fitting), & Manifes Logistik ----- */
+
+export type KategoriInventaris =
+  | 'brass'
+  | 'woodwind'
+  | 'battery'
+  | 'pit'
+  | 'elektronik'
+  | 'guard'
+  | 'podium_properti'
+  | 'seragam_aksesoris'
+  | 'lainnya'
+
+export type KondisiInventaris = 'siap_pakai' | 'perlu_servis' | 'rusak'
+
+export interface CatatanServisInventaris {
+  id: string
+  /** Tanggal perawatan YYYY-MM-DD. */
+  tanggal: string
+  /** Jenis perawatan, mis. "Servis valve & chemical bath", "Ganti head atas". */
+  jenis: string
+  /** Biaya opsional dalam Rupiah. */
+  biaya?: number
+  /** Teknisi / bengkel / pengurus yang menangani. */
+  pelaksana?: string
+  catatan?: string
+  kondisiSetelah?: KondisiInventaris
+}
+
+/**
+ * Satu aset pada Buku Induk Inventaris (`db.inventaris`, Dexie v14).
+ */
+export interface ItemInventaris {
+  id: string
+  /** Kode inventaris internal unit, mis. "BR-TR-01" atau "PIT-MRB-01". */
+  kodeAset: string
+  /** Nomor seri pabrikan (opsional), mis. "YTR-8335-44109". */
+  nomorSeri?: string
+  /** Nama barang/alat, mis. "Trumpet Bb Utama 1". */
+  nama: string
+  kategori: KategoriInventaris
+  /** Merek & tipe model, mis. "Yamaha Xeno YTR-8335". */
+  merekTipe?: string
+  kondisi: KondisiInventaris
+  /** Lokasi penyimpanan standar di markas/gudang, mis. "Rak Brass A1". */
+  lokasiSimpan?: string
+  /** Id anggota pemegang/peminjam saat ini (`Member.id`), kosong bila di gudang. */
+  pemegangId?: string
+  /** Tanggal mulai dipinjamkan YYYY-MM-DD. */
+  tanggalPinjam?: string
+  /** Target tanggal pengembalian YYYY-MM-DD (opsional). */
+  targetKembali?: string
+  /** Kelengkapan yang ikut diserahkan (hardcase, mouthpiece, strap, mallet, dll.). */
+  kelengkapanPinjam?: string
+  /** 1 = otomatis ditarik saat membuat Manifes Loading Truk hari lomba. */
+  wajibBawaLomba?: number
+  riwayatServis: CatatanServisInventaris[]
+  catatan?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export type StatusPinjamSeragam = 'belum' | 'dipinjam' | 'dikembalikan' | 'dicuci'
+
+/**
+ * Profil ukuran tubuh/fitting & pelacakan peminjaman seragam per anggota.
+ */
+export interface ProfilUkuranSeragam {
+  /** Ukuran sepatu baris/marching shoes, mis. "41" atau "38". */
+  sepatu?: string
+  /** Ukuran bibber / celana, mis. "L" atau "32". */
+  bibber?: string
+  /** Panjang kaki/celana dalam cm (untuk kelim bawah). */
+  panjangCelanaCm?: number
+  /** Ukuran jaket / tunic utama, mis. "L". */
+  jaketTunic?: string
+  /** Lingkar dada dalam cm (opsional). */
+  lingkarDadaCm?: number
+  /** Ukuran shako / topi, mis. "57 cm" atau "M". */
+  shakoTopi?: string
+  /** Ukuran sarung tangan, mis. "M". */
+  sarungTangan?: string
+  /** Ukuran / model kostum khusus Color Guard. */
+  kostumGuard?: string
+  /** Nomor seri stel seragam yang dipinjamkan, mis. "SRG-014". */
+  nomorSeriSeragam?: string
+  /** Nomor seri shako/plume box bila dicatat terpisah, mis. "SHK-014". */
+  nomorShako?: string
+  statusPinjam?: StatusPinjamSeragam
+  tanggalAmbil?: string
+  tanggalKembali?: string
+  /** 1 = sudah dicuci/dry-clean sehabis penampilan. */
+  sudahDicuci?: number
+  catatanFitting?: string
+}
+
+/** Ringkasan satu alat inventaris yang dipinjam anggota (aman untuk paket pribadi). */
+export interface PinjamanAlatAnggota {
+  id: string
+  kodeAset: string
+  nama: string
+  kategori: KategoriInventaris
+  merekTipe?: string
+  nomorSeri?: string
+  kondisi: KondisiInventaris
+  tanggalPinjam?: string
+  targetKembali?: string
+  kelengkapanPinjam?: string
+}
+
+/** Muatan perlengkapan pribadi milik satu anggota penerima paket. */
+export interface PerlengkapanPribadiAnggota {
+  memberId: string
+  ukuranSeragam?: ProfilUkuranSeragam
+  alatDipinjam: PinjamanAlatAnggota[]
+}
+
+/**
+ * Satu baris barang pada Manifes Logistik & Loading Truk 3-Tahap.
+ */
+export interface ButirManifesLogistik {
+  id: string
+  /** Tautan opsional ke `ItemInventaris.id` bila ditarik dari buku inventaris. */
+  inventarisId?: string
+  kodeAset?: string
+  nama: string
+  kategori: KategoriInventaris
+  jumlah: number
+  satuan?: string
+  /** Id anggota/kru penanggung jawab barang ini (opsional). */
+  penanggungJawabId?: string
+  /** Tahap 1: 1 = sudah dimuat ke truk/bus saat berangkat dari markas. */
+  muatBerangkat: number
+  waktuBerangkat?: number
+  /** Tahap 2: 1 = sudah dicek lengkap saat tiba/persiapan di lokasi lomba. */
+  cekLokasi: number
+  waktuLokasi?: number
+  /** Tahap 3: 1 = sudah masuk kembali ke gudang markas seusai lomba. */
+  kembaliGudang: number
+  waktuKembali?: number
+  catatan?: string
+}
+
+/**
+ * Dokumen Manifes Logistik Hari Lomba (`db.logistikLomba`, Dexie v14).
+ */
+export interface ManifesLogistikLomba {
+  id: string
+  judul: string
+  /** Tanggal kegiatan YYYY-MM-DD (tersambung ke tanggal Run Sheet halaman Lomba). */
+  tanggal: string
+  /** Tautan opsional ke `Session.id` tertentu pada tanggal tersebut. */
+  sessionId?: string
+  /** Identitas armada, mis. "Truk Box B 9124 KQA + Bus 1". */
+  kendaraan?: string
+  /** Nama koordinator logistik / peralatan. */
+  koordinator?: string
+  /**
+   * Mode aktif pemeriksaan di lapangan: `'berangkat'` | `'lokasi'` | `'pulang'`.
+   * Saat `'pulang'`, setiap barang yang belum tercentang `kembaliGudang === 1`
+   * langsung ditandai merah menyala agar tidak ada yang tertinggal di arena.
+   */
+  tahapAktif?: 'berangkat' | 'lokasi' | 'pulang'
+  catatan?: string
+  butir: ButirManifesLogistik[]
+  createdAt: number
+  updatedAt: number
+}
+
 
 
