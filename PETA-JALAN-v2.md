@@ -6,6 +6,8 @@ Tujuan peta jalan ini ada dua:
 1. Merangkum hasil **Quality Check & Functional Check `v1.0.0`** sebagai garis dasar kesehatan aplikasi dan daftar polesan teknis (`#12`).
 2. Memetakan rancangan terukur **`#12` s.d. `#21`** agar DrillKit berevolusi dari aplikasi *drill + jadwal + absensi + musik* menjadi **platform operasional *all-in-one* untuk program marching band** (latihan harian, *pass-off* hafalan, koreografi *Color Guard*, inventaris alat/seragam, logistik hari lomba, simulasi penjurian, audisi, hingga administrasi unit) — tanpa mengorbankan kesederhanaan pemakaian di lapangan.
 
+> **Status Pelaksanaan (`2 November 2026`):** **SELESAI 100% (`v2.1.0`)** — Seluruh 10 rancangan (`#12` s.d. `#21`) telah selesai diimplementasikan, diuji oleh **135 rangkaian regresi otomatis**, dan dirilis pada **[`RILIS-v2.1.0.md`](RILIS-v2.1.0.md)**.
+
 > **Cara memakai dokumen ini:** Dokumen ini bukan beban yang harus dikerjakan sekaligus. Setiap butir memiliki nomor rancangan tersendiri (`#12` s.d. `#21`) agar kapan pun siap dicicil, cukup sebutkan: *"Kerjakan `#12` dulu"* atau *"Rancang detail `#14`"*.
 
 ---
