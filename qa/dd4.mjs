@@ -23,12 +23,12 @@ const tombol = (teks) => p.evaluate((t) => {
 const pusat = (d) => [d.reduce((a, q) => a + q[0], 0) / d.length, d.reduce((a, q) => a + q[1], 0) / d.length]
 const beda = (a, c) => a.every((q, i) => Math.hypot(q[0] - c[i][0], q[1] - c[i][1]) < 0.02)
 
-await p.goto('http://localhost:5173/', { waitUntil: 'networkidle2' }); await wait(1600)
+await p.goto((process.env.BASE || 'http://localhost:5173') + '/', { waitUntil: 'networkidle2' }); await wait(1600)
 await p.evaluate(() => { const x = [...document.querySelectorAll('button')].find((y) => y.textContent.includes('Muat data contoh')); x && x.click() })
 await wait(3400)
 await p.evaluate(() => { location.hash = '#/drill' }); await wait(2800)
 
-R.adaPanel = await p.evaluate(() => !!([...document.querySelectorAll('h2')].find((h) => h.textContent.includes('Alat gerak massa'))))
+R.adaPanel = await p.evaluate(() => !!document.querySelector('[data-testid="kartu-alat-formasi"]'))
 const A = await posisi()
 R.jmlTitik = A.length
 
@@ -55,19 +55,22 @@ const SP = (pusat(A)[0] + pusat(C)[0]) / 2
 R.cerminTepat = A.every((q, i) => Math.abs(C[i][0] - (2 * SP - q[0])) < 0.02 && Math.abs(C[i][1] - q[1]) < 0.02)
 await p.keyboard.down('Control'); await p.keyboard.press('KeyZ'); await p.keyboard.up('Control'); await wait(1000)
 
-/* ---------- 4. Geser 4 langkah ke depan ---------- */
-R.kilikGeser = await tombol('Ke depan'); await wait(900)
+/* ---------- 4. Geser 4 langkah ke depan (Shift+ArrowDown) ---------- */
+await p.click('[data-testid="inspektor-pilih-semua"]'); await wait(250)
+await p.keyboard.down('Shift'); await p.keyboard.press('ArrowDown'); await p.keyboard.up('Shift'); await wait(700)
+R.kilikGeser = true
 const D = await posisi()
 const selisihY = A.map((q, i) => Math.round((D[i][1] - q[1]) * 1000) / 1000)
 R.geserSeragam = new Set(selisihY).size === 1
 R.geserJarak = selisihY[0]      // 4 langkah × 0,625 yard = 2,5 satuan
 await p.keyboard.down('Control'); await p.keyboard.press('KeyZ'); await p.keyboard.up('Control'); await wait(1000)
 
-/* ---------- 5. Geser 4 langkah ke Side 1 ---------- */
-await tombol('Ke Side 1'); await wait(900)
+/* ---------- 5. Geser 4 langkah ke Side 1 (Shift+ArrowRight) ---------- */
+await p.keyboard.down('Shift'); await p.keyboard.press('ArrowRight'); await p.keyboard.up('Shift'); await wait(700)
 const E = await posisi()
 R.side1Jarak = Math.round((E[0][0] - A[0][0]) * 1000) / 1000
 await p.keyboard.down('Control'); await p.keyboard.press('KeyZ'); await p.keyboard.up('Control'); await wait(1000)
+await p.keyboard.press('Escape'); await wait(200)
 
 /* ---------- 6. Pilih satu titik, lalu kembang-kempis ---------- */
 const lingkaran = await p.$$('circle[data-titik="1"]')

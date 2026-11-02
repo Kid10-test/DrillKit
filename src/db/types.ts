@@ -579,6 +579,44 @@ export interface RippleGerak {
   mode?: 'kejar' | 'bertahap'
 }
 
+export type JenisBentukParametrik =
+  | 'garis'
+  | 'kurva_satu'
+  | 'kurva_s'
+  | 'lingkaran'
+  | 'blok'
+
+export interface TitikKendaliYd {
+  x: number
+  y: number
+}
+
+/**
+ * #22 — Bentuk formasi parametrik hidup (*persistent parametric shape*) pada satu set.
+ *
+ * Menarik gagang kendali (`p0`, `p1`, `c1`, `c2`) di kanvas otomatis mendistribusikan
+ * ulang pemain `memberIds` dengan jarak busur (*arc-length parameterization*) merata.
+ */
+export interface BentukTerikat {
+  id: string
+  nama: string
+  jenis: JenisBentukParametrik
+  /** Urutan pemain dalam bentuk ini (dari p0 ke p1, atau baris demi baris untuk blok). */
+  memberIds: string[]
+  /** Ujung awal (atau pusat lingkaran / sudut awal blok) dalam yard. */
+  p0: TitikKendaliYd
+  /** Ujung akhir (atau titik jari-jari lingkaran / sudut seberang blok) dalam yard. */
+  p1: TitikKendaliYd
+  /** Titik kendali lengkung pertama (Quadratic / Cubic Bézier) dalam yard. */
+  c1?: TitikKendaliYd
+  /** Titik kendali lengkung kedua (Cubic Bézier S-Curve) dalam yard. */
+  c2?: TitikKendaliYd
+  /** Jumlah kolom banjar untuk jenis === 'blok'. */
+  kolom?: number
+  /** Orientasi arah hadap pemain pada bentuk (bawaan 'depan'). */
+  arahHadap?: 'depan' | 'singgung' | 'pusat' | 'tetap'
+}
+
 export interface DrillSet {
   id: string
   drillId: string
@@ -599,6 +637,8 @@ export interface DrillSet {
   langkah?: Record<string, SetelanLangkah>
   /** #16 — simbol visual / tanduk / koreografi yang dicetak di buku saku & tampil di HP anggota */
   visual?: InstruksiVisualSet
+  /** #22 — daftar bentuk parametrik hidup (kurva Bézier, garis, lingkaran, blok) pada set ini */
+  bentukTerikat?: BentukTerikat[]
   createdAt: number
 }
 

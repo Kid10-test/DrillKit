@@ -15,13 +15,13 @@ export const DAFTAR_SHORTCUT: GrupShortcut[] = [
   {
     kelompok: 'Pilihan & menggeser',
     baris: [
-      ['Klik', 'Pilih satu titik'],
-      ['Shift + klik', 'Tambah / kurangi pilihan'],
-      ['Seret di lapangan', 'Kotak pilih (marquee)'],
-      ['Ctrl + A', 'Pilih semua titik yang tampil'],
-      ['Esc', 'Batalkan pilihan'],
+      ['Klik / Shift+klik', 'Pilih satu / tambah pilihan'],
+      ['Seret / Shift+seret', 'Kotak pilih / Lasso bebas'],
+      ['Ctrl + A / Esc', 'Pilih semua / lepas pilihan'],
+      ['X / Y', 'Kunci gerak ke sumbu X / Y'],
       ['Panah', 'Geser titik terpilih 1 langkah'],
       ['Shift + Panah', 'Geser 4 langkah sekaligus'],
+      ['Gagang kotak/kurva', 'Rentang, putar bebas, & lengkung'],
       ['Delete', 'Keluarkan titik terpilih dari set'],
     ],
   },

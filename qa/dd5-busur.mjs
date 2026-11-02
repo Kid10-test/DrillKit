@@ -63,16 +63,16 @@ const jejak = () => p.evaluate(() => {
   return el ? { tag: el.tagName.toLowerCase(), segmen: ((el.getAttribute('d') || '').match(/L/g) || []).length } : null
 })
 
-await p.goto('http://localhost:5173/', { waitUntil: 'networkidle2' }); await wait(1600)
+await p.goto((process.env.BASE || 'http://localhost:5173') + '/', { waitUntil: 'networkidle2' }); await wait(1600)
 await p.evaluate(() => { const x = [...document.querySelectorAll('button')].find((y) => y.textContent.includes('Muat data contoh')); x && x.click() })
 await wait(3400)
 await p.evaluate(() => { location.hash = '#/drill' }); await wait(2800)
 
-// set 1 = blok
-R.blok1 = await tombol('Blok'); await wait(1200)
-// set 2 = blok yang sama
+// set 1 = blok parametrik hidup, lalu salin identik ke set 2
+await p.select('[data-testid="pilih-jenis-bentuk"]', 'blok'); await wait(250)
+R.blok1 = await p.evaluate(() => { const el = document.querySelector('[data-testid="terapkan-bentuk-cepat"]'); if (!el) return false; el.click(); return true }); await wait(1000)
+R.blok2 = await p.evaluate(() => { const el = document.querySelector('[data-testid^="bentuk-salin-berikut-"]'); if (!el || el.disabled) return false; el.click(); return true }); await wait(1000)
 await p.keyboard.press('BracketRight'); await wait(1400)
-R.blok2 = await tombol('Blok'); await wait(1200)
 // putar set 2 → putaran murni dari set 1
 R.putar = await tombol('Kanan ↻'); await wait(1600)
 await p.keyboard.press('BracketLeft'); await wait(1500)

@@ -64,18 +64,16 @@ await p.keyboard.press('BracketRight')
 await wait(1400)
 await tombol('Set baru')
 await wait(1800)
-await p.evaluate(() => {
-  const lab = [...document.querySelectorAll('label')].find((x) => x.textContent.includes('Geser blok'))
-  const sel = lab?.parentElement?.querySelector('select')
-  if (!sel) return false
-  const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
-  set.call(sel, '8')
-  sel.dispatchEvent(new Event('change', { bubbles: true }))
-  return true
-})
-await wait(700)
-await tombol('Ke depan')
-await wait(1500)
+await p.click('[data-testid="inspektor-pilih-semua"]')
+await wait(300)
+await p.keyboard.down('Shift')
+await p.keyboard.press('ArrowDown')
+await wait(250)
+await p.keyboard.press('ArrowDown')
+await p.keyboard.up('Shift')
+await wait(300)
+await p.keyboard.press('Escape')
+await wait(1100)
 // Presenter mengikuti set yang aktif di editor. Paksa ke set 1 supaya uji
 // ini tidak bergantung pada di mana editor kebetulan berhenti — jebakan yang
 // sama pernah menggagalkan asisten-seksi.mjs.

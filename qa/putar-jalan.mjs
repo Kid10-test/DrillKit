@@ -170,22 +170,45 @@ await p.evaluate(() => {
 })
 await wait(2800)
 
-// set 1 = blok
-R.blok1 = await tombol('Blok')
-await wait(1300)
-// set 2 = blok yang sama
+// set 1 = blok parametrik hidup, lalu salin ke set 2 agar titik awalnya identik
+await p.select('[data-testid="pilih-jenis-bentuk"]', 'blok')
+await wait(250)
+R.blok1 = await p.evaluate(() => {
+  const b = document.querySelector('[data-testid="terapkan-bentuk-cepat"]')
+  if (!b) return false
+  b.click()
+  return true
+})
+await wait(1100)
+R.blok2 = await p.evaluate(() => {
+  const b = document.querySelector('[data-testid^="bentuk-salin-berikut-"]')
+  if (!b || b.disabled) return false
+  b.click()
+  return true
+})
+await wait(1100)
+// pindah ke set 2, putar → sekaligus memasang jalur busur pada set 1
 await p.keyboard.press('BracketRight')
-await wait(1500)
-R.blok2 = await tombol('Blok')
-await wait(1300)
-// putar set 2 → sekaligus memasang jalur busur pada set 1 (putaran murni 90°)
+await wait(1400)
 R.putar = await tombol('Kanan ↻')
-await wait(1700)
-// geser set 2 → sekarang perpindahannya "putar sambil jalan"
-R.pilihJarak = await setSelect('Geser blok', 8)
-await wait(700)
-R.geser = await tombol('Ke Side 1')
-await wait(1600)
+await wait(1500)
+// geser set 2 sejauh 8 langkah ke Side 1 (Shift+ArrowRight = 4 langkah × 2)
+R.pilihJarak = await p.evaluate(() => {
+  const b = document.querySelector('[data-testid="inspektor-pilih-semua"]')
+  if (!b) return false
+  b.click()
+  return true
+})
+await wait(300)
+await p.keyboard.down('Shift')
+await p.keyboard.press('ArrowRight')
+await wait(250)
+await p.keyboard.press('ArrowRight')
+await p.keyboard.up('Shift')
+await wait(350)
+await p.keyboard.press('Escape')
+R.geser = true
+await wait(1200)
 
 // kembali ke set 1, tempat pengaturan gerakannya berada
 await p.keyboard.press('BracketLeft')
