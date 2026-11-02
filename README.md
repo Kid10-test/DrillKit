@@ -1038,6 +1038,8 @@ Rincian peta jalan dan catatan rilis lengkap tercatat di [`PETA-JALAN-v2.md`](PE
 
 ## Catatan untuk pengembangan lanjut
 
+> **Peta Jalan Generasi ke-3 (`#22`–`#30`):** Rencana pengembangan berikutnya pasca-`v2.1.0` menuju `v3.0.0` (pemeriksa tabrakan lintasan drill & penyelesai silang 1-klik, perspektif tribun juri *Press Box* + ekspor video `.webm`, penanda *Dress/Guiding*, studio *sticking* perkusi & pelatih intonasi/ritme mandiri, estafet QR berantai tanpa sinyal, konsol podium *Gitapati*, denah *Front Ensemble (Pit)*, serta bundel `.dkshow`) tercatat lengkap di **[`PETA-JALAN-v3.md`](PETA-JALAN-v3.md)**.
+
 * Menambah tabel baru: tambahkan secara tambah-murni (*additive-only*) di `src/db/db.ts` dengan `this.version(N).stores({...})` — saat ini berada di **Dexie `v16` (`28` store)** — dan daftarkan penanganannya di `src/lib/backup.ts` (diuji otomatis oleh `qa/backup-lengkap.mjs`).
 * **Jangan menulis (put/add/update) di dalam `useLiveQuery`** — ia berjalan di transaksi
   read-only dan akan memicu `ReadOnlyError`. Tulis cukup dari handler/aksi pengguna.

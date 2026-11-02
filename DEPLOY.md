@@ -12,8 +12,8 @@ dan bisa **install ke layar utama HP** (PWA) — tetap jalan offline.
 
 ## Opsi cepat: **mode portabel**, tanpa hosting sama sekali
 
-Kalau cuma mau mencoba atau memakai sendiri di HP/laptop lama, pakai **`drillkit-portable.zip`**.
-Berkasnya berisi **satu file `DrillKit.html`** (~2,8 MB, sudah menyertakan mesin partitur MusicXML offline) — semua kode ditanam di
+Kalau cuma mau mencoba atau memakai sendiri di HP/laptop lama, pakai **`drillkit-portable.zip`** (~912 KB ZIP).
+Berkasnya berisi **satu file `DrillKit.html`** (~3,3 MB, sudah menyertakan mesin partitur MusicXML offline) — semua kode ditanam di
 dalamnya, jadi tidak butuh server.
 
 Cara pakai di HP Android:
