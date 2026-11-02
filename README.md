@@ -1,25 +1,35 @@
-# DrillKit — Aplikasi Pelatih Marching Band
+# DrillKit — Platform Operasional *All-in-One* Pelatih Marching Band
 
 ![CI](https://github.com/Kid10-test/DrillKit/actions/workflows/ci/badge.svg)
 
-Aplikasi **all-in-one, gratis, dan offline-first** untuk pelatih marching band:
-editor formasi/drill (+ impor CSV Pyware), data anggota, absensi QR, jadwal latihan,
-metronom + tempo map + rekaman MP3, pembaca & cetak partitur MusicXML/`.mxl`/PDF
-dengan latihan per frasa, serta penerbitan materi terenkripsi ke anggota.
+Aplikasi **all-in-one, gratis, tanpa server/akun, dan 100% *offline-first*** untuk seluruh siklus tahunan unit marching band Indonesia:
+editor koreografi *Field Show* (*FTL, Move+Hold, Ripple, Moving Props*, + impor CSV Pyware) & **Mode Kirab / *Street Parade***,
+lembar hitungan ***Count Sheet Color Guard***, metronom + *tempo map* + rekaman audio + **pembaca/sintesis bunyi partitur MusicXML/`.mxl`/PDF** + drone harmoni *Just Intonation*,
+**matriks setoran hafalan (*Pass-Off*)** & kolaborasi multi-pelatih seksi, **simulasi penilaian juri (*Caption Recap* 100 poin + *Judge Tape*)**,
+**inventaris alat, *fitting* seragam, & manifes truk lomba**, absensi QR, penerbitan materi terenkripsi AES-256 ke anggota, hingga **audisi anggota baru, surat dispensasi A4 per sekolah/fakultas, kartu medis darurat bersandi AES-256-GCM, buku kas TC, & pembekuan arsip lintas-musim (*Season Rollover*)**.
 
-> Status: **Rilis stabil `v1.0.0` — seluruh modul utama & 11 rancangan lanjutan (#1–#11d) telah rampung penuh**
-> (dashboard, anggota, absensi, evaluasi, jadwal/kalender, drill & formasi,
-> musik/metronom/rekaman/partitur, run sheet hari lomba, berbagi/mode anggota,
-> pusat data, serta pengaturan & backup ZIP). Diuji otomatis lewat **116 rangkaian**
-> regresi headless (Node + Chromium). Lihat catatan rilis di [`RILIS-v1.0.0.md`](RILIS-v1.0.0.md).
+> Status: **Rilis stabil `v2.1.0` — seluruh fondasi `v1.0.0` (`#1`–`#11d`) dan seluruh 10 rancangan [`PETA-JALAN-v2.md`](PETA-JALAN-v2.md) (`#12`–`#21`) telah rampung 100%**.
+> Diuji otomatis lewat **135 rangkaian** regresi headless (`57` logika murni Node + `78` E2E Chromium), berjalan di atas **28 store IndexedDB (Dexie `v16`)** dengan **8 dependensi runtime** dan bundel JS awal tetap ramping di **`407,48 kB` (`132,80 kB` gzip)**.
+> Lihat catatan rilis lengkap di **[`RILIS-v2.1.0.md`](RILIS-v2.1.0.md)** (serta rilis perdana di [`RILIS-v1.0.0.md`](RILIS-v1.0.0.md)).
 
 **Mau langsung pakai?** Tiga bundel siap pakai tersedia di folder proyek (dapat dirakit ulang kapan saja dengan `bash scripts/siapkan-rilis.sh`):
 
-- **`drillkit-portable.zip`** — satu file `DrillKit.html` (~2,8 MB, termasuk mesin partitur OSMD), **buka langsung di HP/laptop tanpa
-  hosting**. Semua fitur jalan & data tersimpan di IndexedDB, tanpa perlu server.
-- **`drillkit-release.zip`** — versi untuk **hosting gratis** (Netlify Drop/Vercel/GitHub Pages)
-  supaya bisa di-install ke layar utama HP dan jalan offline penuh.
-- **`drillkit-siap-unggah.zip`** — bundel tarik-lepas ke Netlify Drop lengkap dengan pengingat `paket.json`. Panduan lengkap: [`DEPLOY.md`](DEPLOY.md).
+- **`drillkit-portable.zip`** (~912 KB ZIP → satu berkas `DrillKit.html` ~3,3 MB termasuk mesin partitur OSMD) — **buka langsung di HP/laptop tanpa internet & tanpa hosting** (`file://`). Semua fitur jalan penuh & data tersimpan lokal di IndexedDB.
+- **`drillkit-release.zip`** (~2,0 MB) — versi untuk **hosting gratis** (Netlify Drop/Vercel/GitHub Pages) supaya bisa di-*install* sebagai PWA ke layar utama HP dan jalan offline penuh.
+- **`drillkit-siap-unggah.zip`** (~2,0 MB) — bundel tarik-lepas ke Netlify Drop lengkap dengan pengingat `paket.json`. Panduan lengkap: [`DEPLOY.md`](DEPLOY.md).
+
+---
+
+## Peta Kapabilitas *All-in-One* (`v2.1.0`)
+
+| Ranah Operasional | Yang Tersedia Langsung di DrillKit |
+|---|---|
+| **Rekrutmen, Anggota, & Kehadiran** | Seleksi *Open Recruitment* 4 aspek + luluskan 1-klik (`#21a`), data nama resmi/panggilan (`#1`), kalender seri berulang & `.ics` (`#3`), absensi QR anti-tebak + kios PIN, rapor kehadiran & evaluasi per seksi. |
+| **Koreografi *Field Show*, *Guard*, & Kirab** | Lapangan football/sepak bola/GOR & patok Indonesia `A, B, #` (`#9`), impor CSV Pyware 3D (`#10`), jalur lengkung/busur/sub-grup, ***Follow-the-Leader* (FTL)**, bentuk cepat, ***Move+Hold***, ***Ripple***, simbol tanduk/visual, & ***Moving Props*** (`#16`), ***Count Sheet Color Guard*** (`#17`), serta **Mode Kirab / *Street Parade*, tikungan 90°, & *Display* VIP** (`#19`). |
+| **Musik, Partitur, Setoran, & Kolaborasi Staf** | Metronom *tempo map* & ramp (`#5`), tempo latihan naik otomatis (`#4`), rekaman audio tersinkron birama (`#6`), pembaca & cetak Lyre A5 partitur MusicXML/`.mxl`/PDF + *loop* frasa (`#11`), **bunyi notasi WebAudio & drone akor *Just Intonation*** (`#13`), **matriks setoran hafalan 6 jenjang** (`#14`), serta **gabung setoran asisten per seksi + log revisi show** (`#15`). |
+| **Logistik, Hari Lomba, & Simulasi Kejuaraan** | Buku induk inventaris & **Berita Acara A4**, ***uniform fitting***, & **manifes truk lomba 3-tahap** (`#18`), *run sheet* hitung mundur H-0 lomba, **simulasi penilaian juri (*Caption Recap* 100 poin + *Box 1–5*)**, kurva tren skor, & studio ***Judge Tape* tertaut Set/Birama** (`#20`). |
+| **Administrasi Unit, Medis, Kas, & Lintas-Musim** | Generator **Surat Dispensasi A4 otomatis per sekolah/fakultas** & **Kartu Medis Darurat terenkripsi sandi AES-256-GCM** (`#21b`), **Buku Kas / Iuran TC + Kwitansi A5**, serta **Pembekuan Arsip Musim (*Season Rollover*) + Piagam Musim A4** (`#21c`). |
+| **Distribusi Anggota & Pagar Privasi** | Penerbitan paket grup & paket pribadi terenkripsi **AES-256-GCM** (`#2`) lengkap partitur tersaring per-suara (`#13a`), buku saku koordinat, *count sheet* Guard, & kartu seragam pribadi — dengan pagar privasi keras atas seluruh data internal staf. |
 
 ---
 
@@ -65,11 +75,15 @@ drillkit/
 │  ├─ App.tsx               # daftar route + bootstrap pengaturan
 │  ├─ index.css             # Tailwind + tema
 │  ├─ db/
-│  │  ├─ types.ts           # ⭐ semua bentuk data — mulai baca dari sini
-│  │  ├─ db.ts              # skema IndexedDB (Dexie) + helper pengaturan
+│  │  ├─ types.ts           # ⭐ semua bentuk data (v1.0–v2.1) — mulai baca dari sini
+│  │  ├─ db.ts              # skema IndexedDB Dexie v16 (28 store tambah-murni) + helper pengaturan
 │  │  └─ seed.ts            # data contoh & util hapus data
 │  ├─ lib/
 │  │  ├─ field.ts           # ⭐ geometri lapangan, grid/patok yard–meter (#9)
+│  │  ├─ bentukFormasi.ts   # generator bentuk cepat, FTL, Move+Hold, Ripple, & simbol visual (#16)
+│  │  ├─ propertiGerak.ts   # properti panggung bergerak ber-keyframe posisi & rotasi (#16e)
+│  │  ├─ countSheet.ts      # lembar hitungan Color Guard per 8-hitungan & cetak A4/A5 (#17)
+│  │  ├─ parade.ts          # geometri koridor kirab, Banjar × Saf, tikungan 90°, & rute (#19)
 │  │  ├─ tempoTimeline.ts   # ⭐ evaluator tempo map per ketuk/subdivisi & ramp (#5)
 │  │  ├─ segmenDrill.ts     # garis waktu musik × drill, bantuan hitungan, pecah/gabung set (#5)
 │  │  ├─ metronome.ts       # penjadwal WebAudio, hitung mundur, loop bagian/frasa, jam rekaman
@@ -81,31 +95,41 @@ drillkit/
 │  │  ├─ partiturBagian.ts  # kamus instrumen dwibahasa, filter seksi, & pilihan anggota (#11c)
 │  │  ├─ partiturCetak.ts   # dokumen HTML cetak part / buku saku Lyre A5 murni hex (#11c)
 │  │  ├─ partiturFrasa.ts   # geometri sorot birama, loop frasa, & tautan frasa ↔ set drill (#11d)
+│  │  ├─ partiturPaket.ts   # pemangkas skor MusicXML per-suara untuk paket anggota (#13a)
+│  │  ├─ partiturBunyi.ts   # sintesis bunyi notasi WebAudio langsung dari MusicXML (#13b)
+│  │  ├─ setoran.ts         # matriks setoran hafalan 6 jenjang & progres seksi/pribadi (#14)
+│  │  ├─ kolaborasiSeksi.ts # paket setoran per-seksi & penggabungan anti-konflik (#15)
+│  │  ├─ logPerubahan.ts    # diff revisi koordinat drill / tempo lagu untuk anggota (#15)
+│  │  ├─ inventarisLogistik.ts # inventaris alat, fitting seragam, & manifes truk lomba (#18)
+│  │  ├─ penilaianJuri.ts   # templat Caption Recap 100 poin, Box 1–5, & petunjuk Judge Tape (#20)
+│  │  ├─ administrasiUnit.ts # audisi 4-aspek, medis AES-256-GCM, kas TC, & Season Rollover (#21)
 │  │  ├─ pyware.ts          # pengurai & interpolasi CSV lembar koordinat Pyware 3D (#10)
 │  │  ├─ bukaBerkas.ts      # satu pintu deteksi & pratinjau semua berkas DrillKit (#7)
+│  │  ├─ bagikan.ts         # penyusun paket grup/anggota & pagar privasi kupasDataKhususStaf
 │  │  ├─ terbit.ts          # penerbitan paket grup & enkripsi AES-256-GCM per anggota (#2)
 │  │  ├─ pinPelatih.ts      # pagar PIN pelatih tim via hash PBKDF2 saat build (#8)
 │  │  ├─ namaAnggota.ts     # nama resmi + panggilan & pencocokan lintas impor (#1)
 │  │  ├─ kalender.ts        # kalender bulan, agenda, seri berulang, & ekspor .ics (#3)
 │  │  ├─ laporan.ts         # laporan bulanan, kartu kehadiran, CSV matriks/ringkas (D4)
-│  │  ├─ tuner.ts           # deteksi nada dari mikrofon + nada dengung transposisi (E4)
+│  │  ├─ tuner.ts           # deteksi nada dari mikrofon + drone akor Just Intonation/12-TET (#13c)
 │  │  ├─ panduan.ts         # penyusun panduan 1 halaman A4 pelatih & anggota (F4, J1)
 │  │  ├─ kiosk.ts           # status kunci + penjaga global mode kios
 │  │  └─ shortcut.ts        # daftar shortcut editor (dipakai dialog ? & panduan)
 │  ├─ hooks/                # pembacaan pengaturan, mode anggota, tempo & frasa latihan
 │  ├─ components/
-│  │  ├─ ui.tsx             # Button, Card, Modal, Toast, ErrorBoundary, …
+│  │  ├─ ui.tsx             # Button, Card, Modal (portal z-[220]), Toast, ErrorBoundary, …
 │  │  ├─ DrillEditor.tsx    # editor formasi, penggaris musik × drill, & partitur pendamping
-│  │  ├─ LayarPartitur.tsx  # pembaca partitur OSMD/PDF, sorot birama, & pilih/loop frasa
+│  │  ├─ LayarPartitur.tsx  # pembaca partitur OSMD/PDF, bunyi not, & pilih/loop frasa
 │  │  ├─ BukaBerkas.tsx     # pintu seret-lepas & pratinjau berkas global (#7)
 │  │  ├─ ImporPyware.tsx    # modal impor CSV koordinat Pyware 3D (#10)
-│  │  ├─ TunerDrone.tsx     # penala & nada dengung di halaman Musik
+│  │  ├─ TunerDrone.tsx     # penala & drone harmoni Just Intonation di halaman Musik (#13c)
 │  │  ├─ Panduan.tsx        # kartu & pratinjau cetak "Panduan 1 halaman"
-│  │  └─ Layout.tsx         # sidebar desktop + bottom nav mobile
+│  │  ├─ Layout.tsx         # sidebar desktop + bilah bawah 4-menu & laci Lainnya di HP (#12b)
+│  │  └─ {anggota,drill,lomba,musik,pengaturan,share}/ # modul UI lazy-load per ranah (#12c–#21)
 │  └─ pages/                # satu file per menu (Dashboard, Members, Attendance, Evaluasi,
-│                           # Schedule, Drill, Music, Lomba, Share, Data, Settings)
-├─ qa/                      # ⭐ 116 rangkaian uji regresi (Node + Puppeteer) — lihat qa/README.md
-│  ├─ regresi-penuh.sh      # menjalankan ke-116 rangkaian lawan versi produksi
+│                           # Schedule, Drill, Music, Inventaris, Lomba, Share, Data, Settings)
+├─ qa/                      # ⭐ 135 rangkaian uji regresi (57 logika Node + 78 E2E Chromium)
+│  ├─ regresi-penuh.sh      # menjalankan ke-135 rangkaian lawan versi produksi
 │  ├─ bangun-logika.sh      # merakit modul TS murni ke /tmp/*.mjs untuk uji logika cepat
 │  └─ *.mjs                 # satu berkas per rangkaian uji
 ├─ scripts/
@@ -901,11 +925,11 @@ komputer tersebut belum mendukung `oklch()`.
     memuat sebagian kolom, jadi kolom yang tidak disebut **dipertahankan**
     dari data lama. Tanpa ini, menyunting satu judul lewat CSV akan
     menghapus materi latihan dan rencana latihan sesi itu tanpa kabar.
-  - **Setiap tabel wajib ikut backup.** Daftar tabel dibaca langsung dari
-    basis data oleh pengujian, sehingga tabel baru yang lupa didaftarkan
+  - **Setiap tabel wajib ikut backup.** Daftar ke-28 store Dexie `v16` dibaca langsung dari
+    basis data oleh pengujian (`qa/backup-lengkap.mjs`), sehingga store baru yang lupa didaftarkan
     akan menggagalkan uji — bukan menunggu seseorang kehilangan datanya
-    saat memindahkan perangkat. (Hanya `settings` dan `packages` yang
-    dikecualikan.)
+    saat memindahkan perangkat. (Hanya store lokal peramban seperti `settings`/`packages`/`simpanan`/`riwayat` yang dikecualikan dari payload tabel utama, sementara ketiga store Blob biner — `rekamanAudio`, `partiturBerkas`, dan `judgeTapeAudio` — ikut utuh di **Backup + rekaman (ZIP)**.)
+  - **Ekspor Medis Darurat Bersandi Mandiri (`#21b`).** Selain ikut dalam backup utuh pelatih, Kartu Medis & Kontak Darurat Lapangan dapat diekspor ke berkas terpisah terenkripsi kata sandi **WebCrypto PBKDF2-SHA256 + AES-256-GCM** untuk dipegang tim kesehatan/pendamping bus tanpa mengekspos data latihan lain.
 * Beberapa hal **sengaja tidak** bisa diimpor: **rekap absensi & laporan**
   (data turunan yang dihitung, bukan data asli), serta **drill, set formasi,
   dan lagu** lewat CSV (bentuknya bersarang — tempo map, titik pemain —
@@ -918,11 +942,10 @@ komputer tersebut belum mendukung `oklch()`.
     catatan siapa pun. Aman dibagikan ke mana saja, termasuk grup terbuka.
   - **Berkas per anggota**: satu ZIP berisi satu berkas per anak, sudah
     diberi namanya (`DrillKit-Andra-Pratama-A07.json`). Tiap berkas hanya
-    memuat absensi & catatan **anak itu sendiri**. Butuh satu pesan per
+    memuat absensi, catatan setoran, & perlengkapan seragam **anak itu sendiri**, serta partitur MusicXML yang otomatis dipangkas ke instrumen penerima (`#13a`). Butuh satu pesan per
     orang — itu biayanya, dan tertulis di layar.
-  - Yang **tidak pernah** ikut ke mana pun: token QR absensi, nomor
-    telepon, catatan pribadi pelatih, dan **nilai evaluasi** — yang sampai
-    ke anggota hanya tulisan pelatih, bukan angkanya.
+  - Yang **tidak pernah** ikut ke paket anggota maupun situs publik (`bersihkanAnggota` + `kupasDataKhususStaf`): token QR absensi, nomor
+    telepon, asal sekolah/fakultas & NIS/NIM, catatan internal pelatih, **nilai evaluasi angka** (yang sampai ke anggota hanya tulisan umpan balik pelatih, bukan angkanya), **simulasi penilaian juri & *Judge Tape*** (`#20`), **kartu medis darurat** (`#21b`), **data & nilai audisi** (`#21a`), **buku kas & tunggakan tim** (`#21c`), **arsip lintas-musim**, serta **daftar aset tim keseluruhan & ukuran seragam anggota lain** (`#18`).
   - Berkas per anggota **langsung mengenali pemiliknya**: begitu dibuka,
     namanya sudah terpilih — tidak perlu memilih dari daftar 18 orang.
     Namanya disebut dengan jelas dan bisa diganti, jadi kalau berkasnya
@@ -983,9 +1006,9 @@ komputer tersebut belum mendukung `oklch()`.
 
 ---
 
-## Gelombang fitur terbaru (#7–#11)
+## Gelombang fitur v1 (#7–#11 → `v1.0.0`)
 
-Rincian keputusan desain lengkap tercatat di [`RANCANGAN-LANJUTAN.md`](RANCANGAN-LANJUTAN.md):
+Rincian keputusan desain lengkap tercatat di [`RANCANGAN-LANJUTAN.md`](RANCANGAN-LANJUTAN.md) dan [`RILIS-v1.0.0.md`](RILIS-v1.0.0.md):
 
 * **Satu pintu “Buka berkas DrillKit” (`#7`)** — seret berkas apa pun ke jendela aplikasi (atau buka dari **Dashboard** / menu **Impor & ekspor data**). Isi berkas dikenali otomatis dari bitanya (backup JSON/ZIP, paket anggota, show, repertoar, data pilihan, CSV anggota/jadwal/absensi/koordinat, CSV Pyware, hingga partitur MusicXML/`.mxl`/PDF), selalu menampilkan pratinjau sebelum menulis, dan menolak paket anggota di mode pelatih agar tidak menimpa data tim.
 * **PIN pelatih tim (`#8`)** — bila variabel lingkungan `PIN_PELATIH` diisi saat `npm run build` / `npm run build:portable`, hash PBKDF2-SHA256 ditanam ke bundel sehingga pilihan **Saya pelatih** (dan keluar dari mode anggota) meminta PIN tim. Tanpa `PIN_PELATIH`, aplikasi berjalan persis seperti biasa tanpa rintangan.
@@ -999,11 +1022,25 @@ Rincian keputusan desain lengkap tercatat di [`RANCANGAN-LANJUTAN.md`](RANCANGAN
 
 ---
 
+## Gelombang *All-in-One* v2 (#12–#21 → `v2.1.0`)
+
+Rincian peta jalan dan catatan rilis lengkap tercatat di [`PETA-JALAN-v2.md`](PETA-JALAN-v2.md) dan **[`RILIS-v2.1.0.md`](RILIS-v2.1.0.md)**:
+
+* **Performa bundel, laci navigasi HP, modularisasi, & CI Node 24 (`#12` — `v1.0.1` & `v1.2.0`)** — pemisahan *lazy chunk* menurunkan bundel utama ke bawah batas keras `< 420 kB` (`407,48 kB`), bilah bawah HP diringkas menjadi 4 menu utama + laci **Lainnya**, modal diangkat ke *portal* `z-[220]`, dan komponen besar dipecah ke sub-modul per ranah.
+* **Jembatan musik pribadi, sintesis bunyi notasi, & drone harmoni (`#13` — `v1.1.0`)** — paket anggota otomatis memangkas partitur MusicXML ke *part* instrumen penerima + opsi menyertakan audio lagu ke ZIP anggota; tombol **Bunyikan not** memainkan pitch/ritme partitur lewat WebAudio; penala mendukung drone akor Mayor/Minor/Kuinta dalam **Just Intonation** (Brass Arc) maupun **12-TET** (Pit).
+* **Matriks setoran hafalan (*Pass-Off*) & kolaborasi multi-pelatih seksi (`#14`, `#15` — `v1.1.1` & `v1.1.2`)** — matriks ketuk-cepat 6 jenjang per segmen lagu, **Mode Uji Cepat *Section Leader*** di HP, alur 1-klik **Kirim/Gabung Setoran Seksi** antar asisten pelatih bebas bentrok, serta **Log Perubahan Show Otomatis** yang menyorot **`Menyangkut titikmu!`** di HP anggota ketika koordinat set atau tempo birama direvisi.
+* **Koreografi visual lanjut, *Count Sheet Color Guard*, & Mode Kirab jalan raya (`#16`, `#17`, `#19` — `v1.2.0`, `v1.2.1`, `v1.2.3`)** — jalur sub-grup per set, rantai ***Follow-the-Leader* (FTL)**, bentuk cepat berpratinjau titik hantu, ***Move + Hold***, gelombang ***Ripple***, 8 simbol visual/tanduk di buku saku, serta ***Moving Props*** ber-*keyframe*; lembar kerja ***Count Sheet Color Guard*** per blok 8-hitungan (cetak A4 / saku A5 `#hex` + tampil di HP Guard); serta **Mode Kirab / *Street Parade*** lengkap koridor jalan raya + panggung VIP, generator `Banjar × Saf`, simulasi tikungan 90° (*Wheel* vs *Counter-March*), kalkulator rute km & napas Brass, dan lembar komando A4.
+* **Inventaris alat, *fitting* seragam, & manifes logistik truk lomba (`#18` — `v1.2.2`)** — buku induk aset & riwayat servis + cetak **Berita Acara Peminjaman A4**, profil ukuran seragam lengkap + kartu seragam pribadi di paket anggota, serta manifes pemuatan truk 3-tahap (`Muat di Markas` → `Tiba di Arena` → `Kembali Pulang`) di Hari Lomba.
+* **Simulasi penilaian juri (*Caption Recap*) & studio *Judge Tape* (`#20` — `v2.0.0`)** — 6 templat mata lomba 100 poin (*Field Show, Street Parade, Indoor Winds, Indoor Percussion, Color Guard,* & kustom) lengkap klasifikasi *Box 1–5*, grafik tren skor SVG `#hex`, cetak *Caption Recap* A4, serta perekam ***Judge Tape*** (`db.judgeTapeAudio`) yang otomatis menautkan detik komentar ke **Set, Hitungan, & Birama** lagu.
+* **Audisi anggota baru, surat dispensasi A4, medis AES-256-GCM, buku kas TC, & *Season Rollover* (`#21` — `v2.1.0`)** — seleksi *Open Recruitment* 4 aspek + luluskan 1-klik (`#21a`); generator **Surat Dispensasi Kolektif A4** otomatis terpisah per sekolah/fakultas tujuan & **Kartu Medis Darurat** berekspor mandiri **AES-256-GCM** (`#21b`); serta **Buku Kas / Iuran TC + Kwitansi A5** dan **Pembekuan Arsip Lintas-Musim** lengkap **Piagam Musim A4** tanpa menghapus anggota aktif, inventaris, kartu medis, maupun pengaturan unit (`#21c`).
+
+---
+
 ## Catatan untuk pengembangan lanjut
 
-* Menambah tabel baru: tambahkan di `src/db/db.ts` dengan `this.version(N).stores({...})`.
+* Menambah tabel baru: tambahkan secara tambah-murni (*additive-only*) di `src/db/db.ts` dengan `this.version(N).stores({...})` — saat ini berada di **Dexie `v16` (`28` store)** — dan daftarkan penanganannya di `src/lib/backup.ts` (diuji otomatis oleh `qa/backup-lengkap.mjs`).
 * **Jangan menulis (put/add/update) di dalam `useLiveQuery`** — ia berjalan di transaksi
   read-only dan akan memicu `ReadOnlyError`. Tulis cukup dari handler/aksi pengguna.
 * Konversi koordinat terpusat di `src/lib/field.ts`; kalau mengubah tampilan papan,
   pastikan sumbu x = memanjang dan y = melintang (lihat bagian “Konvensi data”).
-* Setiap fitur baru wajib menjaga warna dokumen cetak/HTML & `layar-partitur` tetap heksadesimal/rgb murni (tanpa `oklch()`/`color-mix()`) serta mendaftarkan skrip ujinya di `qa/regresi-penuh.sh`.
+* Jaga bundel JS awal tetap di bawah **`< 420 kB`** (`qa/polesan-v101.mjs`) dengan memisahkan modul cetak A4/A5 dan panel sekunder ke *lazy chunk* (`React.lazy` / dynamic `import()`), jaga kedua panduan ringkas di `src/lib/panduan.ts` tetap pas **1 halaman A4** (`halamanA4 === 1`), pastikan seluruh keluaran cetak/SVG murni heksadesimal/rgb (tanpa `oklch()`/`color-mix()`/`rgba()`), serta daftarkan skrip uji setiap fitur baru di `qa/regresi-penuh.sh`.
