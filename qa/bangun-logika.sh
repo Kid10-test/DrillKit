@@ -139,6 +139,8 @@ rakit src/lib/tagAnggota.ts              tagAnggota
 rakit src/lib/mesinPointer.ts            mesinPointer
 rakit src/lib/paletPerintah.ts           paletPerintah
 rakit src/lib/shortcut.ts                shortcut
+# #24 — Pemeriksa Tabrakan Lintasan, Kerataan Interval, & Penyelesai Silang 1-Klik.
+rakit src/lib/tabrakanDrill.ts           tabrakanDrill
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.
