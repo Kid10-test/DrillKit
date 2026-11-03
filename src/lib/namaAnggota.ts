@@ -39,6 +39,7 @@ import type {
 } from '../db/types'
 import { gabungCatatanSetoran, idCatatanSetoran } from './setoran'
 import { gabungProfilUkuranSeragam } from './inventarisLogistik'
+import { gabungDaftarTag } from './tagAnggota'
 import { uid } from './utils'
 
 /* ------------------------------ Nama tampil -------------------------------- */
@@ -67,15 +68,15 @@ export function namaDenganPanggilan(m: { name: string; panggilan?: string }): st
   return `${m.name} (${panggil})`
 }
 
-/** Pencarian anggota menemukan nama lengkap, panggilan, dan kode. */
+/** Pencarian anggota menemukan nama lengkap, panggilan, kode, dan tags. */
 export function cocokCari(
-  m: { name?: string; panggilan?: string; code?: string; instrument?: string },
+  m: { name?: string; panggilan?: string; code?: string; instrument?: string; tags?: string[] },
   q: string,
   ikutInstrumen = false,
 ): boolean {
   const s = q.trim().toLowerCase()
   if (!s) return true
-  const bidang = [m.name, m.panggilan, m.code]
+  const bidang: (string | undefined)[] = [m.name, m.panggilan, m.code, ...(m.tags ?? [])]
   if (ikutInstrumen) bidang.push(m.instrument)
   return bidang.some((b) => (b ?? '').toLowerCase().includes(s))
 }
@@ -296,11 +297,19 @@ export function tulisUlangSet(
     set.bentukTerikat?.some((b) => b.memberIds.some((id) => id in peta)),
   )
   const sentuhRipple = sentuh(set.gerak?.ripple?.urutan)
-  if (!sentuh(set.points) && !sentuh(set.langkah) && !sentuhKelompok && !sentuhRipple && !sentuhBentuk) {
+  if (
+    !sentuh(set.points) &&
+    !sentuh(set.langkah) &&
+    !sentuh(set.midsets) &&
+    !sentuhKelompok &&
+    !sentuhRipple &&
+    !sentuhBentuk
+  ) {
     return { set, bentrok: [] }
   }
   const titik = petaKunci(set.points, peta, `Titik ${set.name || set.id}`)
   const langkah = set.langkah ? petaKunci(set.langkah, peta, `Langkah ${set.name || set.id}`) : null
+  const midsets = set.midsets ? petaKunci(set.midsets, peta, `Midset ${set.name || set.id}`) : null
   const rippleBaru =
     set.gerak?.ripple && sentuhRipple
       ? petaKunci(set.gerak.ripple.urutan, peta, `Ripple ${set.name || set.id}`)
@@ -341,12 +350,14 @@ export function tulisUlangSet(
       ...set,
       points: titik.rec,
       ...(langkah ? { langkah: langkah.rec } : {}),
+      ...(midsets ? { midsets: Object.keys(midsets.rec).length ? midsets.rec : undefined } : {}),
       ...(gerakBaru ? { gerak: gerakBaru } : {}),
       ...(sentuhBentuk ? { bentukTerikat: bentukBaru?.length ? bentukBaru : undefined } : {}),
     },
     bentrok: [
       ...titik.bentrok,
       ...(langkah?.bentrok ?? []),
+      ...(midsets?.bentrok ?? []),
       ...(rippleBaru?.bentrok ?? []),
     ],
   }
@@ -834,6 +845,7 @@ function gabungRestore(file: Member, lokal: Member): Member {
     phone: file.phone !== undefined ? file.phone : lokal.phone,
     notes: file.notes !== undefined ? file.notes : lokal.notes,
     ukuranSeragam: gabungProfilUkuranSeragam(file.ukuranSeragam, lokal.ukuranSeragam),
+    tags: gabungDaftarTag(file.tags, lokal.tags),
     panggilan: file.panggilan?.trim() || lokal.panggilan?.trim() || undefined,
     alias,
   })
@@ -870,6 +882,7 @@ function adopsi(lokal: Member, induk: Member, tokenBaru: () => string): Member {
     phone: lokal.phone?.trim() ? lokal.phone : induk.phone,
     notes: lokal.notes?.trim() ? lokal.notes : induk.notes,
     ukuranSeragam: gabungProfilUkuranSeragam(induk.ukuranSeragam, lokal.ukuranSeragam),
+    tags: gabungDaftarTag(induk.tags, lokal.tags),
     panggilan: panggilan || undefined,
     alias,
     createdAt: Math.min(lokal.createdAt || Date.now(), induk.createdAt || Date.now()),
@@ -1146,6 +1159,8 @@ export function rencanakanGabung(opts: {
   if (!isi.nomorInduk?.trim() && opts.buang.nomorInduk?.trim()) isi.nomorInduk = opts.buang.nomorInduk
   const ukuranGabung = gabungProfilUkuranSeragam(isi.ukuranSeragam, opts.buang.ukuranSeragam)
   if (ukuranGabung) isi.ukuranSeragam = ukuranGabung
+  const tagsGabung = gabungDaftarTag(isi.tags, opts.buang.tags)
+  if (tagsGabung) isi.tags = tagsGabung
 
   const sets = (tulis.data.sets ?? []).filter((s, i) => s !== opts.sets[i])
   const drills = (tulis.data.drills ?? []).filter((d, i) => d !== opts.drills[i])

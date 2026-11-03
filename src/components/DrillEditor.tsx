@@ -17,7 +17,9 @@ import type {
   GerakSet,
   InstruksiVisualSet,
   Member,
+  TimpaanTampilanTag,
   TitikKendaliYd,
+  TitikSinggahMidset,
 } from '../db/types'
 import {
   Button,
@@ -105,14 +107,43 @@ import {
   cocokPutaran,
   countEfektifPemain,
   deltaBusur,
+  deltaMidsets,
   deltaPoliFtl,
   gerakOf,
   kelompokPemain,
+  normalisasiMidsetsPemain,
+  panjangJalurMidsets,
   pathPoliFtl,
   progresPemain,
+  sinkronkanKelompokDariTag,
   titikJalur,
   turunkanPusatAkhir,
 } from '../lib/gerak'
+import {
+  gayaTitikPemain,
+  kumpulkanTagRoster,
+  lepasTagDariAnggota,
+  pasangTagKeAnggota,
+  punyaTag,
+} from '../lib/tagAnggota'
+import {
+  AMBANG_GESER_PX,
+  DURASI_TEKAN_LAMA_MS,
+  VIEWPORT_AWAL,
+  aksiSeretKanvasKosong,
+  hitungCubitDuaJari,
+  hitungRadiusTangkapSvg,
+  hitungViewBoxKanvas,
+  jepitViewport,
+  peranPointerEfektif,
+  zoomSekitarTitik,
+  type AlatKanvas,
+  type ModeInputKanvas,
+  type PeranPointer,
+  type ViewportKanvas,
+} from '../lib/mesinPointer'
+import { lengkapiReferensiPintasan, type ItemPaletPerintah } from '../lib/paletPerintah'
+import { DAFTAR_SHORTCUT } from '../lib/shortcut'
 import { PenggarisMusikDrill } from './drill/PenggarisMusikDrill'
 import { PanelAnalitikGerak } from './drill/PanelAnalitikGerak'
 import { PanelAlatFormasi } from './drill/PanelAlatFormasi'
@@ -144,19 +175,19 @@ import CopySetModal from './CopySetModal'
 import TukarCsvModal from './TukarCsv'
 import ImporPywareModal from './ImporPyware'
 import { intipTitipan } from './BukaBerkas'
-import { Jejak, TapakLangkah } from './JejakLangkah'
+import { Jejak, TapakLangkah, TitikPemainBentuk } from './JejakLangkah'
 import type { BusurGambar } from './JejakLangkah'
 import { PointInspector } from './PointInspector'
 import { PerformerDetailModal } from './PerformerDetailModal'
 import { DotSheetModal } from './DotSheetModal'
 import { DrillSettingsModal } from './DrillSettingsModal'
-import { ShortcutHelp } from './ShortcutHelp'
+import { PaletPerintah } from './PaletPerintah'
 
 /* ========================================================================== */
 /*  Editor                                                                     */
 /* ========================================================================== */
 
-type Tool = 'select' | 'lasso' | 'place'
+type Tool = AlatKanvas
 
 /**
  * Pengaturan tampilan editor (A5: jejak gerakan & panah arah).
@@ -199,6 +230,8 @@ type Tampilan = {
   /** #22.4 — resolusi pembulatan langkah mandiri pada sumbu X & Y. */
   langkahX: LangkahBulat
   langkahY: LangkahBulat
+  /** #23.3 — mode input pointer kanvas (`otomatis`, `sentuh`, `tetikus`). */
+  modeInput: ModeInputKanvas
 }
 const TAMPILAN_AWAL: Tampilan = {
   snap: true,
@@ -218,6 +251,7 @@ const TAMPILAN_AWAL: Tampilan = {
   kunciSumbu: 'bebas',
   langkahX: 1,
   langkahY: 1,
+  modeInput: 'otomatis',
 }
 
 function bacaTampilan(): Tampilan {
@@ -578,6 +612,50 @@ export function Editor({
     nextBentuk?: BentukTerikat[]
     moved: boolean
   } | null>(null)
+  /** #23.1 — seret titik singgah (Midset) langsung pada garis jejak biru di kanvas. */
+  const gagangMidsetRef = useRef<{
+    memberId: string
+    indeks: number
+    padaCount: number
+    startX: number
+    startY: number
+    asalTitik: TitikKendaliYd
+    baruDibuat: boolean
+    origMidsets: Record<string, TitikSinggahMidset[]>
+    nextMidsets?: Record<string, TitikSinggahMidset[]>
+    moved: boolean
+  } | null>(null)
+  /** #23.2 — input pemberian tag cepat untuk pemain terpilih di editor. */
+  const [inputTagMassal, setInputTagMassal] = useState('')
+  /** #23.3 — viewport zoom/pan kanvas, deteksi pointer terakhir, target cepat, & balon tekan-lama. */
+  const [viewport, setViewport] = useState<ViewportKanvas>(VIEWPORT_AWAL)
+  const viewportRef = useRef<ViewportKanvas>(VIEWPORT_AWAL)
+  viewportRef.current = viewport
+  const [pointerTerakhir, setPointerTerakhir] = useState<PeranPointer>('tetikus')
+  const [lebarSvgPx, setLebarSvgPx] = useState(760)
+  const [siapLetakkanId, setSiapLetakkanId] = useState<string | null>(null)
+  const [balonInfo, setBalonInfo] = useState<{ x: number; y: number; teks: string } | null>(null)
+  const timerTekanLamaRef = useRef<number>(0)
+  const panGeserRef = useRef<{
+    pointerId: number
+    startClientX: number
+    startClientY: number
+    vpAwal: ViewportKanvas
+    rect: { left: number; top: number; width: number; height: number }
+    moved: boolean
+    additive: boolean
+  } | null>(null)
+  const jariAktifRef = useRef(
+    new Map<number, { awalX: number; awalY: number; kiniX: number; kiniY: number }>(),
+  )
+  const cubitAwalRef = useRef<{
+    vpAwal: ViewportKanvas
+    idA: number
+    idB: number
+    awalA: { x: number; y: number }
+    awalB: { x: number; y: number }
+    rect: { left: number; top: number; width: number; height: number }
+  } | null>(null)
   /** callback ref yang stabil per pemain (tidak dibuat ulang tiap render) */
   const dotRefCb = useCallback((id: string) => {
     let cb = dotCbs.current.get(id)
@@ -649,15 +727,21 @@ export function Editor({
     setId: string
     points: Record<string, DrillPoint>
     bentukTerikat?: BentukTerikat[]
+    midsets?: Record<string, TitikSinggahMidset[]>
   }[]
   /** 'salin' = dari set ini ke set lain · 'ambil' = dari set lain ke set ini. */
   const [copyMode, setCopyMode] = useState<'salin' | 'ambil' | null>(null)
   const [history, setHistory] = useState<Langkah[]>([])
   const [future, setFuture] = useState<Langkah[]>([])
 
-  /** Simpan keadaan beberapa set sebagai satu langkah riwayat (termasuk bentukTerikat). */
+  /** Simpan keadaan beberapa set sebagai satu langkah riwayat (termasuk bentukTerikat & midsets). */
   function snapshotMany(
-    list: { id: string; points: Record<string, DrillPoint>; bentukTerikat?: BentukTerikat[] }[],
+    list: {
+      id: string
+      points: Record<string, DrillPoint>
+      bentukTerikat?: BentukTerikat[]
+      midsets?: Record<string, TitikSinggahMidset[]>
+    }[],
   ) {
     if (!list.length) return
     const langkah: Langkah = list.map((s) => ({
@@ -666,15 +750,28 @@ export function Editor({
       bentukTerikat: s.bentukTerikat?.length
         ? (JSON.parse(JSON.stringify(s.bentukTerikat)) as BentukTerikat[])
         : undefined,
+      midsets:
+        s.midsets && Object.keys(s.midsets).length
+          ? (JSON.parse(JSON.stringify(s.midsets)) as Record<string, TitikSinggahMidset[]>)
+          : undefined,
     }))
     setHistory((h) => [...h.slice(-49), langkah])
     setFuture([])
   }
 
-  /** Panggil sebelum mengubah titik/bentuk, supaya keadaan lama bisa dikembalikan. */
+  /** Panggil sebelum mengubah titik/bentuk/midset, supaya keadaan lama bisa dikembalikan. */
   function snapshot() {
     const cur = setRef.current
-    if (cur) snapshotMany([{ id: cur.id, points: cur.points, bentukTerikat: cur.bentukTerikat }])
+    if (cur) {
+      snapshotMany([
+        {
+          id: cur.id,
+          points: cur.points,
+          bentukTerikat: cur.bentukTerikat,
+          midsets: cur.midsets,
+        },
+      ])
+    }
   }
 
   const undo = useCallback(async () => {
@@ -689,6 +786,10 @@ export function Editor({
         bentukTerikat: s?.bentukTerikat?.length
           ? (JSON.parse(JSON.stringify(s.bentukTerikat)) as BentukTerikat[])
           : undefined,
+        midsets:
+          s?.midsets && Object.keys(s.midsets).length
+            ? (JSON.parse(JSON.stringify(s.midsets)) as Record<string, TitikSinggahMidset[]>)
+            : undefined,
       }
     })
     setFuture((f) => [sekarang, ...f.slice(0, 49)])
@@ -698,6 +799,7 @@ export function Editor({
         db.sets.update(e.setId, {
           points: e.points,
           bentukTerikat: e.bentukTerikat?.length ? e.bentukTerikat : undefined,
+          midsets: e.midsets && Object.keys(e.midsets).length ? e.midsets : undefined,
         }),
       ),
     )
@@ -717,6 +819,10 @@ export function Editor({
         bentukTerikat: s?.bentukTerikat?.length
           ? (JSON.parse(JSON.stringify(s.bentukTerikat)) as BentukTerikat[])
           : undefined,
+        midsets:
+          s?.midsets && Object.keys(s.midsets).length
+            ? (JSON.parse(JSON.stringify(s.midsets)) as Record<string, TitikSinggahMidset[]>)
+            : undefined,
       }
     })
     setHistory((h) => [...h.slice(-49), sekarang])
@@ -726,6 +832,7 @@ export function Editor({
         db.sets.update(e.setId, {
           points: e.points,
           bentukTerikat: e.bentukTerikat?.length ? e.bentukTerikat : undefined,
+          midsets: e.midsets && Object.keys(e.midsets).length ? e.midsets : undefined,
         }),
       ),
     )
@@ -745,8 +852,14 @@ export function Editor({
   const fRef = useRef(f)
   fRef.current = f
   const sYd = stepYd(f)
-  /** DD2 — cara pemain berpindah ke set berikutnya pada set yang aktif. */
-  const gerakSet = gerakOf(set?.gerak)
+  const roster = members.filter((m) => (drill.rosterIds.length ? drill.rosterIds.includes(m.id) : true))
+  const daftarTagRoster = useMemo(() => kumpulkanTagRoster(roster), [roster])
+  /** DD2 & #23.2 — cara pemain berpindah ke set berikutnya (kelompok terikat Tag disinkronkan). */
+  const gerakSet = useMemo(() => {
+    const mentah = gerakOf(set?.gerak)
+    const klp = sinkronkanKelompokDariTag(mentah.kelompok, roster)
+    return klp !== mentah.kelompok ? { ...mentah, kelompok: klp } : mentah
+  }, [set?.gerak, roster])
   /** DD2 — gerak set SEBELUMNYA: dipakai jejak "masuk" (kuning). */
   const gerakSebelum = gerakOf(prevSet?.gerak)
   /** DD2 — simpan pengaturan gerak untuk set yang sedang aktif. */
@@ -764,6 +877,13 @@ export function Editor({
     db.sets.update(set.id, { visual: vis })
     forceRender()
   }
+  /** #23.2 — simpan timpaan warna/bentuk titik berbasis Tag khusus pada set aktif. */
+  function simpanTampilanTagSet(peta: Record<string, TimpaanTampilanTag> | undefined) {
+    if (!set) return
+    set.tampilanTag = peta
+    void db.sets.update(set.id, { tampilanTag: peta })
+    forceRender()
+  }
   /**
    * Versi ref — dipakai handler animasi yang dipasang sekali di `useEffect`,
    * supaya tidak terjebak closure usang seperti yang pernah terjadi pada
@@ -778,10 +898,13 @@ export function Editor({
    */
   const uk = (n: number) => ukurTitik(f, n)
 
-  const roster = members.filter((m) => (drill.rosterIds.length ? drill.rosterIds.includes(m.id) : true))
   /** DD2 — section yang ada di drill ini, dipakai untuk mengatur tunda mulai. */
   const seksiUnik = [...new Set(roster.map((m) => m.section))]
-  const visible = roster.filter((m) => (sectionFilter === 'all' ? true : m.section === sectionFilter))
+  const visible = roster.filter((m) => {
+    if (sectionFilter === 'all') return true
+    if (sectionFilter.startsWith('tag:')) return punyaTag(m, sectionFilter.slice(4))
+    return m.section === sectionFilter
+  })
   const visibleIds = new Set(visible.map((m) => m.id))
   /** Versi ref supaya handler yang dipasang sekali selalu membaca data terbaru. */
   /** DD3 — analitik gerak untuk perpindahan yang sedang aktif. */
@@ -905,6 +1028,17 @@ export function Editor({
       if (ftlYd && ftlYd.totalPanjang > 0) return Math.max(1, Math.round(ftlYd.totalPanjang / sYd))
     }
     const klp = kelompokPemain(gerakSet, id)
+    if (!lurus && set?.midsets?.[id]?.length) {
+      const kAkhir = klp
+        ? klp.jalur === 'lengkung'
+          ? (klp.lengkung ?? 0.4)
+          : 0
+        : gerakSet.jalur === 'lengkung'
+          ? gerakSet.lengkung
+          : 0
+      const jrkMid = panjangJalurMidsets(dari, ke, set.midsets[id], set.counts || 8, kAkhir)
+      return Math.max(1, Math.round(jrkMid / sYd))
+    }
     // 31e — sama dengan analitik: `lurus` mengabaikan kelengkungan.
     const rasio = lurus
       ? 1
@@ -933,6 +1067,20 @@ export function Editor({
         payload.bentukTerikat = bentukBaru && bentukBaru.length ? bentukBaru : undefined
       }
       await db.sets.update(setId, payload)
+      await db.drills.update(drill.id, { updatedAt: Date.now() })
+    },
+    [set?.id, drill.id],
+  )
+
+  const writeMidsets = useCallback(
+    async (
+      midsetsBaru: Record<string, TitikSinggahMidset[]> | undefined,
+      setId = set?.id,
+    ) => {
+      if (!setId) return
+      const rapi =
+        midsetsBaru && Object.keys(midsetsBaru).length ? midsetsBaru : undefined
+      await db.sets.update(setId, { midsets: rapi })
       await db.drills.update(drill.id, { updatedAt: Date.now() })
     },
     [set?.id, drill.id],
@@ -1132,6 +1280,7 @@ export function Editor({
       counts: set.counts,
       points: set.points,
       gerak: set.gerak,
+      midsets: set.midsets,
       tujuan: nextSet.points,
       di,
       porsi,
@@ -1148,9 +1297,14 @@ export function Editor({
       counts: hasil.hitunganKedua,
       points: hasil.tengah,
       gerak: hasil.gerakKedua,
+      ...(hasil.midsetsKedua ? { midsets: hasil.midsetsKedua } : {}),
       createdAt: Date.now(),
     }
-    await db.sets.update(set.id, { counts: hasil.hitunganPertama, gerak: hasil.gerakPertama })
+    await db.sets.update(set.id, {
+      counts: hasil.hitunganPertama,
+      gerak: hasil.gerakPertama,
+      midsets: hasil.midsetsPertama,
+    })
     await db.sets.put(baru)
     if (countSheetsDrill?.length) {
       await Promise.all(
@@ -1181,9 +1335,32 @@ export function Editor({
   async function gabungSetBerikut() {
     if (!set || !nextSet) return
     await foto(drill.id, 'sebelum-gabung-set')
-    const counts = Math.max(1, Math.floor(set.counts)) + Math.max(1, Math.floor(nextSet.counts))
+    const countsAwal = Math.max(1, Math.floor(set.counts))
+    const countsKedua = Math.max(1, Math.floor(nextSet.counts))
+    const counts = countsAwal + countsKedua
     const gerak = gabungGerak(set.gerak, nextSet.gerak)
-    await db.sets.update(set.id, { counts, gerak })
+    const midsetsGabung: Record<string, TitikSinggahMidset[]> = {}
+    const semuaIdMid = new Set([
+      ...Object.keys(set.midsets ?? {}),
+      ...Object.keys(nextSet.midsets ?? {}),
+    ])
+    for (const id of semuaIdMid) {
+      const a = normalisasiMidsetsPemain(set.midsets?.[id], countsAwal)
+      const b = normalisasiMidsetsPemain(nextSet.midsets?.[id], countsKedua).map((w) => ({
+        ...w,
+        padaCount: w.padaCount + countsAwal,
+      }))
+      const titikTengah = nextSet.points[id]
+        ? [{ padaCount: countsAwal, x: nextSet.points[id].x, y: nextSet.points[id].y }]
+        : []
+      const rapi = normalisasiMidsetsPemain([...a, ...titikTengah, ...b], counts)
+      if (rapi.length) midsetsGabung[id] = rapi
+    }
+    await db.sets.update(set.id, {
+      counts,
+      gerak,
+      midsets: Object.keys(midsetsGabung).length ? midsetsGabung : undefined,
+    })
     const idLeleh = nextSet.id
     await db.sets.delete(idLeleh)
     await bersihkanKeyframeSetPenanda(idLeleh)
@@ -1520,6 +1697,39 @@ export function Editor({
   const ftlRef = useRef(ftlKeluar)
   ftlRef.current = ftlKeluar
 
+  /** #23.1 — peta titik singgah (Midsets) keluar & masuk dalam satuan gambar SVG. */
+  const midsetsSvgKeluar = useMemo(() => {
+    const peta = new Map<string, TitikSinggahMidset[]>()
+    if (!set?.midsets) return peta
+    const counts = Math.max(2, Math.floor(set.counts || 8))
+    for (const [id, daftar] of Object.entries(set.midsets)) {
+      const rapi = normalisasiMidsetsPemain(daftar, counts)
+      if (!rapi.length) continue
+      peta.set(
+        id,
+        rapi.map((w) => ({ ...w, x: sx(w.x), y: sy(w.y) })),
+      )
+    }
+    return peta
+  }, [set?.midsets, set?.counts, sx, sy])
+  const midsetsSvgRef = useRef(midsetsSvgKeluar)
+  midsetsSvgRef.current = midsetsSvgKeluar
+
+  const midsetsSvgMasuk = useMemo(() => {
+    const peta = new Map<string, TitikSinggahMidset[]>()
+    if (!prevSet?.midsets) return peta
+    const counts = Math.max(2, Math.floor(prevSet.counts || 8))
+    for (const [id, daftar] of Object.entries(prevSet.midsets)) {
+      const rapi = normalisasiMidsetsPemain(daftar, counts)
+      if (!rapi.length) continue
+      peta.set(
+        id,
+        rapi.map((w) => ({ ...w, x: sx(w.x), y: sy(w.y) })),
+      )
+    }
+    return peta
+  }, [prevSet?.midsets, prevSet?.counts, sx, sy])
+
   /** #16.2 — pratinjau langsung bentuk cepat di kanvas sebelum diterapkan. */
   const pratinjauTitikBentuk = useMemo(() => {
     if (!pratinjauBentukAktif || !set) return null
@@ -1640,6 +1850,215 @@ export function Editor({
   const snapVal = (x: number, y: number) =>
     bulatkanKoordinatSumbu(x, y, fRef.current, opsiPembulatanRef.current)
 
+  /* ------------------ #23.1, #23.2, & #23.3 — Helper Kanvas ------------------ */
+
+  const viewBoxKanvas = useMemo(() => hitungViewBoxKanvas(viewport, VW, VH), [viewport, VW, VH])
+  const peranAktif = useMemo(
+    () =>
+      peranPointerEfektif(
+        view.modeInput,
+        pointerTerakhir === 'sentuh' ? 'touch' : pointerTerakhir === 'pena' ? 'pen' : 'mouse',
+      ),
+    [view.modeInput, pointerTerakhir],
+  )
+  const rHitSentuh = useMemo(
+    () => hitungRadiusTangkapSvg(viewBoxKanvas.width, lebarSvgPx, peranAktif, uk(1.35)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [viewBoxKanvas.width, lebarSvgPx, peranAktif, f],
+  )
+  const siapLetakkanRef = useRef<string | null>(null)
+  siapLetakkanRef.current = siapLetakkanId
+
+  useEffect(() => {
+    const ukur = () => {
+      if (svgRef.current?.clientWidth) setLebarSvgPx(svgRef.current.clientWidth)
+    }
+    ukur()
+    window.addEventListener('resize', ukur)
+    return () => window.removeEventListener('resize', ukur)
+  }, [])
+
+  function batalkanTimerBalon() {
+    if (timerTekanLamaRef.current) {
+      window.clearTimeout(timerTekanLamaRef.current)
+      timerTekanLamaRef.current = 0
+    }
+  }
+
+  function jadwalkanBalonSentuh(clientX: number, clientY: number, teks: string, peran: PeranPointer) {
+    batalkanTimerBalon()
+    if (peran !== 'sentuh' || !teks.trim()) return
+    timerTekanLamaRef.current = window.setTimeout(() => {
+      timerTekanLamaRef.current = 0
+      setBalonInfo({ x: clientX, y: clientY, teks: teks.trim() })
+    }, DURASI_TEKAN_LAMA_MS)
+  }
+
+  useEffect(() => {
+    if (!balonInfo) return
+    const id = window.setTimeout(() => setBalonInfo(null), 2800)
+    return () => window.clearTimeout(id)
+  }, [balonInfo])
+
+  function ubahZoomKanvas(faktor: number) {
+    setViewport((vp) => {
+      const vb = hitungViewBoxKanvas(vp, VW, VH)
+      return zoomSekitarTitik(vp, faktor, vb.x + vb.width / 2, vb.y + vb.height / 2, VW, VH)
+    })
+  }
+
+  function resetViewportKanvas() {
+    setViewport(VIEWPORT_AWAL)
+  }
+
+  function cariCountSinggahBebas(daftar: TitikSinggahMidset[], counts: number): number | null {
+    const batas = Math.floor(counts)
+    if (batas < 2) return null
+    const urut = normalisasiMidsetsPemain(daftar, batas)
+    const dipakai = new Set(urut.map((w) => Math.round(w.padaCount)))
+    const tengah = Math.max(1, Math.min(batas - 1, Math.round(batas / 2)))
+    if (!dipakai.has(tengah)) return tengah
+    const simpul = [0, ...urut.map((w) => w.padaCount), batas]
+    let celahTerbesar = 0
+    let kandidat: number | null = null
+    for (let i = 0; i < simpul.length - 1; i++) {
+      const celah = simpul[i + 1] - simpul[i]
+      const c = Math.round((simpul[i] + simpul[i + 1]) / 2)
+      if (celah > celahTerbesar && c > 0 && c < batas && !dipakai.has(c)) {
+        celahTerbesar = celah
+        kandidat = c
+      }
+    }
+    if (kandidat !== null) return kandidat
+    for (let c = 1; c < batas; c++) {
+      if (!dipakai.has(c)) return c
+    }
+    return null
+  }
+
+  function posisiJalurPemainYd(id: string, padaCount: number): TitikKendaliYd | null {
+    if (!set || !nextSet) return null
+    const p = set.points[id]
+    const q = nextSet.points[id]
+    if (!p || !q) return null
+    const counts = Math.max(2, set.counts || 8)
+    const t = Math.min(0.99, Math.max(0.01, padaCount / counts))
+    const klp = kelompokPemain(gerakSet, id)
+    const kAkhir = klp
+      ? klp.jalur === 'lengkung'
+        ? (klp.lengkung ?? 0.4)
+        : 0
+      : gerakSet.jalur === 'lengkung'
+        ? gerakSet.lengkung
+        : 0
+    const mid = set.midsets?.[id]
+    const [dx, dy] = mid?.length
+      ? deltaMidsets(p, q, mid, counts, t, kAkhir, klp?.jalanCount ?? gerakSet.jalanCount)
+      : titikJalur(t, q.x - p.x, q.y - p.y, kAkhir)
+    return { x: p.x + dx, y: p.y + dy }
+  }
+
+  function tambahMidsetPemain(memberId: string) {
+    if (!set || !nextSet) return
+    const counts = Math.max(0, Math.floor(set.counts || 0))
+    if (counts < 2) {
+      toast.push('Set harus berdurasi minimal 2 hitungan untuk titik singgah', 'info')
+      return
+    }
+    const daftarLama = normalisasiMidsetsPemain(set.midsets?.[memberId], counts)
+    const countBaru = cariCountSinggahBebas(daftarLama, counts)
+    if (countBaru === null) {
+      toast.push('Semua hitungan pada perpindahan ini sudah memiliki titik singgah', 'info')
+      return
+    }
+    const pos = posisiJalurPemainYd(memberId, countBaru)
+    if (!pos) return
+    const disnap = snapVal(pos.x, pos.y)
+    snapshot()
+    const baru = normalisasiMidsetsPemain(
+      [...daftarLama, { padaCount: countBaru, x: disnap.x, y: disnap.y }],
+      counts,
+    )
+    const petaBaru = { ...(set.midsets ?? {}), [memberId]: baru }
+    set.midsets = petaBaru
+    void writeMidsets(petaBaru, set.id)
+    forceRender()
+    toast.push(`Titik singgah hitungan ${countBaru} ditambahkan`)
+  }
+
+  function ubahCountMidsetPemain(memberId: string, indeks: number, padaCountBaru: number) {
+    if (!set) return
+    const counts = Math.max(2, Math.floor(set.counts || 8))
+    const daftarLama = normalisasiMidsetsPemain(set.midsets?.[memberId], counts)
+    if (!daftarLama[indeks]) return
+    snapshot()
+    const diubah = daftarLama.map((w, i) =>
+      i === indeks
+        ? { ...w, padaCount: Math.max(1, Math.min(counts - 1, Math.round(padaCountBaru))) }
+        : w,
+    )
+    const rapi = normalisasiMidsetsPemain(diubah, counts)
+    const petaBaru = { ...(set.midsets ?? {}), [memberId]: rapi }
+    set.midsets = petaBaru
+    void writeMidsets(petaBaru, set.id)
+    forceRender()
+  }
+
+  function hapusMidsetPemain(memberId: string, indeks?: number) {
+    if (!set?.midsets?.[memberId]?.length) return
+    const counts = Math.max(2, Math.floor(set.counts || 8))
+    const daftarLama = normalisasiMidsetsPemain(set.midsets[memberId], counts)
+    snapshot()
+    const sisa =
+      typeof indeks === 'number' ? daftarLama.filter((_, i) => i !== indeks) : []
+    const petaBaru = { ...set.midsets }
+    if (sisa.length) petaBaru[memberId] = sisa
+    else delete petaBaru[memberId]
+    set.midsets = Object.keys(petaBaru).length ? petaBaru : undefined
+    void writeMidsets(set.midsets, set.id)
+    forceRender()
+    toast.push('Titik singgah dihapus', 'info')
+  }
+
+  function pilihAnggotaBerTag(tag: string) {
+    if (!set) return
+    const cocok = roster
+      .filter((m) => punyaTag(m, tag) && Boolean(set.points[m.id]) && visibleIds.has(m.id))
+      .map((m) => m.id)
+    setSelected(cocok)
+    toast.push(
+      cocok.length
+        ? `${cocok.length} anggota ber-tag #${tag} dipilih`
+        : `Belum ada anggota #${tag} yang ditempatkan di set ini`,
+      'info',
+    )
+  }
+
+  async function pasangTagKePilihan(tagMentah: string) {
+    const tag = tagMentah.trim()
+    if (!tag || !selected.length) return
+    const target = selected
+      .map((id) => rosterById.get(id))
+      .filter((m): m is Member => Boolean(m))
+    if (!target.length) return
+    const diperbarui = target.map((m) => pasangTagKeAnggota(m, tag))
+    await db.members.bulkPut(diperbarui)
+    setInputTagMassal('')
+    toast.push(`Tag #${tag.replace(/^#+/, '').trim()} dipasang ke ${diperbarui.length} anggota`)
+  }
+
+  async function tambahTagSatuAnggota(memberId: string, tag: string) {
+    const m = rosterById.get(memberId)
+    if (!m || !tag.trim()) return
+    await db.members.put(pasangTagKeAnggota(m, tag))
+  }
+
+  async function hapusTagSatuAnggota(memberId: string, tag: string) {
+    const m = rosterById.get(memberId)
+    if (!m) return
+    await db.members.put(lepasTagDariAnggota(m, tag))
+  }
+
   /* --------------------------- Interaksi pointer --------------------------- */
 
   /** Konversi koordinat layar (clientX/Y) ke koordinat gambar SVG. */
@@ -1654,12 +2073,27 @@ export function Editor({
 
   function onPointerDownPoint(e: React.PointerEvent, memberId: string) {
     e.stopPropagation()
-    if (tool === 'place') return
+    const peran = peranPointerEfektif(view.modeInput, e.pointerType)
+    setPointerTerakhir(peran)
+    setBalonInfo(null)
+    setSiapLetakkanId(null)
+    if (tool === 'pan') return
     const additive = e.shiftKey || e.metaKey || e.ctrlKey
     const chosen = additive ? (selected.includes(memberId) ? selected : [...selected, memberId]) : [memberId]
     setSelected(chosen)
     const cur = setRef.current
     if (!cur) return
+    const mInfo = rosterById.get(memberId)
+    const pInfo = cur.points[memberId]
+    if (mInfo && pInfo) {
+      const infoTags = mInfo.tags?.length ? ` · #${mInfo.tags.join(' #')}` : ''
+      jadwalkanBalonSentuh(
+        e.clientX,
+        e.clientY,
+        `${mInfo.code} · ${mInfo.name} (${sectionLabel(mInfo.section)})${infoTags} — ${coorTextSafe(pInfo.x, pInfo.y, f)}`,
+        peran,
+      )
+    }
     const orig: Record<string, DrillPoint> = {}
     for (const id of chosen) if (cur.points[id]) orig[id] = { ...cur.points[id] }
     const u = clientToUser(e.clientX, e.clientY)
@@ -1748,6 +2182,15 @@ export function Editor({
         r.setAttribute('height', '0')
       }
       if (!m.moved) {
+        if (siapLetakkanRef.current) {
+          const { ix: gIx, iy: gIy } = geomRef.current
+          const pos = snapVal(gIx(m.x0), gIy(m.y0))
+          const targetId = siapLetakkanRef.current
+          setSiapLetakkanId(null)
+          updatePoint(targetId, pos)
+          setSelected([targetId])
+          return
+        }
         // Klik biasa di area kosong → kosongkan pilihan (kecuali menambah).
         if (!m.additive) setSelected([])
         return
@@ -2022,11 +2465,70 @@ export function Editor({
         cur.bentukTerikat = nextBentuk
         setSudutPutarBebas(deg)
         forceRender()
+        return
+      }
+
+      // 4) #23.1 — Gagang titik singgah (Midset) di garis jejak biru kanvas
+      const gm = gagangMidsetRef.current
+      if (gm) {
+        const rawDx = -(u.x - gm.startX)
+        const rawDy = -(u.y - gm.startY)
+        const { x: dx, y: dy } = terapkanKunciSumbu(
+          { x: 0, y: 0 },
+          { x: rawDx, y: rawDy },
+          kunciSumbuRef.current,
+        )
+        if (!gm.moved) {
+          if (Math.abs(dx) + Math.abs(dy) < 1e-4) return
+          snapshotMany([
+            {
+              id: cur.id,
+              points: cur.points,
+              bentukTerikat: cur.bentukTerikat,
+              midsets: Object.keys(gm.origMidsets).length ? gm.origMidsets : undefined,
+            },
+          ])
+          gm.moved = true
+        }
+        const dijepit = jepitKeLapangan(gm.asalTitik.x + dx, gm.asalTitik.y + dy, ff)
+        const disnap = bulatkanKoordinatSumbu(dijepit.x, dijepit.y, ff, opsiPembulatanRef.current)
+        const modeKunci = kunciSumbuRef.current
+        const koordAkhir =
+          modeKunci === 'hanya_x'
+            ? { x: disnap.x, y: gm.asalTitik.y }
+            : modeKunci === 'hanya_y'
+              ? { x: gm.asalTitik.x, y: disnap.y }
+              : disnap
+        const counts = Math.max(2, Math.floor(cur.counts || 8))
+        const daftarAsal = normalisasiMidsetsPemain(gm.origMidsets[gm.memberId], counts)
+        const entriBaru: TitikSinggahMidset = {
+          ...(gm.indeks >= 0 && daftarAsal[gm.indeks]
+            ? daftarAsal[gm.indeks]
+            : { padaCount: gm.padaCount }),
+          padaCount: gm.padaCount,
+          x: koordAkhir.x,
+          y: koordAkhir.y,
+        }
+        const gabungan =
+          gm.indeks >= 0
+            ? daftarAsal.map((w, i) => (i === gm.indeks ? entriBaru : w))
+            : [...daftarAsal, entriBaru]
+        const rapi = normalisasiMidsetsPemain(gabungan, counts)
+        const nextMidsets = { ...gm.origMidsets, [gm.memberId]: rapi }
+        gm.nextMidsets = nextMidsets
+        cur.midsets = nextMidsets
+        forceRender()
       }
     }
 
     function onMove(ev: PointerEvent) {
-      if (!gagangBentukRef.current && !gagangSkalaRef.current && !gagangPutarRef.current) return
+      if (
+        !gagangBentukRef.current &&
+        !gagangSkalaRef.current &&
+        !gagangPutarRef.current &&
+        !gagangMidsetRef.current
+      )
+        return
       gPending = ev
       if (gRaf) return
       gRaf = requestAnimationFrame(() => {
@@ -2063,6 +2565,39 @@ export function Editor({
       if (gp?.moved && gp.nextPoints && cur) {
         void writePoints(gp.nextPoints, cur.id, gp.nextBentuk ?? null)
       }
+
+      const gm = gagangMidsetRef.current
+      gagangMidsetRef.current = null
+      if (gm && cur) {
+        if (gm.moved && gm.nextMidsets) {
+          void writeMidsets(gm.nextMidsets, cur.id)
+        } else if (gm.baruDibuat && !gm.moved) {
+          // Ketuk tunggal pada gagang '+' jejak biru tetap menyisipkan titik singgah di tempatnya
+          snapshotMany([
+            {
+              id: cur.id,
+              points: cur.points,
+              bentukTerikat: cur.bentukTerikat,
+              midsets: Object.keys(gm.origMidsets).length ? gm.origMidsets : undefined,
+            },
+          ])
+          const counts = Math.max(2, Math.floor(cur.counts || 8))
+          const disnap = bulatkanKoordinatSumbu(
+            gm.asalTitik.x,
+            gm.asalTitik.y,
+            fRef.current,
+            opsiPembulatanRef.current,
+          )
+          const daftar = normalisasiMidsetsPemain(
+            [...(gm.origMidsets[gm.memberId] ?? []), { padaCount: gm.padaCount, x: disnap.x, y: disnap.y }],
+            counts,
+          )
+          const petaBaru = { ...gm.origMidsets, [gm.memberId]: daftar }
+          cur.midsets = petaBaru
+          void writeMidsets(petaBaru, cur.id)
+          forceRender()
+        }
+      }
     }
 
     window.addEventListener('pointermove', onMove)
@@ -2073,7 +2608,7 @@ export function Editor({
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
     }
-  }, [writePoints])
+  }, [writePoints, writeMidsets])
   /**
    * Karena saat menggeser React tidak di-render ulang, panel koordinat
    * diperbarui langsung lewat DOM supaya angkanya tetap hidup.
@@ -2114,6 +2649,8 @@ export function Editor({
       if (!d.moved) {
         // Abaikan getaran kecil, lalu simpan riwayat sekali di awal geseran.
         if (Math.abs(dx) + Math.abs(dy) < 1e-6) return
+        batalkanTimerBalon()
+        setBalonInfo(null)
         snapshot()
         d.moved = true
       }
@@ -2152,6 +2689,7 @@ export function Editor({
     }
 
     function onUp() {
+      batalkanTimerBalon()
       const d = dragRef.current
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current)
@@ -2217,19 +2755,58 @@ export function Editor({
 
   function onFieldClick(e: React.PointerEvent) {
     if (!set) return
-    if (tool === 'place' && selected.length === 1) {
-      const u = clientToUser(e.clientX, e.clientY)
-      const p = snapVal(ix(u.x), iy(u.y))
-      updatePoint(selected[0], p)
-      return
+    const peran = peranPointerEfektif(view.modeInput, e.pointerType)
+    setPointerTerakhir(peran)
+    setBalonInfo(null)
+    if (svgRef.current?.clientWidth) setLebarSvgPx(svgRef.current.clientWidth)
+
+    // #23.3 — lacak multi-jari untuk cubit 2 jari (pinch-to-zoom)
+    if (e.pointerType === 'touch' || peran === 'sentuh') {
+      jariAktifRef.current.set(e.pointerId, {
+        awalX: e.clientX,
+        awalY: e.clientY,
+        kiniX: e.clientX,
+        kiniY: e.clientY,
+      })
+      if (jariAktifRef.current.size === 2 && svgRef.current) {
+        const entri = [...jariAktifRef.current.entries()]
+        const r = svgRef.current.getBoundingClientRect()
+        cubitAwalRef.current = {
+          vpAwal: viewportRef.current,
+          idA: entri[0][0],
+          idB: entri[1][0],
+          awalA: { x: entri[0][1].kiniX, y: entri[0][1].kiniY },
+          awalB: { x: entri[1][1].kiniX, y: entri[1][1].kiniY },
+          rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+        }
+        panGeserRef.current = null
+        marqRef.current = null
+        lassoRef.current = null
+        dragRef.current = null
+        return
+      }
     }
-    if (tool === 'place') return
+
     const u = clientToUser(e.clientX, e.clientY)
     const additive = e.shiftKey || e.metaKey || e.ctrlKey
-    if (tool === 'lasso' || e.altKey) {
+    const aksi = aksiSeretKanvasKosong({ peran, alat: tool, altKey: e.altKey })
+    if (aksi === 'lasso') {
       lassoRef.current = {
         simpulYd: [{ x: ix(u.x), y: iy(u.y) }],
         simpulSvg: [{ sx: u.x, sy: u.y }],
+        moved: false,
+        additive,
+      }
+      return
+    }
+    if (aksi === 'pan' && svgRef.current) {
+      const r = svgRef.current.getBoundingClientRect()
+      panGeserRef.current = {
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        vpAwal: viewportRef.current,
+        rect: { left: r.left, top: r.top, width: Math.max(1, r.width), height: Math.max(1, r.height) },
         moved: false,
         additive,
       }
@@ -2244,6 +2821,100 @@ export function Editor({
       additive,
     }
   }
+
+  /**
+   * #23.3 — Geser kanvas 1 jari (`panGeserRef`), cubit 2 jari (`cubitAwalRef`),
+   * dan roda tetikus `Ctrl+Wheel` untuk memperbesar/memperkecil lapangan.
+   */
+  useEffect(() => {
+    function onMove(ev: PointerEvent) {
+      const jari = jariAktifRef.current.get(ev.pointerId)
+      if (jari) {
+        jari.kiniX = ev.clientX
+        jari.kiniY = ev.clientY
+      }
+      const cubit = cubitAwalRef.current
+      if (cubit && jariAktifRef.current.size >= 2) {
+        const jA = jariAktifRef.current.get(cubit.idA)
+        const jB = jariAktifRef.current.get(cubit.idB)
+        if (jA && jB) {
+          setViewport(
+            hitungCubitDuaJari(
+              cubit.awalA,
+              cubit.awalB,
+              { x: jA.kiniX, y: jA.kiniY },
+              { x: jB.kiniX, y: jB.kiniY },
+              cubit.vpAwal,
+              cubit.rect,
+              VW,
+              VH,
+            ),
+          )
+        }
+        return
+      }
+
+      const pg = panGeserRef.current
+      if (!pg || pg.pointerId !== ev.pointerId) return
+      const dxPx = ev.clientX - pg.startClientX
+      const dyPx = ev.clientY - pg.startClientY
+      if (!pg.moved && Math.hypot(dxPx, dyPx) < AMBANG_GESER_PX) return
+      pg.moved = true
+      const lebarView = VW / pg.vpAwal.zoom
+      const tinggiView = VH / pg.vpAwal.zoom
+      const panX = pg.vpAwal.panX - (dxPx / pg.rect.width) * lebarView
+      const panY = pg.vpAwal.panY - (dyPx / pg.rect.height) * tinggiView
+      setViewport(jepitViewport({ zoom: pg.vpAwal.zoom, panX, panY }, VW, VH))
+    }
+
+    function onUp(ev: PointerEvent) {
+      jariAktifRef.current.delete(ev.pointerId)
+      if (jariAktifRef.current.size < 2) {
+        cubitAwalRef.current = null
+      }
+      const pg = panGeserRef.current
+      if (!pg || pg.pointerId !== ev.pointerId) return
+      panGeserRef.current = null
+      if (!pg.moved) {
+        if (siapLetakkanRef.current) {
+          const u = clientToUser(ev.clientX, ev.clientY)
+          const { ix: gIx, iy: gIy } = geomRef.current
+          const pos = snapVal(gIx(u.x), gIy(u.y))
+          const targetId = siapLetakkanRef.current
+          setSiapLetakkanId(null)
+          updatePoint(targetId, pos)
+          setSelected([targetId])
+          return
+        }
+        if (!pg.additive) setSelected([])
+      }
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [VW, VH])
+
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      const u = clientToUser(e.clientX, e.clientY)
+      const faktor = e.deltaY < 0 ? 1.18 : 1 / 1.18
+      setViewport((vp) => zoomSekitarTitik(vp, faktor, u.x, u.y, VW, VH))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [VW, VH])
 
   /**
    * B3 — jalankan (atau hentikan) urutan latihan: semua set dimainkan
@@ -2266,6 +2937,12 @@ export function Editor({
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // #23.4 — Ctrl+K / ⌘K membuka/menutup Palet Perintah dari mana saja (termasuk dari input).
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault()
+        setBantuan((v) => !v)
+        return
+      }
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       // Undo / redo bisa dipakai kapan saja, bahkan tanpa titik terpilih.
@@ -2290,6 +2967,10 @@ export function Editor({
         // A7 — kalau sedang memetik penanda, Esc membatalkannya dulu.
         if (petik) {
           setPetik(null)
+          return
+        }
+        if (siapLetakkanRef.current) {
+          setSiapLetakkanId(null)
           return
         }
         setSelected([])
@@ -2504,15 +3185,32 @@ export function Editor({
           // ripple, Move+Hold, FTL, jalur sub-kelompok, atau busur.
           const t = progresPemain(p, gr, seksiMember.get(id), countsScrub, id)
           const ftl = ftlRef.current.get(id)
+          const midSvg = midsetsSvgRef.current.get(id)
           const klp = kelompokPemain(gr, id)
           const bs = busurKeluar.get(id)
+          const pAsal = set?.points[id]
+          const kAkhir = klp
+            ? klp.jalur === 'lengkung'
+              ? (klp.lengkung ?? 0.4)
+              : 0
+            : lengkungScrub
           const [tx, ty] = ftl
             ? deltaPoliFtl(ftl, t)
-            : klp
-              ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
-              : bs
-                ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser ?? { x: 0, y: 0 })
-                : titikJalur(t, vx, vy, lengkungScrub)
+            : midSvg && pAsal
+              ? deltaMidsets(
+                  { x: sx(pAsal.x), y: sy(pAsal.y) },
+                  { x: sx(pAsal.x) + vx, y: sy(pAsal.y) + vy },
+                  midSvg,
+                  countsScrub,
+                  p,
+                  kAkhir,
+                  klp?.jalanCount ?? gr.jalanCount,
+                )
+              : klp
+                ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
+                : bs
+                  ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser ?? { x: 0, y: 0 })
+                  : titikJalur(t, vx, vy, lengkungScrub)
           g.setAttribute('transform', `translate(${tx} ${ty})`)
         }
       }
@@ -2652,15 +3350,32 @@ export function Editor({
         // lalu posisinya pada FTL, sub-kelompok, busur, atau jalur utama.
         const t = progresPemain(p, gr, seksiMember.get(id), counts, id)
         const ftl = ftlRef.current.get(id)
+        const midSvg = midsetsSvgRef.current.get(id)
         const klp = kelompokPemain(gr, id)
         const bs = busurRef.current.get(id)
+        const pAsal = setRef.current?.points[id]
+        const kAkhir = klp
+          ? klp.jalur === 'lengkung'
+            ? (klp.lengkung ?? 0.4)
+            : 0
+          : lengkung
         const [tx, ty] = ftl
           ? deltaPoliFtl(ftl, t)
-          : klp
-            ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
-            : bs
-              ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser ?? { x: 0, y: 0 })
-              : titikJalur(t, vx, vy, lengkung)
+          : midSvg && pAsal
+            ? deltaMidsets(
+                { x: sx(pAsal.x), y: sy(pAsal.y) },
+                { x: sx(pAsal.x) + vx, y: sy(pAsal.y) + vy },
+                midSvg,
+                counts,
+                p,
+                kAkhir,
+                klp?.jalanCount ?? gr.jalanCount,
+              )
+            : klp
+              ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
+              : bs
+                ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser ?? { x: 0, y: 0 })
+                : titikJalur(t, vx, vy, lengkung)
         g.setAttribute('transform', `translate(${tx} ${ty})`)
       }
       if (markersRef.current.some(apakahPropertiBergerak)) {
@@ -2804,6 +3519,7 @@ export function Editor({
     const clone = el.cloneNode(true) as SVGSVGElement
     clone.querySelectorAll('[data-editor-ui="1"], [data-marquee="1"]').forEach((n) => n.remove())
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    clone.setAttribute('viewBox', `0 0 ${VW} ${VH}`)
     clone.setAttribute('width', String(VW * 10))
     clone.setAttribute('height', String(VH * 10))
     return new XMLSerializer().serializeToString(clone)
@@ -2947,13 +3663,334 @@ export function Editor({
     }
   }
 
+  function mulaiSeretGagangMidset(
+    e: React.PointerEvent,
+    memberId: string,
+    indeks: number,
+    padaCount: number,
+    asalYd: TitikKendaliYd,
+    baruDibuat = false,
+  ) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!set) return
+    const peran = peranPointerEfektif(view.modeInput, e.pointerType)
+    setPointerTerakhir(peran)
+    setBalonInfo(null)
+    const u = clientToUser(e.clientX, e.clientY)
+    gagangMidsetRef.current = {
+      memberId,
+      indeks,
+      padaCount,
+      baruDibuat,
+      startX: u.x,
+      startY: u.y,
+      asalTitik: { ...asalYd },
+      origMidsets: set.midsets
+        ? (JSON.parse(JSON.stringify(set.midsets)) as Record<string, TitikSinggahMidset[]>)
+        : {},
+      moved: false,
+    }
+  }
+
+  const daftarPerintahPalet = useMemo<ItemPaletPerintah[]>(() => {
+    const aksiUtama: ItemPaletPerintah[] = [
+      {
+        id: 'putar-jeda',
+        label: playing ? 'Jeda animasi formasi' : 'Mainkan animasi formasi',
+        kategori: 'Pemutaran',
+        pintasan: 'Spasi',
+        kataKunci: ['play', 'pause', 'animasi', 'putar', 'jalan'],
+        jalankan: () => setPlaying((p) => !p),
+      },
+      {
+        id: 'urutan-semua-set',
+        label: urutan ? 'Hentikan urutan seluruh set' : 'Mainkan urutan seluruh set',
+        kategori: 'Pemutaran',
+        pintasan: 'R',
+        kataKunci: ['runthrough', 'urutan', 'semua', 'set'],
+        nonaktif: sets.length < 2,
+        jalankan: () => mulaiUrutan(),
+      },
+      {
+        id: 'buka-presenter',
+        label: 'Buka Mode Presenter (layar penuh)',
+        kategori: 'Pemutaran',
+        pintasan: 'F',
+        kataKunci: ['presenter', 'proyektor', 'fullscreen', 'layar penuh'],
+        jalankan: () => setPresenter(true),
+      },
+      {
+        id: 'toggle-klik-tempo',
+        label: view.klik ? 'Matikan klik metronom editor' : 'Nyalakan klik metronom editor',
+        kategori: 'Pemutaran',
+        kataKunci: ['metronom', 'klik', 'ketukan', 'audio', 'tempo'],
+        jalankan: () => ubah('klik', !view.klik),
+      },
+      {
+        id: 'set-sebelumnya',
+        label: 'Pindah ke set sebelumnya',
+        kategori: 'Set & Navigasi',
+        pintasan: '[',
+        kataKunci: ['prev', 'set', 'mundur', 'sebelumnya'],
+        nonaktif: idx <= 0,
+        jalankan: () => setIdx((i) => Math.max(0, i - 1)),
+      },
+      {
+        id: 'set-berikutnya',
+        label: 'Pindah ke set berikutnya',
+        kategori: 'Set & Navigasi',
+        pintasan: ']',
+        kataKunci: ['next', 'set', 'maju', 'berikutnya'],
+        nonaktif: idx >= sets.length - 1,
+        jalankan: () => setIdx((i) => Math.min(sets.length - 1, i + 1)),
+      },
+      {
+        id: 'gandakan-set',
+        label: `Gandakan ${set?.name ?? 'set aktif'}`,
+        kategori: 'Set & Navigasi',
+        pintasan: 'Ctrl + D',
+        kataKunci: ['duplicate', 'duplikat', 'tambah set', 'salin formasi'],
+        nonaktif: !set,
+        jalankan: () => void duplicateSet(),
+      },
+      {
+        id: 'pecah-set',
+        label: 'Buka panel Pecah Set…',
+        kategori: 'Set & Navigasi',
+        kataKunci: ['split', 'pecah', 'set', 'hitungan tengah'],
+        nonaktif: !nextSet,
+        jalankan: () => bukaPecah(),
+      },
+      {
+        id: 'undo-aksi',
+        label: 'Batalkan perubahan terakhir (Undo)',
+        kategori: 'Titik & Bentuk',
+        pintasan: 'Ctrl + Z',
+        kataKunci: ['undo', 'batal', 'riwayat'],
+        nonaktif: !history.length,
+        jalankan: () => undo(),
+      },
+      {
+        id: 'redo-aksi',
+        label: 'Ulangi perubahan yang dibatalkan (Redo)',
+        kategori: 'Titik & Bentuk',
+        pintasan: 'Ctrl + Shift + Z',
+        kataKunci: ['redo', 'ulangi'],
+        nonaktif: !future.length,
+        jalankan: () => redo(),
+      },
+      {
+        id: 'pilih-semua',
+        label: 'Pilih semua titik pemain yang tampil',
+        kategori: 'Titik & Bentuk',
+        pintasan: 'Ctrl + A',
+        kataKunci: ['select all', 'pilih semua', 'anggota'],
+        nonaktif: !placed.length,
+        jalankan: () =>
+          setSelected(Object.keys(set?.points ?? {}).filter((id) => visibleIds.has(id))),
+      },
+      {
+        id: 'kosongkan-pilihan',
+        label: 'Kosongkan pilihan titik',
+        kategori: 'Titik & Bentuk',
+        pintasan: 'Esc',
+        kataKunci: ['deselect', 'lepas', 'batal pilih'],
+        nonaktif: !selected.length,
+        jalankan: () => setSelected([]),
+      },
+      {
+        id: 'tambah-midset-pilihan',
+        label: 'Sisipkan titik singgah (Midset) untuk pemain terpilih',
+        kategori: 'Titik & Bentuk',
+        kataKunci: ['midset', 'waypoint', 'titik singgah', 'belok', 'jalur biru'],
+        nonaktif: selected.length !== 1 || !nextSet || (set?.counts ?? 0) < 2,
+        jalankan: () => {
+          if (selected[0]) tambahMidsetPemain(selected[0])
+        },
+      },
+      {
+        id: 'alat-pilih',
+        label: 'Alat Kanvas: Pilih & Geser',
+        kategori: 'Tampilan & Mode',
+        kataKunci: ['select', 'marquee', 'kotak pilih', 'alat'],
+        jalankan: () => setTool('select'),
+      },
+      {
+        id: 'alat-lasso',
+        label: 'Alat Kanvas: Lasso Bebas',
+        kategori: 'Tampilan & Mode',
+        pintasan: 'Alt + seret',
+        kataKunci: ['lasso', 'poligon bebas', 'lengkung'],
+        jalankan: () => setTool('lasso'),
+      },
+      {
+        id: 'alat-pan',
+        label: 'Alat Kanvas: Geser Papan (Pan)',
+        kategori: 'Tampilan & Mode',
+        kataKunci: ['pan', 'tangan', 'geser layar', 'zoom kanvas'],
+        jalankan: () => setTool('pan'),
+      },
+      {
+        id: 'mode-input-otomatis',
+        label: 'Mode Input: Otomatis (deteksi sentuh / pena / tetikus)',
+        kategori: 'Tampilan & Mode',
+        kataKunci: ['tablet', 'ipad', 'stylus', 'otomatis', 'pointer', 'input'],
+        jalankan: () => ubah('modeInput', 'otomatis'),
+      },
+      {
+        id: 'mode-input-sentuh',
+        label: 'Mode Input: Sentuh / Tablet (geser 1 jari = pan, target besar)',
+        kategori: 'Tampilan & Mode',
+        kataKunci: ['touch', 'tablet', 'jari', 'sentuh', 'ipad'],
+        jalankan: () => ubah('modeInput', 'sentuh'),
+      },
+      {
+        id: 'mode-input-tetikus',
+        label: 'Mode Input: Tetikus / Desktop (geser area kosong = kotak pilih)',
+        kategori: 'Tampilan & Mode',
+        kataKunci: ['mouse', 'desktop', 'kursor', 'tetikus'],
+        jalankan: () => ubah('modeInput', 'tetikus'),
+      },
+      {
+        id: 'reset-zoom-kanvas',
+        label: 'Kembalikan Zoom Kanvas ke 100%',
+        kategori: 'Tampilan & Mode',
+        kataKunci: ['zoom', 'reset', '100%', 'penuh', 'lapangan'],
+        jalankan: () => resetViewportKanvas(),
+      },
+      {
+        id: 'kunci-sumbu-x',
+        label:
+          view.kunciSumbu === 'hanya_x'
+            ? 'Buka kunci sumbu X (kembali bebas)'
+            : 'Kunci sumbu gerak ke X (kiri–kanan saja)',
+        kategori: 'Titik & Bentuk',
+        pintasan: 'X',
+        kataKunci: ['axis lock', 'sumbu x', 'mendatar', 'yard'],
+        jalankan: () => ubah('kunciSumbu', view.kunciSumbu === 'hanya_x' ? 'bebas' : 'hanya_x'),
+      },
+      {
+        id: 'kunci-sumbu-y',
+        label:
+          view.kunciSumbu === 'hanya_y'
+            ? 'Buka kunci sumbu Y (kembali bebas)'
+            : 'Kunci sumbu gerak ke Y (depan–belakang saja)',
+        kategori: 'Titik & Bentuk',
+        pintasan: 'Y',
+        kataKunci: ['axis lock', 'sumbu y', 'vertikal', 'hash'],
+        jalankan: () => ubah('kunciSumbu', view.kunciSumbu === 'hanya_y' ? 'bebas' : 'hanya_y'),
+      },
+      {
+        id: 'toggle-jejak',
+        label: view.jalur || view.masuk ? 'Sembunyikan garis jejak gerakan' : 'Tampilkan garis jejak gerakan',
+        kategori: 'Tampilan & Mode',
+        pintasan: 'J',
+        kataKunci: ['trail', 'path', 'jejak', 'garis biru', 'kuning'],
+        jalankan: () => {
+          const hidup = view.jalur || view.masuk
+          ubah('jalur', !hidup)
+          ubah('masuk', !hidup)
+        },
+      },
+      {
+        id: 'toggle-penanda',
+        label: view.penanda ? 'Sembunyikan penanda & properti lapangan' : 'Tampilkan penanda & properti lapangan',
+        kategori: 'Tampilan & Mode',
+        pintasan: 'M',
+        kataKunci: ['marker', 'props', 'penanda', 'bendera', 'panggung'],
+        jalankan: () => ubah('penanda', !view.penanda),
+      },
+      {
+        id: 'toggle-snap',
+        label: view.snap ? 'Matikan Snap ke Grid langkah' : 'Nyalakan Snap ke Grid langkah',
+        kategori: 'Tampilan & Mode',
+        kataKunci: ['snap', 'grid', 'langkah', 'pembulatan'],
+        jalankan: () => ubah('snap', !view.snap),
+      },
+      {
+        id: 'buka-dot-sheet',
+        label: 'Buka Kartu / Buku Saku (Dot Sheet) per pemain',
+        kategori: 'Ekspor & Cetak',
+        kataKunci: ['dot sheet', 'buku saku', 'cetak kartu', 'koordinat'],
+        jalankan: () => setDotSheet(true),
+      },
+      {
+        id: 'cetak-bagan',
+        label: 'Cetak bagan lapangan set aktif (A4 / PDF)',
+        kategori: 'Ekspor & Cetak',
+        kataKunci: ['print', 'pdf', 'cetak bagan', 'chart'],
+        jalankan: () => printChart(),
+      },
+      {
+        id: 'unduh-png',
+        label: 'Unduh gambar formasi (PNG)',
+        kategori: 'Ekspor & Cetak',
+        kataKunci: ['export', 'png', 'gambar', 'unduh'],
+        jalankan: () => void exportPNG(),
+      },
+      {
+        id: 'unduh-csv-koordinat',
+        label: 'Unduh lembar koordinat seluruh set (CSV)',
+        kategori: 'Ekspor & Cetak',
+        kataKunci: ['csv', 'excel', 'koordinat', 'unduh', 'ekspor'],
+        jalankan: () => exportCoordSheet(),
+      },
+      {
+        id: 'pengaturan-drill',
+        label: 'Buka Pengaturan Drill (ukuran lapangan, tempo, riwayat)',
+        kategori: 'Set & Navigasi',
+        kataKunci: ['settings', 'pengaturan', 'ukuran lapangan', 'tempo'],
+        jalankan: () => setSettingsOpen(true),
+      },
+    ]
+
+    const aksiTag: ItemPaletPerintah[] = daftarTagRoster.map(({ tag }) => ({
+      id: `pilih-tag-${tag}`,
+      label: `Pilih semua anggota ber-tag #${tag}`,
+      kategori: 'Titik & Bentuk',
+      kataKunci: ['tag', 'label', 'kelompok', tag],
+      jalankan: () => pilihAnggotaBerTag(tag),
+    }))
+
+    return lengkapiReferensiPintasan([...aksiUtama, ...aksiTag], DAFTAR_SHORTCUT)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    playing,
+    urutan,
+    sets.length,
+    idx,
+    set?.id,
+    set?.name,
+    set?.counts,
+    Boolean(nextSet),
+    history.length,
+    future.length,
+    placed.length,
+    selected,
+    view,
+    daftarTagRoster,
+  ])
+
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
       {/* ------------------------------ Papan ------------------------------- */}
-      <div className="space-y-3">
+      <div className="min-w-0 space-y-3">
         <Card padded={false} className="overflow-hidden">
           {/* Toolbar */}
-          <div className="no-print flex flex-wrap items-center gap-2 border-b border-slate-800 px-3 py-2.5">
+          <div
+            className="no-print flex flex-wrap items-center gap-2 border-b border-slate-800 px-3 py-2.5"
+            onPointerDown={(e) => {
+              const peran = peranPointerEfektif(view.modeInput, e.pointerType)
+              if (peran !== 'sentuh') return
+              const elJudul = (e.target as HTMLElement | null)?.closest('[title]') as HTMLElement | null
+              if (elJudul) {
+                jadwalkanBalonSentuh(e.clientX, e.clientY, elJudul.getAttribute('title') ?? '', peran)
+              }
+            }}
+            onPointerUp={batalkanTimerBalon}
+            onPointerCancel={batalkanTimerBalon}
+          >
             <div className="flex items-center gap-1">
               <button
                 data-kiosk-allow
@@ -2979,7 +4016,7 @@ export function Editor({
               </button>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
               <Button size="sm" variant={playing ? 'danger' : 'primary'} onClick={() => setPlaying((p) => !p)} data-kiosk-allow>
                 {playing ? <IconPause size={14} /> : <IconPlay size={14} />}
                 {playing ? (
@@ -3015,10 +4052,10 @@ export function Editor({
                 data-kiosk-allow
                 data-testid="tombol-shortcut"
                 onClick={() => setBantuan(true)}
-                title="Daftar shortcut keyboard (?)"
+                title="Palet perintah & daftar pintasan keyboard (Ctrl+K / ?)"
                 className="h-9 px-2.5 sm:h-8 sm:px-2"
               >
-                ?
+                <span className="hidden sm:inline">⌘K · </span>?
               </Button>
               <Button size="sm" variant="ghost" onClick={undo} disabled={!history.length} title="Undo (Ctrl+Z)">
                 ↶
@@ -3039,6 +4076,74 @@ export function Editor({
               >
                 ⚙
               </Button>
+            </div>
+
+            {/* #23.3 — Sakelar Mode Input (Otomatis / Sentuh / Tetikus) + Kontrol Zoom Kanvas */}
+            <div className="flex flex-wrap items-center gap-1" data-testid="kontrol-input-zoom">
+              <div
+                className="inline-flex rounded-lg border border-slate-800 bg-slate-900/80 p-0.5 text-[11px]"
+                data-testid="sakelar-mode-input"
+                role="group"
+                aria-label="Mode input kanvas"
+              >
+                {(
+                  [
+                    ['otomatis', 'Otomatis', 'Deteksi otomatis sentuhan jari, pena stylus, atau tetikus'],
+                    ['sentuh', 'Sentuh', 'Mode tablet: seret 1 jari menggeser kanvas, target tangkap diperbesar >= 40 px'],
+                    ['tetikus', 'Tetikus', 'Mode desktop: seret area kosong membuat kotak pilih'],
+                  ] as const
+                ).map(([kode, label, ket]) => (
+                  <button
+                    key={kode}
+                    type="button"
+                    data-testid={`mode-input-${kode}`}
+                    onClick={() => ubah('modeInput', kode)}
+                    title={ket}
+                    className={cx(
+                      'rounded-md px-1.5 py-1 transition sm:px-2',
+                      view.modeInput === kode
+                        ? 'bg-emerald-600/25 font-medium text-emerald-200'
+                        : 'text-slate-400 hover:text-slate-200',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div
+                className="inline-flex items-center rounded-lg border border-slate-800 bg-slate-900/80 p-0.5 text-[11px]"
+                data-testid="kontrol-zoom-kanvas"
+              >
+                <button
+                  type="button"
+                  data-testid="zoom-perkecil"
+                  onClick={() => ubahZoomKanvas(1 / 1.25)}
+                  disabled={viewport.zoom <= 1.001}
+                  title="Perkecil tampilan lapangan"
+                  className="rounded px-1.5 py-0.5 text-slate-300 hover:bg-slate-800 disabled:opacity-35"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  data-testid="zoom-reset"
+                  onClick={resetViewportKanvas}
+                  title="Kembalikan zoom ke 100% (Ctrl + roda tetikus atau cubit 2 jari untuk zoom)"
+                  className="px-1.5 py-0.5 font-mono text-[10px] text-slate-300 hover:text-emerald-300"
+                >
+                  {Math.round(viewport.zoom * 100)}%
+                </button>
+                <button
+                  type="button"
+                  data-testid="zoom-perbesar"
+                  onClick={() => ubahZoomKanvas(1.25)}
+                  disabled={viewport.zoom >= 3.99}
+                  title="Perbesar tampilan lapangan"
+                  className="rounded px-1.5 py-0.5 text-slate-300 hover:bg-slate-800 disabled:opacity-35"
+                >
+                  +
+                </button>
+              </div>
             </div>
 
             <div className="ml-auto flex flex-wrap items-center gap-1">
@@ -3088,11 +4193,37 @@ export function Editor({
           </div>
 
           {/* Kanvas */}
-          <div data-kiosk-block className="drill-surface bg-slate-950 p-2 sm:p-3">
+          <div data-kiosk-block className="drill-surface relative bg-slate-950 p-2 sm:p-3">
+            {siapLetakkanId && rosterById.get(siapLetakkanId) && (
+              <div
+                data-testid="banner-siap-letakkan"
+                className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-emerald-700/50 bg-emerald-950/50 px-3 py-1.5 text-xs text-emerald-200"
+              >
+                <span>
+                  Ketuk di mana saja pada lapangan untuk menempatkan{' '}
+                  <b>{rosterById.get(siapLetakkanId)!.code}</b> ({rosterById.get(siapLetakkanId)!.name}).
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSiapLetakkanId(null)}
+                  className="rounded px-2 py-0.5 text-[11px] text-emerald-300 hover:bg-emerald-900/50"
+                >
+                  Batal (Esc)
+                </button>
+              </div>
+            )}
             <svg
               ref={svgRef}
-              viewBox={`0 0 ${VW} ${VH}`}
-              className="w-full touch-none select-none"
+              data-testid="kanvas-drill-svg"
+              viewBox={`${viewBoxKanvas.x} ${viewBoxKanvas.y} ${viewBoxKanvas.width} ${viewBoxKanvas.height}`}
+              className={cx(
+                'w-full touch-none select-none',
+                siapLetakkanId
+                  ? 'cursor-crosshair'
+                  : tool === 'pan' || peranAktif === 'sentuh'
+                    ? 'cursor-grab'
+                    : '',
+              )}
               onPointerDown={onFieldClick}
               onPointerDownCapture={petik ? ambilTitikPenanda : undefined}
             >
@@ -3194,10 +4325,12 @@ export function Editor({
                             opacity={0.8}
                             putus="1.6 1"
                             busur={busurMasuk.get(id)}
+                            midsetsSvg={midsetsSvgMasuk.get(id)}
+                            countsSet={prevSet?.counts}
                             panah={view.panah ? 'url(#dk-panah-masuk)' : undefined}
                           />
                         )}
-                        {/* tujuan: ke set berikutnya (FTL, sub-kelompok, busur, atau jalur utama) */}
+                        {/* tujuan: ke set berikutnya (FTL, titik singgah/midsets, sub-kelompok, busur, atau jalur utama) */}
                         {ada(q) &&
                           (ftlKeluar.get(id) ? (
                             <path
@@ -3229,6 +4362,8 @@ export function Editor({
                               warna={warnaJalur(id)}
                               opacity={view.analitik ? 0.95 : 0.75}
                               busur={kelompokPemain(gerakSet, id) ? undefined : busurKeluar.get(id)}
+                              midsetsSvg={midsetsSvgKeluar.get(id)}
+                              countsSet={set.counts}
                               panah={view.panah ? 'url(#dk-panah-keluar)' : undefined}
                             />
                           ))}
@@ -3245,6 +4380,8 @@ export function Editor({
                             y2={sy(q!.y)}
                             lengkung={gerakSet.jalur === 'lengkung' ? gerakSet.lengkung : 0}
                             busur={busurKeluar.get(id)}
+                            midsetsSvg={midsetsSvgKeluar.get(id)}
+                            countsSet={set.counts}
                             jumlah={jumlahLangkah(id, p, q!)}
                             warna={warnaJalur(id)}
                           />
@@ -3351,6 +4488,12 @@ export function Editor({
                 const fx = Math.sin(rad) * -uk(1.6)
                 const fy = Math.cos(rad) * uk(1.6)
                 const isSel = selSet.has(id)
+                const gayaTitik = gayaTitikPemain(
+                  m,
+                  sectionDot(m.section),
+                  drill.tampilanTag,
+                  set?.tampilanTag,
+                )
                 return (
                   <g
                     key={id}
@@ -3359,20 +4502,31 @@ export function Editor({
                     className="cursor-move"
                     style={{ touchAction: 'none' }}
                   >
+                    {peranAktif !== 'tetikus' && (
+                      <circle
+                        data-editor-ui="1"
+                        data-hit-sentuh="1"
+                        cx={sx(x)}
+                        cy={sy(y)}
+                        r={rHitSentuh}
+                        fill="#ffffff"
+                        fillOpacity={0.001}
+                      />
+                    )}
                     <line
                       x1={sx(x)}
                       y1={sy(y)}
                       x2={sx(x) + fx}
                       y2={sy(y) + fy}
-                      stroke={sectionDot(m.section)}
+                      stroke={gayaTitik.warna}
                       strokeWidth={0.35}
                     />
-                    <circle
-                      data-titik="1"
+                    <TitikPemainBentuk
                       cx={sx(x)}
                       cy={sy(y)}
                       r={uk(isSel ? 1.5 : 1.15)}
-                      fill={sectionDot(m.section)}
+                      fill={gayaTitik.warna}
+                      bentuk={gayaTitik.bentuk}
                       stroke={isSel ? '#f8fafc' : '#0b1120'}
                       strokeWidth={uk(isSel ? 0.35 : 0.18)}
                     />
@@ -3391,6 +4545,117 @@ export function Editor({
                   </g>
                 )
               })}
+
+              {/* #23.1 — Gagang Titik Singgah (Midsets) langsung pada jejak biru pemain terpilih */}
+              {!playing && set && nextSet && view.jalur && selectedAktif.length > 0 && (set.counts ?? 0) >= 2 && (
+                <g data-testid="lapisan-gagang-midset" data-editor-ui="1">
+                  {selectedAktif.map((id) => {
+                    const p = set.points[id]
+                    const q = nextSet.points[id]
+                    if (!p || !q || ftlKeluar.get(id)) return null
+                    if (Math.hypot(q.x - p.x, q.y - p.y) < 1e-3 && !set.midsets?.[id]?.length) {
+                      return null
+                    }
+                    const counts = Math.max(2, Math.floor(set.counts || 8))
+                    const daftarMid = normalisasiMidsetsPemain(set.midsets?.[id], counts)
+                    const countBebas =
+                      selectedAktif.length <= 4 ? cariCountSinggahBebas(daftarMid, counts) : null
+                    const posTambah =
+                      countBebas !== null ? posisiJalurPemainYd(id, countBebas) : null
+                    const dIntan = uk(0.95)
+                    return (
+                      <g key={`midsets-${id}`} data-testid={`grup-midset-${id}`}>
+                        {daftarMid.map((w, wi) => {
+                          const wx = sx(w.x)
+                          const wy = sy(w.y)
+                          return (
+                            <g
+                              key={`mid-${id}-${wi}`}
+                              data-testid={`gagang-midset-${id}-${wi}`}
+                              className="cursor-grab"
+                              style={{ touchAction: 'none' }}
+                              onPointerDown={(e) =>
+                                mulaiSeretGagangMidset(e, id, wi, w.padaCount, { x: w.x, y: w.y }, false)
+                              }
+                              onDoubleClick={(e) => {
+                                e.stopPropagation()
+                                hapusMidsetPemain(id, wi)
+                              }}
+                            >
+                              {peranAktif !== 'tetikus' && (
+                                <circle
+                                  data-editor-ui="1"
+                                  cx={wx}
+                                  cy={wy}
+                                  r={rHitSentuh}
+                                  fill="#ffffff"
+                                  fillOpacity={0.001}
+                                />
+                              )}
+                              <polygon
+                                points={`${wx},${wy - dIntan} ${wx + dIntan},${wy} ${wx},${wy + dIntan} ${wx - dIntan},${wy}`}
+                                fill="#38bdf8"
+                                stroke="#0f172a"
+                                strokeWidth={uk(0.22)}
+                              />
+                              <text
+                                x={wx}
+                                y={wy - uk(1.35)}
+                                textAnchor="middle"
+                                fontSize={uk(1.15)}
+                                fill="#bae6fd"
+                                style={{ pointerEvents: 'none', fontWeight: 700 }}
+                              >
+                                c{w.padaCount}
+                              </text>
+                            </g>
+                          )
+                        })}
+                        {posTambah && countBebas !== null && (
+                          <g
+                            data-testid={`tambah-midset-kanvas-${id}`}
+                            className="cursor-pointer"
+                            style={{ touchAction: 'none' }}
+                            onPointerDown={(e) =>
+                              mulaiSeretGagangMidset(e, id, -1, countBebas, posTambah, true)
+                            }
+                          >
+                            {peranAktif !== 'tetikus' && (
+                              <circle
+                                data-editor-ui="1"
+                                cx={sx(posTambah.x)}
+                                cy={sy(posTambah.y)}
+                                r={rHitSentuh}
+                                fill="#ffffff"
+                                fillOpacity={0.001}
+                              />
+                            )}
+                            <circle
+                              cx={sx(posTambah.x)}
+                              cy={sy(posTambah.y)}
+                              r={uk(0.8)}
+                              fill="#0f172a"
+                              stroke="#38bdf8"
+                              strokeWidth={uk(0.2)}
+                              strokeDasharray="0.45 0.3"
+                            />
+                            <text
+                              x={sx(posTambah.x)}
+                              y={sy(posTambah.y) + uk(0.38)}
+                              textAnchor="middle"
+                              fontSize={uk(1.15)}
+                              fill="#38bdf8"
+                              style={{ pointerEvents: 'none', fontWeight: 700 }}
+                            >
+                              +
+                            </text>
+                          </g>
+                        )}
+                      </g>
+                    )
+                  })}
+                </g>
+              )}
 
               {/* #22.1 — Gagang kendali interaktif bentuk parametrik hidup (P0, P1, C1, C2) */}
               {!playing && (set?.bentukTerikat?.length ?? 0) > 0 && (
@@ -4165,7 +5430,7 @@ export function Editor({
                 )}
               </div>
 
-              {/* DD2 & #16 — koreografi visual, FTL/sub-kelompok, Move+Hold, Ripple, & jalur */}
+              {/* DD2, #16, & #23.2 — koreografi visual, sorotan tag, FTL/sub-kelompok, Move+Hold, Ripple, & jalur */}
               {set && (
                 <PanelGerakSet
                   set={set}
@@ -4182,6 +5447,7 @@ export function Editor({
                   seksiUnik={seksiUnik}
                   selectedIds={selected}
                   rosterById={rosterById}
+                  simpanTampilanTagSet={simpanTampilanTagSet}
                 />
               )}
             </div>
@@ -4190,7 +5456,7 @@ export function Editor({
       </div>
 
       {/* ------------------------------- Panel -------------------------------- */}
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
         <Card>
           <h2 className="mb-2 text-sm font-semibold text-slate-200">Alat kanvas &amp; pengunci sumbu</h2>
           <div className="grid grid-cols-3 gap-1">
@@ -4214,20 +5480,23 @@ export function Editor({
             </Button>
             <Button
               size="sm"
-              data-testid="alat-place"
-              variant={tool === 'place' ? 'primary' : 'soft'}
-              onClick={() => setTool('place')}
+              data-testid="alat-pan"
+              variant={tool === 'pan' ? 'primary' : 'soft'}
+              onClick={() => setTool('pan')}
               className="px-1.5 text-xs"
+              title="Seret di area kosong lapangan untuk menggeser tampilan (di mode Sentuh aktif otomatis)"
             >
-              Letakkan
+              Geser papan
             </Button>
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-            {tool === 'place'
-              ? 'Pilih satu anggota di daftar bawah, lalu sentuh lapangan untuk menempatkan titiknya.'
+            {tool === 'pan'
+              ? 'Seret area kosong untuk menggeser lapangan (gunakan cubit 2 jari, Ctrl+Wheel, atau tombol +/− di atas untuk zoom).'
               : tool === 'lasso'
                 ? 'Seret poligon bebas mengelilingi barisan melengkung/miring (tahan Shift untuk tambah/kurangi pilihan).'
-                : 'Geser titik atau gagang di kanvas. Seret kotak di area kosong (atau tahan Alt untuk lasso cepat).'}
+                : peranAktif === 'sentuh'
+                  ? 'Mode sentuh aktif: seret titik/gagang untuk memindahkan, seret 1 jari di area kosong untuk menggeser lapangan, tahan titik/ikon untuk info.'
+                  : 'Geser titik atau gagang di kanvas. Seret kotak di area kosong (atau tahan Alt untuk lasso cepat).'}
           </p>
 
           {/* #22.4 — Pengunci Sumbu Gerak (Axis Lock X / Y) */}
@@ -4410,12 +5679,13 @@ export function Editor({
         )}
 
         <Card>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-200">Anggota</h2>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-200">Anggota &amp; Tag</h2>
             <Select
+              data-testid="filter-anggota-editor"
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
-              className="w-32 py-1 text-xs"
+              className="w-36 py-1 text-xs"
             >
               <option value="all">Semua</option>
               {visibleSections().map((s) => (
@@ -4423,28 +5693,110 @@ export function Editor({
                   {s.label}
                 </option>
               ))}
+              {daftarTagRoster.length > 0 && (
+                <optgroup label="Tag Lintas-Seksi">
+                  {daftarTagRoster.map(({ tag }) => (
+                    <option key={`tag:${tag}`} value={`tag:${tag}`}>
+                      #{tag}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </Select>
           </div>
 
+          {daftarTagRoster.length > 0 && (
+            <div className="mb-2.5 flex flex-wrap gap-1" data-testid="baris-chip-tag">
+              {daftarTagRoster.map(({ tag, memberIds }) => (
+                <button
+                  key={tag}
+                  type="button"
+                  data-testid={`pilih-cepat-tag-${tag}`}
+                  onClick={() => pilihAnggotaBerTag(tag)}
+                  className="rounded-md border border-emerald-700/40 bg-emerald-950/30 px-2 py-0.5 text-[10px] font-medium text-emerald-300 hover:bg-emerald-900/40"
+                  title="Klik untuk memilih semua anggota ber-tag ini di set aktif"
+                >
+                  #{tag} ({memberIds.length})
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selected.length >= 2 && (
+            <form
+              data-testid="form-tag-massal"
+              className="mb-2.5 flex gap-1"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void pasangTagKePilihan(inputTagMassal)
+              }}
+            >
+              <Input
+                data-testid="input-tag-massal"
+                value={inputTagMassal}
+                onChange={(e) => setInputTagMassal(e.target.value)}
+                placeholder={`Beri tag ke ${selected.length} terpilih…`}
+                className="py-1 text-xs"
+              />
+              <Button
+                type="submit"
+                size="sm"
+                variant="soft"
+                data-testid="simpan-tag-massal"
+                disabled={!inputTagMassal.trim()}
+              >
+                + Tag
+              </Button>
+            </form>
+          )}
+
           {unplaced.length > 0 && (
             <div className="mb-3">
-              <p className="mb-1.5 text-[11px] font-medium text-amber-400">Belum masuk set ini ({unplaced.length})</p>
+              <p className="mb-1.5 text-[11px] font-medium text-amber-400">
+                Belum masuk set ini ({unplaced.length})
+              </p>
               <div className="flex flex-wrap gap-1">
                 {unplaced
-                  .filter((m) => (sectionFilter === 'all' ? true : m.section === sectionFilter))
-                  .map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => {
-                        updatePoint(m.id, snapVal(0, 0))
-                        setSelected([m.id])
-                      }}
-                      className="rounded-md border border-slate-700 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-800"
-                      title="Tempatkan di tengah lapangan"
-                    >
-                      + {m.code}
-                    </button>
-                  ))}
+                  .filter((m) =>
+                    sectionFilter === 'all'
+                      ? true
+                      : sectionFilter.startsWith('tag:')
+                        ? punyaTag(m, sectionFilter.slice(4))
+                        : m.section === sectionFilter,
+                  )
+                  .map((m) => {
+                    const disiapkan = siapLetakkanId === m.id
+                    return (
+                      <div key={m.id} className="inline-flex overflow-hidden rounded-md border border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSiapLetakkanId(null)
+                            updatePoint(m.id, snapVal(0, 0))
+                            setSelected([m.id])
+                          }}
+                          className="px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-800"
+                          title="Tempatkan langsung di tengah lapangan (0, 0)"
+                        >
+                          + {m.code}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`siap-letakkan-${m.id}`}
+                          onClick={() => setSiapLetakkanId((cur) => (cur === m.id ? null : m.id))}
+                          className={cx(
+                            'border-l border-slate-700 px-1.5 py-1 text-[11px]',
+                            disiapkan
+                              ? 'bg-emerald-600/30 text-emerald-200'
+                              : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+                          )}
+                          title="Siapkan lalu ketuk titik tujuan di lapangan"
+                        >
+                          ⌖
+                        </button>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           )}
@@ -4453,18 +5805,34 @@ export function Editor({
             {visible.map((m) => {
               const has = !!set?.points[m.id]
               const sel = selected.includes(m.id)
+              const disiapkan = siapLetakkanId === m.id
               return (
                 <button
                   key={m.id}
-                  onClick={() => setSelected(sel ? (selected.includes(m.id) ? [m.id] : []) : [m.id])}
+                  onClick={() => {
+                    if (!has) {
+                      setSiapLetakkanId((cur) => (cur === m.id ? null : m.id))
+                      return
+                    }
+                    setSelected(sel ? (selected.includes(m.id) ? [m.id] : []) : [m.id])
+                  }}
                   className={cx(
                     'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition',
-                    sel ? 'bg-emerald-600/15 ring-1 ring-emerald-600/30' : 'hover:bg-slate-800/60',
+                    sel || disiapkan
+                      ? 'bg-emerald-600/15 ring-1 ring-emerald-600/30'
+                      : 'hover:bg-slate-800/60',
                   )}
                 >
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: sectionDot(m.section) }} />
                   <NamaTampil anggota={m} className={cx('truncate', has ? 'text-slate-200' : 'text-slate-500')} />
-                  <span className="ml-auto shrink-0 text-[10px] text-slate-500">{m.code}</span>
+                  {m.tags?.[0] && (
+                    <span className="shrink-0 rounded bg-slate-800 px-1 py-0.5 text-[9px] text-emerald-300">
+                      #{m.tags[0]}
+                    </span>
+                  )}
+                  <span className="ml-auto shrink-0 text-[10px] text-slate-500">
+                    {disiapkan ? '⌖ ketuk lapangan' : m.code}
+                  </span>
                   {has && set && (
                     <span
                       onClick={(e) => {
@@ -4494,6 +5862,14 @@ export function Editor({
             field={f}
             onChange={(patch) => updatePoint(selected[0], patch)}
             onDetail={() => setDetailId(selected[0])}
+            midsets={set.midsets?.[selected[0]]}
+            countsSet={set.counts}
+            adaSetBerikut={Boolean(nextSet)}
+            onTambahMidset={() => tambahMidsetPemain(selected[0])}
+            onUbahCountMidset={(wi, countBaru) => ubahCountMidsetPemain(selected[0], wi, countBaru)}
+            onHapusMidset={(wi) => hapusMidsetPemain(selected[0], wi)}
+            onTambahTag={(tag) => void tambahTagSatuAnggota(selected[0], tag)}
+            onHapusTag={(tag) => void hapusTagSatuAnggota(selected[0], tag)}
           />
         )}
       </div>
@@ -4633,7 +6009,24 @@ export function Editor({
         />
       )}
 
-      <ShortcutHelp open={bantuan} onClose={() => setBantuan(false)} />
+      <PaletPerintah
+        open={bantuan}
+        onClose={() => setBantuan(false)}
+        perintah={daftarPerintahPalet}
+      />
+
+      {balonInfo && (
+        <div
+          data-testid="balon-info-sentuh"
+          style={{
+            left: Math.max(12, Math.min((typeof window !== 'undefined' ? window.innerWidth : 800) - 260, balonInfo.x - 90)),
+            top: Math.max(12, balonInfo.y - 54),
+          }}
+          className="pointer-events-none fixed z-50 max-w-xs rounded-xl border border-slate-700 bg-slate-900/95 px-3 py-1.5 text-xs text-slate-100 shadow-xl"
+        >
+          {balonInfo.teks}
+        </div>
+      )}
 
       <TukarCsvModal
         open={tukarCsv}

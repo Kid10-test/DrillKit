@@ -134,6 +134,11 @@ rakit src/lib/judgeTapeZip.ts            judgeTapeZip
 # #21 — Audisi Anggota Baru, Surat Dispensasi, Kartu Medis AES-256-GCM, Buku Kas, & Arsip Musim.
 rakit src/lib/administrasiUnit.ts        administrasiUnit
 rakit src/lib/administrasiUnitCetak.ts   administrasiUnitCetak
+# #23 — Titik Singgah (Midsets), Tags Lintas-Seksi, Mesin Pointer Tablet/Stylus, & Palet Ctrl+K.
+rakit src/lib/tagAnggota.ts              tagAnggota
+rakit src/lib/mesinPointer.ts            mesinPointer
+rakit src/lib/paletPerintah.ts           paletPerintah
+rakit src/lib/shortcut.ts                shortcut
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.

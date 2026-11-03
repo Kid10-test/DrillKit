@@ -14,13 +14,21 @@ import { Badge, Button, Card, EmptyState, Select, StatTile } from "../ui"
 import { IconLoop, IconPause, IconPlay } from "../Icons"
 import {
   bangunPetaFtl,
+  deltaMidsets,
   deltaPoliFtl,
   gerakOf,
   kelompokPemain,
+  normalisasiMidsetsPemain,
+  panjangJalurMidsets,
+  pathSvgMidsets,
   progresPemain,
+  proyeksiMidsets,
   ringkasKoreografiSet,
+  sinkronkanKelompokDariTag,
   titikJalur,
 } from "../../lib/gerak"
+import { gayaTitikPemain } from "../../lib/tagAnggota"
+import { TitikPemainBentuk } from "../JejakLangkah"
 import { apakahPropertiBergerak, penandaEfektifPadaSet, tugasKruPropertiAnggota } from "../../lib/propertiGerak"
 import { countSheetUntukAnggota } from "../../lib/countSheet"
 import { KartuCountSheetFormasiAnggota } from "../musik/PanelCountSheetSinkron"
@@ -119,7 +127,9 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
       akhirSvg[id] = { x: sx(q.x), y: sy(q.y) }
       vec.push([id, sx(q.x) - sx(p.x), sy(q.y) - sy(p.y)])
     }
-    const gr = gerakOf(set.gerak)
+    const grMentah = gerakOf(set.gerak)
+    const klpSinkron = sinkronkanKelompokDariTag(grMentah.kelompok, members)
+    const gr = klpSinkron !== grMentah.kelompok ? { ...grMentah, kelompok: klpSinkron } : grMentah
     const lengkung = gr.jalur === 'lengkung' ? gr.lengkung : 0
     const petaFtl = gr.kelompok?.length ? bangunPetaFtl(gr.kelompok, awalSvg, akhirSvg) : new Map()
     const seksiMap = new Map(members.map((m) => [m.id, m.section]))
@@ -133,11 +143,22 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
         const t = progresPemain(p, gr, seksiMap.get(id), counts, id)
         const ftl = petaFtl.get(id)
         const klp = kelompokPemain(gr, id)
+        const mid = set.midsets?.[id]
         const [tx, ty] = ftl
           ? deltaPoliFtl(ftl, t)
-          : klp
-            ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
-            : titikJalur(t, vx, vy, lengkung)
+          : mid?.length && awalSvg[id] && akhirSvg[id]
+            ? deltaMidsets(
+                awalSvg[id],
+                akhirSvg[id],
+                proyeksiMidsets(mid, counts, (mx, my) => ({ x: sx(mx), y: sy(my) })),
+                counts,
+                t,
+                klp ? (klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0) : lengkung,
+                klp?.jalanCount ?? gr.jalanCount,
+              )
+            : klp
+              ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
+              : titikJalur(t, vx, vy, lengkung)
         g.setAttribute('transform', `translate(${tx} ${ty})`)
       }
       if (adaPropGerak) setProgresProp(p)
@@ -234,6 +255,28 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
               Object.entries(set?.points ?? {}).map(([id, p]) => {
                 const q = nextSet.points[id]
                 if (!q) return null
+                const midSvg = set?.midsets?.[id]?.length
+                  ? proyeksiMidsets(set.midsets[id], set.counts || 8, (mx, my) => ({ x: sx(mx), y: sy(my) }))
+                  : undefined
+                if (midSvg?.length) {
+                  return (
+                    <path
+                      key={`p-${id}`}
+                      data-testid={id === me.id ? 'anggota-jalur-midset' : undefined}
+                      d={pathSvgMidsets(
+                        { x: sx(p.x), y: sy(p.y) },
+                        { x: sx(q.x), y: sy(q.y) },
+                        midSvg,
+                        set?.counts || 8,
+                      )}
+                      fill="none"
+                      stroke={id === me.id ? '#38bdf8' : '#cbd5e1'}
+                      strokeOpacity={id === me.id ? 0.85 : 0.35}
+                      strokeWidth={id === me.id ? 0.4 : 0.15}
+                      strokeDasharray="1 1"
+                    />
+                  )
+                }
                 return (
                   <line
                     key={`p-${id}`}
@@ -241,7 +284,8 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
                     y1={sy(p.y)}
                     x2={sx(q.x)}
                     y2={sy(q.y)}
-                    stroke="rgba(255,255,255,0.35)"
+                    stroke="#cbd5e1"
+                    strokeOpacity={0.35}
                     strokeWidth={id === me.id ? 0.4 : 0.15}
                     strokeDasharray="1 1"
                   />
@@ -253,6 +297,12 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
               const mine = id === me.id
               const deg = facingDeg(p.facing, p.facingDeg)
               const rad = (deg * Math.PI) / 180
+              const gaya = gayaTitikPemain(
+                m,
+                sectionDot(m.section),
+                drill.tampilanTag,
+                set?.tampilanTag,
+              )
               return (
                 <g
                   key={id}
@@ -266,14 +316,15 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
                     y1={sy(p.y)}
                     x2={sx(p.x) - Math.sin(rad) * 1.6}
                     y2={sy(p.y) + Math.cos(rad) * 1.6}
-                    stroke={sectionDot(m.section)}
+                    stroke={gaya.warna}
                     strokeWidth={0.35}
                   />
-                  <circle
+                  <TitikPemainBentuk
                     cx={sx(p.x)}
                     cy={sy(p.y)}
                     r={uk(mine ? 2.2 : 1.15)}
-                    fill={sectionDot(m.section)}
+                    bentuk={gaya.bentuk}
+                    fill={gaya.warna}
                     stroke={mine ? '#fbbf24' : '#0b1120'}
                     strokeWidth={uk(mine ? 0.6 : 0.18)}
                   />
@@ -402,13 +453,38 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
               <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/40 p-3">
                 <p className="text-xs font-medium text-slate-300">
                   Gerakan ke {nextSet.name}: {set?.counts ?? 0} count
-                  {jarak(myPoint, myNext) !== null && (
+                  {myPoint && myNext && (
                     <>
                       {' '}
-                      · jarak <b className="text-emerald-400">{jarak(myPoint, myNext)}</b> langkah
+                      · jarak{' '}
+                      <b className="text-emerald-400">
+                        {set?.midsets?.[me.id]?.length
+                          ? Math.round(
+                              panjangJalurMidsets(
+                                myPoint,
+                                myNext,
+                                set.midsets[me.id],
+                                set.counts || 8,
+                              ) / sYd,
+                            )
+                          : jarak(myPoint, myNext)}
+                      </b>{' '}
+                      langkah
                     </>
                   )}
                 </p>
+                {set?.midsets?.[me.id]?.length ? (
+                  <ul
+                    className="mt-1.5 space-y-1 rounded-md border border-sky-800/40 bg-sky-950/25 px-2.5 py-1.5 text-[11px] text-sky-200"
+                    data-testid="anggota-daftar-midset"
+                  >
+                    {normalisasiMidsetsPemain(set.midsets[me.id], set.counts || 8).map((w, wi) => (
+                      <li key={`mid-me-${wi}`} className="font-mono">
+                        ↳ Singgah hitungan <b>{w.padaCount}</b>: {coordText(w.x, w.y, f)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 {myNext && (
                   <p className="mt-1 text-[11px] text-slate-500">
                     Tujuan: {coordText(myNext.x, myNext.y, f)} ·{' '}

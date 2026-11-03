@@ -6,7 +6,14 @@ import type {
   Member,
   SetelanLangkah,
 } from '../db/types'
-import { bangunPetaFtl, countEfektifPemain, gerakOf, kelompokPemain } from './gerak'
+import {
+  bangunPetaFtl,
+  countEfektifPemain,
+  gerakOf,
+  kelompokPemain,
+  panjangJalurMidsets,
+  sinkronkanKelompokDariTag,
+} from './gerak'
 import { sectionLabel } from './utils'
 
 /**
@@ -251,8 +258,10 @@ export function analisisPerpindahan(
   if (counts <= 0) return KOSONG
   const amb = ambangEfektif(ambang)
 
-  const g = gerakOf(dari.gerak)
-  // 31e — kalau desainer memilih jarak lurus, kelengkungan & FTL diabaikan:
+  const gMentah = gerakOf(dari.gerak)
+  const kelompokSinkron = sinkronkanKelompokDariTag(gMentah.kelompok, anggota)
+  const g = kelompokSinkron !== gMentah.kelompok ? { ...gMentah, kelompok: kelompokSinkron } : gMentah
+  // 31e — kalau desainer memilih jarak lurus, kelengkungan, FTL, & midsets diabaikan:
   // yang dihitung perpindahan titik awal → akhir, bukan jarak tempuh kaki.
   const rasioDasar =
     dasarJarak === 'lurus' ? 1 : g.jalur === 'lengkung' ? rasioLengkung(g.lengkung) : 1
@@ -270,14 +279,24 @@ export function analisisPerpindahan(
     if (!p || !q) continue
     const ftl = petaFtlYd.get(m.id)
     const klp = kelompokPemain(g, m.id)
+    const mid = dari.midsets?.[m.id]
     const lurusYd = Math.hypot(q.x - p.x, q.y - p.y)
+    const lengkungPemain = klp
+      ? klp.jalur === 'lengkung'
+        ? (klp.lengkung ?? 0.4)
+        : 0
+      : g.jalur === 'lengkung'
+        ? g.lengkung
+        : 0
     const jarakYd = ftl
       ? ftl.totalPanjang
       : dasarJarak === 'lurus'
         ? lurusYd
-        : klp
-          ? lurusYd * (klp.jalur === 'lengkung' ? rasioLengkung(klp.lengkung ?? 0.4) : 1)
-          : lurusYd * rasioDasar
+        : mid?.length
+          ? panjangJalurMidsets(p, q, mid, counts, lengkungPemain)
+          : klp
+            ? lurusYd * (klp.jalur === 'lengkung' ? rasioLengkung(klp.lengkung ?? 0.4) : 1)
+            : lurusYd * rasioDasar
     if (jarakYd < 0.01) continue
     // Waktu yang benar-benar tersedia buat pemain ini (memperhitungkan
     // Move+Hold `jalanCount`, `tunda` per seksi, dan gelombang `ripple`).

@@ -1,14 +1,16 @@
 /**
  * Diekstrak dari `src/pages/Drill.tsx` (#5 — pecah Drill.tsx).
- * Isinya tidak diubah; hanya alamat impor yang disesuaikan.
+ * Diperkaya pada #23.1 & #23.2 dengan kendali Titik Singgah (Midset) dan Tags anggota.
  */
 
 /** Inspektur satu titik terpilih di editor. */
+import { useState } from 'react'
 import type {
   DrillPoint,
   Facing,
   FieldConfig,
   Member,
+  TitikSinggahMidset,
 } from '../db/types'
 import { NamaTampil } from './NamaTampil'
 import {
@@ -18,15 +20,11 @@ import {
   Input,
   Select,
 } from './ui'
-
 import {
   coordText as coorTextSafe,
   stepYd,
 } from '../lib/field'
-
-/* ========================================================================== */
-/*  Komponen pendukung                                                         */
-/* ========================================================================== */
+import { normalisasiMidsetsPemain } from '../lib/gerak'
 
 export function PointInspector({
   member,
@@ -34,6 +32,14 @@ export function PointInspector({
   field,
   onChange,
   onDetail,
+  countsSet,
+  adaSetBerikut,
+  midsets,
+  onTambahMidset,
+  onUbahCountMidset,
+  onHapusMidset,
+  onTambahTag,
+  onHapusTag,
 }: {
   member: Member
   point: DrillPoint
@@ -41,8 +47,22 @@ export function PointInspector({
   onChange: (p: Partial<DrillPoint>) => void
   /** DD6 — buka panel detail pemain ini (riwayat gerak & perlengkapan). */
   onDetail?: () => void
+  /** #23.1 — jumlah hitungan set aktif & ketersediaan set tujuan untuk titik singgah. */
+  countsSet?: number
+  adaSetBerikut?: boolean
+  midsets?: TitikSinggahMidset[]
+  onTambahMidset?: () => void
+  onUbahCountMidset?: (indeks: number, padaCountBaru: number) => void
+  onHapusMidset?: (indeks: number) => void
+  /** #23.2 — kelola tag lintas-seksi langsung pada anggota terpilih. */
+  onTambahTag?: (tag: string) => void
+  onHapusTag?: (tag: string) => void
 }) {
   const s = stepYd(field)
+  const [inputTag, setInputTag] = useState('')
+  const batasCount = Math.max(0, Math.floor(countsSet ?? 0))
+  const daftarMid = normalisasiMidsetsPemain(midsets, batasCount)
+
   return (
     <Card>
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -95,6 +115,121 @@ export function PointInspector({
           </Select>
         </div>
       </div>
+
+      {/* #23.1 — Titik Singgah (Midset) per-pemain di tengah perpindahan */}
+      {adaSetBerikut && batasCount >= 2 && onTambahMidset && (
+        <div
+          className="mt-3 border-t border-slate-800 pt-2.5"
+          data-testid="inspektur-midset"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-medium text-slate-300">
+              Titik singgah (Midset)
+            </span>
+            <Button
+              size="sm"
+              variant="soft"
+              data-testid="tombol-tambah-midset"
+              onClick={onTambahMidset}
+              disabled={daftarMid.length >= batasCount - 1}
+              className="px-2 py-0.5 text-[11px]"
+              title="Sisipkan titik singgah di garis jejak biru pemain ini tanpa memecah set seluruh tim"
+            >
+              + Singgah
+            </Button>
+          </div>
+          {daftarMid.length === 0 ? (
+            <p className="mt-1 text-[10px] leading-snug text-slate-500">
+              Seret tanda <b>+</b> di garis biru kanvas atau klik <b>+ Singgah</b> untuk membelokkan jalur pemain ini.
+            </p>
+          ) : (
+            <ul className="mt-1.5 space-y-1" data-testid="daftar-midset-pemain">
+              {daftarMid.map((w, idx) => (
+                <li
+                  key={`mid-${w.padaCount}-${idx}`}
+                  data-testid={`baris-midset-${idx}`}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-950/60 px-2 py-1 text-[11px]"
+                >
+                  <span className="text-[10px] text-sky-300">Hit.</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={batasCount - 1}
+                    data-testid={`input-count-midset-${idx}`}
+                    value={w.padaCount}
+                    onChange={(e) =>
+                      onUbahCountMidset?.(
+                        idx,
+                        Math.max(1, Math.min(batasCount - 1, Math.round(Number(e.target.value) || 1))),
+                      )
+                    }
+                    className="w-14 px-1.5 py-0.5 text-xs"
+                  />
+                  <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-slate-300">
+                    {coorTextSafe(w.x, w.y, field)}
+                  </span>
+                  <button
+                    type="button"
+                    data-testid={`hapus-midset-${idx}`}
+                    onClick={() => onHapusMidset?.(idx)}
+                    className="rounded px-1 text-slate-500 hover:text-rose-400"
+                    title="Hapus titik singgah ini"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* #23.2 — Tag lintas-seksi langsung pada anggota terpilih */}
+      {onTambahTag && onHapusTag && (
+        <div className="mt-3 border-t border-slate-800 pt-2.5" data-testid="inspektur-tag-anggota">
+          <span className="block text-[11px] font-medium text-slate-300">Tags lintas-seksi</span>
+          {(member.tags?.length ?? 0) > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {member.tags!.map((tg) => (
+                <span
+                  key={tg}
+                  className="inline-flex items-center gap-1 rounded-md border border-emerald-700/40 bg-emerald-950/40 px-1.5 py-0.5 text-[10px] font-medium text-emerald-200"
+                >
+                  #{tg}
+                  <button
+                    type="button"
+                    data-testid={`hapus-tag-inspektur-${tg}`}
+                    onClick={() => onHapusTag(tg)}
+                    className="text-emerald-400/70 hover:text-rose-300"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <form
+            className="mt-1.5 flex items-center gap-1"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!inputTag.trim()) return
+              onTambahTag(inputTag)
+              setInputTag('')
+            }}
+          >
+            <Input
+              data-testid="input-tag-inspektur"
+              value={inputTag}
+              onChange={(e) => setInputTag(e.target.value)}
+              placeholder="Tambah tag (mis. Solois)…"
+              className="flex-1 py-1 text-xs"
+            />
+            <Button size="sm" variant="soft" type="submit" disabled={!inputTag.trim()}>
+              +
+            </Button>
+          </form>
+        </div>
+      )}
     </Card>
   )
 }

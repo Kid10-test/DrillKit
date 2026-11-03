@@ -1,19 +1,24 @@
 /**
  * Diekstrak dari `src/pages/Drill.tsx` (#5 — pecah Drill.tsx).
- * Isinya tidak diubah; hanya alamat impor yang disesuaikan.
+ * Diperkaya pada #23.1 & #23.2 untuk mendukung rantai titik singgah (Midsets)
+ * serta bentuk geometri titik berbasis Tag lintas-seksi (#hex murni).
  */
 
-/** DD2 — Jejak gerak & tapak langkah di kanvas editor. */
+/** DD2, #23.1, & #23.2 — Jejak gerak, tapak langkah, & bentuk titik di kanvas. */
 
+import type { BentukTitikTag, TitikSinggahMidset } from '../db/types'
 import {
   deltaBusur,
+  deltaMidsets,
   kendaliJalur,
   pathBusur,
+  pathSvgMidsets,
   titikJalur,
 } from '../lib/gerak'
+import { poligonBentukTitik } from '../lib/tagAnggota'
 
 /* ========================================================================== */
-/*  DD2 — Jejak gerak                                                         */
+/*  DD2 & #23.1 — Jejak gerak                                                 */
 /* ========================================================================== */
 
 /**
@@ -30,9 +35,8 @@ export type BusurGambar = {
 }
 
 /**
- * Satu jejak perpindahan pemain: garis lurus, atau **kurva** kalau set-nya
- * memakai jalur melengkung. Jejak "masuk" memakai pengaturan set sebelumnya,
- * jejak "keluar" memakai pengaturan set yang aktif.
+ * Satu jejak perpindahan pemain: garis lurus, kurva, busur putaran, atau rantai
+ * multi-segmen `midsets` (#23.1).
  */
 export function Jejak({
   nama,
@@ -46,6 +50,8 @@ export function Jejak({
   putus,
   panah,
   busur,
+  midsetsSvg,
+  countsSet,
 }: {
   nama: string
   x1: number
@@ -59,6 +65,9 @@ export function Jejak({
   panah?: string
   /** DD4 — busur putaran: dipakai kalau pemain ini mengikuti putaran blok. */
   busur?: BusurGambar
+  /** #23.1 — titik singgah dalam ruang gambar SVG (bila pemain memiliki midsets). */
+  midsetsSvg?: TitikSinggahMidset[]
+  countsSet?: number
 }) {
   const atribut = {
     stroke: warna,
@@ -67,8 +76,17 @@ export function Jejak({
     fill: 'none',
     markerEnd: panah,
   }
-  // DD4 — busur putaran digambar dari titik awal, mengikuti putaran yang sama
-  // dengan animasi (bukan perintah `A`, supaya keduanya tidak mungkin beda).
+  if (midsetsSvg?.length) {
+    return (
+      <path
+        data-trail={nama}
+        data-midset-trail="1"
+        d={pathSvgMidsets({ x: x1, y: y1 }, { x: x2, y: y2 }, midsetsSvg, countsSet ?? 8, lengkung)}
+        strokeDasharray={putus}
+        {...atribut}
+      />
+    )
+  }
   if (busur) {
     return (
       <path
@@ -94,15 +112,7 @@ export function Jejak({
 }
 
 /**
- * DD9 — Tapak langkah.
- *
- * Tanda kecil di sepanjang jejak, **satu tiap satu langkah**, jadi pelatih bisa
- * melihat langsung berapa kali pemain melangkah dan di mana kaki mendarat.
- * Jarak antar tapak mengikuti mode langkah (DD10b): mode `menyesuaikan`
- * menaruh tapak sesuai hitungan, mode `tetap` sesuai ukuran langkah.
- *
- * Sengaja cuma digambar untuk pemain yang dipilih — kalau digambar untuk
- * seisi formasi, papan akan penuh oleh tapak dan justru tidak terbaca.
+ * DD9 & #23.1 — Tapak langkah di sepanjang jejak (termasuk melewati rantai `midsets`).
  */
 export function TapakLangkah({
   x1,
@@ -111,6 +121,8 @@ export function TapakLangkah({
   y2,
   lengkung,
   busur,
+  midsetsSvg,
+  countsSet,
   jumlah,
   warna,
 }: {
@@ -120,6 +132,8 @@ export function TapakLangkah({
   y2: number
   lengkung: number
   busur?: BusurGambar
+  midsetsSvg?: TitikSinggahMidset[]
+  countsSet?: number
   jumlah: number
   warna: string
 }) {
@@ -127,9 +141,11 @@ export function TapakLangkah({
   const titik: { k: number; x: number; y: number }[] = []
   for (let k = 1; k < jumlah; k++) {
     const t = k / jumlah
-    const [dx, dy] = busur
-      ? deltaBusur(t, x1, y1, busur.pusat, busur.sudut, busur.geser ?? { x: 0, y: 0 })
-      : titikJalur(t, x2 - x1, y2 - y1, lengkung)
+    const [dx, dy] = midsetsSvg?.length
+      ? deltaMidsets({ x: x1, y: y1 }, { x: x2, y: y2 }, midsetsSvg, countsSet ?? 8, t, lengkung)
+      : busur
+        ? deltaBusur(t, x1, y1, busur.pusat, busur.sudut, busur.geser ?? { x: 0, y: 0 })
+        : titikJalur(t, x2 - x1, y2 - y1, lengkung)
     titik.push({ k, x: x1 + dx, y: y1 + dy })
   }
   return (
@@ -141,6 +157,78 @@ export function TapakLangkah({
   )
 }
 
-/* ========================================================================== */
-/*  Halaman utama                                                              */
-/* ========================================================================== */
+/**
+ * #23.2 — Penggambar titik pemain berbasis bentuk (`bulat`, `kotak`, `intan`, `segitiga`)
+ * dengan warna `#hex` murni.
+ *
+ * Selalu menyertakan jangkar `<circle data-titik="1" cx cy>` agar pembaca koordinat DOM
+ * dan uji regresi lama bekerja seragam pada bentuk geometri apa pun.
+ */
+export function TitikPemainBentuk({
+  cx,
+  cy,
+  r,
+  bentuk = 'bulat',
+  fill,
+  stroke,
+  strokeWidth,
+}: {
+  cx: number
+  cy: number
+  r: number
+  bentuk?: BentukTitikTag
+  fill: string
+  stroke: string
+  strokeWidth: number
+}) {
+  if (bentuk === 'bulat') {
+    return (
+      <circle
+        data-titik="1"
+        data-bentuk-titik="bulat"
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+      />
+    )
+  }
+  const sKotak = r * 1.82
+  return (
+    <>
+      <circle
+        data-titik="1"
+        data-bentuk-titik={bentuk}
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill={fill}
+        fillOpacity={0}
+        stroke="none"
+      />
+      {bentuk === 'kotak' ? (
+        <rect
+          data-bentuk-geometri="kotak"
+          x={cx - sKotak / 2}
+          y={cy - sKotak / 2}
+          width={sKotak}
+          height={sKotak}
+          rx={r * 0.18}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+        />
+      ) : (
+        <polygon
+          data-bentuk-geometri={bentuk}
+          points={poligonBentukTitik(bentuk, cx, cy, r)}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+        />
+      )}
+    </>
+  )
+}

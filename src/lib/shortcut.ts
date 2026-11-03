@@ -45,7 +45,7 @@ export const DAFTAR_SHORTCUT: GrupShortcut[] = [
       ['L', 'Ulangi perpindahan terus-menerus'],
       ['R', 'Urutan latihan: mainkan semua set berurutan'],
       ['F', 'Mode presenter (layar penuh)'],
-      ['?', 'Buka daftar ini'],
+      ['Ctrl+K / ?', 'Palet perintah & pintasan'],
     ],
   },
 ]

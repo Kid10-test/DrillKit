@@ -77,6 +77,13 @@ export interface Member {
   kelasJurusan?: string
   /** #21b — Nomor induk siswa/mahasiswa/pegawai (NIS/NIM/NIP, opsional, privat). */
   nomorInduk?: string
+  /**
+   * #23.2 — Tag lintas-seksi terpadu (mis. "Solois", "Sayap Kiri", "FTL Tuba").
+   * Aman disertakan pada paket grup/anggota karena mendeskripsikan peran formasi/visual
+   * di panggung, sekaligus menjadi sumber seleksi 1-klik, sorot warna/bentuk per-set,
+   * dan jalur sub-kelompok `GerakKelompok`.
+   */
+  tags?: string[]
   /** Token acak untuk QR absensi — jadi tidak bisa ditebak */
   token: string
   createdAt: number
@@ -558,6 +565,12 @@ export interface InstruksiVisualSet {
 export interface GerakKelompok {
   id: string
   nama: string
+  /**
+   * #23.2 — Tautan opsional ke tag lintas-seksi (`Member.tags`).
+   * Bila diisi, anggota kelompok otomatis disinkronkan dari pemilik tag tersebut
+   * tanpa harus memilih ulang anggota tiap berpindah set.
+   */
+  tag?: string
   /** Urutan pemain dalam kelompok ini (pada FTL, indeks 0 adalah pemimpin barisan) */
   memberIds: string[]
   /** Gaya jalur khusus sub-kelompok ini */
@@ -568,6 +581,33 @@ export interface GerakKelompok {
   mudah?: 'rata' | 'halus' | 'mulaiPelan' | 'akhirPelan'
   /** Hitungan jalan sebelum Hold khusus kelompok ini (opsional) */
   jalanCount?: number
+}
+
+/**
+ * #23.1 — Titik singgah (*midset* / *waypoint*) per-pemain di tengah perpindahan set.
+ *
+ * Hanya disimpan pada pemain yang benar-benar membelok menghindari rintangan/properti,
+ * sehingga pemain lain tidak ikut menanggung baris koordinat tambahan di buku saku.
+ */
+export interface TitikSinggahMidset {
+  /** Hitungan (1 .. set.counts - 1) saat pemain tiba di titik singgah ini. */
+  padaCount: number
+  /** Koordinat lapangan dalam yard (relatif tengah lapangan). */
+  x: number
+  y: number
+  /** Derajat kelengkungan opsional (-1..1) dari titik sebelumnya menuju titik singgah ini. */
+  lengkung?: number
+}
+
+/** #23.2 — Bentuk geometri titik pemain berbasis Tag lintas-seksi di kanvas. */
+export type BentukTitikTag = 'bulat' | 'kotak' | 'intan' | 'segitiga'
+
+/** #23.2 — Timpaan warna & bentuk titik untuk suatu Tag lintas-seksi (per-drill atau per-set). */
+export interface TimpaanTampilanTag {
+  /** Warna isi titik dalam format #hex murni (kosong = tetap memakai warna section). */
+  warna?: string
+  /** Bentuk geometri titik di kanvas (bawaan 'bulat'). */
+  bentuk?: BentukTitikTag
 }
 
 export interface RippleGerak {
@@ -639,6 +679,10 @@ export interface DrillSet {
   visual?: InstruksiVisualSet
   /** #22 — daftar bentuk parametrik hidup (kurva Bézier, garis, lingkaran, blok) pada set ini */
   bentukTerikat?: BentukTerikat[]
+  /** #23.1 — titik singgah per-pemain di tengah perpindahan menuju set berikutnya */
+  midsets?: Record<string, TitikSinggahMidset[]>
+  /** #23.2 — timpaan warna/bentuk titik berbasis Tag lintas-seksi khusus pada set ini */
+  tampilanTag?: Record<string, TimpaanTampilanTag>
   createdAt: number
 }
 
@@ -798,6 +842,8 @@ export interface Drill {
   markers?: FieldMarker[]
   /** DD10b — bawaan cara langkah dihitung untuk seluruh drill. */
   setelanLangkah?: SetelanLangkah
+  /** #23.2 — gaya tampilan bawaan untuk Tag lintas-seksi di seluruh drill (bisa ditimpa per set). */
+  tampilanTag?: Record<string, TimpaanTampilanTag>
   /**
    * 31e — dasar jarak untuk drill ini: jarak tempuh mengikuti jalur, atau
    * garis lurus. Kosong = `jalur`, persis seperti sebelumnya, jadi drill
