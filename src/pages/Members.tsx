@@ -38,6 +38,7 @@ import {
   JUDUL_CSV_ANGGOTA,
   pecahCsv,
 } from '../lib/namaAnggota'
+import { kumpulkanTagRoster, punyaTag, uraiInputTag } from '../lib/tagAnggota'
 import { catatanCsvSatuArah, kenaliBerkas, tampakCsvAnggota } from '../lib/bukaBerkas'
 import { mintaPratinjau, useTitipan } from '../components/BukaBerkas'
 import { NamaTampil, useModeNama } from '../components/NamaTampil'
@@ -92,7 +93,7 @@ export default function Members() {
   const jmlInventaris = useLiveQuery(() => db.inventaris.count(), [], 0)
   const jmlAudisi = useLiveQuery(() => db.audisi.count(), [], 0)
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<Section | 'all'>('all')
+  const [filter, setFilter] = useState<string>('all')
   const [showInactive, setShowInactive] = useState(false)
   const [editing, setEditing] = useState<Member | null>(null)
   const [open, setOpen] = useState(false)
@@ -100,10 +101,18 @@ export default function Members() {
   const [gabung, setGabung] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const daftarTagAnggota = useMemo(() => kumpulkanTagRoster(members), [members])
+
   const list = useMemo(() => {
     return members
       .filter((m) => (showInactive ? true : m.active === 1))
-      .filter((m) => (filter === 'all' ? true : m.section === filter))
+      .filter((m) =>
+        filter === 'all'
+          ? true
+          : filter.startsWith('tag:')
+            ? punyaTag(m, filter.slice(4))
+            : m.section === filter,
+      )
       .filter((m) => cocokCari(m, q, true))
   }, [members, q, filter, showInactive])
 
@@ -425,13 +434,27 @@ export default function Members() {
             />
           </div>
           <div className="flex gap-2">
-            <Select value={filter} onChange={(e) => setFilter(e.target.value as Section | 'all')} className="sm:w-44">
+            <Select
+              data-testid="filter-tag-anggota"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="sm:w-44"
+            >
               <option value="all">Semua section</option>
               {visibleSections().map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
               ))}
+              {daftarTagAnggota.length > 0 && (
+                <optgroup label="Tag Lintas-Seksi">
+                  {daftarTagAnggota.map(({ tag, memberIds }) => (
+                    <option key={`tag:${tag}`} value={`tag:${tag}`}>
+                      #{tag} ({memberIds.length})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </Select>
           </div>
         </div>
@@ -475,6 +498,14 @@ export default function Members() {
                         )}
                         <Badge>{m.code}</Badge>
                         {m.role !== 'member' && <Badge className="border-violet-500/30 bg-violet-500/10 text-violet-300">{ROLE_LABEL[m.role]}</Badge>}
+                        {(m.tags ?? []).map((tg) => (
+                          <span
+                            key={tg}
+                            className="rounded-md border border-emerald-700/40 bg-emerald-950/40 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300"
+                          >
+                            #{tg}
+                          </span>
+                        ))}
                       </div>
                       <p className="truncate text-xs text-slate-500">
                         {m.instrument || '—'} · masuk {m.joinYear}
@@ -551,7 +582,11 @@ function MemberModal({
   existingCodes: string[]
 }) {
   const [m, setM] = useState<Member | null>(member)
-  useEffect(() => setM(member), [member])
+  const [teksTag, setTeksTag] = useState('')
+  useEffect(() => {
+    setM(member)
+    setTeksTag((member?.tags ?? []).join(', '))
+  }, [member])
 
   if (!m) return null
   const dupe = existingCodes.filter((c) => c === m.code).length > (member?.code === m.code ? 1 : 0)
@@ -566,7 +601,13 @@ function MemberModal({
           <Button variant="ghost" onClick={onClose}>
             Batal
           </Button>
-          <Button variant="primary" onClick={() => onSave(m)}>
+          <Button
+            variant="primary"
+            onClick={() => {
+              const tagsBersih = uraiInputTag(teksTag)
+              onSave({ ...m, tags: tagsBersih.length ? tagsBersih : undefined })
+            }}
+          >
             Simpan
           </Button>
         </>
@@ -650,6 +691,14 @@ function MemberModal({
           <Input
             value={m.nomorInduk ?? ''}
             onChange={(e) => setM({ ...m, nomorInduk: e.target.value || undefined })}
+          />
+        </Field>
+        <Field label="Tags lintas-seksi" hint="pisahkan koma, mis. Solois, Sayap Kiri">
+          <Input
+            data-testid="kolom-tags-anggota"
+            value={teksTag}
+            onChange={(e) => setTeksTag(e.target.value)}
+            placeholder="Mis. Solois, Sayap Kiri, FTL Tuba"
           />
         </Field>
       </div>

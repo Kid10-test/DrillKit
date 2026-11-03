@@ -7,12 +7,14 @@
  */
 import { useState } from 'react'
 import type {
+  BentukTitikTag,
   DrillSet,
   GerakKelompok,
   GerakSet,
   InstruksiVisualSet,
   JenisSimbolVisual,
   Member,
+  TimpaanTampilanTag,
 } from '../../db/types'
 import {
   DAFTAR_SIMBOL_VISUAL,
@@ -21,6 +23,11 @@ import {
   labelGelombangRipple,
   type GerakLengkap,
 } from '../../lib/gerak'
+import {
+  DAFTAR_BENTUK_TAG,
+  PALET_WARNA_TAG,
+  kumpulkanTagRoster,
+} from '../../lib/tagAnggota'
 import { cx, sectionLabel, uid } from '../../lib/utils'
 import { Button, Input, Select } from '../ui'
 
@@ -39,6 +46,7 @@ export function PanelGerakSet({
   seksiUnik,
   selectedIds,
   rosterById,
+  simpanTampilanTagSet,
 }: {
   set: DrillSet
   adaSetBerikut: boolean
@@ -54,10 +62,17 @@ export function PanelGerakSet({
   seksiUnik: string[]
   selectedIds: string[]
   rosterById: Map<string, Member>
+  /** #23.2 — simpan timpaan warna/bentuk titik per-Tag khusus pada set aktif. */
+  simpanTampilanTagSet?: (peta: Record<string, TimpaanTampilanTag> | undefined) => void
 }) {
   const [namaKlpBaru, setNamaKlpBaru] = useState('')
   const [jalurKlpBaru, setJalurKlpBaru] = useState<'ftl' | 'lengkung' | 'lurus'>('ftl')
+  const [tagKlpTerpilih, setTagKlpTerpilih] = useState('')
+  const [tagSorotTerpilih, setTagSorotTerpilih] = useState('')
+  const [warnaTagSorot, setWarnaTagSorot] = useState<string>(PALET_WARNA_TAG[0].hex)
+  const [bentukTagSorot, setBentukTagSorot] = useState<BentukTitikTag>('intan')
   const [jmlGelombangRipple, setJmlGelombangRipple] = useState(4)
+  const daftarTagRoster = kumpulkanTagRoster([...rosterById.values()])
 
   const counts = Math.max(0, set.counts || 0)
   const jalanAktif =
@@ -105,6 +120,47 @@ export function PanelGerakSet({
     }
     simpanGerak({ kelompok: [...bersihLama, klpBaru] })
     setNamaKlpBaru('')
+  }
+
+  function tambahKelompokDariTag() {
+    const infoTag =
+      daftarTagRoster.find((t) => t.tag === tagKlpTerpilih) ?? daftarTagRoster[0]
+    if (!infoTag) return
+    const kandidat = infoTag.memberIds.filter((id) => set.points[id])
+    if (kandidat.length < (jalurKlpBaru === 'ftl' ? 2 : 1)) return
+    const bersihLama = daftarKlp
+      .filter((k) => k.tag?.toLowerCase() !== infoTag.tag.toLowerCase())
+      .map((k) => ({ ...k, memberIds: k.memberIds.filter((id) => !kandidat.includes(id)) }))
+      .filter((k) => k.memberIds.length > 0)
+    const klpBaru: GerakKelompok = {
+      id: uid('klp_'),
+      nama: namaKlpBaru.trim() || infoTag.tag,
+      tag: infoTag.tag,
+      memberIds: kandidat,
+      jalur: jalurKlpBaru,
+      ...(jalurKlpBaru === 'lengkung' ? { lengkung: 0.4 } : {}),
+    }
+    simpanGerak({ kelompok: [...bersihLama, klpBaru] })
+    setNamaKlpBaru('')
+  }
+
+  function pasangSorotTag() {
+    if (!simpanTampilanTagSet) return
+    const targetTag = (tagSorotTerpilih || daftarTagRoster[0]?.tag || '').trim()
+    if (!targetTag) return
+    const skrg = { ...(set.tampilanTag ?? {}) }
+    skrg[targetTag] = {
+      warna: warnaTagSorot || undefined,
+      bentuk: bentukTagSorot,
+    }
+    simpanTampilanTagSet(skrg)
+  }
+
+  function hapusSorotTag(tag: string) {
+    if (!simpanTampilanTagSet || !set.tampilanTag) return
+    const skrg = { ...set.tampilanTag }
+    delete skrg[tag]
+    simpanTampilanTagSet(Object.keys(skrg).length ? skrg : undefined)
   }
 
   function hapusKelompok(id: string) {
@@ -176,6 +232,105 @@ export function PanelGerakSet({
           onChange={(e) => ubahCatatanVisual(e.target.value)}
         />
       </div>
+
+      {/* #23.2 — Sorot Warna & Bentuk Titik Berbasis Tag Lintas-Seksi per Set */}
+      {simpanTampilanTagSet && daftarTagRoster.length > 0 && (
+        <div
+          className="rounded-lg border border-slate-800 bg-slate-950/50 p-2.5"
+          data-testid="panel-sorot-tag-set"
+        >
+          <p className="text-[11px] font-medium text-slate-300">
+            Sorot warna &amp; bentuk Tag di set ini
+          </p>
+          <p className="mt-0.5 text-[10px] leading-snug text-slate-500">
+            Tandai sub-unit lintas-seksi (mis. <i>Solois</i>) dengan warna/bentuk khusus hanya pada set ini.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <Select
+              data-testid="pilih-tag-sorot-set"
+              value={tagSorotTerpilih || daftarTagRoster[0]?.tag || ''}
+              onChange={(e) => setTagSorotTerpilih(e.target.value)}
+              className="w-32 py-1 text-xs"
+              aria-label="Pilih tag untuk disorot"
+            >
+              {daftarTagRoster.map((t) => (
+                <option key={t.tag} value={t.tag}>
+                  #{t.tag} ({t.memberIds.length})
+                </option>
+              ))}
+            </Select>
+            <Select
+              data-testid="pilih-bentuk-tag-set"
+              value={bentukTagSorot}
+              onChange={(e) => setBentukTagSorot(e.target.value as BentukTitikTag)}
+              className="w-28 py-1 text-xs"
+              aria-label="Pilih bentuk titik tag"
+            >
+              {DAFTAR_BENTUK_TAG.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.simbol} {b.label}
+                </option>
+              ))}
+            </Select>
+            <div className="flex items-center gap-1" role="group" aria-label="Pilih warna sorot tag">
+              {PALET_WARNA_TAG.map((w) => (
+                <button
+                  key={w.hex}
+                  type="button"
+                  data-testid={`warna-tag-${w.hex.slice(1)}`}
+                  onClick={() => setWarnaTagSorot(w.hex)}
+                  title={w.nama}
+                  className={cx(
+                    'h-5 w-5 rounded-full border transition',
+                    warnaTagSorot === w.hex ? 'scale-110 border-white ring-1 ring-white' : 'border-slate-700',
+                  )}
+                  style={{ background: w.hex }}
+                />
+              ))}
+            </div>
+            <Button
+              size="sm"
+              variant="soft"
+              data-testid="pasang-sorot-tag-set"
+              onClick={pasangSorotTag}
+            >
+              Pasang
+            </Button>
+          </div>
+          {set.tampilanTag && Object.keys(set.tampilanTag).length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5" data-testid="daftar-sorot-tag-aktif">
+              {Object.entries(set.tampilanTag).map(([tag, gaya]) => {
+                const infoBentuk =
+                  DAFTAR_BENTUK_TAG.find((b) => b.id === (gaya.bentuk ?? 'bulat')) ?? DAFTAR_BENTUK_TAG[0]
+                return (
+                  <span
+                    key={tag}
+                    data-testid={`lencana-sorot-tag-${tag}`}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] text-slate-200"
+                  >
+                    <span
+                      className="text-xs leading-none"
+                      style={{ color: gaya.warna ?? '#38bdf8' }}
+                    >
+                      {infoBentuk.simbol}
+                    </span>
+                    <span>#{tag}</span>
+                    <button
+                      type="button"
+                      data-testid={`hapus-sorot-tag-${tag}`}
+                      onClick={() => hapusSorotTag(tag)}
+                      className="ml-0.5 text-slate-500 hover:text-rose-400"
+                      title={`Hapus sorot #${tag} di set ini`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* DD2 & #16 — Gerakan menuju set berikutnya */}
       {adaSetBerikut && (
@@ -411,6 +566,44 @@ export function PanelGerakSet({
               </Button>
             </div>
 
+            {daftarTagRoster.length > 0 && (
+              <div
+                className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-800/70 pt-2"
+                data-testid="baris-kelompok-dari-tag"
+              >
+                <span className="text-[10px] text-slate-400">Dari Tag:</span>
+                <Select
+                  data-testid="pilih-tag-kelompok"
+                  value={tagKlpTerpilih || daftarTagRoster[0]?.tag || ''}
+                  onChange={(e) => setTagKlpTerpilih(e.target.value)}
+                  className="w-36 py-1 text-xs"
+                  aria-label="Pilih tag lintas-seksi untuk jalur sub-kelompok"
+                >
+                  {daftarTagRoster.map((t) => (
+                    <option key={t.tag} value={t.tag}>
+                      #{t.tag} ({t.memberIds.filter((id) => Boolean(set.points[id])).length} di set)
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  size="sm"
+                  variant="soft"
+                  data-testid="tambah-kelompok-tag"
+                  disabled={
+                    (() => {
+                      const info =
+                        daftarTagRoster.find((t) => t.tag === tagKlpTerpilih) ?? daftarTagRoster[0]
+                      const n = info ? info.memberIds.filter((id) => Boolean(set.points[id])).length : 0
+                      return n < (jalurKlpBaru === 'ftl' ? 2 : 1)
+                    })()
+                  }
+                  onClick={tambahKelompokDariTag}
+                >
+                  + Pasang Tag
+                </Button>
+              </div>
+            )}
+
             {daftarKlp.length > 0 && (
               <ul className="mt-2 space-y-1.5" data-testid="daftar-kelompok-gerak">
                 {daftarKlp.map((k) => {
@@ -426,6 +619,11 @@ export function PanelGerakSet({
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold text-sky-200">
                           {k.nama}{' '}
+                          {k.tag && (
+                            <span className="mr-1 rounded bg-emerald-950/80 px-1 py-0.5 text-[9px] font-medium text-emerald-300">
+                              #{k.tag}
+                            </span>
+                          )}
                           <span className="text-[10px] font-normal text-slate-400">
                             ({k.jalur === 'ftl' ? 'FTL' : k.jalur} · {k.memberIds.length} pemain)
                           </span>

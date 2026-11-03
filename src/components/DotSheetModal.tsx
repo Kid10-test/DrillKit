@@ -28,7 +28,7 @@ import {
   IconPrinter,
 } from './Icons'
 import { barisPenandaCetak } from './FieldMarkers'
-import { ringkasKoreografiSet } from '../lib/gerak'
+import { normalisasiMidsetsPemain, ringkasKoreografiSet } from '../lib/gerak'
 import { tugasKruPropertiAnggota } from '../lib/propertiGerak'
 import { ringkasKerjaGuardPadaSet } from '../lib/countSheet'
 
@@ -190,81 +190,140 @@ export function DotSheetModal({
   const ordered = [...sets].sort((a, b) => a.order - b.order)
   const fileName = `${slugify(drill.name)}-${format === 'lipat' ? 'buku-saku' : 'dot-sheet'}`
 
-  /** `lpc` = metrik gerak per perpindahan (DD3), dipakai untuk kolom Lk/cnt. */
-  function rowsFor(
+  /**
+   * #23.1 — Kumpulan baris tabel untuk satu pemain (set utama + sub-baris titik
+   * singgah `midsets` HANYA bila pemain ini benar-benar memiliki midset).
+   */
+  function susunBarisPemain(
     m: Member,
     compact: boolean,
     lpc: Map<string, MetrikPemain>[],
-    dari = 0,
-    sampai = ordered.length,
-  ): string {
+  ): { setNomor: number; html: string }[] {
     const tambah = (sertakanLpc ? 1 : 0) + (sertakanUkuran ? 1 : 0)
     const kosong = (compact ? 2 : 4) + tambah
-    // 2b — kartu lipat mencetak set dalam rentang [dari, sampai); nomor
-    // baris tetap nomor set global (i + 1), bukan nomor di dalam muka.
-    return ordered
-      .slice(dari, sampai)
-      .map((set, k) => {
-        const i = dari + k
-        const p = set.points[m.id]
-        const next = ordered[i + 1]?.points[m.id]
-        if (!p)
-          return `<tr><td>${i + 1}</td><td>${esc(set.name)}</td><td colspan="${kosong}" class="muted">— tidak di lapangan —</td></tr>`
-        const met = lpc[i]?.get(m.id)
-        /**
-         * DD10b — angka yang dicetak adalah **jumlah langkah yang benar-benar
-         * dijalankan pemain**, jadi mengikuti modenya: mode `tetap` dihitung
-         * dari jarak (dan sudah mengikuti jalur, termasuk lengkungan), mode
-         * `menyesuaikan` dihitung dari hitungan. Karena itu angkanya selalu
-         * sejalan dengan kolom Lk/cnt: langkah ÷ count = Lk/cnt.
-         */
-        const dist = next
-          ? Math.round(met ? met.jarakLangkah : Math.hypot(next.x - p.x, next.y - p.y) / sYd)
-          : 0
-        const durasi = ((set.counts * drill.beatsPerCount * 60) / Math.max(20, drill.tempo)).toFixed(1)
-        const koordinat = coorTextSafe(p.x, p.y, drill.field)
-        // DD8 — panah arah jalan, mengikuti orientasi gambar chart (lihat kompas).
-        const arah = next ? panahArah(next.x - p.x, next.y - p.y) : ''
-        const panahHtml = sertakanArah && arah ? ` <span class="panah">${arah}</span>` : ''
-        // DD8 — langkah per hitungan untuk perpindahan dari set ini ke berikutnya.
-        const selLpc = sertakanLpc ? `<td>${selLangkahPerCount(met)}</td>` : ''
-        const selUk = sertakanUkuran ? `<td>${selUkuranLangkah(met)}</td>` : ''
-        const isyarat = ringkasKoreografiSet(set, {
-          memberId: m.id,
-          sectionId: m.section,
-          padat: compact,
+    const hasil: { setNomor: number; html: string }[] = []
+
+    ordered.forEach((set, i) => {
+      const p = set.points[m.id]
+      const next = ordered[i + 1]?.points[m.id]
+      if (!p) {
+        hasil.push({
+          setNomor: i + 1,
+          html: `<tr><td>${i + 1}</td><td>${esc(set.name)}</td><td colspan="${kosong}" class="muted">— tidak di lapangan —</td></tr>`,
         })
-        if (apakahModeParade(drill.field)) {
-          const posPrd = posisiSafBanjarAnggota(set.points, m.id, drill.field)
-          if (posPrd) {
-            isyarat.unshift(`Saf ${posPrd.nomorSaf} · Bjr ${posPrd.nomorBanjar}`)
-          }
+        return
+      }
+      const met = lpc[i]?.get(m.id)
+      const daftarMid = next ? normalisasiMidsetsPemain(set.midsets?.[m.id], set.counts) : []
+      // Bila ada titik singgah, arah & langkah baris utama menuju titik singgah pertama
+      const tujuanAwal = daftarMid.length > 0 ? daftarMid[0] : next
+      const dist = next
+        ? daftarMid.length > 0
+          ? Math.round(Math.hypot(daftarMid[0].x - p.x, daftarMid[0].y - p.y) / sYd)
+          : Math.round(met ? met.jarakLangkah : Math.hypot(next.x - p.x, next.y - p.y) / sYd)
+        : 0
+      const countSegmenAwal = daftarMid.length > 0 ? daftarMid[0].padaCount : set.counts
+      const durasi = ((countSegmenAwal * drill.beatsPerCount * 60) / Math.max(20, drill.tempo)).toFixed(1)
+      const koordinat = coorTextSafe(p.x, p.y, drill.field)
+      const arah = tujuanAwal ? panahArah(tujuanAwal.x - p.x, tujuanAwal.y - p.y) : ''
+      const panahHtml = sertakanArah && arah ? ` <span class="panah">${arah}</span>` : ''
+      const selLpc = sertakanLpc ? `<td>${selLangkahPerCount(met)}</td>` : ''
+      const selUk = sertakanUkuran ? `<td>${selUkuranLangkah(met)}</td>` : ''
+      const isyarat = ringkasKoreografiSet(set, {
+        memberId: m.id,
+        sectionId: m.section,
+        padat: compact,
+      })
+      if (apakahModeParade(drill.field)) {
+        const posPrd = posisiSafBanjarAnggota(set.points, m.id, drill.field)
+        if (posPrd) {
+          isyarat.unshift(`Saf ${posPrd.nomorSaf} · Bjr ${posPrd.nomorBanjar}`)
         }
-        if (sertakanGuard && countSheets.length > 0) {
-          isyarat.push(...ringkasKerjaGuardPadaSet(countSheets, set.id, m))
-        }
-        if (compact) {
-          const ekorVisual = isyarat.length
-            ? ` <span class="isyarat-visual">· ${esc(isyarat.join(' '))}</span>`
-            : ''
-          return `<tr><td>${i + 1}</td><td>${esc(set.name)}${ekorVisual}</td><td>${set.counts}</td><td class="mono">${esc(koordinat)}</td><td>${next ? dist : '-'}${panahHtml}</td>${selLpc}${selUk}</tr>`
-        }
+      }
+      if (sertakanGuard && countSheets.length > 0) {
+        isyarat.push(...ringkasKerjaGuardPadaSet(countSheets, set.id, m))
+      }
+      if (compact) {
+        const ekorVisual = isyarat.length
+          ? ` <span class="isyarat-visual">· ${esc(isyarat.join(' '))}</span>`
+          : ''
+        hasil.push({
+          setNomor: i + 1,
+          html: `<tr><td>${i + 1}</td><td>${esc(set.name)}${ekorVisual}</td><td>${countSegmenAwal}</td><td class="mono">${esc(koordinat)}</td><td>${next ? dist : '-'}${panahHtml}</td>${selLpc}${selUk}</tr>`,
+        })
+      } else {
         const blokVisual = isyarat.length
           ? `<div class="isyarat-a4">${esc(isyarat.join(' · '))}</div>`
           : ''
-        return `<tr>
+        hasil.push({
+          setNomor: i + 1,
+          html: `<tr>
           <td>${i + 1}</td>
           <td>${esc(set.name)}${blokVisual}</td>
-          <td>${set.counts}</td>
+          <td>${countSegmenAwal}</td>
           <td class="mono">${esc(koordinat)}</td>
           <td>${Math.round((p.x / sYd) * 4) / 4}</td>
           <td>${Math.round(((p.y + drill.field.widthYd / 2) / sYd) * 4) / 4}</td>
           <td>${next ? `${dist} (${durasi}s)` : '-'}${panahHtml}</td>
           ${selLpc}
           ${selUk}
-        </tr>`
-      })
-      .join('')
+        </tr>`,
+        })
+      }
+
+      // Sub-baris titik singgah (#23.1) — hanya bagi pemain yang memilikinya
+      if (next && daftarMid.length > 0) {
+        daftarMid.forEach((w, wi) => {
+          const keSimpul = wi + 1 < daftarMid.length ? daftarMid[wi + 1] : next
+          const countLanjut =
+            (wi + 1 < daftarMid.length ? daftarMid[wi + 1].padaCount : set.counts) - w.padaCount
+          const jrkLangkah = Math.round(Math.hypot(keSimpul.x - w.x, keSimpul.y - w.y) / sYd)
+          const durMid = ((countLanjut * drill.beatsPerCount * 60) / Math.max(20, drill.tempo)).toFixed(1)
+          const koorMid = coorTextSafe(w.x, w.y, drill.field)
+          const arahMid = panahArah(keSimpul.x - w.x, keSimpul.y - w.y)
+          const panahMid = sertakanArah && arahMid ? ` <span class="panah">${arahMid}</span>` : ''
+          const lpcMid =
+            sertakanLpc
+              ? `<td><span class="mono">${countLanjut > 0 ? Math.round((jrkLangkah / countLanjut) * 100) / 100 : '-'}</span></td>`
+              : ''
+          const ukMid =
+            sertakanUkuran
+              ? `<td><span class="mono">${Math.round(sYd * 360) / 10}&Prime;</span></td>`
+              : ''
+          if (compact) {
+            hasil.push({
+              setNomor: i + 1,
+              html: `<tr class="baris-midset"><td>${i + 1}.${w.padaCount}</td><td>&#8627; Singgah hit. ${w.padaCount}</td><td>${countLanjut}</td><td class="mono">${esc(koorMid)}</td><td>${jrkLangkah}${panahMid}</td>${lpcMid}${ukMid}</tr>`,
+            })
+          } else {
+            hasil.push({
+              setNomor: i + 1,
+              html: `<tr class="baris-midset">
+          <td>${i + 1}.${w.padaCount}</td>
+          <td>&#8627; Singgah hit. ${w.padaCount}</td>
+          <td>${countLanjut}</td>
+          <td class="mono">${esc(koorMid)}</td>
+          <td>${Math.round((w.x / sYd) * 4) / 4}</td>
+          <td>${Math.round(((w.y + drill.field.widthYd / 2) / sYd) * 4) / 4}</td>
+          <td>${jrkLangkah} (${durMid}s)${panahMid}</td>
+          ${lpcMid}
+          ${ukMid}
+        </tr>`,
+            })
+          }
+        })
+      }
+    })
+
+    return hasil
+  }
+
+  function rowsFor(
+    m: Member,
+    compact: boolean,
+    lpc: Map<string, MetrikPemain>[],
+  ): string {
+    return susunBarisPemain(m, compact, lpc).map((b) => b.html).join('')
   }
 
   function buildHtml(): string {
@@ -391,6 +450,7 @@ export function DotSheetModal({
       /** Satu lembaran kartu (190 × 135 mm) milik satu pemain. */
       function kartuHtml(
         m: Member,
+        barisPemain: { setNomor: number; html: string }[],
         r: { depan: [number, number]; belakang: [number, number] },
         k: number,
         nKartu: number,
@@ -398,7 +458,13 @@ export function DotSheetModal({
         const [d0, d1] = r.depan
         const [b0, b1] = r.belakang
         const terakhir = k === nKartu - 1
-        const labelDepan = d1 > d0 ? `Set ${d0 + 1}–${d1}` : 'Belum ada set'
+        const rentangLabel = (a: number, b: number) => {
+          if (b <= a || !barisPemain.length) return 'Belum ada set'
+          const sAwal = barisPemain[a]?.setNomor ?? a + 1
+          const sAkhir = barisPemain[b - 1]?.setNomor ?? b
+          return `Set ${sAwal}–${sAkhir}`
+        }
+        const labelDepan = d1 > d0 ? rentangLabel(d0, d1) : 'Belum ada set'
         const kakiDepan =
           b1 > b0
             ? `${labelDepan} · bersambung ke muka belakang →`
@@ -407,11 +473,11 @@ export function DotSheetModal({
               : labelDepan
         const isiBelakang =
           b1 > b0
-            ? `<p class="sambung">← sambungan Set ${b0 + 1}–${b1} · ${esc(m.name)} <span class="code">${esc(m.code)}</span></p>
-               <table>${kolomLipat()}${kepalaTabel(true)}<tbody>${rowsFor(m, true, lpc, b0, b1)}</tbody></table>`
+            ? `<p class="sambung">← sambungan ${rentangLabel(b0, b1)} · ${esc(m.name)} <span class="code">${esc(m.code)}</span></p>
+               <table>${kolomLipat()}${kepalaTabel(true)}<tbody>${barisPemain.slice(b0, b1).map((x) => x.html).join('')}</tbody></table>`
             : ordered.length > 0
               ? nKartu > 1
-                ? `<p class="muka-penuh">Set ${d0 + 1}–${d1} selesai di muka depan.</p>`
+                ? `<p class="muka-penuh">${labelDepan} selesai di muka depan.</p>`
                 : `<p class="muka-penuh">Seluruh ${ordered.length} set ada di muka depan.</p>`
               : ''
         const ekorBelakang = terakhir
@@ -423,7 +489,7 @@ export function DotSheetModal({
         <div class="muka depan">
           ${kepalaMuka(m)}
           ${sertakanArah ? kompasHtml(patokOf(drill.field).aktif === 1) : ''}
-          <table>${kolomLipat()}${kepalaTabel(true)}<tbody>${rowsFor(m, true, lpc, d0, d1)}</tbody></table>
+          <table>${kolomLipat()}${kepalaTabel(true)}<tbody>${barisPemain.slice(d0, d1).map((x) => x.html).join('')}</tbody></table>
           <p class="kaki">${kakiDepan}</p>
         </div>
         <div class="muka">
@@ -433,11 +499,12 @@ export function DotSheetModal({
       </section>`
       }
 
-      const semuaKartu = targets.flatMap((m) =>
-        rencanaKartu(ordered.length, KAP_DEPAN, kapBelakang, KAP_BELAKANG_TENGAH).map((r, k, semua) =>
-          kartuHtml(m, r, k, semua.length),
-        ),
-      )
+      const semuaKartu = targets.flatMap((m) => {
+        const barisPemain = susunBarisPemain(m, true, lpc)
+        return rencanaKartu(barisPemain.length, KAP_DEPAN, kapBelakang, KAP_BELAKANG_TENGAH).map(
+          (r, k, semua) => kartuHtml(m, barisPemain, r, k, semua.length),
+        )
+      })
       // Dua kartu per lembar A4, lengkap dengan garis potong di antaranya.
       const pisah =
         '<div class="antar"><span>✂</span><div class="garis"></div><span>potong</span><div class="garis"></div><span>✂</span></div>'
@@ -515,6 +582,7 @@ export function DotSheetModal({
          table { font-size: 11px; }
          th, td { padding: 4px 6px; }
          .isyarat-a4 { font-size: 9px; color: #334155; font-weight: 600; margin-top: 1px; }
+         .baris-midset td { background: #f8fafc; color: #0f172a; font-style: italic; }
          .notes { margin-top: 8px; font-size: 10.5px; }
          .legend { margin-top: 4px; font-size: 9px; color:#555; }
          .kompas { display:flex; gap:8px; align-items:center; margin-bottom:6px; padding:4px 6px; border:1px solid #cbd5e1; background:#f8fafc; font-size:9px; color:#475569; line-height:1.4; }

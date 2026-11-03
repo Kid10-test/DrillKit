@@ -7,13 +7,19 @@ import {
   bangunPetaFtl,
   cocokPutaran,
   deltaBusur,
+  deltaMidsets,
   deltaPoliFtl,
   gerakOf,
   kelompokPemain,
+  pathSvgMidsets,
   progresPemain,
+  proyeksiMidsets,
   ringkasKoreografiSet,
+  sinkronkanKelompokDariTag,
   titikJalur,
 } from '../lib/gerak'
+import { gayaTitikPemain } from '../lib/tagAnggota'
+import { TitikPemainBentuk } from './JejakLangkah'
 import { apakahPropertiBergerak, penandaEfektifPadaSet } from '../lib/propertiGerak'
 import { TINGKAT_LABEL, URUTAN_TINGKAT, analisisPerpindahan, lebihBerat } from '../lib/analitik'
 import { stepYd } from '../lib/field'
@@ -492,7 +498,9 @@ export function DrillPresenter({
       vec.push([id, sx(q.x) - sx(p.x), sy(q.y) - sy(p.y)])
     }
     // DD2/#16 — gerak set ini: bentuk jalur, pembagian kecepatan, tunda, ripple, Move+Hold, FTL.
-    const gr = gerakOf(set.gerak)
+    const grMentah = gerakOf(set.gerak)
+    const klpSinkron = sinkronkanKelompokDariTag(grMentah.kelompok, roster)
+    const gr = klpSinkron !== grMentah.kelompok ? { ...grMentah, kelompok: klpSinkron } : grMentah
     const lengkungGerak = gr.jalur === 'lengkung' ? gr.lengkung : 0
     const busur = petaBusur(set, nextSet)
     const awalSvg: Record<string, { x: number; y: number }> = {}
@@ -510,13 +518,24 @@ export function DrillPresenter({
         const ftl = petaFtl.get(id)
         const klp = kelompokPemain(gr, id)
         const bs = busur.get(id)
+        const mid = set.midsets?.[id]
         const [tx, ty] = ftl
           ? deltaPoliFtl(ftl, t)
-          : klp
-            ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
-            : bs
-              ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser)
-              : titikJalur(t, vx, vy, lengkungGerak)
+          : mid?.length && awalSvg[id] && akhirSvg[id]
+            ? deltaMidsets(
+                awalSvg[id],
+                akhirSvg[id],
+                proyeksiMidsets(mid, counts, (mx, my) => ({ x: sx(mx), y: sy(my) })),
+                counts,
+                t,
+                klp ? (klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0) : lengkungGerak,
+                klp?.jalanCount ?? gr.jalanCount,
+              )
+            : klp
+              ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
+              : bs
+                ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser)
+                : titikJalur(t, vx, vy, lengkungGerak)
         g.setAttribute('transform', `translate(${tx} ${ty})`)
       }
       if (adaPropGerak) setProgresProp(p)
@@ -589,8 +608,10 @@ export function DrillPresenter({
           const q = ke.points[id]
           if (q && ikutGerak(id)) vec.push([id, sx(q.x) - sx(p.x), sy(q.y) - sy(p.y)])
         }
-        // DD2/#16 — pengaturan gerak diambil dari set ASAL perpindahan ini.
-        const gr = gerakOf(dari.gerak)
+        // DD2/#16/#23 — pengaturan gerak diambil dari set ASAL perpindahan ini.
+        const grMentah = gerakOf(dari.gerak)
+        const klpSinkron = sinkronkanKelompokDariTag(grMentah.kelompok, roster)
+        const gr = klpSinkron !== grMentah.kelompok ? { ...grMentah, kelompok: klpSinkron } : grMentah
         const lengkungGerak = gr.jalur === 'lengkung' ? gr.lengkung : 0
         const busur = petaBusur(dari, ke)
         const awalSvg: Record<string, { x: number; y: number }> = {}
@@ -609,13 +630,24 @@ export function DrillPresenter({
             const ftl = petaFtl.get(id)
             const klp = kelompokPemain(gr, id)
             const bs = busur.get(id)
+            const mid = dari.midsets?.[id]
             const [tx, ty] = ftl
               ? deltaPoliFtl(ftl, t)
-              : klp
-                ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
-                : bs
-                  ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser)
-                  : titikJalur(t, vx, vy, lengkungGerak)
+              : mid?.length && awalSvg[id] && akhirSvg[id]
+                ? deltaMidsets(
+                    awalSvg[id],
+                    akhirSvg[id],
+                    proyeksiMidsets(mid, counts, (mx, my) => ({ x: sx(mx), y: sy(my) })),
+                    counts,
+                    t,
+                    klp ? (klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0) : lengkungGerak,
+                    klp?.jalanCount ?? gr.jalanCount,
+                  )
+                : klp
+                  ? titikJalur(t, vx, vy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
+                  : bs
+                    ? deltaBusur(t, bs.x0, bs.y0, bs.pusat, bs.sudut, bs.geser)
+                    : titikJalur(t, vx, vy, lengkungGerak)
             g.setAttribute('transform', `translate(${tx} ${ty})`)
           }
           // Harus dibatasi ke dalam presenter: editor di belakangnya juga punya
@@ -953,20 +985,36 @@ export function DrillPresenter({
                 const x2 = sx(q.x)
                 const y2 = sy(q.y)
                 if (x1 === x2 && y1 === y2) return null
+                const midSvg = set?.midsets?.[id]?.length
+                  ? proyeksiMidsets(set.midsets[id], set.counts || 8, (mx, my) => ({ x: sx(mx), y: sy(my) }))
+                  : undefined
                 return (
                   <g key={`p-${id}`}>
-                    <line
-                      data-trail="keluar"
-                      x1={x1}
-                      y1={y1}
-                      x2={x2}
-                      y2={y2}
-                      stroke="#e2e8f0"
-                      strokeOpacity={0.45}
-                      strokeWidth={0.22}
-                      strokeDasharray="1 1"
-                      markerEnd="url(#dk-panah-presenter)"
-                    />
+                    {midSvg?.length ? (
+                      <path
+                        data-trail="keluar"
+                        d={pathSvgMidsets({ x: x1, y: y1 }, { x: x2, y: y2 }, midSvg, set?.counts || 8)}
+                        fill="none"
+                        stroke="#e2e8f0"
+                        strokeOpacity={0.45}
+                        strokeWidth={0.22}
+                        strokeDasharray="1 1"
+                        markerEnd="url(#dk-panah-presenter)"
+                      />
+                    ) : (
+                      <line
+                        data-trail="keluar"
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
+                        stroke="#e2e8f0"
+                        strokeOpacity={0.45}
+                        strokeWidth={0.22}
+                        strokeDasharray="1 1"
+                        markerEnd="url(#dk-panah-presenter)"
+                      />
+                    )}
                     {/* titik hantu: ke mana pemain akan berdiri */}
                     <circle
                       data-ghost="keluar"
@@ -990,7 +1038,13 @@ export function DrillPresenter({
               const rad = (facingDeg(p.facing, p.facingDeg) * Math.PI) / 180
               const fx = Math.sin(rad) * -uk(2)
               const fy = Math.cos(rad) * uk(2)
-              const warna = sectionDot(m.section)
+              const gayaTitik = gayaTitikPemain(
+                m,
+                sectionDot(m.section),
+                drill.tampilanTag,
+                set?.tampilanTag,
+              )
+              const warna = gayaTitik.warna
               return (
                 <g
                   key={id}
@@ -1008,7 +1062,15 @@ export function DrillPresenter({
                     stroke={warna}
                     strokeWidth={0.5}
                   />
-                  <circle data-titik="1" cx={sx(p.x)} cy={sy(p.y)} r={uk(1.35)} fill={warna} stroke="#0b1120" strokeWidth={uk(0.22)} />
+                  <TitikPemainBentuk
+                    cx={sx(p.x)}
+                    cy={sy(p.y)}
+                    r={uk(1.35)}
+                    bentuk={gayaTitik.bentuk}
+                    fill={warna}
+                    stroke="#0b1120"
+                    strokeWidth={uk(0.22)}
+                  />
                   {showCodes && (
                     <text
                       x={sx(p.x)}

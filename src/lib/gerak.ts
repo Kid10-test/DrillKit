@@ -3,6 +3,8 @@ import type {
   GerakKelompok,
   GerakSet,
   JenisSimbolVisual,
+  Member,
+  TitikSinggahMidset,
 } from '../db/types'
 
 /**
@@ -120,6 +122,214 @@ export function kelompokPemain(
 ): GerakKelompok | undefined {
   if (!g?.kelompok?.length || !memberId) return undefined
   return g.kelompok.find((k) => k.memberIds.includes(memberId))
+}
+
+/**
+ * #23.2 — Sinkronkan daftar `memberIds` pada `GerakKelompok` yang terikat ke `tag`
+ * lintas-seksi (`Member.tags`).
+ *
+ * Urutan pemain yang sudah ada (termasuk pemimpin FTL di indeks 0) dipertahankan
+ * selama pemainnya masih memegang tag tersebut; anggota baru pemegang tag yang sama
+ * disisipkan di belakang secara otomatis tanpa perlu memilih ulang tiap pindah set.
+ */
+export function sinkronkanKelompokDariTag(
+  kelompok: GerakKelompok[] | undefined,
+  anggota: Pick<Member, 'id' | 'tags'>[],
+): GerakKelompok[] | undefined {
+  if (!kelompok?.length) return kelompok
+  let berubah = false
+  const hasil = kelompok.map((klp) => {
+    const tagKunci = klp.tag?.trim().toLowerCase()
+    if (!tagKunci) return klp
+    const pemegang = anggota
+      .filter((m) => (m.tags ?? []).some((t) => t.trim().toLowerCase() === tagKunci))
+      .map((m) => m.id)
+    if (!pemegang.length) return klp
+    const setPemegang = new Set(pemegang)
+    const tetap = klp.memberIds.filter((id) => setPemegang.has(id))
+    const sudah = new Set(tetap)
+    const gabungan = [...tetap, ...pemegang.filter((id) => !sudah.has(id))]
+    if (
+      gabungan.length === klp.memberIds.length &&
+      gabungan.every((id, idx) => id === klp.memberIds[idx])
+    ) {
+      return klp
+    }
+    berubah = true
+    return { ...klp, memberIds: gabungan }
+  })
+  return berubah ? hasil : kelompok
+}
+
+/* ========================================================================== */
+/*  #23.1 — Titik Singgah Per-Pemain (Midsets / Per-Performer Waypoints)      */
+/* ========================================================================== */
+
+/**
+ * Normalisasi & urutkan daftar titik singgah satu pemain pada rentang `1 .. counts - 1`.
+ * Bila ada dua entri pada hitungan yang sama, entri terakhir menang.
+ */
+export function normalisasiMidsetsPemain(
+  daftar: TitikSinggahMidset[] | undefined,
+  countsSet: number,
+): TitikSinggahMidset[] {
+  if (!daftar?.length) return []
+  const batas = Math.max(1, Math.floor(countsSet))
+  if (batas < 2) return []
+  const olehCount = new Map<number, TitikSinggahMidset>()
+  for (const w of daftar) {
+    if (!w || !Number.isFinite(w.padaCount) || !Number.isFinite(w.x) || !Number.isFinite(w.y)) {
+      continue
+    }
+    const c = Math.round(w.padaCount * 100) / 100
+    if (c <= 0 || c >= batas) continue
+    const k: TitikSinggahMidset = {
+      padaCount: c,
+      x: Math.round(w.x * 1e6) / 1e6,
+      y: Math.round(w.y * 1e6) / 1e6,
+      ...(typeof w.lengkung === 'number' && Math.abs(w.lengkung) > 1e-6
+        ? { lengkung: Math.max(-1.5, Math.min(1.5, w.lengkung)) }
+        : {}),
+    }
+    olehCount.set(c, k)
+  }
+  return [...olehCount.values()].sort((a, b) => a.padaCount - b.padaCount)
+}
+
+/** Proyeksikan daftar midsets dari ruang yard ke ruang gambar SVG (atau sebaliknya). */
+export function proyeksiMidsets(
+  daftar: TitikSinggahMidset[] | undefined,
+  countsSet: number,
+  proyeksi: (x: number, y: number) => { x: number; y: number },
+): TitikSinggahMidset[] {
+  const urut = normalisasiMidsetsPemain(daftar, countsSet)
+  return urut.map((w) => {
+    const p = proyeksi(w.x, w.y)
+    return { ...w, x: p.x, y: p.y }
+  })
+}
+
+/**
+ * Evaluasi perpindahan relatif `[dx, dy]` terhadap `awal` sepanjang rantai `midsets`
+ * pada progres lintasan ternormalisasi `t` (`0..1`).
+ *
+ * Menjamin pemain tiba **tepat** di koordinat `(w.x, w.y)` saat hitungan `w.padaCount`.
+ */
+export function deltaMidsets(
+  awal: { x: number; y: number },
+  akhir: { x: number; y: number },
+  midsets: TitikSinggahMidset[] | undefined,
+  countsSet: number,
+  t: number,
+  lengkungAkhir = 0,
+  jalanCount?: number,
+): [number, number] {
+  const urut = normalisasiMidsetsPemain(midsets, countsSet)
+  if (!urut.length) {
+    return titikJalur(t, akhir.x - awal.x, akhir.y - awal.y, lengkungAkhir)
+  }
+  const p = Math.min(1, Math.max(0, t))
+  if (p <= 0) return [0, 0]
+  if (p >= 1) return [akhir.x - awal.x, akhir.y - awal.y]
+
+  const maxPada = urut[urut.length - 1].padaCount
+  const pembagi =
+    typeof jalanCount === 'number' && jalanCount > maxPada && jalanCount < countsSet
+      ? jalanCount
+      : Math.max(1, countsSet)
+
+  const simpul: { u: number; x: number; y: number; lengkung: number }[] = [
+    { u: 0, x: awal.x, y: awal.y, lengkung: 0 },
+  ]
+  for (const w of urut) {
+    const u = Math.min(0.9999, Math.max(0.0001, w.padaCount / pembagi))
+    const uAman = Math.max(simpul[simpul.length - 1].u + 1e-4, u)
+    simpul.push({
+      u: Math.min(0.9999, uAman),
+      x: w.x,
+      y: w.y,
+      lengkung: w.lengkung ?? 0,
+    })
+  }
+  simpul.push({ u: 1, x: akhir.x, y: akhir.y, lengkung: lengkungAkhir })
+
+  let seg = 0
+  while (seg < simpul.length - 2 && simpul[seg + 1].u < p) {
+    seg++
+  }
+  const s0 = simpul[seg]
+  const s1 = simpul[seg + 1]
+  const rentang = Math.max(1e-6, s1.u - s0.u)
+  const tau = Math.min(1, Math.max(0, (p - s0.u) / rentang))
+  const [lx, ly] = titikJalur(tau, s1.x - s0.x, s1.y - s0.y, s1.lengkung)
+  return [s0.x - awal.x + lx, s0.y - awal.y + ly]
+}
+
+/** Panjang satu segmen lurus/kuadratik dengan pendekatan Simpson 8 pias. */
+function panjangSegmenJalur(dx: number, dy: number, lengkung: number): number {
+  const lurus = Math.hypot(dx, dy)
+  if (!lengkung || lurus < 1e-6) return lurus
+  let total = 0
+  let [px, py] = [0, 0]
+  const N = 12
+  for (let i = 1; i <= N; i++) {
+    const [qx, qy] = titikJalur(i / N, dx, dy, lengkung)
+    total += Math.hypot(qx - px, qy - py)
+    px = qx
+    py = qy
+  }
+  return total
+}
+
+/** Total panjang tempuh (yard atau satuan gambar) melewati seluruh titik singgah `midsets`. */
+export function panjangJalurMidsets(
+  awal: { x: number; y: number },
+  akhir: { x: number; y: number },
+  midsets: TitikSinggahMidset[] | undefined,
+  countsSet: number,
+  lengkungAkhir = 0,
+): number {
+  const urut = normalisasiMidsetsPemain(midsets, countsSet)
+  if (!urut.length) {
+    return panjangSegmenJalur(akhir.x - awal.x, akhir.y - awal.y, lengkungAkhir)
+  }
+  let total = 0
+  let cur = awal
+  for (const w of urut) {
+    total += panjangSegmenJalur(w.x - cur.x, w.y - cur.y, w.lengkung ?? 0)
+    cur = w
+  }
+  total += panjangSegmenJalur(akhir.x - cur.x, akhir.y - cur.y, lengkungAkhir)
+  return total
+}
+
+/** Susun atribut `d` SVG `<path>` untuk jejak ber-midset (lurus per segmen atau kurva Q). */
+export function pathSvgMidsets(
+  awal: { x: number; y: number },
+  akhir: { x: number; y: number },
+  midsetsSvg: TitikSinggahMidset[] | undefined,
+  countsSet: number,
+  lengkungAkhir = 0,
+): string {
+  const urut = normalisasiMidsetsPemain(midsetsSvg, countsSet)
+  const perintah: string[] = [`M ${awal.x.toFixed(3)} ${awal.y.toFixed(3)}`]
+  let cur = awal
+  const tambahSegmen = (ke: { x: number; y: number }, k: number) => {
+    if (!k || Math.abs(k) < 1e-6) {
+      perintah.push(`L ${ke.x.toFixed(3)} ${ke.y.toFixed(3)}`)
+    } else {
+      const [cx, cy] = kendaliJalur(ke.x - cur.x, ke.y - cur.y, k)
+      perintah.push(
+        `Q ${(cur.x + cx).toFixed(3)} ${(cur.y + cy).toFixed(3)} ${ke.x.toFixed(3)} ${ke.y.toFixed(3)}`,
+      )
+    }
+    cur = ke
+  }
+  for (const w of urut) {
+    tambahSegmen(w, w.lengkung ?? 0)
+  }
+  tambahSegmen(akhir, lengkungAkhir)
+  return perintah.join(' ')
 }
 
 /** Label gelombang Ripple (0 -> 'A', 1 -> 'B', ..., 25 -> 'Z', 26 -> '27'). */
@@ -530,7 +740,7 @@ export function infoSimbolVisual(id: JenisSimbolVisual) {
  * - **DrillPresenter** (bilah status atas saat latihan).
  */
 export function ringkasKoreografiSet(
-  set: Pick<DrillSet, 'counts' | 'gerak' | 'visual'> | undefined,
+  set: Pick<DrillSet, 'counts' | 'gerak' | 'visual' | 'midsets'> | undefined,
   opsi?: { memberId?: string; sectionId?: string; padat?: boolean },
 ): string[] {
   if (!set) return []
@@ -538,6 +748,21 @@ export function ringkasKoreografiSet(
   const g = set.gerak
   const klp = kelompokPemain(g, opsi?.memberId)
   const counts = Math.max(0, set.counts || 0)
+
+  // 0. #23.1 — Titik singgah (Midsets) per pemain
+  if (opsi?.memberId && set.midsets?.[opsi.memberId]?.length) {
+    const daftarMid = normalisasiMidsetsPemain(set.midsets[opsi.memberId], counts)
+    if (daftarMid.length === 1) {
+      butir.push(
+        opsi.padat
+          ? `Singgah c${daftarMid[0].padaCount}`
+          : `Singgah hit. ${daftarMid[0].padaCount}`,
+      )
+    } else if (daftarMid.length > 1) {
+      const str = daftarMid.map((w) => w.padaCount).join(',')
+      butir.push(opsi.padat ? `Singgah c${str}` : `Singgah hit. ${str}`)
+    }
+  }
 
   // 1. Pembagian Move + Hold
   const jalanCount = klp?.jalanCount ?? g?.jalanCount

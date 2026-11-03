@@ -33,7 +33,7 @@
  * sisa simpangannya masih di bawah ±0,15 yard untuk perpindahan 10 yard.
  */
 
-import type { DrillPoint, GerakSet, LatihTempo, TandaBirama } from '../db/types'
+import type { DrillPoint, GerakSet, LatihTempo, TandaBirama, TitikSinggahMidset } from '../db/types'
 import type { TempoLatihan } from './tempoLatihan'
 import { labelBirama } from './birama'
 import { createTempoTimeline } from './tempoTimeline'
@@ -42,10 +42,12 @@ import {
   bangunPetaFtl,
   cocokPutaran,
   deltaBusur,
+  deltaMidsets,
   deltaPoliFtl,
   gerakOf,
   kelompokPemain,
   kendaliJalur,
+  normalisasiMidsetsPemain,
   progresPemain,
   titikJalur,
 } from './gerak'
@@ -425,6 +427,8 @@ export interface PermintaanPecah {
   points: Record<string, DrillPoint>
   /** gerak dari set ini ke set berikutnya */
   gerak?: GerakSet
+  /** #23.1 — titik singgah per-pemain pada set ini (bila ada) */
+  midsets?: Record<string, TitikSinggahMidset[]>
   /** posisi pemain di set berikutnya */
   tujuan: Record<string, DrillPoint>
   /** hitungan tempat pecah (1 … counts-1) */
@@ -449,6 +453,10 @@ export interface HasilPecah {
   hitunganPertama: number
   /** hitungan set peralihan */
   hitunganKedua: number
+  /** #23.1 — titik singgah bagian pertama (`padaCount < di`) */
+  midsetsPertama?: Record<string, TitikSinggahMidset[]>
+  /** #23.1 — titik singgah bagian kedua (`padaCount > di`, digeser `- di`) */
+  midsetsKedua?: Record<string, TitikSinggahMidset[]>
 }
 
 /** `lengkung` yang menghasilkan kendali paling dekat dengan titik kendali bebas. */
@@ -518,10 +526,20 @@ export function pecahSet(r: PermintaanPecah): HasilPecah | null {
     const dy = q.y - p.y
     const ftl = petaFtl.get(id)
     const klp = kelompokPemain(g, id)
+    const mid = r.midsets?.[id]
     let ox = 0
     let oy = 0
     if (ftl) {
       ;[ox, oy] = deltaPoliFtl(ftl, t)
+    } else if (mid?.length) {
+      const kAkhir = klp
+        ? klp.jalur === 'lengkung'
+          ? (klp.lengkung ?? 0.4)
+          : 0
+        : g.jalur === 'lengkung'
+          ? g.lengkung
+          : 0
+      ;[ox, oy] = deltaMidsets(p, q, mid, counts, t, kAkhir, klp?.jalanCount ?? g.jalanCount)
     } else if (klp) {
       ;[ox, oy] = titikJalur(t, dx, dy, klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0)
     } else if (putar && cocokPutaran(p.x, p.y, q.x, q.y, putar.pusat, putar.sudut, geser)) {
@@ -580,6 +598,24 @@ export function pecahSet(r: PermintaanPecah): HasilPecah | null {
   const dasarK1: GerakSet = jalanK1 ? { ...dasarTanpaJalan, jalanCount: jalanK1 } : dasarTanpaJalan
   const dasarK2: GerakSet = jalanK2 ? { ...dasarTanpaJalan, jalanCount: jalanK2 } : { ...dasarTanpaJalan }
 
+  const midsetsPertama: Record<string, TitikSinggahMidset[]> = {}
+  const midsetsKedua: Record<string, TitikSinggahMidset[]> = {}
+  if (r.midsets) {
+    for (const [id, daftar] of Object.entries(r.midsets)) {
+      const urut = normalisasiMidsetsPemain(daftar, counts)
+      const k1 = urut.filter((w) => w.padaCount < di)
+      const k2 = urut
+        .filter((w) => w.padaCount > di)
+        .map((w) => ({ ...w, padaCount: Math.round((w.padaCount - di) * 100) / 100 }))
+      if (k1.length) midsetsPertama[id] = k1
+      if (k2.length) midsetsKedua[id] = k2
+    }
+  }
+  const hasilMid = {
+    ...(Object.keys(midsetsPertama).length ? { midsetsPertama } : {}),
+    ...(Object.keys(midsetsKedua).length ? { midsetsKedua } : {}),
+  }
+
   if (putar) {
     /*
      * Busur dipecah dengan meneruskan **pusat yang sedang berjalan**:
@@ -615,6 +651,7 @@ export function pecahSet(r: PermintaanPecah): HasilPecah | null {
       },
       hitunganPertama: di,
       hitunganKedua: counts - di,
+      ...hasilMid,
     }
   }
 
@@ -633,6 +670,7 @@ export function pecahSet(r: PermintaanPecah): HasilPecah | null {
     gerakKedua: buatLengkung(dasarK2, bobotK2 > 0 ? jumlahK2 / bobotK2 : null),
     hitunganPertama: di,
     hitunganKedua: counts - di,
+    ...hasilMid,
   }
 }
 
