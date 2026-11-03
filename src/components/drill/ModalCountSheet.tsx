@@ -725,6 +725,53 @@ export default function ModalCountSheet({
                         />
                       </div>
 
+                      {/* #25 — Warna kain bendera per-blok untuk Pratinjau Perspektif Tribun Juri */}
+                      {(bl.alat === 'flag' || bl.alat === 'swing_flag' || bl.alat === 'prop') && (
+                        <div
+                          className="mb-2 flex flex-wrap items-center gap-1.5 text-[11px]"
+                          data-testid={`pilih-warna-bendera-blok-${idx}`}
+                        >
+                          <span className="text-slate-400">Warna kain:</span>
+                          {[
+                            '#f43f5e',
+                            '#dc2626',
+                            '#f59e0b',
+                            '#fde047',
+                            '#10b981',
+                            '#166534',
+                            '#38bdf8',
+                            '#9333ea',
+                            '#f8fafc',
+                          ].map((hx) => (
+                            <button
+                              key={hx}
+                              type="button"
+                              data-testid={`swatch-bendera-blok-${idx}-${hx.slice(1)}`}
+                              onClick={() =>
+                                ubahSatuBlok(bl.id, {
+                                  warnaBendera: bl.warnaBendera === hx ? undefined : hx,
+                                })
+                              }
+                              aria-label={`Warna kain ${hx}`}
+                              style={{ backgroundColor: hx }}
+                              className={cx(
+                                'h-4 w-4 rounded-full border border-slate-700',
+                                bl.warnaBendera === hx ? 'ring-2 ring-white' : '',
+                              )}
+                            />
+                          ))}
+                          {bl.warnaBendera && (
+                            <button
+                              type="button"
+                              onClick={() => ubahSatuBlok(bl.id, { warnaBendera: undefined })}
+                              className="text-[10px] text-slate-400 hover:text-slate-200"
+                            >
+                              Ikuti bawaan
+                            </button>
+                          )}
+                        </div>
+                      )}
+
                       {/* Ringkasan Teknik + Pil Cepat */}
                       <div className="mb-2">
                         <Input

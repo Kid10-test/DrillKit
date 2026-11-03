@@ -475,6 +475,23 @@ export function PenandaPanel({
                   onChange={(e) => ubah({ rotasi: Number(e.target.value) || 0 })}
                 />
               </Field>
+              {(draf.jenis === 'kotak' || draf.jenis === 'titik') && (
+                <Field label="Tinggi fisik (meter)" hint="0 = terpal datar · >0 = properti 3D di Tribun">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="12"
+                    step="0.1"
+                    data-testid="tinggi-penanda-meter"
+                    value={draf.tinggiMeter ?? 0}
+                    onChange={(e) =>
+                      ubah({
+                        tinggiMeter: Math.max(0, Math.min(12, Number(e.target.value) || 0)) || undefined,
+                      })
+                    }
+                  />
+                </Field>
+              )}
             </div>
 
             {/* #16.4 — Properti bergerak per Set */}

@@ -101,6 +101,7 @@ import {
 } from '../lib/countSheet'
 import type { PropsModalCountSheet } from './drill/ModalCountSheet'
 import type { ModalParadeProps } from './drill/ModalParade'
+import type { PropsModalPerspektifTribun } from './drill/ModalPerspektifTribun'
 import {
   type GerakLengkap,
   bangunPetaFtl,
@@ -344,6 +345,21 @@ export function Editor({
       setKompModalParade(() => mod.default)
     }
     setParadeOpen(true)
+  }
+
+  /** #25 — Studio Perspektif Tribun Juri, Kontras Seragam/Bendera, & Ekspor Video .webm (dimuat malas). */
+  const [tribunOpen, setTribunOpen] = useState(false)
+  const [tribunKeVideo, setTribunKeVideo] = useState(false)
+  const [KompModalTribun, setKompModalTribun] =
+    useState<React.ComponentType<PropsModalPerspektifTribun> | null>(null)
+
+  async function bukaTribun(keVideo = false) {
+    if (!KompModalTribun) {
+      const mod = await import('./drill/ModalPerspektifTribun')
+      setKompModalTribun(() => mod.default)
+    }
+    setTribunKeVideo(keVideo)
+    setTribunOpen(true)
   }
 
   /**
@@ -4172,6 +4188,20 @@ export function Editor({
         kataKunci: ['cincin', 'tabrakan', 'benturan', 'ring', 'peringatan'],
         jalankan: () => setTampilCincinTabrakan((v) => !v),
       },
+      {
+        id: 'buka-perspektif-tribun',
+        label: 'Buka Pratinjau Perspektif Tribun Juri (Press Box 2.5D & Kontras Seragam)',
+        kategori: 'Tampilan & Mode',
+        kataKunci: ['tribun', 'press box', 'perspektif', 'juri', 'seragam', 'bendera', 'kontras', 'halangan'],
+        jalankan: () => void bukaTribun(false),
+      },
+      {
+        id: 'ekspor-video-show',
+        label: 'Rekam & Ekspor Video Animasi Show (.webm)',
+        kategori: 'Ekspor & Cetak',
+        kataKunci: ['video', 'webm', 'rekam', 'animasi', 'whatsapp', 'ekspor'],
+        jalankan: () => void bukaTribun(true),
+      },
     ]
 
     const aksiTag: ItemPaletPerintah[] = daftarTagRoster.map(({ tag }) => ({
@@ -4409,6 +4439,15 @@ export function Editor({
                 data-testid="tombol-parade"
               >
                 {apakahModeParade(f) ? 'Parade ●' : 'Parade'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void bukaTribun(false)}
+                title="Pratinjau Perspektif Tribun Juri (Press Box 2.5D), Kontras Seragam/Bendera & Ekspor Video (.webm)"
+                data-testid="tombol-tribun-video"
+              >
+                Tribun &amp; Video
               </Button>
               <Button
                 size="sm"
@@ -6364,6 +6403,24 @@ export function Editor({
           songAwal={lagu ?? null}
           namaTim={settings?.teamName ?? 'Tim'}
           sections={settings?.sections ?? []}
+        />
+      )}
+
+      {KompModalTribun && (
+        <KompModalTribun
+          open={tribunOpen}
+          onClose={() => setTribunOpen(false)}
+          drill={drill}
+          sets={sets}
+          roster={roster}
+          idxAwal={idx}
+          progresAwal={progress}
+          countSheets={countSheetsDrill ?? []}
+          song={lagu ?? null}
+          tempoPerSet={petaSet ? daftarTempo(petaSet, drill.tempo, sets.length) : undefined}
+          durasiPerSet={petaSet ? petaSet.map((p) => p.detik) : undefined}
+          detikMulaiPerSet={petaSet ? petaSet.map((p) => p.detikMulai) : undefined}
+          bukaLangsungTabVideo={tribunKeVideo}
         />
       )}
 
