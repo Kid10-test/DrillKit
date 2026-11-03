@@ -143,6 +143,18 @@ import {
   type ViewportKanvas,
 } from '../lib/mesinPointer'
 import { lengkapiReferensiPintasan, type ItemPaletPerintah } from '../lib/paletPerintah'
+import {
+  cariSaranTukarSilang,
+  periksaKerataanSpasi,
+  periksaTabrakanSet,
+  ratakanSpasiBarisan,
+  selesaikanSemuaSilang2Opt,
+  terapkanTukarTujuan,
+  tukarAnggotaPadaBentukTerikat,
+  type KejadianTabrakan,
+  type SaranTukarSilang,
+  type TemuanKerataanSpasi,
+} from '../lib/tabrakanDrill'
 import { DAFTAR_SHORTCUT } from '../lib/shortcut'
 import { PenggarisMusikDrill } from './drill/PenggarisMusikDrill'
 import { PanelAnalitikGerak } from './drill/PanelAnalitikGerak'
@@ -900,12 +912,16 @@ export function Editor({
 
   /** DD2 — section yang ada di drill ini, dipakai untuk mengatur tunda mulai. */
   const seksiUnik = [...new Set(roster.map((m) => m.section))]
-  const visible = roster.filter((m) => {
-    if (sectionFilter === 'all') return true
-    if (sectionFilter.startsWith('tag:')) return punyaTag(m, sectionFilter.slice(4))
-    return m.section === sectionFilter
-  })
-  const visibleIds = new Set(visible.map((m) => m.id))
+  const visible = useMemo(
+    () =>
+      roster.filter((m) => {
+        if (sectionFilter === 'all') return true
+        if (sectionFilter.startsWith('tag:')) return punyaTag(m, sectionFilter.slice(4))
+        return m.section === sectionFilter
+      }),
+    [roster, sectionFilter],
+  )
+  const visibleIds = useMemo(() => new Set(visible.map((m) => m.id)), [visible])
   /** Versi ref supaya handler yang dipasang sekali selalu membaca data terbaru. */
   /** DD3 — analitik gerak untuk perpindahan yang sedang aktif. */
   const analisis = analisisPerpindahan(
@@ -919,6 +935,71 @@ export function Editor({
     drill.setelanLangkah,
     settings?.ambangGerak,
     drill.setelanJarak,
+  )
+  /** #24 — pemeriksaan benturan lintasan, silang 2-Opt, & kerataan spasi (0 biaya saat scrub 60fps). */
+  const [tampilCincinTabrakan, setTampilCincinTabrakan] = useState(true)
+  const [idPratinjauTukar, setIdPratinjauTukar] = useState<string | null>(null)
+  useEffect(() => {
+    setIdPratinjauTukar(null)
+  }, [set?.id, nextSet?.id])
+
+  const hasilTabrakan = useMemo(
+    () =>
+      set && nextSet
+        ? periksaTabrakanSet({
+            dari: set,
+            ke: nextSet,
+            anggota: roster,
+            stepYd: sYd,
+            markers,
+            sets,
+            idxSet: idx,
+            hanya: visibleIds,
+          })
+        : undefined,
+    [
+      set,
+      set?.points,
+      set?.gerak,
+      set?.midsets,
+      set?.counts,
+      nextSet,
+      nextSet?.points,
+      sets,
+      idx,
+      roster,
+      sYd,
+      markers,
+      visibleIds,
+    ],
+  )
+
+  const saranTukarSilang = useMemo(
+    () =>
+      set && nextSet
+        ? cariSaranTukarSilang({
+            dari: set,
+            ke: nextSet,
+            anggota: roster,
+            stepYd: sYd,
+            hanya: visibleIds,
+          })
+        : [],
+    [set, set?.points, set?.gerak, set?.midsets, nextSet, nextSet?.points, roster, sYd, visibleIds],
+  )
+
+  const temuanSpasi = useMemo(
+    () =>
+      set
+        ? periksaKerataanSpasi({
+            set,
+            anggota: roster,
+            stepYd: sYd,
+            selectedIds: selected,
+            hanya: visibleIds,
+          })
+        : [],
+    [set, set?.points, set?.bentukTerikat, roster, sYd, selected, visibleIds],
   )
   /** Ambang yang benar-benar berlaku — punya tim, atau bawaan. */
   const ambang = useMemo(() => ambangEfektif(settings?.ambangGerak), [settings?.ambangGerak])
@@ -3252,6 +3333,111 @@ export function Editor({
     if (blok.index !== idx) setIdx(blok.index)
   }
 
+  /** #24.1 — Lompat scrubber tepat ke hitungan benturan & pilih pemain yang terlibat. */
+  function fokusBenturan(k: KejadianTabrakan) {
+    const counts = Math.max(1, set?.counts ?? 8)
+    const p = Math.min(1, Math.max(0, k.padaCount / counts))
+    if (sliderRef.current) {
+      sliderRef.current.value = String(view.perHitungan ? Math.round(p * counts) : p)
+    }
+    geserKe(p)
+    setSelected(k.jenis === 'pemain_properti' ? [k.idA] : [k.idA, k.idB])
+  }
+
+  /** #24.4 — Tukar tujuan satu pasangan silang di set berikutnya (Undo 1 langkah). */
+  function tukarSatuPasangan(saran: SaranTukarSilang) {
+    if (!set || !nextSet) return
+    snapshotMany([
+      { id: set.id, points: set.points, bentukTerikat: set.bentukTerikat, midsets: set.midsets },
+      {
+        id: nextSet.id,
+        points: nextSet.points,
+        bentukTerikat: nextSet.bentukTerikat,
+        midsets: nextSet.midsets,
+      },
+    ])
+    const ptsTujuan = terapkanTukarTujuan(nextSet.points, [saran])
+    const bentukTujuan = tukarAnggotaPadaBentukTerikat(nextSet.bentukTerikat, [saran])
+    nextSet.points = ptsTujuan
+    nextSet.bentukTerikat = bentukTujuan
+    void writePoints(ptsTujuan, nextSet.id, bentukTujuan ?? null)
+    setIdPratinjauTukar(null)
+    forceRender()
+    toast.push(
+      `Tujuan ${saran.kodeA} ↔ ${saran.kodeB} ditukar di ${nextSet.name} (hemat ${saran.hematLangkah.toFixed(1)} langkah)`,
+    )
+  }
+
+  /** #24.4 — Urai seluruh jalur bersilangan 2-Opt sekaligus di set berikutnya. */
+  function tukarSemuaSilang() {
+    if (!set || !nextSet || !saranTukarSilang.length) return
+    snapshotMany([
+      { id: set.id, points: set.points, bentukTerikat: set.bentukTerikat, midsets: set.midsets },
+      {
+        id: nextSet.id,
+        points: nextSet.points,
+        bentukTerikat: nextSet.bentukTerikat,
+        midsets: nextSet.midsets,
+      },
+    ])
+    const hasil = selesaikanSemuaSilang2Opt({
+      dari: set,
+      ke: nextSet,
+      anggota: roster,
+      stepYd: sYd,
+      hanya: visibleIds,
+    })
+    if (hasil.jumlahPertukaran <= 0) return
+    nextSet.points = hasil.kePointsBaru
+    nextSet.bentukTerikat = hasil.bentukTerikatBaru
+    void writePoints(hasil.kePointsBaru, nextSet.id, hasil.bentukTerikatBaru ?? null)
+    setIdPratinjauTukar(null)
+    forceRender()
+    toast.push(
+      `${hasil.jumlahPertukaran} silang jalur diurai di ${nextSet.name} (hemat ${hasil.totalHematLangkah.toFixed(1)} langkah)`,
+    )
+  }
+
+  /** #24.3 — Ratakan spasi barisan pada set aktif tanpa mengikat bentuk. */
+  function ratakanSpasi(temuan: TemuanKerataanSpasi) {
+    if (!set) return
+    snapshot()
+    const ptsBaru = ratakanSpasiBarisan(set.points, temuan)
+    set.points = ptsBaru
+    void writePoints(ptsBaru, set.id)
+    setSelected(temuan.memberIds)
+    forceRender()
+    toast.push(`Spasi ${temuan.label} diratakan (${temuan.spasiRataLangkah.toFixed(1)} langkah)`)
+  }
+
+  /** #24.3 — Ratakan spasi sekaligus ikat ke Bentuk Garis Hidup (#22). */
+  function ikatKeGarisHidup(temuan: TemuanKerataanSpasi) {
+    if (!set) return
+    snapshot()
+    const btk: BentukTerikat = {
+      id: uid('btk_'),
+      nama: temuan.label,
+      jenis: 'garis',
+      memberIds: [...temuan.memberIds],
+      p0: { x: temuan.p0.x, y: temuan.p0.y },
+      p1: { x: temuan.p1.x, y: temuan.p1.y },
+      arahHadap: 'tetap',
+    }
+    const hasil = hitungTitikBentukTerikat(btk, set.points, f, {
+      snapAktif: false,
+      langkahX: 0,
+      langkahY: 0,
+    })
+    const ptsBaru = { ...set.points, ...hasil }
+    const bentukBaru = pasangBentukTerikatPadaSet(set.bentukTerikat, btk)
+    set.points = ptsBaru
+    set.bentukTerikat = bentukBaru
+    void writePoints(ptsBaru, set.id, bentukBaru)
+    setSelected(temuan.memberIds)
+    forceRender()
+    toast.push(`${temuan.label} diratakan & diikat ke Garis Hidup`)
+  }
+
   /** Permintaan geser dari penggaris dijalankan setelah set aktifnya tergambar. */
   useEffect(() => {
     if (!geserPending) return
@@ -3943,6 +4129,49 @@ export function Editor({
         kataKunci: ['settings', 'pengaturan', 'ukuran lapangan', 'tempo'],
         jalankan: () => setSettingsOpen(true),
       },
+      {
+        id: 'lompat-benturan-pertama',
+        label: hasilTabrakan?.kejadian.length
+          ? `Lompat ke benturan terparah (${hasilTabrakan.kejadian[0].kodeA} × ${hasilTabrakan.kejadian[0].kodeB} · c${hasilTabrakan.kejadian[0].padaCount})`
+          : 'Lompat ke benturan lintasan terparah',
+        kategori: 'Titik & Bentuk',
+        kataKunci: ['tabrakan', 'benturan', 'collision', 'nyaris', 'keselamatan', 'scrubber'],
+        nonaktif: !hasilTabrakan?.kejadian.length,
+        jalankan: () => {
+          if (hasilTabrakan?.kejadian[0]) fokusBenturan(hasilTabrakan.kejadian[0])
+        },
+      },
+      {
+        id: 'urai-semua-silang',
+        label: saranTukarSilang.length
+          ? `Urai semua jalur seksi bersilangan (${saranTukarSilang.length} pasangan)`
+          : 'Urai semua jalur seksi bersilangan (2-Opt)',
+        kategori: 'Titik & Bentuk',
+        kataKunci: ['silang', 'uncross', '2-opt', 'tukar', 'swap', 'jalur'],
+        nonaktif: !saranTukarSilang.length,
+        jalankan: () => tukarSemuaSilang(),
+      },
+      {
+        id: 'ratakan-spasi-pertama',
+        label: temuanSpasi.length
+          ? `Ratakan interval barisan (${temuanSpasi[0].label})`
+          : 'Ratakan interval barisan yang melenceng',
+        kategori: 'Titik & Bentuk',
+        kataKunci: ['spasi', 'interval', 'rata', 'spacing', 'drift', 'barisan'],
+        nonaktif: !temuanSpasi.length,
+        jalankan: () => {
+          if (temuanSpasi[0]) ratakanSpasi(temuanSpasi[0])
+        },
+      },
+      {
+        id: 'toggle-cincin-tabrakan',
+        label: tampilCincinTabrakan
+          ? 'Sembunyikan cincin benturan di kanvas'
+          : 'Tampilkan cincin benturan di kanvas',
+        kategori: 'Tampilan & Mode',
+        kataKunci: ['cincin', 'tabrakan', 'benturan', 'ring', 'peringatan'],
+        jalankan: () => setTampilCincinTabrakan((v) => !v),
+      },
     ]
 
     const aksiTag: ItemPaletPerintah[] = daftarTagRoster.map(({ tag }) => ({
@@ -3970,6 +4199,10 @@ export function Editor({
     selected,
     view,
     daftarTagRoster,
+    tampilCincinTabrakan,
+    hasilTabrakan,
+    saranTukarSilang,
+    temuanSpasi,
   ])
 
   return (
@@ -4546,6 +4779,149 @@ export function Editor({
                 )
               })}
 
+              {/* #24.1 & #24.2 — Cincin peringatan benturan lintasan & properti (murni #hex) */}
+              {set && nextSet && tampilCincinTabrakan && (hasilTabrakan?.kejadian.length ?? 0) > 0 && (
+                <g data-testid="lapisan-tabrakan-kanvas" data-editor-ui="1">
+                  {hasilTabrakan!.kejadian.slice(0, 12).map((k, idxRing) => {
+                    const cxSvg = sx(k.x)
+                    const cySvg = sy(k.y)
+                    const counts = Math.max(1, set.counts ?? 8)
+                    const aktifDiScrub = Math.abs(progress * counts - k.padaCount) <= 0.6
+                    const warnaUtama = k.tingkat === 'tabrakan' ? '#f43f5e' : '#f59e0b'
+                    const warnaTeks = k.tingkat === 'tabrakan' ? '#fda4af' : '#fde68a'
+                    const rAman = Math.max(uk(1.3), k.batasAmanLangkah * sYd * 0.5)
+                    return (
+                      <g
+                        key={k.id}
+                        data-testid={`cincin-tabrakan-${idxRing}`}
+                        className="cursor-pointer"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          fokusBenturan(k)
+                        }}
+                      >
+                        {aktifDiScrub && (
+                          <circle
+                            cx={cxSvg}
+                            cy={cySvg}
+                            r={rAman + uk(0.85)}
+                            fill="none"
+                            stroke={warnaUtama}
+                            strokeWidth={uk(0.3)}
+                            strokeOpacity={0.95}
+                          />
+                        )}
+                        <circle
+                          cx={cxSvg}
+                          cy={cySvg}
+                          r={rAman}
+                          fill={warnaUtama}
+                          fillOpacity={aktifDiScrub ? 0.28 : 0.14}
+                          stroke={warnaUtama}
+                          strokeWidth={uk(aktifDiScrub ? 0.28 : 0.2)}
+                          strokeDasharray="0.55 0.35"
+                        />
+                        <circle
+                          cx={cxSvg}
+                          cy={cySvg}
+                          r={uk(0.42)}
+                          fill={warnaUtama}
+                          stroke="#0f172a"
+                          strokeWidth={uk(0.16)}
+                        />
+                        <text
+                          x={cxSvg}
+                          y={cySvg - rAman - uk(0.35)}
+                          textAnchor="middle"
+                          fontSize={uk(1.05)}
+                          fill={warnaTeks}
+                          stroke="#0f172a"
+                          strokeWidth={uk(0.28)}
+                          paintOrder="stroke"
+                          style={{ pointerEvents: 'none', fontWeight: 700 }}
+                        >
+                          {`! c${k.padaCount}`}
+                        </text>
+                      </g>
+                    )
+                  })}
+                </g>
+              )}
+
+              {/* #24.4 — Pratinjau jalur bebas silang 2-Opt di kanvas (murni #hex) */}
+              {!playing && set && nextSet && idPratinjauTukar && (() => {
+                const pratinjau = saranTukarSilang.find((s) => s.id === idPratinjauTukar)
+                if (!pratinjau) return null
+                const pA = set.points[pratinjau.idA]
+                const pB = set.points[pratinjau.idB]
+                const qA = nextSet.points[pratinjau.idA]
+                const qB = nextSet.points[pratinjau.idB]
+                if (!pA || !pB || !qA || !qB) return null
+                return (
+                  <g
+                    data-testid="lapisan-pratinjau-tukar"
+                    data-editor-ui="1"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {/* Jalur lama bersilangan (merah putus-putus redup) */}
+                    <line
+                      x1={sx(pA.x)}
+                      y1={sy(pA.y)}
+                      x2={sx(qA.x)}
+                      y2={sy(qA.y)}
+                      stroke="#f43f5e"
+                      strokeOpacity={0.55}
+                      strokeWidth={uk(0.22)}
+                      strokeDasharray="0.7 0.45"
+                    />
+                    <line
+                      x1={sx(pB.x)}
+                      y1={sy(pB.y)}
+                      x2={sx(qB.x)}
+                      y2={sy(qB.y)}
+                      stroke="#f43f5e"
+                      strokeOpacity={0.55}
+                      strokeWidth={uk(0.22)}
+                      strokeDasharray="0.7 0.45"
+                    />
+                    {/* Jalur baru bebas silang sesudah ditukar (zamrud tegas) */}
+                    <line
+                      x1={sx(pA.x)}
+                      y1={sy(pA.y)}
+                      x2={sx(qB.x)}
+                      y2={sy(qB.y)}
+                      stroke="#10b981"
+                      strokeWidth={uk(0.34)}
+                    />
+                    <line
+                      x1={sx(pB.x)}
+                      y1={sy(pB.y)}
+                      x2={sx(qA.x)}
+                      y2={sy(qA.y)}
+                      stroke="#10b981"
+                      strokeWidth={uk(0.34)}
+                    />
+                    <circle
+                      cx={sx(qB.x)}
+                      cy={sy(qB.y)}
+                      r={uk(0.85)}
+                      fill="none"
+                      stroke="#6ee7b7"
+                      strokeWidth={uk(0.24)}
+                    />
+                    <circle
+                      cx={sx(qA.x)}
+                      cy={sy(qA.y)}
+                      r={uk(0.85)}
+                      fill="none"
+                      stroke="#6ee7b7"
+                      strokeWidth={uk(0.24)}
+                    />
+                  </g>
+                )
+              })()}
+
               {/* #23.1 — Gagang Titik Singgah (Midsets) langsung pada jejak biru pemain terpilih */}
               {!playing && set && nextSet && view.jalur && selectedAktif.length > 0 && (set.counts ?? 0) >= 2 && (
                 <g data-testid="lapisan-gagang-midset" data-editor-ui="1">
@@ -4920,27 +5296,54 @@ export function Editor({
               {playing ? <IconPause size={14} /> : <IconPlay size={14} />}
             </Button>
 
-            <input
-              ref={sliderRef}
-              type="range"
-              min={0}
-              max={view.perHitungan ? Math.max(1, set?.counts ?? 1) : 1}
-              step={view.perHitungan ? 1 : 0.005}
-              defaultValue={0}
-              data-kiosk-allow
-              data-testid="garis-waktu"
-              onInput={(e) => {
-                const v = Number(e.currentTarget.value)
-                // Mode per hitungan: nilainya hitungan, diubah jadi progres 0..1.
-                geserKe(view.perHitungan ? v / Math.max(1, set?.counts ?? 1) : v)
-              }}
-              title={
-                view.perHitungan
-                  ? 'Geser hitungan demi hitungan'
-                  : 'Geser bebas di tengah perpindahan'
-              }
-              className="h-1.5 min-w-[120px] flex-1 accent-emerald-500"
-            />
+            <div className="relative flex min-w-[120px] flex-1 items-center py-1">
+              {set && nextSet && (hasilTabrakan?.kejadian.length ?? 0) > 0 && (
+                <div
+                  data-testid="penanda-tabrakan-scrubber"
+                  className="pointer-events-none absolute inset-x-1 -top-1 h-2"
+                >
+                  {hasilTabrakan!.kejadian.slice(0, 10).map((k, idxTick) => {
+                    const counts = Math.max(1, set.counts ?? 8)
+                    const persen = Math.min(100, Math.max(0, (k.padaCount / counts) * 100))
+                    return (
+                      <button
+                        key={k.id}
+                        type="button"
+                        data-testid={`tik-benturan-${idxTick}`}
+                        onClick={() => fokusBenturan(k)}
+                        title={`${k.kodeA} × ${k.kodeB} pada hitungan ${k.padaCount}`}
+                        style={{
+                          left: `${persen}%`,
+                          backgroundColor: k.tingkat === 'tabrakan' ? '#f43f5e' : '#f59e0b',
+                        }}
+                        className="pointer-events-auto absolute top-0 h-2 w-2 -translate-x-1/2 rounded-full ring-1 ring-slate-950"
+                      />
+                    )
+                  })}
+                </div>
+              )}
+              <input
+                ref={sliderRef}
+                type="range"
+                min={0}
+                max={view.perHitungan ? Math.max(1, set?.counts ?? 1) : 1}
+                step={view.perHitungan ? 1 : 0.005}
+                defaultValue={0}
+                data-kiosk-allow
+                data-testid="garis-waktu"
+                onInput={(e) => {
+                  const v = Number(e.currentTarget.value)
+                  // Mode per hitungan: nilainya hitungan, diubah jadi progres 0..1.
+                  geserKe(view.perHitungan ? v / Math.max(1, set?.counts ?? 1) : v)
+                }}
+                title={
+                  view.perHitungan
+                    ? 'Geser hitungan demi hitungan'
+                    : 'Geser bebas di tengah perpindahan'
+                }
+                className="h-1.5 w-full accent-emerald-500"
+              />
+            </div>
 
             <Button
               size="sm"
@@ -5665,16 +6068,30 @@ export function Editor({
           roster={roster}
         />
 
-        {/* --------------------- DD3 & #12c — Analitik gerakan ---------------------- */}
-        {set && nextSet && (
+        {/* --------- DD3, #12c, & #24 — Analitik gerakan, Benturan, 2-Opt, & Spasi --------- */}
+        {set && (
           <PanelAnalitikGerak
             drill={drill}
+            adaSetBerikut={Boolean(nextSet)}
             nyalaAnalitik={view.analitik}
             onToggleAnalitik={(v) => ubah('analitik', v)}
             analisis={analisis}
             ambang={ambang}
             terberat={terberat}
             rosterById={rosterById}
+            hasilTabrakan={hasilTabrakan}
+            tampilCincinTabrakan={tampilCincinTabrakan}
+            onToggleCincinTabrakan={setTampilCincinTabrakan}
+            onFokusBenturan={fokusBenturan}
+            saranTukarSilang={saranTukarSilang}
+            idPratinjauTukar={idPratinjauTukar}
+            onPratinjauTukar={setIdPratinjauTukar}
+            onTukarSatuPasangan={tukarSatuPasangan}
+            onTukarSemuaSilang={tukarSemuaSilang}
+            temuanSpasi={temuanSpasi}
+            onPilihBarisanSpasi={setSelected}
+            onRatakanSpasi={ratakanSpasi}
+            onIkatKeGarisHidup={ikatKeGarisHidup}
           />
         )}
 
