@@ -169,17 +169,21 @@ await wait(1800)
  * perpindahan sungguhan.
  */
 R.pilihJarak = await p.evaluate(() => {
-  const lab = [...document.querySelectorAll('label')].find((x) => x.textContent.includes('Geser blok'))
-  const sel = lab?.parentElement?.querySelector('select')
-  if (!sel) return false
-  const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
-  set.call(sel, '8')
-  sel.dispatchEvent(new Event('change', { bubbles: true }))
+  const b = document.querySelector('[data-testid="inspektor-pilih-semua"]')
+  if (!b) return false
+  b.click()
   return true
 })
-await wait(700)
-R.geser = await tombol('Ke depan')
-await wait(1500)
+await wait(300)
+await p.keyboard.down('Shift')
+await p.keyboard.press('ArrowDown')
+await wait(250)
+await p.keyboard.press('ArrowDown')
+await p.keyboard.up('Shift')
+await wait(300)
+await p.keyboard.press('Escape')
+R.geser = true
+await wait(1100)
 
 /**
  * Catatan ditulis pada set **tujuan**, karena asisten membacakan catatan set

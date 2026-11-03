@@ -292,8 +292,11 @@ export function tulisUlangSet(
   const sentuhKelompok = Boolean(
     set.gerak?.kelompok?.some((k) => k.memberIds.some((id) => id in peta)),
   )
+  const sentuhBentuk = Boolean(
+    set.bentukTerikat?.some((b) => b.memberIds.some((id) => id in peta)),
+  )
   const sentuhRipple = sentuh(set.gerak?.ripple?.urutan)
-  if (!sentuh(set.points) && !sentuh(set.langkah) && !sentuhKelompok && !sentuhRipple) {
+  if (!sentuh(set.points) && !sentuh(set.langkah) && !sentuhKelompok && !sentuhRipple && !sentuhBentuk) {
     return { set, bentrok: [] }
   }
   const titik = petaKunci(set.points, peta, `Titik ${set.name || set.id}`)
@@ -302,6 +305,15 @@ export function tulisUlangSet(
     set.gerak?.ripple && sentuhRipple
       ? petaKunci(set.gerak.ripple.urutan, peta, `Ripple ${set.name || set.id}`)
       : null
+  const bentukBaru =
+    sentuhBentuk && set.bentukTerikat
+      ? set.bentukTerikat
+          .map((b) => ({
+            ...b,
+            memberIds: tulisUlangRoster(b.memberIds, peta),
+          }))
+          .filter((b) => b.memberIds.length >= 2)
+      : set.bentukTerikat
   const gerakBaru =
     (sentuhKelompok || rippleBaru) && set.gerak
       ? {
@@ -330,6 +342,7 @@ export function tulisUlangSet(
       points: titik.rec,
       ...(langkah ? { langkah: langkah.rec } : {}),
       ...(gerakBaru ? { gerak: gerakBaru } : {}),
+      ...(sentuhBentuk ? { bentukTerikat: bentukBaru?.length ? bentukBaru : undefined } : {}),
     },
     bentrok: [
       ...titik.bentrok,

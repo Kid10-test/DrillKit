@@ -31,12 +31,13 @@ const posisi = () => p.evaluate(()=>[...document.querySelectorAll('g.cursor-move
 }).filter(Boolean))
 const kePusat=(d)=>[d.reduce((a,q)=>a+q[0],0)/d.length, d.reduce((a,q)=>a+q[1],0)/d.length]
 const ringkas=(awal,pusat,skrg)=>{ const r=skrg.map((q,i)=>Math.hypot(q[0]-pusat[0],q[1]-pusat[1])/Math.hypot(awal[i][0]-pusat[0],awal[i][1]-pusat[1])); return {min:Math.round(Math.min(...r)*1000)/1000, maks:Math.round(Math.max(...r)*1000)/1000} }
-await p.goto('http://localhost:5173/', { waitUntil: 'networkidle2' }); await wait(1600)
+await p.goto((process.env.BASE || 'http://localhost:5173') + '/', { waitUntil: 'networkidle2' }); await wait(1600)
 await p.evaluate(()=>{ const x=[...document.querySelectorAll('button')].find(y=>y.textContent.includes('Muat data contoh')); x&&x.click() })
 await wait(3400); await p.evaluate(()=>{ location.hash='#/drill' }); await wait(2800)
-await tombol('Blok'); await wait(1200)
+await p.select('[data-testid="pilih-jenis-bentuk"]', 'blok'); await wait(250)
+await p.click('[data-testid="terapkan-bentuk-cepat"]'); await wait(1000)
+await p.click('[data-testid^="bentuk-salin-berikut-"]'); await wait(1000)
 await p.keyboard.press('BracketRight'); await wait(1400)
-await tombol('Blok'); await wait(1200)
 await setSudut(90); await wait(700)
 await tombol('Kanan ↻'); await wait(1700)
 await p.keyboard.press('BracketLeft'); await wait(1500)

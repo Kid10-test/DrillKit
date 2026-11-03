@@ -11,14 +11,13 @@ const tombol = (t) => p.evaluate((x)=>{
 const status = async () => ({
   kiri: await tombol('↺ Kiri'), kanan: await tombol('Kanan ↻'),
   kecil: await tombol('Kecilkan'), besar: await tombol('Besarkan'),
-  cermin: await tombol('Kiri ⇄ Kanan'), geser: await tombol('Ke depan'),
+  cermin: await tombol('Kiri ⇄ Kanan'),
 })
 const info = () => p.evaluate(() => {
-  const h=[...document.querySelectorAll('h2')].find(x=>x.textContent.includes('Alat gerak massa'))
-  const card=h&&h.closest('div[class*="rounded"]')
+  const card = document.querySelector('[data-testid="kartu-alat-formasi"]')
   return card ? card.innerText.replace(/\s+/g,' ').slice(0,180) : null
 })
-await p.goto('http://localhost:5173/', { waitUntil: 'networkidle2' }); await wait(1600)
+await p.goto((process.env.BASE || 'http://localhost:5173') + '/', { waitUntil: 'networkidle2' }); await wait(1600)
 await p.evaluate(() => { const x=[...document.querySelectorAll('button')].find(y=>y.textContent.includes('Muat data contoh')); x&&x.click() })
 await wait(3400); await p.evaluate(() => { location.hash = '#/drill' }); await wait(2800)
 const R = {}
