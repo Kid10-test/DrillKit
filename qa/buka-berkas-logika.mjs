@@ -468,7 +468,7 @@ const showJson = json({ format: 'drillkit-show', versi: 1, dibuat: 444, tim: 'Ge
   cek('csv pyware ke drill', TUJUAN_JENIS['csv-pyware'].rute === '/drill')
   cek('csv pyware menyebut tempatnya', /Impor Pyware/.test(TUJUAN_JENIS['csv-pyware'].tempat))
   // #11a — label & tujuan sesuai rancangan §5.1.
-  cek('label partitur', LABEL_JENIS.partitur === 'Partitur (MusicXML / PDF) (#11a)', LABEL_JENIS.partitur)
+  cek('label partitur', LABEL_JENIS.partitur === 'Partitur (MusicXML / MuseScore / PDF) (#11a)', LABEL_JENIS.partitur)
   cek('partitur ke musik', TUJUAN_JENIS.partitur.rute === '/musik', TUJUAN_JENIS.partitur.rute)
   cek('partitur menyebut tempatnya', /Partitur lagu/.test(TUJUAN_JENIS.partitur.tempat), TUJUAN_JENIS.partitur.tempat)
   // kenaliTeks = jalan pintas teks.

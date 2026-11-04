@@ -67,6 +67,7 @@ import {
 } from '../lib/partiturFrasa'
 import { PanelTukarRepertoar } from '../components/TukarRepertoar'
 import { PanelPartitur } from '../components/PanelPartitur'
+import type { TambalanPeta } from '../components/musik/ModalTarikPeta'
 import { LayarPartitur } from '../components/LayarPartitur'
 import { IndikatorKetuk, PanelSedangDiputar, StripSegmen } from '../components/PanelLagu'
 import { diam as hentikanUcapan, ucap as ucapkan } from '../lib/ucap'
@@ -977,6 +978,17 @@ export default function Music({
    * #11a — metadata partitur lagu. Blob-nya sudah ditulis `partiturSimpan.ts`
    * sebelum baris ini dipanggil (berkas dulu, metadata kemudian).
    */
+  /** #27 — hasil "Tarik peta tempo dari partitur" (sudah dipratinjau pelatih). */
+  async function handleTerapkanPeta(songId: string, tambalan: TambalanPeta) {
+    await db.songs.update(songId, {
+      tempoMap: tambalan.tempoMap,
+      bpm: tambalan.bpm,
+      beats: tambalan.beats,
+      tandaBirama: tambalan.tandaBirama,
+      panjangBirama: tambalan.panjangBirama,
+    })
+  }
+
   async function handleUpdatePartitur(songId: string, meta: PartiturMeta | null) {
     await db.songs.update(songId, { partitur: meta })
   }
@@ -1821,6 +1833,7 @@ export default function Music({
                   hanyaPutar={hanyaPutar}
                   terbuka={partiturTerbuka && !!song.partitur}
                   onToggleBuka={() => setPartiturTerbuka((v) => !v)}
+                  onTerapkanPeta={hanyaPutar ? undefined : handleTerapkanPeta}
                 />
               </div>
             </div>

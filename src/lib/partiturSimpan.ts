@@ -19,11 +19,14 @@
  *    yang disimpan ke `partiturBerkas` dan dikemas ke ZIP backup selalu bita
  *    MusicXML hasil urai (`tipe: 'musicxml'`), sehingga tidak butuh migrasi
  *    Dexie dan tetap bisa dibuka di perangkat penerima backup ber-peramban lama.
+ * 5. **#27 — `.mscz`/`.mscx` MuseScore diterjemahkan di pintu masuk** (lewat
+ *    `mscz.ts` yang dimuat malas) menjadi `.musicxml` biasa — pola yang sama
+ *    dengan `.mxl`, jadi tetap nol store Dexie baru.
  */
 import { db } from '../db/db'
 import type { PartiturBerkasItem, PartiturMeta } from '../db/types'
 import { apakahMxl, namaMusicXmlDariMxl, uraiMxl } from './mxl'
-import { putusanPartitur, type PutusanPartitur } from './partitur'
+import { deteksiPartitur, putusanPartitur, type PutusanPartitur } from './partitur'
 import { hitungHashAudio } from './rekaman'
 
 /** Hasil memasang berkas: metadata siap disimpan + baris store-nya + putusan. */
@@ -48,6 +51,16 @@ export interface HasilPeriksaPartitur {
   namaSimpan: string
   /** `true` bila berkas masukan berasal dari arsip `.mxl` yang berhasil dibuka. */
   dariMxl: boolean
+  /**
+   * #27 — terisi bila berkas masukan adalah berkas asli MuseScore yang
+   * berhasil diterjemahkan ke MusicXML (`.mscz` arsip / `.mscx` teks).
+   */
+  dariMuseScore?: {
+    asal: 'mscz' | 'mscx'
+    versi: string
+    /** Hal yang dilewati/didekati konverter — ditampilkan apa adanya. */
+    peringatan: string[]
+  }
 }
 
 /**
@@ -105,6 +118,35 @@ export async function periksaPartitur(
 ): Promise<HasilPeriksaPartitur> {
   const ab = await file.arrayBuffer()
   const bita = new Uint8Array(ab)
+
+  // #27 — berkas asli MuseScore diperiksa SEBELUM `.mxl` (keduanya ZIP ber-
+  // container.xml). Konverternya dimuat malas: bundel awal tidak bertambah.
+  if (deteksiPartitur(bita).tipe === 'musescore') {
+    const { uraiMuseScore, namaMusicXmlDariMuseScore } = await import('./mscz')
+    const urai = await uraiMuseScore(bita)
+    if (!urai.ok) {
+      return {
+        putusan: { boleh: false, tipe: 'musescore', alasan: `Berkas MuseScore tidak bisa diterjemahkan: ${urai.alasan}` },
+        hash: await hitungHashAudio(bita),
+        ukuran: file.size || ab.byteLength,
+        blobSiap: file,
+        namaSimpan: namaFile,
+        dariMxl: false,
+      }
+    }
+    const bitaXml = urai.bitaXml
+    const salinan = new Uint8Array(bitaXml.byteLength)
+    salinan.set(bitaXml)
+    return {
+      putusan: putusanPartitur(bitaXml),
+      hash: await hitungHashAudio(bitaXml),
+      ukuran: bitaXml.byteLength,
+      blobSiap: new Blob([salinan], { type: 'application/vnd.recordare.musicxml+xml' }),
+      namaSimpan: namaMusicXmlDariMuseScore(namaFile),
+      dariMxl: false,
+      dariMuseScore: { asal: urai.asal, versi: urai.versi, peringatan: urai.peringatan },
+    }
+  }
 
   if (apakahMxl(bita)) {
     const urai = await uraiMxl(bita)

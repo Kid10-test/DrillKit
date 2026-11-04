@@ -480,7 +480,7 @@ try {
   )
   cek(
     'pintu #7 mengenali .mxl streaming deflate (bit 3) sebagai Partitur',
-    (await teks(p, '[data-testid="buka-jenis"]')) === 'Partitur (MusicXML / PDF) (#11a)',
+    (await teks(p, '[data-testid="buka-jenis"]')) === 'Partitur (MusicXML / MuseScore / PDF) (#11a)',
   )
   const teksModalMxl = await teks(p, '[data-testid="modal-buka-berkas"]')
   cek(

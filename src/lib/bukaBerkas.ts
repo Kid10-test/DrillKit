@@ -34,8 +34,8 @@
  */
 import { bukaZip } from './zip'
 import { deteksiPyware } from './pyware'
-import { PESAN_MXL, deteksiPartitur, ringkasMusicXml, teksPartitur, type RingkasanPartitur } from './partitur'
-import { apakahMxl, uraiMxl } from './mxl'
+import { PESAN_MUSESCORE, PESAN_MXL, deteksiPartitur, ringkasMusicXml, teksPartitur, type RingkasanPartitur } from './partitur'
+import { apakahArsipMuseScore, apakahMxl, uraiMxl } from './mxl'
 
 /* ------------------------------ Jenis ---------------------------------- */
 
@@ -71,7 +71,7 @@ export const LABEL_JENIS: Record<JenisBerkas, string> = {
   'csv-pyware': 'CSV koordinat Pyware (#10)',
   'csv-jadwal': 'CSV jadwal',
   'csv-absensi': 'CSV absensi',
-  partitur: 'Partitur (MusicXML / PDF) (#11a)',
+  partitur: 'Partitur (MusicXML / MuseScore / PDF) (#11a)',
   'tak-dikenal': 'Tidak dikenal',
 }
 
@@ -359,6 +359,11 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
     // ini pelatih menerima "ZIP ini tidak memuat berkas JSON DrillKit" —
     // jawaban yang benar tetapi tidak menolong siapa pun. Pesannya satu
     // sumber dengan modul partitur (D1).
+    // #27 — `.mscz` MuseScore juga ZIP ber-container.xml; dikenali lebih dulu
+    // dan dialihkan ke jalur asinkron (`kenaliBerkasAsync`) yang menerjemahkannya.
+    if (entri.some((e) => /\.mscx$/i.test(e.nama)) || apakahArsipMuseScore(bita)) {
+      return { jenis: 'tak-dikenal', nama, catatan: PESAN_MUSESCORE }
+    }
     if (entri.some((e) => e.nama === 'META-INF/container.xml') || apakahMxl(bita)) {
       return { jenis: 'tak-dikenal', nama, catatan: PESAN_MXL }
     }
@@ -490,6 +495,8 @@ export function kenaliBerkas(nama: string, bita: Uint8Array): BerkasDikenal {
   // oleh pengenalan CSV yang longgar — dan PDF pun tidak pernah sampai ke
   // pengurai CSV.
   const det = deteksiPartitur(bita)
+  // #27 — `.mscx` mentah MuseScore: dialihkan ke jalur asinkron.
+  if (det.tipe === 'musescore') return { jenis: 'tak-dikenal', nama, catatan: PESAN_MUSESCORE }
   if (det.ya) {
     if (det.tipe === 'pdf') {
       // Tidak ada yang bisa diringkas dari PDF; bitanya juga tidak dijadikan
@@ -564,6 +571,21 @@ export function kenaliTeks(nama: string, teks: string): BerkasDikenal {
  * hasilnya identik dengan `kenaliBerkas(nama, bita)`.
  */
 export async function kenaliBerkasAsync(nama: string, bita: Uint8Array): Promise<BerkasDikenal> {
+  // #27 — berkas asli MuseScore diterjemahkan dulu (konverter dimuat malas).
+  if (deteksiPartitur(bita).tipe === 'musescore') {
+    const { uraiMuseScore } = await import('./mscz')
+    const urai = await uraiMuseScore(bita)
+    if (!urai.ok) {
+      return { jenis: 'tak-dikenal', nama, catatan: `Berkas MuseScore tidak bisa diterjemahkan: ${urai.alasan}` }
+    }
+    const kenal = kenaliBerkas(nama, urai.bitaXml)
+    return {
+      ...kenal,
+      catatan:
+        `Diterjemahkan langsung dari MuseScore ${urai.versi} (.${urai.asal}) ke MusicXML.` +
+        (urai.peringatan.length > 0 ? ` ${urai.peringatan.join(' ')}` : ''),
+    }
+  }
   if (apakahMxl(bita)) {
     const urai = await uraiMxl(bita)
     if (!urai.ok) {

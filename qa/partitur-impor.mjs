@@ -402,8 +402,8 @@ const lapisanTampil = await seretBerkasKeJendela(
 cek('seret berkas menampilkan lapisan-seret', lapisanTampil === true)
 cek('lapisan-seret tertutup setelah berkas dilepas', !(await ada(p, '[data-testid="lapisan-seret"]')))
 cek(
-  'pintu #7 mengenali label Partitur (MusicXML / PDF) (#11a)',
-  (await teks(p, '[data-testid="buka-jenis"]')) === 'Partitur (MusicXML / PDF) (#11a)',
+  'pintu #7 mengenali label Partitur (MusicXML / MuseScore / PDF) (#11a)',
+  (await teks(p, '[data-testid="buka-jenis"]')) === 'Partitur (MusicXML / MuseScore / PDF) (#11a)',
   await teks(p, '[data-testid="buka-jenis"]'),
 )
 cek(
@@ -440,7 +440,7 @@ await p.waitForSelector('[data-testid="modal-buka-berkas"]', { timeout: 10000 })
 await wait(400)
 cek(
   'PDF dikenali pintu #7 sebagai Partitur',
-  (await teks(p, '[data-testid="buka-jenis"]')) === 'Partitur (MusicXML / PDF) (#11a)',
+  (await teks(p, '[data-testid="buka-jenis"]')) === 'Partitur (MusicXML / MuseScore / PDF) (#11a)',
 )
 cek(
   'pratinjau PDF menjelaskan tidak diringkas tetapi bisa disimpan',
