@@ -825,6 +825,34 @@ export interface FieldMarker {
    * (atau posisi dasar x, y, x2, y2, rotasi).
    */
   perSet?: Record<string, PosisiPenandaSet>
+  /**
+   * #25 — Tinggi fisik properti panggung/podium/layar dalam meter (opsional).
+   * `0` atau kosong berarti terpal/marka datar di lantai; `> 0` diekstrusi 2.5D
+   * pada Pratinjau Perspektif Tribun Juri & diperiksa terhadap halangan pandang.
+   */
+  tinggiMeter?: number
+}
+
+/** #25 — Empat preset sudut pandang vertikal pada Pratinjau Perspektif Tribun Juri. */
+export type PresetSudutTribun = 'podium' | 'tribun_rendah' | 'press_box' | 'atas'
+
+/** #25 — Pilihan warna permukaan lapangan untuk simulasi kontras seragam & bendera. */
+export type PresetLatarTribun =
+  | 'sesuai_drill'
+  | 'rumput_stadion'
+  | 'biru_indoor'
+  | 'abu_gor'
+  | 'aspal_parade'
+
+/** #25 — Skema warna seragam tim & kain bendera bawaan (murni #hex, bebas data pribadi). */
+export interface SkemaVisualTribun {
+  jaketHex: string
+  celanaHex: string
+  plumeHex: string
+  warnaBenderaHex: string
+  latar: PresetLatarTribun
+  /** Tinggi rata-rata badan pemain dalam meter (bawaan 1,72 m). */
+  tinggiPemainMeter?: number
 }
 
 export interface Drill {
@@ -844,6 +872,8 @@ export interface Drill {
   setelanLangkah?: SetelanLangkah
   /** #23.2 — gaya tampilan bawaan untuk Tag lintas-seksi di seluruh drill (bisa ditimpa per set). */
   tampilanTag?: Record<string, TimpaanTampilanTag>
+  /** #25 — skema warna seragam, bendera, & latar pratinjau perspektif tribun juri. */
+  skemaVisualTribun?: SkemaVisualTribun
   /**
    * 31e — dasar jarak untuk drill ini: jarak tempuh mengikuti jalur, atau
    * garis lurus. Kosong = `jalur`, persis seperti sebelumnya, jadi drill
@@ -1575,6 +1605,8 @@ export interface BlokCountSheet {
   arahHadap?: ArahHadapGuard
   /** Catatan posisi tangan / pegangan (*tab, cheater, strap, flat*). */
   posisiTangan?: string
+  /** #25 — Warna kain bendera / properti (#hex murni) pada blok ini untuk simulasi kontras tribun. */
+  warnaBendera?: string
   /** Catatan ekspresi / staging tambahan. */
   catatan?: string
 }

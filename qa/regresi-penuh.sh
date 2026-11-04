@@ -164,12 +164,13 @@ bash bangun-logika.sh || exit 1
 # Pintasan Ctrl+K / ? yang menggantikan modal statis lama) sehingga total
 # regresi penuh menjadi 139 rangkaian.
 
-# Generasi ke-3 Gelombang 1 v2.2.2 (#24) — menambahkan
-# `tabrakan-spasi-silang-logika` & `tabrakan-spasi-silang` (Detektor Tabrakan
-# Lintasan 0,25-count + properti panggung berputar, Radius Ruang Aman Sadar-
-# Instrumen & Blind Back-March, Pemeriksa Kerataan Spasi Barisan + Ratakan /
-# Ikat ke Garis #22, serta Penyelesai Silang 1-Klik 2-Opt dengan pratinjau
-# kanvas & Undo 1 langkah) sehingga total regresi penuh menjadi 141 rangkaian.
+# Generasi ke-3 Gelombang 1 v2.2.3 (#25) — menambahkan
+# `perspektif-tribun-video-logika` & `perspektif-tribun-video` (Proyeksi 2,5D
+# Perspektif Tribun Juri 4 preset Podium 3m / Tribun Rendah 8m / Press Box 18m
+# / Atas 90°, Deteksi Halangan Pandang 3D Properti & Barisan, Simulasi Kontras
+# WCAG 2.1 Seragam/Bendera terhadap rumput/terpal indoor, serta Perekam Video
+# Pertunjukan Offline `.webm` tersinkron klik metronom / audio lagu) sehingga
+# total regresi penuh menjadi 143 rangkaian.
 
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika grid-patok-logika uji-situs uji-rilis uji-lapangan \
@@ -181,11 +182,11 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet inventaris-logistik mode-kirab penilaian-juri administrasi-unit kanvas-parametrik midsets-tags-pointer-palet tabrakan-spasi-silang \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet inventaris-logistik mode-kirab penilaian-juri administrasi-unit kanvas-parametrik midsets-tags-pointer-palet tabrakan-spasi-silang perspektif-tribun-video \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika kanvas-parametrik-logika midsets-tags-pointer-palet-logika tabrakan-spasi-silang-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika kanvas-parametrik-logika midsets-tags-pointer-palet-logika tabrakan-spasi-silang-logika perspektif-tribun-video-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill m1-penggaris-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman m6-drill-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \
