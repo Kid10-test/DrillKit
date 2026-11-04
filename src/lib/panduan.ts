@@ -68,7 +68,7 @@ const LANGKAH: [string, string][] = [
   ],
   [
     'Partitur, frasa, &amp; penala',
-    'Menu <b>Musik &amp; Metronom</b>: pasang partitur (<i>.musicxml</i>/<i>.mxl</i>/<i>.pdf</i>) → <b>Buka partitur</b> (filter part/seksi, <b>Pilih frasa di partitur</b> + tempo latihan, cetak buku saku Lyre A5) &amp; selaraskan MP3. Kartu <b>Penala &amp; nada dengung</b>: pilih <b>Instrumen</b> (trumpet Bb, mellophone F, sax Eb), tombol <b>Bb konser</b> → <b>Putar dengung</b> → <b>Dengarkan</b>.',
+    'Menu <b>Musik &amp; Metronom</b>: pasang partitur (<i>.mscz</i>/<i>.musicxml</i>/<i>.mxl</i>/<i>.pdf</i>) → <b>Tarik peta tempo</b> (sukat, BPM, rit., volta) → <b>Buka partitur</b> (filter part/seksi, <b>Pilih frasa di partitur</b> + tempo latihan, cetak buku saku Lyre A5) &amp; selaraskan MP3. Kartu <b>Penala &amp; nada dengung</b>: pilih <b>Instrumen</b> (trumpet Bb, mellophone F, sax Eb), tombol <b>Bb konser</b> → <b>Putar dengung</b> → <b>Dengarkan</b>.',
   ],
   [
     'Jadwal, absensi, &amp; lomba',
@@ -367,7 +367,7 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
 
   /* 5. Rekaman audio & partitur latihan */
   bagian.push(`<h2>5. Rekaman audio &amp; partitur latihan</h2>
-    <p style="margin:2px 0 3px">Di tab <b>Musik</b>, buka lagu: tekan <b>Tambahkan rekaman dari pelatih</b> untuk memasang MP3 (sidik rekaman dicocokkan ✔) dan <b>Tambahkan dari pelatih</b> untuk berkas partitur (<i>.musicxml</i>/<i>.mxl</i>/<i>.pdf</i>). Tekan <b>Buka partitur</b> — notasi tersaring otomatis ke instrumenmu (tombol <b>Ke part saya</b>), birama aktif disorot mengikuti musik, dan <b>Pilih frasa di partitur</b> mengulang bagian sulit dengan tempo latihan. Berkas disimpan offline di HP dan <b>tidak terhapus</b> saat kamu memperbarui materi paket.</p>`)
+    <p style="margin:2px 0 3px">Di tab <b>Musik</b>, buka lagu: tekan <b>Tambahkan rekaman dari pelatih</b> untuk memasang MP3 (sidik rekaman dicocokkan ✔) dan <b>Tambahkan dari pelatih</b> untuk berkas partitur (<i>.musicxml</i>/<i>.mxl</i>/<i>.pdf</i>). Tekan <b>Buka partitur</b> — notasi tersaring otomatis ke instrumenmu (tombol <b>Ke part saya</b>), birama aktif disorot mengikuti musik, dan <b>Pilih frasa di partitur</b> mengulang bagian sulit dengan tempo latihan; <b>Kertas: Gelap</b> untuk latihan malam. Berkas disimpan offline di HP dan <b>tidak terhapus</b> saat kamu memperbarui materi paket.</p>`)
 
   /* 6. Materi berubah */
   bagian.push(`<h2>6. Kalau materi berubah</h2>

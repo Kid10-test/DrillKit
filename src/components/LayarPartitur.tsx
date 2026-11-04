@@ -68,6 +68,7 @@ import {
   uraiJadwalNadaMusicXml,
 } from '../lib/partiturBunyi'
 import type { TempoLatihan } from '../lib/tempoLatihan'
+import { bacaSetelan, simpanSetelan } from '../lib/tuner'
 import { DEFAULT_SECTIONS, cx } from '../lib/utils'
 import { IconDownload, IconLoop, IconMusic, IconPause, IconPlay, IconPrinter } from './Icons'
 import { PratinjauCetakPartitur } from './PratinjauCetakPartitur'
@@ -92,6 +93,26 @@ function tentukanFilterAwalLagu(
   }
   return { jenis: 'semua' }
 }
+
+/**
+ * #27 — "Kertas gelap" untuk latihan malam di lapangan: kanvas notasi dibalik
+ * warnanya (CSS `filter`, hanya tampilan layar — cetak/HTML tetap putih).
+ * Pilihan diingat per perangkat.
+ */
+const KUNCI_KERTAS_GELAP = 'drillkit.partitur.kertasGelap'
+const FILTER_KERTAS_GELAP = 'invert(0.9) hue-rotate(180deg)'
+const LATAR_KERTAS_GELAP = '#1a1a1a'
+
+function bacaKertasGelap(): boolean {
+  try {
+    return localStorage.getItem(KUNCI_KERTAS_GELAP) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** #27 — pilihan nada acuan A4 (Hz) bersama penala; ditulis ke setelan `drillkit.penala`. */
+export const PILIHAN_A4_HZ = [440, 441, 442, 443, 444] as const
 
 export function LayarPartitur({
   song,
@@ -168,6 +189,8 @@ export function LayarPartitur({
 
   // #11d — auto-scroll mengikuti birama aktif + mode 2-ketuk pilih frasa di kanvas
   const [ikutiBirama, setIkutiBirama] = useState(true)
+  const [kertasGelap, setKertasGelap] = useState(bacaKertasGelap)
+  const [a4Hz, setA4Hz] = useState(() => bacaSetelan().a4)
   const [modePilihFrasa, setModePilihFrasa] = useState(false)
   const [calonAwalFrasa, setCalonAwalFrasa] = useState<number | null>(null)
   const [setAwalTerpilih, setSetAwalTerpilih] = useState<number | null>(null)
@@ -511,6 +534,7 @@ export function LayarPartitur({
       persenTempo: persen,
       dariBirama: dari,
       sampaiBirama: sampai,
+      a4Hz,
     })
     void pemutar.mulai({
       hasilJadwal,
@@ -522,7 +546,7 @@ export function LayarPartitur({
       },
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tandaFilterId, tempoLatihan?.persen, tempoLatihan?.geser, tempoLatihan?.mode, frasaMenyala, frasa?.dari, frasa?.sampai])
+  }, [tandaFilterId, tempoLatihan?.persen, tempoLatihan?.geser, tempoLatihan?.mode, frasaMenyala, frasa?.dari, frasa?.sampai, a4Hz])
 
   async function toggleBunyikanNot() {
     if (sedangBunyiNot) {
@@ -556,6 +580,7 @@ export function LayarPartitur({
       persenTempo: persen,
       dariBirama: dari,
       sampaiBirama: sampai,
+      a4Hz,
     })
     setSedangBunyiNot(true)
     setPosisiNot({ birama: dari, ketuk: 0 })
@@ -817,6 +842,53 @@ export function LayarPartitur({
                 >
                   {tataLetak === 'vertikal' ? 'Tata letak: Halaman' : 'Tata letak: Mendatar'}
                 </Button>
+
+                <Button
+                  size="sm"
+                  variant={kertasGelap ? 'primary' : 'outline'}
+                  data-testid="partitur-kertas-gelap"
+                  aria-pressed={kertasGelap}
+                  onClick={() => {
+                    const baru = !kertasGelap
+                    setKertasGelap(baru)
+                    try {
+                      localStorage.setItem(KUNCI_KERTAS_GELAP, baru ? '1' : '0')
+                    } catch {
+                      /* mode privat: cukup berlaku sesi ini */
+                    }
+                  }}
+                  title="Balik warna notasi untuk latihan malam (hanya layar; cetak tetap putih)"
+                >
+                  {kertasGelap ? 'Kertas: Gelap' : 'Kertas: Terang'}
+                </Button>
+
+                <label
+                  className="inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px]"
+                  style={{ borderColor: '#334155', backgroundColor: '#020617', color: '#cbd5e1' }}
+                  title="Nada acuan A4 untuk bunyi notasi — sama dengan setelan penala"
+                >
+                  A4
+                  <select
+                    data-testid="partitur-a4"
+                    value={a4Hz}
+                    onChange={(e) => {
+                      const nilai = Number(e.target.value)
+                      setA4Hz(nilai)
+                      simpanSetelan({ ...bacaSetelan(), a4: nilai })
+                    }}
+                    className="bg-transparent py-0.5 tabular-nums outline-none"
+                    style={{ color: '#e2e8f0', backgroundColor: '#020617' }}
+                  >
+                    {(PILIHAN_A4_HZ as readonly number[]).includes(a4Hz) ? null : (
+                      <option value={a4Hz}>{a4Hz} Hz</option>
+                    )}
+                    {PILIHAN_A4_HZ.map((hz) => (
+                      <option key={hz} value={hz}>
+                        {hz} Hz
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
                 {!galatRender && (
                   <Button
@@ -1476,10 +1548,11 @@ export function LayarPartitur({
             <div
               ref={kertasRef}
               data-testid="partitur-kertas"
+              data-kertas-gelap={kertasGelap ? '1' : '0'}
               style={{
-                backgroundColor: WARNA_PARTITUR_HEX.kertas,
+                backgroundColor: kertasGelap ? LATAR_KERTAS_GELAP : WARNA_PARTITUR_HEX.kertas,
                 color: WARNA_PARTITUR_HEX.tinta,
-                borderColor: '#cbd5e1',
+                borderColor: kertasGelap ? '#334155' : '#cbd5e1',
               }}
               className={cx(
                 'overflow-auto rounded-xl border p-3 sm:p-5',
@@ -1500,6 +1573,7 @@ export function LayarPartitur({
                 <div
                   ref={wadahSvgRef}
                   data-testid="partitur-kanvas-svg"
+                  style={kertasGelap ? { filter: FILTER_KERTAS_GELAP } : undefined}
                   className={cx(tataLetak === 'mendatar' ? 'min-w-max' : 'w-full min-w-[300px]')}
                 />
 

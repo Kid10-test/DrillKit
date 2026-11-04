@@ -444,7 +444,7 @@ interface CalonRootfile {
  * `META-INF/container.xml`, lalu pilih yang menunjuk ke berkas MusicXML utama
  * (bukan lampiran gambar *thumbnail* atau PDF pratinjau).
  */
-function pilihJalurUtamaContainer(teksContainer: string): string | null {
+function daftarRootfile(teksContainer: string): CalonRootfile[] {
   const calon: CalonRootfile[] = []
   const polaRootfile = /<rootfile\b([^>]*?)\/?>/gi
   let cocok: RegExpExecArray | null
@@ -463,7 +463,11 @@ function pilihJalurUtamaContainer(teksContainer: string): string | null {
     }
     if (fullPath) calon.push({ fullPath, mediaType })
   }
+  return calon
+}
 
+function pilihJalurUtamaContainer(teksContainer: string): string | null {
+  const calon = daftarRootfile(teksContainer)
   if (calon.length === 0) return null
 
   const bukanMxlSendiri = (j: string) => !/\.mxl$/i.test(j)
@@ -584,5 +588,70 @@ export async function uraiMxl(bita: Uint8Array): Promise<HasilUraiMxl> {
   } catch (e) {
     const pesan = e instanceof Error ? e.message : String(e)
     return { ok: false, alasan: `gagal membuka .mxl: ${pesan}` }
+  }
+}
+
+/* ------------------------- #27 — Arsip MuseScore ------------------------ */
+
+/**
+ * #27 — Pemeriksaan sinkron cepat: arsip ZIP yang memuat berkas `.mscx`
+ * (MuseScore 3/4 `.mscz`). Nama berkas di *Central Directory* ZIP selalu
+ * tersimpan tanpa kompresi, jadi cukup mencari penanda ASCII-nya.
+ *
+ * Diperiksa **sebelum** `apakahMxl`: `.mscz` juga memuat
+ * `META-INF/container.xml`, sehingga tanpa urutan ini ia dikira `.mxl` lalu
+ * ditolak dengan galat `elemen akar <museScore>`.
+ */
+export function apakahArsipMuseScore(bita: Uint8Array): boolean {
+  return magicZip(bita) && memuatAscii(bita, '.mscx')
+}
+
+/**
+ * #27 — Buka berkas utama sebuah arsip partitur (dipakai `mscz.ts`).
+ *
+ * Urutan pencarian: `<rootfile>` di `META-INF/container.xml` yang cocok
+ * `utamakan` → entri pertama di arsip yang cocok `utamakan` (bagian
+ * `Excerpts/` dihindari). Batas 8 MB, CRC-32, dan dukungan *stored/deflate*
+ * sama persis dengan `.mxl`. Galat tidak dilempar.
+ */
+export async function bukaEntriUtamaArsip(
+  bita: Uint8Array,
+  opsi: { utamakan: RegExp; label: string },
+): Promise<{ ok: true; bita: Uint8Array; jalur: string } | { ok: false; alasan: string }> {
+  try {
+    if (bita.length > BATAS_BITA) {
+      return { ok: false, alasan: `ukuran berkas ${opsi.label} (${formatMb(bita.length)}) melebihi batas ${formatMb(BATAS_BITA)}` }
+    }
+    if (!magicZip(bita)) {
+      return { ok: false, alasan: `bukan arsip ${opsi.label}/ZIP yang sah (tanda tangan PK tidak ditemukan)` }
+    }
+    const dir = bacaDirektoriPusat(bita)
+    if (!dir.ok) return { ok: false, alasan: dir.alasan.replace('.mxl', opsi.label) }
+
+    let jalur: string | null = null
+    const entriContainer = cariEntri(dir.entri, 'META-INF/container.xml')
+    if (entriContainer) {
+      const hc = await ekstrakEntri(bita, entriContainer)
+      if (hc.ok) {
+        const calon = daftarRootfile(teksPartitur(hc.bita)).find((c) => opsi.utamakan.test(c.fullPath))
+        if (calon && cariEntri(dir.entri, calon.fullPath)) jalur = calon.fullPath
+      }
+    }
+    if (!jalur) {
+      const cocok = dir.entri.filter((e) => opsi.utamakan.test(e.nama))
+      const utama = cocok.find((e) => !/^excerpts\//i.test(e.nama)) ?? cocok[0]
+      if (utama) jalur = utama.nama
+    }
+    if (!jalur) {
+      return { ok: false, alasan: `arsip ${opsi.label} tidak memuat berkas partitur utama` }
+    }
+    const entri = cariEntri(dir.entri, jalur)!
+    const hasil = await ekstrakEntri(bita, entri)
+    if (!hasil.ok) return { ok: false, alasan: hasil.alasan.replace('.mxl', opsi.label) }
+    if (hasil.bita.length === 0) return { ok: false, alasan: `berkas utama "${jalur}" di dalam ${opsi.label} kosong (0 bita)` }
+    return { ok: true, bita: hasil.bita, jalur: entri.nama }
+  } catch (e) {
+    const pesan = e instanceof Error ? e.message : String(e)
+    return { ok: false, alasan: `gagal membuka ${opsi.label}: ${pesan}` }
   }
 }

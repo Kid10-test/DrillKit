@@ -27,6 +27,10 @@ echo "== merakit modul untuk uji logika =="
 rakit src/lib/modePerangkat.ts modePerangkat
 rakit src/lib/bagikan.ts      bagikan
 rakit src/lib/zip.ts          zip
+# #27 — jembatan MuseScore (.mscz/.mscx → MusicXML) & tarik peta tempo dari partitur.
+rakit src/lib/xmlRingan.ts    xmlRingan
+rakit src/lib/mscz.ts         mscz
+rakit src/lib/petaPartitur.ts petaPartitur
 rakit src/lib/metronome.ts    metronome
 # TempoTimeline is the shared evaluator for metronome, recordings, and drills.
 rakit src/lib/tempoTimeline.ts tempoTimeline

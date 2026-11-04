@@ -40,12 +40,15 @@ import {
 import { formatBytes } from '../lib/backup'
 import { Button, ConfirmButton, useToast } from './ui'
 import { IconEye, IconUpload } from './Icons'
+import { ModalTarikPeta, type TambalanPeta } from './musik/ModalTarikPeta'
 
 /** Pratinjau berkas yang baru dipilih, sebelum apa pun ditulis. */
 interface PilihanPartitur {
   namaFile: string
-  /** Nama berkas asli bila dikonversi dari `.mxl` (mis. `pembuka.mxl`). */
+  /** Nama berkas asli bila dikonversi dari `.mxl`/`.mscz`/`.mscx` (mis. `pembuka.mscz`). */
   namaAsli?: string
+  /** #27 — keterangan konversi MuseScore (versi + hal yang dilewati). */
+  museScore?: { asal: 'mscz' | 'mscx'; versi: string; peringatan: string[] }
   ukuran: number
   hash: string
   /** Metadata yang AKAN disimpan — sekaligus bahan ringkasannya. */
@@ -65,6 +68,7 @@ export function PanelPartitur({
   hanyaPutar = false,
   terbuka = false,
   onToggleBuka,
+  onTerapkanPeta,
 }: {
   song: Song
   /** Tulis `Song.partitur` — bentuk yang sama dengan `onUpdateSong` #6. */
@@ -74,6 +78,11 @@ export function PanelPartitur({
   terbuka?: boolean
   /** #11b — buka/sembunyikan panel baca `LayarPartitur`. */
   onToggleBuka?: () => void
+  /**
+   * #27 — tulis hasil "Tarik peta dari partitur" ke lagu (tempo map, BPM,
+   * sukat, panjang). Kosong = tombolnya tidak ditampilkan (mis. mode anggota).
+   */
+  onTerapkanPeta?: (songId: string, tambalan: TambalanPeta) => Promise<void>
 }) {
   const toast = useToast()
   const [pilihan, setPilihan] = useState<PilihanPartitur | null>(null)
@@ -82,6 +91,7 @@ export function PanelPartitur({
   const [sibuk, setSibuk] = useState(false)
   const [storage, setStorage] = useState<InfoPenyimpanan | null>(null)
   const [tampilKuota, setTampilKuota] = useState(false)
+  const [tarikBuka, setTarikBuka] = useState(false)
   /** Satu input untuk semua tombol: yang membuka pemilih berkas selalu sama. */
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -113,7 +123,7 @@ export function PanelPartitur({
     setSibuk(true)
     setTolak(null)
     try {
-      const { putusan, hash, ukuran, blobSiap, namaSimpan, dariMxl } = await periksaPartitur(f, f.name)
+      const { putusan, hash, ukuran, blobSiap, namaSimpan, dariMxl, dariMuseScore } = await periksaPartitur(f, f.name)
       if (!putusan.boleh) {
         // Berkas tidak sah / .mxl rusak berhenti di sini; tidak ada yang ditulis.
         setPilihan(null)
@@ -122,7 +132,8 @@ export function PanelPartitur({
       }
       setPilihan({
         namaFile: namaSimpan,
-        namaAsli: dariMxl && namaSimpan !== f.name ? f.name : undefined,
+        namaAsli: (dariMxl || dariMuseScore) && namaSimpan !== f.name ? f.name : undefined,
+        museScore: dariMuseScore,
         ukuran,
         hash,
         meta: metaDariPutusan(namaSimpan, ukuran, hash, putusan, Date.now()),
@@ -190,7 +201,8 @@ export function PanelPartitur({
         <div>
           <p className="text-xs font-semibold text-slate-300">Partitur — {song.title}</p>
           <p className="mt-0.5 text-[11px] text-slate-500">
-            MusicXML (.musicxml / .mxl) atau PDF dari MuseScore/Sibelius/Finale. Disimpan offline di perangkat ini.
+            Berkas asli MuseScore (.mscz / .mscx), MusicXML (.musicxml / .mxl), atau PDF. Disimpan offline di perangkat
+            ini.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -203,7 +215,7 @@ export function PanelPartitur({
             ref={inputRef}
             id="partitur-input"
             type="file"
-            accept=".musicxml,.mxl,.xml,.pdf"
+            accept=".mscz,.mscx,.musicxml,.mxl,.xml,.pdf"
             className="hidden"
             data-testid="partitur-pilih"
             onChange={(e) => {
@@ -222,6 +234,18 @@ export function PanelPartitur({
               onClick={onToggleBuka}
             >
               <IconEye size={14} /> {terbuka ? 'Sembunyikan partitur' : 'Buka partitur'}
+            </Button>
+          )}
+          {meta && meta.tipe === 'musicxml' && adaBerkas === true && !pilihan && !hanyaPutar && onTerapkanPeta && (
+            <Button
+              variant="soft"
+              size="sm"
+              disabled={sibuk}
+              data-testid="partitur-tarik-peta"
+              title="Tarik peta birama, sukat, tempo, repeat/volta, & huruf latihan dari partitur ke tempo map lagu"
+              onClick={() => setTarikBuka(true)}
+            >
+              Tarik peta tempo
             </Button>
           )}
           {meta && !hanyaPutar && (
@@ -298,6 +322,19 @@ export function PanelPartitur({
             {pilihan.namaAsli ? `${pilihan.namaAsli} → ${pilihan.namaFile}` : pilihan.namaFile} ·{' '}
             {formatBytes(pilihan.ukuran)} · SHA: {pilihan.hash.slice(0, 10)}…
           </p>
+          {pilihan.museScore && (
+            <div data-testid="partitur-dari-musescore" className="mt-1.5 text-[11px] leading-relaxed text-emerald-100/90">
+              Diterjemahkan langsung dari MuseScore {pilihan.museScore.versi} (.{pilihan.museScore.asal}) ke MusicXML —
+              tanpa perlu membuka MuseScore.
+              {pilihan.museScore.peringatan.length > 0 && (
+                <ul className="mt-1 list-disc pl-4 text-amber-200/90">
+                  {pilihan.museScore.peringatan.map((p, i) => (
+                    <li key={i}>{p}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button variant="primary" size="sm" disabled={sibuk} data-testid="partitur-simpan" onClick={() => void pasang()}>
               {meta ? 'Pasang (ganti yang lama)' : 'Pasang partitur'}
@@ -307,6 +344,18 @@ export function PanelPartitur({
             </Button>
           </div>
         </div>
+      )}
+
+      {tarikBuka && onTerapkanPeta && (
+        <ModalTarikPeta
+          song={song}
+          open={tarikBuka}
+          onClose={() => setTarikBuka(false)}
+          onSimpan={async (id, tambalan) => {
+            await onTerapkanPeta(id, tambalan)
+            toast.push(`Tempo map diisi dari partitur (${tambalan.tempoMap.length} segmen)`)
+          }}
+        />
       )}
 
       {/* Ringkasan: satu sumber, dari metadata lagu atau dari berkas yang baru dipilih. */}

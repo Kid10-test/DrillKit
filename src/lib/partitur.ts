@@ -76,10 +76,27 @@ export const PESAN_MXL =
   'Ini MusicXML terkompresi (.mxl). Simpan ulang dari MuseScore sebagai ' +
   "'MusicXML file (*.musicxml)' — DrillKit belum membuka yang terkompresi."
 
+/**
+ * #27 — Penanda berkas asli MuseScore (`.mscz` / `.mscx`) di jalur **sinkron**.
+ *
+ * Jalur sinkron tidak bisa menerjemahkan (konverternya dimuat malas), jadi
+ * pesannya bukan penolakan buntu: pemanggil asinkron (`periksaPartitur`,
+ * `kenaliBerkasAsync`) mengenali `tipe: 'musescore'` lalu memuat `mscz.ts`.
+ * Kata kunci `MuseScore (.mscz/.mscx)` dipakai `mintaPratinjau` untuk
+ * mengalihkan berkas ke jalur asinkron.
+ */
+export const PESAN_MUSESCORE =
+  'Ini berkas asli MuseScore (.mscz/.mscx). DrillKit menerjemahkannya langsung ke MusicXML ' +
+  'saat dipasang di Musik → Partitur lagu.'
+
 /* -------------------------------- Tipe ---------------------------------- */
 
-/** Hasil deteksi dari bita. `mxl` sengaja ada supaya penolakannya bisa menyebut nama formatnya. */
-export type JenisPartitur = 'musicxml' | 'mxl' | 'pdf'
+/**
+ * Hasil deteksi dari bita. `mxl` sengaja ada supaya penolakannya bisa menyebut
+ * nama formatnya; `musescore` (#27) menandai berkas asli MuseScore yang
+ * diterjemahkan oleh `mscz.ts` di jalur asinkron.
+ */
+export type JenisPartitur = 'musicxml' | 'mxl' | 'pdf' | 'musescore'
 
 /** Satu part sesuai `<part-list>`. */
 export interface BagianPartitur {
@@ -504,6 +521,10 @@ export function deteksiPartitur(bita: Uint8Array): DeteksiPartitur {
     if (bita.length === 0) return { ya: false, alasan: 'berkas kosong (0 bita)' }
     if (mulaiDengan(bita, '%PDF-')) return { ya: true, tipe: 'pdf' }
     if (bita[0] === 0x50 && bita[1] === 0x4b && (bita[2] === 3 || bita[2] === 5 || bita[2] === 7)) {
+      // #27 — `.mscz` juga memuat container.xml; dikenali lebih dulu.
+      if (memuatPenanda(bita, '.mscx')) {
+        return { ya: false, tipe: 'musescore', alasan: PESAN_MUSESCORE }
+      }
       if (memuatPenanda(bita, 'META-INF/container.xml')) {
         return { ya: false, tipe: 'mxl', alasan: PESAN_MXL }
       }
@@ -515,6 +536,10 @@ export function deteksiPartitur(bita: Uint8Array): DeteksiPartitur {
     const akar = akarElemen(teksPartitur(bita))
     if (akar.nama === 'score-partwise' || akar.nama === 'score-timewise') {
       return { ya: true, tipe: 'musicxml' }
+    }
+    // #27 — `.mscx` mentah: bukan lagi galat `elemen akar <museScore>`.
+    if (akar.nama === 'museScore') {
+      return { ya: false, tipe: 'musescore', alasan: PESAN_MUSESCORE }
     }
     return {
       ya: false,

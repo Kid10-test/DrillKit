@@ -60,6 +60,7 @@ import {
   type JadwalNadaPartitur,
 } from '../lib/partiturBunyi'
 import { cx, downloadFile, sectionLabel, todayISO, uid, visibleSections } from '../lib/utils'
+import { bacaSetelan } from '../lib/tuner'
 
 const KUNCI_PENGUJI = 'drillkit_penguji_setoran_v1'
 
@@ -342,6 +343,7 @@ export function PanelSetoranHafalan() {
       persenTempo: persenTempoUji,
       dariBirama: dari,
       sampaiBirama: sampai,
+      a4Hz: bacaSetelan().a4,
     })
     if (!pemutarRef.current) pemutarRef.current = new PemutarNadaPartitur()
     const ok = await pemutarRef.current.mulai({

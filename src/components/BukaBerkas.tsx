@@ -49,7 +49,11 @@ export function mintaPratinjau(hasil: BerkasDikenal, bita?: Uint8Array): void {
   // #11b — tombol lama memanggil `kenaliBerkas` sinkron (yang menandai .mxl
   // dengan pesan MusicXML terkompresi). Urai secara asinkron di sini supaya
   // semua tombol lama ikut mengenali .mxl tanpa menarik mxl/partitur di awal.
-  if (bita && hasil.jenis === 'tak-dikenal' && hasil.catatan?.includes('MusicXML terkompresi (.mxl)')) {
+  if (
+    bita &&
+    hasil.jenis === 'tak-dikenal' &&
+    (hasil.catatan?.includes('MusicXML terkompresi (.mxl)') || hasil.catatan?.includes('MuseScore (.mscz/.mscx)'))
+  ) {
     void Promise.all([import('../lib/bukaBerkas'), import('./PratinjauBerkasModal')]).then(
       ([{ kenaliBerkasAsync }]) =>
         kenaliBerkasAsync(hasil.nama, bita).then((baru) => {
@@ -177,7 +181,7 @@ export function TombolBukaBerkas({
         <IconUpload size={16} /> {label}
         <input
           type="file"
-          accept=".json,.csv,.zip,.musicxml,.mxl,.xml,.pdf,application/json,text/csv,application/zip,application/pdf,application/vnd.recordare.musicxml"
+          accept=".json,.csv,.zip,.musicxml,.mxl,.mscz,.mscx,.xml,.pdf,application/json,text/csv,application/zip,application/pdf,application/vnd.recordare.musicxml"
           data-testid={`${testId}-input`}
           className="hidden"
           onChange={(e) => {
