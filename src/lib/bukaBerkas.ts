@@ -695,6 +695,7 @@ export const TABEL_BACKUP: { kolom: string; label: string }[] = [
   { kolom: 'medisAnggota', label: 'Kartu medis darurat' },
   { kolom: 'kasIuran', label: 'Buku kas & iuran TC' },
   { kolom: 'arsipMusim', label: 'Arsip lintas-musim' },
+  { kolom: 'tindakLanjut', label: 'Catatan cleaning & tindak lanjut' },
 ]
 
 /**

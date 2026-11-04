@@ -655,6 +655,56 @@ export interface BentukTerikat {
   kolom?: number
   /** Orientasi arah hadap pemain pada bentuk (bawaan 'depan'). */
   arahHadap?: 'depan' | 'singgung' | 'pusat' | 'tetap'
+  /** #26 — acuan pelurusan (*dress/guide*) khusus bentuk ini; menimpa `DrillSet.dress`. */
+  dress?: DressBarisan
+}
+
+/**
+ * #26 — Acuan pelurusan barisan (*dress / guiding*).
+ *
+ * Kiri/kanan selalu dari **sudut pandang pemain yang menghadap penonton**:
+ * kiri = arah Side 2 (−x), kanan = arah Side 1 (+x).
+ */
+export type AcuanDress = 'kiri' | 'tengah' | 'kanan' | 'depan' | 'belakang' | 'anggota'
+
+export interface DressBarisan {
+  acuan: AcuanDress
+  /** Wajib bila `acuan === 'anggota'`: id pemain pemandu. */
+  anggotaId?: string
+}
+
+/**
+ * #26 — Slot **Hole**: titik penjaga interval (lingkar putus-putus) ketika
+ * posisi belum terisi / pemain sedang cedera. Koordinatnya disimpan di
+ * `DrillSet.points[hole.id]` supaya bentuk `#22`, jalur set, dan salin set
+ * tetap bekerja tanpa jalur kode baru. Bukan anggota: tidak ikut roster,
+ * analitik, benturan `#24`, ekspor, maupun penomoran titik tim.
+ */
+export interface SlotHole {
+  /** Selalu diawali `hole_`. */
+  id: string
+  /** Label pendek di kanvas & kertas, mis. `H1`. */
+  label: string
+  alasan?: 'kosong' | 'cedera' | 'izin'
+  /** Pemain asal yang posisinya dijadikan hole (untuk tombol isi kembali). */
+  memberIdAsal?: string
+  createdAt: number
+}
+
+/**
+ * #26 — Pemain **Bayangan / Alternate** yang mengikuti titik pemain inti.
+ * Titiknya diturunkan saat tampil/cetak (tidak disimpan), hanya pada set yang
+ * tidak memberi titik sendiri kepada si bayangan.
+ */
+export interface BayanganAnggota {
+  memberId: string
+  indukId: string
+  /** `berbagi` = nomor & titik sama persis; `offset` = bergeser aman dari induk. */
+  mode: 'berbagi' | 'offset'
+  /** Jarak geser dalam langkah (bawaan 1). */
+  offsetLangkah?: number
+  /** Arah geser menurut lapangan (bawaan `belakang`). */
+  arahOffset?: 'belakang' | 'depan' | 's1' | 's2'
 }
 
 export interface DrillSet {
@@ -683,6 +733,8 @@ export interface DrillSet {
   midsets?: Record<string, TitikSinggahMidset[]>
   /** #23.2 — timpaan warna/bentuk titik berbasis Tag lintas-seksi khusus pada set ini */
   tampilanTag?: Record<string, TimpaanTampilanTag>
+  /** #26 — acuan pelurusan barisan bawaan set ini (bisa ditimpa per bentuk). */
+  dress?: DressBarisan
   createdAt: number
 }
 
@@ -874,6 +926,10 @@ export interface Drill {
   tampilanTag?: Record<string, TimpaanTampilanTag>
   /** #25 — skema warna seragam, bendera, & latar pratinjau perspektif tribun juri. */
   skemaVisualTribun?: SkemaVisualTribun
+  /** #26 — slot Hole (titik penjaga interval) di drill ini. */
+  holes?: SlotHole[]
+  /** #26 — pemain bayangan/alternate yang mengikuti titik pemain inti. */
+  bayangan?: BayanganAnggota[]
   /**
    * 31e — dasar jarak untuk drill ini: jarak tempuh mengikuti jalur, atau
    * garis lurus. Kosong = `jalur`, persis seperti sebelumnya, jadi drill
@@ -2064,6 +2120,8 @@ export interface ArsipMusim {
     penilaianLomba: PenilaianLomba[]
     kasIuran: TransaksiKasIuran[]
     audisi: CalonAudisi[]
+    /** #26 — catatan cleaning/tindak lanjut musim itu (arsip lama tidak memilikinya). */
+    tindakLanjut?: TindakLanjut[]
   }
   createdAt: number
 }
@@ -2072,3 +2130,38 @@ export interface ArsipMusim {
 
 
 
+
+/* -------------------- #26 — Tindak Lanjut / Catatan Cleaning -------------------- */
+
+/** Alur tunggal temuan → fokus → beres (dipakai #26 cleaning, #20 juri, & Papan Staf #34). */
+export type StatusTindakLanjut = 'temuan' | 'fokus' | 'beres'
+
+/** Asal catatan; `#34` akan menambah sumber baru tanpa mengubah store. */
+export type SumberTindakLanjut = 'cleaning' | 'juri' | 'staf'
+
+/**
+ * #26 — Satu catatan tindak lanjut staf (`db.tindakLanjut`, Dexie v17).
+ *
+ * Khusus staf: dikupas dari setiap paket anggota (`kupasDataKhususStaf`).
+ * Sengaja tidak menyimpan id anggota supaya tidak menambah jalur data pribadi.
+ */
+export interface TindakLanjut {
+  id: string
+  judul: string
+  catatan?: string
+  status: StatusTindakLanjut
+  sumber: SumberTindakLanjut
+  drillId?: string
+  setId?: string
+  /** Nomor set 1-based saat dicatat (tetap terbaca walau urutan set berubah). */
+  setNomor?: number
+  /** Rentang birama terkait bila drill ditautkan ke lagu. */
+  biramaDari?: number
+  biramaSampai?: number
+  /** Id seksi (`SectionDef.id`) yang menjadi sasaran perbaikan. */
+  seksi?: string
+  prioritas?: 'tinggi' | 'normal'
+  createdAt: number
+  updatedAt: number
+  beresAt?: number
+}

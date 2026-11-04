@@ -521,8 +521,22 @@ export function putusRujukan(
   // `set.gerak.kelompok[].memberIds`, serta `set.gerak.ripple.urutan` agar
   // impor sebagian tidak menyisakan ID anggota yang tidak ada di perangkat.
   const idAnggotaSah = kumpulkanId(berkas, yangAda, 'anggota')
+  // #26 — slot Hole (`hole_…`) bukan anggota, tetapi rujukan sah di kelompok/ripple set.
+  const idTitikSah = (id: string) => idAnggotaSah.has(id) || id.startsWith('hole_')
   const daftarDrill = ambil(hasil, 'drill') as Drill[]
   for (const d of daftarDrill) {
+    // #26 — pemain bayangan yang anggota/induknya tidak ada dibuang.
+    if (d.bayangan?.length) {
+      const sahB = d.bayangan.filter((b) => idAnggotaSah.has(b.memberId) && idAnggotaSah.has(b.indukId))
+      if (sahB.length !== d.bayangan.length) {
+        for (const b of d.bayangan) {
+          if (!idAnggotaSah.has(b.memberId) || !idAnggotaSah.has(b.indukId)) {
+            putus.push({ jenis: 'drill', id: d.id, kolom: 'pemain bayangan', nilai: idAnggotaSah.has(b.memberId) ? b.indukId : b.memberId })
+          }
+        }
+        d.bayangan = sahB.length ? sahB : undefined
+      }
+    }
     if (!d.markers?.length) continue
     let berubah = false
     const markersBaru = d.markers.map((mk) => {
@@ -548,11 +562,11 @@ export function putusRujukan(
     if (s.gerak.kelompok?.length) {
       kelompokBaru = s.gerak.kelompok
         .map((klp) => {
-          const sah = klp.memberIds.filter((id) => idAnggotaSah.has(id))
+          const sah = klp.memberIds.filter((id) => idTitikSah(id))
           if (sah.length === klp.memberIds.length) return klp
           klpBerubah = true
           for (const id of klp.memberIds) {
-            if (!idAnggotaSah.has(id)) {
+            if (!idTitikSah(id)) {
               putus.push({ jenis: 'set', id: s.id, kolom: 'kelompok gerak', nilai: id })
             }
           }
@@ -566,7 +580,7 @@ export function putusRujukan(
     if (s.gerak.ripple?.urutan) {
       const urutanSah: Record<string, number> = {}
       for (const [id, gel] of Object.entries(s.gerak.ripple.urutan)) {
-        if (idAnggotaSah.has(id)) urutanSah[id] = gel
+        if (idTitikSah(id)) urutanSah[id] = gel
         else {
           rplBerubah = true
           putus.push({ jenis: 'set', id: s.id, kolom: 'ripple', nilai: id })

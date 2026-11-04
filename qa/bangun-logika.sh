@@ -144,6 +144,11 @@ rakit src/lib/tabrakanDrill.ts           tabrakanDrill
 # #25 — Pratinjau Perspektif Tribun Juri, Kontras Seragam/Bendera, & Ekspor Video (.webm).
 rakit src/lib/perspektifTribun.ts        perspektifTribun
 rakit src/lib/eksporVideoDrill.ts        eksporVideoDrill
+# #26 — Buku Saku Generasi Baru: penjejak lintasan bersama, xCounts, dress, hole, bayangan, cleaning.
+rakit src/lib/jejakJalur.ts              jejakJalur
+rakit src/lib/bukuSakuPemain.ts          bukuSakuPemain
+rakit src/lib/tindakLanjut.ts            tindakLanjut
+rakit src/lib/cleaningCetak.ts           cleaningCetak
 # #7 — satu pintu buka berkas: deteksi isi, pratinjau, nama jelas, aturan mode.
 rakit src/lib/bukaBerkas.ts bukaBerkas
 # #11a §13 step 5 — ZIP score manifest extraction and round-trip preview.
