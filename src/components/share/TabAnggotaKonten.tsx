@@ -47,6 +47,16 @@ import { sectionDot, STATUS_META, daysFromToday, formatDateLong, pct, todayISO }
 import { apakahModeParade, coordText, facingDeg, stepYd, ukurTitik } from "../../lib/field"
 import { posisiSafBanjarAnggota } from "../../lib/parade"
 import { acakUrutan, bangunSoal, nilaiTebakan, TOLERANSI_LANGKAH, type NilaiTebakan } from "../../lib/kuis"
+import {
+  bacaPerspektifPemain,
+  infoXCountPemain,
+  keteranganBayangan,
+  proyeksiLapangan,
+  resolusiDress,
+  simpanPerspektifPemain,
+  terapkanBayangan,
+} from "../../lib/bukuSakuPemain"
+import { LaciBeamPartitur } from "../drill/LaciBeamPartitur"
 
 
 /**
@@ -64,10 +74,24 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
   const [playing, setPlaying] = useState(false)
 
   const drill = bundle.drills.find((d) => d.id === drillId) ?? bundle.drills[0]
+  /**
+   * #26 — titik pemain bayangan/alternate diturunkan dari induknya di sini
+   * (hanya tampilan), jadi seluruh kartu & animasi di bawah otomatis ikut.
+   */
   const sets: DrillSet[] = useMemo(
-    () => bundle.sets.filter((s) => s.drillId === drill?.id).sort((a, b) => a.order - b.order),
-    [bundle.sets, drill?.id],
+    () =>
+      drill
+        ? terapkanBayangan(
+            bundle.sets.filter((s) => s.drillId === drill.id).sort((a, b) => a.order - b.order),
+            drill,
+          )
+        : [],
+    [bundle.sets, drill],
   )
+  /** #26 — perspektif pemain 180° (penonton di atas), disimpan per perangkat. */
+  const [balikMentah, setBalikMentah] = useState(bacaPerspektifPemain)
+  /** #26 — laci Beam partitur di bawah kanvas. */
+  const [beamTerbuka, setBeamTerbuka] = useState(false)
   useEffect(() => {
     if (sets.length && !sets.some((s) => s.id === setId)) setSetId(sets[0].id)
   }, [sets, setId])
@@ -76,12 +100,11 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
   /** Ukuran titik mengikuti luas lapangan — sama seperti di editor. */
   const uk = (n: number) => ukurTitik(f, n)
   const sYd = stepYd(f)
-  const halfW = f.widthYd / 2
-  const halfL = (f.lengthYd + f.endZoneYd * 2) / 2
   const VW = f.lengthYd + f.endZoneYd * 2
   const VH = f.widthYd
-  const sx = (x: number) => halfL - x
-  const sy = (y: number) => halfW - y
+  // Mode Kirab punya sisi panggung sendiri, jadi perspektif 180° hanya untuk lapangan.
+  const balik = balikMentah && !apakahModeParade(f)
+  const { sx, sy, arahHadap } = proyeksiLapangan(f, balik)
 
   const idxSet = sets.findIndex((s) => s.id === setId)
   const set = sets[idxSet] ?? sets[0]
@@ -176,7 +199,7 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
       cancelAnimationFrame(rafRef.current)
       for (const [id] of vec) dotRefs.current.get(id)?.removeAttribute('transform')
     }
-  }, [playing, set, nextSet, drill, members, countSheetsAnggota.length])
+  }, [playing, set, nextSet, drill, members, countSheetsAnggota.length, balik])
 
   const gantiSet = (arah: number) => {
     setPlaying(false)
@@ -243,7 +266,7 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
       <Card padded={false} className="overflow-hidden">
         <div className="bg-slate-950 p-2">
           <svg viewBox={`0 0 ${VW} ${VH}`} className="w-full">
-            <FieldSurface f={f} VW={VW} VH={VH} sx={sx} sy={sy} />
+            <FieldSurface f={f} VW={VW} VH={VH} sx={sx} sy={sy} balik={balik} />
             {(drill.markers?.length ?? 0) > 0 && (
               <MarkerLayer
                 markers={penandaEfektifPadaSet(drill.markers ?? [], sets, idxSet, progresProp)}
@@ -291,6 +314,27 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
                   />
                 )
               })}
+            {/* #26 — slot Hole: lingkar putus-putus penjaga interval */}
+            {(drill.holes ?? []).map((h) => {
+              const ph = set?.points?.[h.id]
+              if (!ph) return null
+              return (
+                <g key={h.id} data-testid="anggota-hole" style={{ pointerEvents: 'none' }}>
+                  <circle
+                    cx={sx(ph.x)}
+                    cy={sy(ph.y)}
+                    r={uk(1.15)}
+                    fill="none"
+                    stroke="#e2e8f0"
+                    strokeWidth={uk(0.22)}
+                    strokeDasharray={`${uk(0.5)} ${uk(0.35)}`}
+                  />
+                  <text x={sx(ph.x)} y={sy(ph.y) + uk(0.4)} textAnchor="middle" fontSize={uk(1)} fill="#e2e8f0">
+                    {h.label}
+                  </text>
+                </g>
+              )
+            })}
             {Object.entries(set?.points ?? {}).map(([id, p]) => {
               const m = members.find((x) => x.id === id)
               if (!m) return null
@@ -314,8 +358,8 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
                   <line
                     x1={sx(p.x)}
                     y1={sy(p.y)}
-                    x2={sx(p.x) - Math.sin(rad) * 1.6}
-                    y2={sy(p.y) + Math.cos(rad) * 1.6}
+                    x2={sx(p.x) - Math.sin(rad) * 1.6 * arahHadap}
+                    y2={sy(p.y) + Math.cos(rad) * 1.6 * arahHadap}
                     stroke={gaya.warna}
                     strokeWidth={0.35}
                   />
@@ -354,9 +398,60 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
             })}
           </svg>
         </div>
-        <div className="border-t border-slate-800 px-3 py-2 text-[11px] text-slate-500">
-          Titikmu ditandai lingkaran emas · ukuran langkah {Math.round((1 / sYd) * 10) / 10} langkah/yard
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 px-3 py-2 text-[11px] text-slate-500">
+          <span className="min-w-0 flex-1">
+            Titikmu ditandai lingkaran emas · ukuran langkah {Math.round((1 / sYd) * 10) / 10} langkah/yard
+            {balik ? ' · tampilan dari sudut pandang pemain (penonton di atas)' : ''}
+          </span>
+          {!apakahModeParade(f) && (
+            <button
+              type="button"
+              data-testid="toggle-perspektif-pemain"
+              aria-pressed={balik}
+              onClick={() => {
+                setBalikMentah((v) => {
+                  simpanPerspektifPemain(!v)
+                  return !v
+                })
+              }}
+              className={
+                'rounded-full border px-2.5 py-1 text-[11px] active:scale-[.97] ' +
+                (balik ? 'border-amber-500/50 bg-amber-500/15 text-amber-200' : 'border-slate-700 text-slate-300')
+              }
+              title="Putar 180°: penonton/podium di atas, seperti dilihat dari tempatmu berdiri"
+            >
+              ⟲ Sudut pandang pemain
+            </button>
+          )}
+          <button
+            type="button"
+            data-testid="toggle-beam"
+            aria-pressed={beamTerbuka}
+            onClick={() => setBeamTerbuka((v) => !v)}
+            className={
+              'rounded-full border px-2.5 py-1 text-[11px] active:scale-[.97] ' +
+              (beamTerbuka ? 'border-sky-500/50 bg-sky-500/15 text-sky-200' : 'border-slate-700 text-slate-300')
+            }
+            title="Tampilkan partitur suaramu untuk birama set ini"
+          >
+            ♫ Partitur set ini
+          </button>
         </div>
+        {beamTerbuka && (
+          <div className="border-t border-slate-800 p-2">
+            <LaciBeamPartitur
+              song={laguDrill}
+              drill={drill}
+              sets={sets}
+              idxSet={Math.max(0, idxSet)}
+              anggotaAktif={me}
+              sectionsTim={bundle.team?.sections}
+              namaTim={bundle.team?.teamName}
+              hanyaPutar
+              onTutup={() => setBeamTerbuka(false)}
+            />
+          </div>
+        )}
       </Card>
 
       <Card>
@@ -387,6 +482,26 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
               .join(', ')}
           </div>
         )}
+        {keteranganBayangan(drill, me.id, members) && (
+          <p
+            className="mb-2.5 rounded-lg border border-violet-700/40 bg-violet-950/25 px-2.5 py-2 text-[11px] text-violet-200"
+            data-testid="anggota-bayangan"
+          >
+            {keteranganBayangan(drill, me.id, members)}
+          </p>
+        )}
+        {(() => {
+          const dress = resolusiDress(set, me.id, members)
+          if (!dress) return null
+          return (
+            <p
+              className="mb-2.5 rounded-lg border border-emerald-700/40 bg-emerald-950/25 px-2.5 py-2 text-xs font-semibold text-emerald-200"
+              data-testid="anggota-dress"
+            >
+              {dress.teks}
+            </p>
+          )
+        })()}
         {myPoint ? (
           <>
             {apakahModeParade(f) && (() => {
@@ -485,6 +600,19 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
                     ))}
                   </ul>
                 ) : null}
+                {set && (() => {
+                  const info = infoXCountPemain({ dari: set, ke: nextSet, anggota: members, memberId: me.id, field: f })
+                  if (!info || (!info.teksXCount && !info.teksTengah)) return null
+                  return (
+                    <div
+                      className="mt-1.5 space-y-0.5 rounded-md border border-amber-800/40 bg-amber-950/20 px-2.5 py-1.5 font-mono text-[11px] text-amber-200"
+                      data-testid="anggota-xcount"
+                    >
+                      {info.teksXCount && <p>{info.teksXCount}</p>}
+                      {info.teksTengah && <p>{info.teksTengah}</p>}
+                    </div>
+                  )
+                })()}
                 {myNext && (
                   <p className="mt-1 text-[11px] text-slate-500">
                     Tujuan: {coordText(myNext.x, myNext.y, f)} ·{' '}

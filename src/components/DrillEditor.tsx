@@ -191,6 +191,8 @@ import { intipTitipan } from './BukaBerkas'
 import { Jejak, TapakLangkah, TitikPemainBentuk } from './JejakLangkah'
 import type { BusurGambar } from './JejakLangkah'
 import { PointInspector } from './PointInspector'
+import { PanelTitikKhusus } from './drill/PanelTitikKhusus'
+import { PanelCleaningSet } from './drill/PanelCleaningSet'
 import { PerformerDetailModal } from './PerformerDetailModal'
 import { DotSheetModal } from './DotSheetModal'
 import { DrillSettingsModal } from './DrillSettingsModal'
@@ -4746,6 +4748,39 @@ export function Editor({
                 </g>
               )}
 
+              {/* #26 — Slot Hole: lingkar putus-putus penjaga interval (bukan anggota, tidak bisa diseret) */}
+              {(drill.holes?.length ?? 0) > 0 && set && (
+                <g data-testid="lapisan-hole" style={{ pointerEvents: 'none' }}>
+                  {drill.holes!.map((h) => {
+                    const ph = set.points[h.id]
+                    if (!ph) return null
+                    return (
+                      <g key={h.id} data-hole={h.label}>
+                        <circle
+                          cx={sx(ph.x)}
+                          cy={sy(ph.y)}
+                          r={uk(1.15)}
+                          fill="none"
+                          stroke="#e2e8f0"
+                          strokeWidth={uk(0.22)}
+                          strokeDasharray={`${uk(0.5)} ${uk(0.35)}`}
+                        />
+                        <text
+                          x={sx(ph.x)}
+                          y={sy(ph.y) + uk(0.4)}
+                          textAnchor="middle"
+                          fontSize={uk(1)}
+                          fill="#e2e8f0"
+                          style={{ fontWeight: 700 }}
+                        >
+                          {h.label}
+                        </text>
+                      </g>
+                    )
+                  })}
+                </g>
+              )}
+
               {/* Titik pemain */}
               {Object.entries(set?.points ?? {}).map(([id, p]) => {
                 const m = rosterById.get(id)
@@ -6095,6 +6130,23 @@ export function Editor({
           onLepasBentuk={lepasBentukTerikat}
         />
 
+        {/* #26 — Dress/guiding, slot Hole, & pemain Bayangan (Tap ID) */}
+        <PanelTitikKhusus
+          drill={drill}
+          sets={sets}
+          idx={idx}
+          roster={roster}
+          dipilih={selected}
+          onSebelumUbah={() => snapshotMany(sets)}
+          onPatchSets={async (patches) => {
+            for (const pt of patches) await db.sets.update(pt.id, pt.patch)
+            await db.drills.update(drill.id, { updatedAt: Date.now() })
+          }}
+          onUbahDrill={async (patch) => {
+            await db.drills.update(drill.id, { ...patch, updatedAt: Date.now() })
+          }}
+        />
+
         <PenandaPanel
           markers={markers}
           sYd={sYd}
@@ -6133,6 +6185,24 @@ export function Editor({
             onIkatKeGarisHidup={ikatKeGarisHidup}
           />
         )}
+
+        {/* #26 — Catatan cleaning tertaut set (store terpadu tindakLanjut, dipakai Papan Staf #34) */}
+        <Card>
+          <PanelCleaningSet
+            drillId={drill.id}
+            namaDrill={drill.name}
+            namaTim={settings?.teamName ?? 'Tim'}
+            setId={set?.id}
+            setNomor={set ? idx + 1 : undefined}
+            namaSet={set?.name}
+            rentangBirama={
+              daftarSetBiramaDrill[idx]
+                ? { dari: daftarSetBiramaDrill[idx].biramaDari, sampai: daftarSetBiramaDrill[idx].biramaSampai }
+                : null
+            }
+            sections={settings.sections ?? []}
+          />
+        </Card>
 
         <Card>
           <div className="mb-2 flex items-center justify-between gap-2">

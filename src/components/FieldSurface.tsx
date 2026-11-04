@@ -37,6 +37,7 @@ export function FieldSurface({
   sx,
   sy,
   pratinjau = false,
+  balik = false,
 }: {
   f: FieldConfig
   VW: number
@@ -45,6 +46,11 @@ export function FieldSurface({
   sy: (n: number) => number
   /** Bila `true`, memakai atribut `data-pratinjau-lap` agar tidak bentrok dengan kanvas utama. */
   pratinjau?: boolean
+  /**
+   * #26 — perspektif pemain 180°: pemanggil memakai `sx`/`sy` terbalik, dan
+   * label tetap (S1/S2, FRONT/BACK) ikut ditukar supaya terbaca benar.
+   */
+  balik?: boolean
 }) {
   const tagLap = (jenis: string) =>
     pratinjau ? { 'data-pratinjau-lap': jenis } : { 'data-lap': jenis }
@@ -455,7 +461,7 @@ export function FieldSurface({
             fill="#ffffff"
             fillOpacity={0.6}
           >
-            S1
+            {balik ? 'S2' : 'S1'}
           </text>
           <text
             {...tagLap('teks')}
@@ -466,7 +472,7 @@ export function FieldSurface({
             fillOpacity={0.6}
             textAnchor="end"
           >
-            S2
+            {balik ? 'S1' : 'S2'}
           </text>
         </>
       )}
@@ -474,18 +480,18 @@ export function FieldSurface({
       <text
         {...tagLap('teks')}
         x={modeParade ? 1.5 : VW / 2}
-        y={VH - (modeParade ? 0.35 * skalaTeksParade : 0.8)}
+        y={balik ? 1.2 : VH - (modeParade ? 0.35 * skalaTeksParade : 0.8)}
         fontSize={modeParade ? 1.2 * skalaTeksParade : 1.8}
         fill="#ffffff"
         fillOpacity={0.5}
         textAnchor={modeParade ? 'start' : 'middle'}
       >
-        {modeParade ? 'TEPI DEPAN (PENONTON)' : 'FRONT (penonton)'}
+        {modeParade ? 'TEPI DEPAN (PENONTON)' : balik ? 'PENONTON (front)' : 'FRONT (penonton)'}
       </text>
       <text
         {...tagLap('teks')}
         x={modeParade ? 1.5 : VW / 2}
-        y={modeParade ? 0.9 * skalaTeksParade : 1.2}
+        y={balik ? VH - 0.8 : modeParade ? 0.9 * skalaTeksParade : 1.2}
         fontSize={modeParade ? 1.15 * skalaTeksParade : 1.6}
         fill="#ffffff"
         fillOpacity={0.45}

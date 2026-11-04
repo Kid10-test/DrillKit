@@ -29,6 +29,7 @@ import type {
   KartuMedisAnggota,
   TransaksiKasIuran,
   ArsipMusim,
+  TindakLanjut,
 } from './types'
 
 /**
@@ -95,6 +96,8 @@ export class DrillKitDB extends Dexie {
   kasIuran!: Table<TransaksiKasIuran, string>
   /** #21c — arsip lintas-musim baca-saja (Season Rollover). */
   arsipMusim!: Table<ArsipMusim, string>
+  /** #26 — catatan cleaning & tindak lanjut staf (temuan → fokus → beres), dipakai juga #34. */
+  tindakLanjut!: Table<TindakLanjut, string>
 
   constructor() {
     super('drillkit')
@@ -167,6 +170,10 @@ export class DrillKitDB extends Dexie {
       medisAnggota: 'id, memberId, golonganDarah, updatedAt',
       kasIuran: 'id, tanggal, jenis, kategoriProgram, memberId, updatedAt',
       arsipMusim: 'id, tahunMusim, tanggalArsip, createdAt',
+    })
+    // #26 — satu store tindak lanjut terpadu (cleaning set, juri #20, Papan Staf #34) — penambahan murni v17.
+    this.version(17).stores({
+      tindakLanjut: 'id, status, drillId, setId, sumber, updatedAt',
     })
   }
 }

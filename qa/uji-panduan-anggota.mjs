@@ -117,6 +117,7 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
     'src/components/ModalRekamanLagu.tsx',
     'src/components/PanelPartitur.tsx',
     'src/components/LayarPartitur.tsx',
+    'src/components/drill/LaciBeamPartitur.tsx',
   ].map(baca).join('\n').replace(/&amp;/g, '&')
   const LABEL = [
     'Saya anggota', 'Ambil materi dari situs', 'Buka paket tim', 'Ganti paket', 'Ganti nama',
@@ -126,6 +127,7 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
     'Tambahkan rekaman dari pelatih', 'Tambahkan dari pelatih', 'Buka partitur', 'Ke part saya', 'Pilih frasa di partitur',
     'Lihat mode anggota', 'Bersihkan & muat ulang', 'Aplikasi gagal dimuat',
     'Penyimpanan browser belum bisa dipakai',
+    'Sudut pandang pemain', 'Partitur set ini',
   ]
   for (const l of LABEL) {
     uji(`label "${l}" disebut panduan & ada di aplikasi`, tSitus.includes(l) && sumber.includes(l),

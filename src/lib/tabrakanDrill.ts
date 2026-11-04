@@ -22,21 +22,8 @@ import type {
   Member,
 } from '../db/types'
 import { facingDeg } from './field'
-import {
-  bangunPetaFtl,
-  cocokPutaran,
-  deltaBusur,
-  deltaMidsets,
-  deltaPoliFtl,
-  gerakOf,
-  kelompokPemain,
-  progresPemain,
-  sinkronkanKelompokDariTag,
-  titikJalur,
-} from './gerak'
+import { buatPenjejakSet, posisiJalurPadaP, type JalurPemain } from './jejakJalur'
 import { apakahPropertiBergerak, penandaEfektifPadaSet } from './propertiGerak'
-
-type PoliFtl = ReturnType<typeof bangunPetaFtl> extends Map<string, infer V> ? V : never
 
 /* ============================================================================
  * 1. Radius Ruang Aman Sadar-Instrumen & Arah Jalan Mundur
@@ -188,24 +175,12 @@ export interface HasilPemeriksaanTabrakan {
   jmlJalanMundur: number
 }
 
-interface DeskriptorLintasanPemain {
-  id: string
+/** #26 — lintasan diambil dari penjejak bersama `jejakJalur.ts`, ditambah data ruang aman alat. */
+interface DeskriptorLintasanPemain extends JalurPemain {
   anggota: Member
-  awal: DrillPoint
-  akhir: DrillPoint
-  diam: boolean
   radiusYd: number
   radiusLangkah: number
   kategoriAlat: KategoriRuangInstrumen
-  ftl?: PoliFtl
-  adaMidset: boolean
-  jalanCount?: number
-  kAkhir: number
-  busur?: {
-    pusat: { x: number; y: number }
-    sudut: number
-    geser: { x: number; y: number }
-  }
 }
 
 interface SampelPosisiPemain {
@@ -216,49 +191,6 @@ interface SampelPosisiPemain {
   vy: number
   sedangBergerak: boolean
   jalanMundur: boolean
-}
-
-function evaluasiPosisiPadaP(
-  d: DeskriptorLintasanPemain,
-  dari: DrillSet,
-  g: ReturnType<typeof gerakOf>,
-  counts: number,
-  p: number,
-): { x: number; y: number } {
-  if (d.diam || p <= 0) return { x: d.awal.x, y: d.awal.y }
-  if (p >= 1 && !g.ripple && !d.jalanCount && !(g.tunda[d.anggota.section] > 0)) {
-    return { x: d.akhir.x, y: d.akhir.y }
-  }
-  const t = progresPemain(p, g, d.anggota.section, counts, d.id)
-  if (d.ftl) {
-    const [dx, dy] = deltaPoliFtl(d.ftl, t)
-    return { x: d.awal.x + dx, y: d.awal.y + dy }
-  }
-  if (d.adaMidset && dari.midsets?.[d.id]?.length) {
-    const [dx, dy] = deltaMidsets(
-      d.awal,
-      d.akhir,
-      dari.midsets[d.id],
-      counts,
-      p,
-      d.kAkhir,
-      d.jalanCount,
-    )
-    return { x: d.awal.x + dx, y: d.awal.y + dy }
-  }
-  if (d.busur) {
-    const [dx, dy] = deltaBusur(
-      t,
-      d.awal.x,
-      d.awal.y,
-      d.busur.pusat,
-      d.busur.sudut,
-      d.busur.geser,
-    )
-    return { x: d.awal.x + dx, y: d.awal.y + dy }
-  }
-  const [dx, dy] = titikJalur(t, d.akhir.x - d.awal.x, d.akhir.y - d.awal.y, d.kAkhir)
-  return { x: d.awal.x + dx, y: d.awal.y + dy }
 }
 
 /**
@@ -356,60 +288,23 @@ export function periksaTabrakanSet(opsi: {
   const counts = Math.max(0, Math.floor(dari.counts || 0))
   if (counts <= 0) return kosong
 
-  const gMentah = gerakOf(dari.gerak)
-  const kelompokSinkron = sinkronkanKelompokDariTag(gMentah.kelompok, anggota)
-  const g =
-    kelompokSinkron !== gMentah.kelompok ? { ...gMentah, kelompok: kelompokSinkron } : gMentah
-
-  const petaFtl = g.kelompok?.length ? bangunPetaFtl(g.kelompok, dari.points, ke.points) : new Map()
-  const ptBusur = g.jalur === 'busur' ? g.putar : undefined
-  const geserBusur = ptBusur?.pusatAkhir
-    ? { x: ptBusur.pusatAkhir.x - ptBusur.pusat.x, y: ptBusur.pusatAkhir.y - ptBusur.pusat.y }
-    : { x: 0, y: 0 }
+  const penjejak = buatPenjejakSet({ dari, ke, anggota, hanya })
+  const g = penjejak.g
 
   const deskriptor: DeskriptorLintasanPemain[] = []
   let radiusMaksYd = sYd
 
   for (const m of anggota) {
-    if (hanya && !hanya.has(m.id)) continue
-    const p0 = dari.points[m.id]
-    const p1 = ke.points[m.id] ?? p0
-    if (!p0 || !p1) continue
+    const jalur = penjejak.jalur.get(m.id)
+    if (!jalur) continue
     const infoAlat = radiusAmanInstrumen(m, sYd)
     if (infoAlat.radiusYd > radiusMaksYd) radiusMaksYd = infoAlat.radiusYd
-    const klp = kelompokPemain(g, m.id)
-    const ftl = petaFtl.get(m.id)
-    const adaMidset = Boolean(!ftl && dari.midsets?.[m.id]?.length)
-    const kAkhir = klp
-      ? klp.jalur === 'lengkung'
-        ? (klp.lengkung ?? 0.4)
-        : 0
-      : g.jalur === 'lengkung'
-        ? g.lengkung
-        : 0
-    const ikutBusur =
-      !ftl &&
-      !adaMidset &&
-      !klp &&
-      ptBusur &&
-      cocokPutaran(p0.x, p0.y, p1.x, p1.y, ptBusur.pusat, ptBusur.sudut, geserBusur)
-        ? { pusat: ptBusur.pusat, sudut: ptBusur.sudut, geser: geserBusur }
-        : undefined
-    const diam = Math.hypot(p1.x - p0.x, p1.y - p0.y) < 1e-4 && !adaMidset && !ftl
     deskriptor.push({
-      id: m.id,
+      ...jalur,
       anggota: m,
-      awal: p0,
-      akhir: p1,
-      diam,
       radiusYd: infoAlat.radiusYd,
       radiusLangkah: infoAlat.radiusLangkah,
       kategoriAlat: infoAlat.kategori,
-      ftl,
-      adaMidset,
-      jalanCount: klp?.jalanCount ?? g.jalanCount,
-      kAkhir,
-      busur: ikutBusur,
     })
   }
 
@@ -463,15 +358,15 @@ export function periksaTabrakanSet(opsi: {
 
     for (let i = 0; i < deskriptor.length; i++) {
       const d = deskriptor[i]
-      const pos = evaluasiPosisiPadaP(d, dari, g, counts, p)
+      const pos = posisiJalurPadaP(d, dari, g, counts, p)
       let vx = 0
       let vy = 0
       let sedangBergerak = false
       if (!d.diam) {
         const pSebelum = Math.max(0, p - dtP)
         const pSesudah = Math.min(1, p + dtP)
-        const a = evaluasiPosisiPadaP(d, dari, g, counts, pSebelum)
-        const b = evaluasiPosisiPadaP(d, dari, g, counts, pSesudah)
+        const a = posisiJalurPadaP(d, dari, g, counts, pSebelum)
+        const b = posisiJalurPadaP(d, dari, g, counts, pSesudah)
         vx = b.x - a.x
         vy = b.y - a.y
         sedangBergerak = Math.hypot(vx, vy) > sYd * 0.04

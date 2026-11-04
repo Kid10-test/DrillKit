@@ -62,6 +62,7 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
         penilaianLomba: payload.penilaianLomba,
         kasIuran: payload.kasIuran,
         audisi: payload.audisi,
+        tindakLanjut: payload.tindakLanjut,
       })
 
       const tabelBersih = TABEL_MUSIMAN_DIARSIPKAN.map((nama: string) => db.table(nama))
@@ -112,6 +113,7 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
         db.penilaianLomba,
         db.kasIuran,
         db.audisi,
+        db.tindakLanjut,
       ]
       await db.transaction('rw', tabelTulis, async () => {
         for (const t of tabelTulis) await t.clear()
@@ -132,6 +134,7 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
         if (m.penilaianLomba?.length) await db.penilaianLomba.bulkPut(m.penilaianLomba)
         if (m.kasIuran?.length) await db.kasIuran.bulkPut(m.kasIuran)
         if (m.audisi?.length) await db.audisi.bulkPut(m.audisi)
+        if (m.tindakLanjut?.length) await db.tindakLanjut.bulkPut(m.tindakLanjut)
       })
       toast.push(`Data musim "${arsip.namaMusim}" berhasil dimuat kembali ke ruang kerja aktif`)
     } catch (err) {

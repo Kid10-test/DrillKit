@@ -37,18 +37,8 @@ import {
   warnaGarisGrid,
   warnaLapangan,
 } from './field'
-import {
-  bangunPetaFtl,
-  cocokPutaran,
-  deltaBusur,
-  deltaMidsets,
-  deltaPoliFtl,
-  gerakOf,
-  kelompokPemain,
-  progresPemain,
-  sinkronkanKelompokDariTag,
-  titikJalur,
-} from './gerak'
+import { progresPemain } from './gerak'
+import { buatPenjejakSet } from './jejakJalur'
 import { penandaEfektifPadaSet } from './propertiGerak'
 
 /* ============================================================================
@@ -621,86 +611,24 @@ export function interpolasiBingkaiShow(opsi: {
 
   const counts = Math.max(1, dari.counts || 8)
   const hitunganSaatIni = Math.round(p * counts * 10) / 10
-  const mentahG = gerakOf(dari.gerak)
-  const klpSinkron = sinkronkanKelompokDariTag(mentahG.kelompok, anggota)
-  const g = klpSinkron !== mentahG.kelompok ? { ...mentahG, kelompok: klpSinkron } : mentahG
-
-  const petaFtl =
-    ke && g.kelompok?.some((k) => k.jalur === 'ftl')
-      ? bangunPetaFtl(g.kelompok, dari.points, ke.points)
-      : new Map()
-
-  const pt = g.jalur === 'busur' ? g.putar : undefined
-  const geserBusur =
-    pt && pt.pusatAkhir
-      ? { x: pt.pusatAkhir.x - pt.pusat.x, y: pt.pusatAkhir.y - pt.pusat.y }
-      : { x: 0, y: 0 }
+  // #26 — lintasan yard diambil dari penjejak bersama (sama dengan #24 benturan & xCounts).
+  const penjejak = buatPenjejakSet({ dari, ke, anggota, hanya })
 
   const pemain: BingkaiPemainTribun[] = []
   const petaWarnaBendera = new Map<string, string>()
 
   for (const m of anggota) {
     if (hanya && !hanya.has(m.id)) continue
-    const awal = dari.points[m.id]
-    if (!awal) continue
-    const akhir = ke?.points[m.id] ?? awal
-    const diam = !ke || !ke.points[m.id] || Math.hypot(akhir.x - awal.x, akhir.y - awal.y) < 1e-4
-
-    let x = awal.x
-    let y = awal.y
+    const jalur = penjejak.jalur.get(m.id)
+    if (!jalur) continue
+    const { awal, akhir, diam } = jalur
+    const pos = penjejak.posisi(m.id, p) ?? { x: awal.x, y: awal.y }
+    const x = pos.x
+    const y = pos.y
     let sedangMelangkah = false
-
     if (!diam && p > 0) {
-      const t = progresPemain(p, g, m.section, counts, m.id)
+      const t = progresPemain(p, penjejak.g, m.section, counts, m.id)
       sedangMelangkah = t > 0.001 && t < 0.999
-      const ftl = petaFtl.get(m.id)
-      const klp = kelompokPemain(g, m.id)
-      const kAkhir = klp
-        ? klp.jalur === 'lengkung'
-          ? (klp.lengkung ?? 0.4)
-          : 0
-        : g.jalur === 'lengkung'
-          ? g.lengkung
-          : 0
-
-      if (ftl) {
-        const [dx, dy] = deltaPoliFtl(ftl, t)
-        x = awal.x + dx
-        y = awal.y + dy
-      } else if (dari.midsets?.[m.id]?.length) {
-        const [dx, dy] = deltaMidsets(
-          awal,
-          akhir,
-          dari.midsets[m.id],
-          counts,
-          p,
-          kAkhir,
-          klp?.jalanCount ?? g.jalanCount,
-        )
-        x = awal.x + dx
-        y = awal.y + dy
-      } else if (klp) {
-        const [dx, dy] = titikJalur(
-          t,
-          akhir.x - awal.x,
-          akhir.y - awal.y,
-          klp.jalur === 'lengkung' ? (klp.lengkung ?? 0.4) : 0,
-        )
-        x = awal.x + dx
-        y = awal.y + dy
-      } else if (
-        pt &&
-        pt.sudut &&
-        cocokPutaran(awal.x, awal.y, akhir.x, akhir.y, pt.pusat, pt.sudut, geserBusur)
-      ) {
-        const [dx, dy] = deltaBusur(t, awal.x, awal.y, pt.pusat, pt.sudut, geserBusur)
-        x = awal.x + dx
-        y = awal.y + dy
-      } else {
-        const [dx, dy] = titikJalur(t, akhir.x - awal.x, akhir.y - awal.y, kAkhir)
-        x = awal.x + dx
-        y = awal.y + dy
-      }
     }
 
     const degAwal = facingDeg(awal.facing, awal.facingDeg)
@@ -1158,7 +1086,8 @@ function gambarPermukaanLapanganPerspektif(
     ctx.globalAlpha = 0.14
     ctx.lineWidth = 0.8
     for (const gx of garisSubgrid(field)) {
-      const xInt = halfL - gx
+      // `garisGridUtama`/`garisSubgrid` sudah mengembalikan koordinat internal (bukan SVG).
+      const xInt = gx
       garis3D(ctx, kamera, xInt, -halfW, 0, xInt, halfW, 0)
     }
   }
@@ -1166,7 +1095,8 @@ function gambarPermukaanLapanganPerspektif(
   // Garis yard / grid utama
   if (gridUtamaTampil(field)) {
     for (const gx of garisGridUtama(field)) {
-      const xInt = halfL - gx
+      // `garisGridUtama`/`garisSubgrid` sudah mengembalikan koordinat internal (bukan SVG).
+      const xInt = gx
       const diTengah50 = Math.abs(xInt) < 0.05
       ctx.globalAlpha = diTengah50 ? 0.65 : 0.34
       ctx.lineWidth = diTengah50 ? 1.8 : 1.05

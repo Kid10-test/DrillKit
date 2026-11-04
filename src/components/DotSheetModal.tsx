@@ -35,11 +35,18 @@ import { ringkasKerjaGuardPadaSet } from '../lib/countSheet'
 import {
   apakahModeParade,
   coordText as coorTextSafe,
-  panahArah,
   patokOf,
   stepYd,
 } from '../lib/field'
 import { posisiSafBanjarAnggota } from '../lib/parade'
+import {
+  infoXCountPemain,
+  keteranganBayangan,
+  panahArahPerspektif,
+  resolusiDress,
+  terapkanBayangan,
+} from '../lib/bukuSakuPemain'
+import { buatPenjejakSet, type PenjejakSet } from '../lib/jejakJalur'
 import {
   TINGKAT_WARNA,
   type MetrikPemain,
@@ -101,7 +108,11 @@ function selUkuranLangkah(met?: MetrikPemain): string {
  * Arah memakai patokan **lapangan** (S1/S2, penonton/belakang), bukan
  * kiri/kanan, supaya tidak rancu dengan sudut pandang pemain.
  */
-function kompasHtml(pakaiPatok: boolean): string {
+function kompasHtml(pakaiPatok: boolean, balik = false): string {
+  // #26 — perspektif pemain 180°: penonton di atas, S1 di kanan.
+  const [atas, bawah, kiri, kanan] = balik
+    ? ['PENONTON', 'BELAKANG', 'S2', 'S1']
+    : ['BELAKANG', 'PENONTON', 'S1', 'S2']
   const legenda = pakaiPatok
     ? `<b>A</b> = tengah lapangan &middot; <b>&minus;</b> mendekati A &middot; <b>+</b> menjauhi A<br>
   <span class="mono">C&#39;</span> = C di seberang A (sisi S2) &middot; panah = arah jalan`
@@ -109,14 +120,14 @@ function kompasHtml(pakaiPatok: boolean): string {
   return `<div class="kompas">
   <svg viewBox="0 0 40 40" width="34" height="34" style="flex:none">
     <rect x="1" y="1" width="38" height="38" fill="none" stroke="#94a3b8"/>
-    <text x="20" y="9" font-size="6" text-anchor="middle" fill="#64748b">BELAKANG</text>
-    <text x="20" y="36" font-size="6" text-anchor="middle" fill="#64748b">PENONTON</text>
-    <text x="3" y="23" font-size="6" fill="#64748b">S1</text>
-    <text x="30" y="23" font-size="6" fill="#64748b">S2</text>
+    <text x="20" y="9" font-size="6" text-anchor="middle" fill="#64748b">${atas}</text>
+    <text x="20" y="36" font-size="6" text-anchor="middle" fill="#64748b">${bawah}</text>
+    <text x="3" y="23" font-size="6" fill="#64748b">${kiri}</text>
+    <text x="30" y="23" font-size="6" fill="#64748b">${kanan}</text>
     <path d="M20 30 L20 14" stroke="#334155" stroke-width="1.2"/>
     <path d="M20 14 l-3 4 M20 14 l3 4" stroke="#334155" stroke-width="1.2" fill="none"/>
   </svg>
-  <div>${legenda}</div>
+  <div>${legenda}${balik ? '<br><b>Sudut pandang pemain</b> — kertas diputar 180°, penonton di atas' : ''}</div>
 </div>`
 }
 
@@ -178,6 +189,15 @@ export function DotSheetModal({
   const [sertakanUkuran, setSertakanUkuran] = useState(true)
   /** #17 — sertakan ringkasan kerja alat Count Sheet bagi anggota Guard. */
   const [sertakanGuard, setSertakanGuard] = useState(true)
+  /**
+   * #26 — xCounts & titik tengah. Di Lembar A4 menjadi kolom terakhir (bawaan
+   * menyala); di kartu lipat menjadi sub-baris yang memakan kapasitas kartu,
+   * jadi bawaannya mati.
+   */
+  const [xcA4, setXcA4] = useState(true)
+  const [xcLipat, setXcLipat] = useState(false)
+  /** #26 — perspektif pemain 180° (kompas & panah arah ikut berputar). */
+  const [perspektifPemain, setPerspektifPemain] = useState(false)
   const countSheets = useLiveQuery(
     () => db.countSheets.where('drillId').equals(drill.id).toArray(),
     [drill.id],
@@ -187,7 +207,10 @@ export function DotSheetModal({
   const [preview, setPreview] = useState<string | null>(null)
 
   const sYd = stepYd(drill.field)
-  const ordered = [...sets].sort((a, b) => a.order - b.order)
+  // #26 — pemain bayangan memakai titik turunan induknya (hanya di kertas).
+  const ordered = terapkanBayangan([...sets].sort((a, b) => a.order - b.order), drill)
+  const sertakanXCount = format === 'lipat' ? xcLipat : xcA4
+  const panah = (dx: number, dy: number) => panahArahPerspektif(dx, dy, perspektifPemain)
   const fileName = `${slugify(drill.name)}-${format === 'lipat' ? 'buku-saku' : 'dot-sheet'}`
 
   /**
@@ -198,8 +221,10 @@ export function DotSheetModal({
     m: Member,
     compact: boolean,
     lpc: Map<string, MetrikPemain>[],
+    penjejak: (PenjejakSet | undefined)[] = [],
   ): { setNomor: number; html: string }[] {
-    const tambah = (sertakanLpc ? 1 : 0) + (sertakanUkuran ? 1 : 0)
+    const kolomXcA4 = !compact && sertakanXCount
+    const tambah = (sertakanLpc ? 1 : 0) + (sertakanUkuran ? 1 : 0) + (kolomXcA4 ? 1 : 0)
     const kosong = (compact ? 2 : 4) + tambah
     const hasil: { setNomor: number; html: string }[] = []
 
@@ -225,7 +250,7 @@ export function DotSheetModal({
       const countSegmenAwal = daftarMid.length > 0 ? daftarMid[0].padaCount : set.counts
       const durasi = ((countSegmenAwal * drill.beatsPerCount * 60) / Math.max(20, drill.tempo)).toFixed(1)
       const koordinat = coorTextSafe(p.x, p.y, drill.field)
-      const arah = tujuanAwal ? panahArah(tujuanAwal.x - p.x, tujuanAwal.y - p.y) : ''
+      const arah = tujuanAwal ? panah(tujuanAwal.x - p.x, tujuanAwal.y - p.y) : ''
       const panahHtml = sertakanArah && arah ? ` <span class="panah">${arah}</span>` : ''
       const selLpc = sertakanLpc ? `<td>${selLangkahPerCount(met)}</td>` : ''
       const selUk = sertakanUkuran ? `<td>${selUkuranLangkah(met)}</td>` : ''
@@ -243,6 +268,24 @@ export function DotSheetModal({
       if (sertakanGuard && countSheets.length > 0) {
         isyarat.push(...ringkasKerjaGuardPadaSet(countSheets, set.id, m))
       }
+      // #26 — acuan pelurusan barisan
+      const dress = resolusiDress(set, m.id, roster)
+      if (dress) isyarat.push(dress.teks)
+      // #26 — xCounts & titik tengah perpindahan ini
+      const infoXc =
+        sertakanXCount && next
+          ? infoXCountPemain({
+              dari: set,
+              ke: ordered[i + 1],
+              anggota: roster,
+              memberId: m.id,
+              field: drill.field,
+              maks: compact ? 4 : 6,
+              penjejak: penjejak[i],
+            })
+          : null
+      const teksXc = infoXc ? [infoXc.teksTengah, infoXc.teksXCount].filter(Boolean).join(' · ') : ''
+      const selXcA4 = kolomXcA4 ? `<td class="xcount">${teksXc ? esc(teksXc) : '<span class="muted">-</span>'}</td>` : ''
       if (compact) {
         const ekorVisual = isyarat.length
           ? ` <span class="isyarat-visual">· ${esc(isyarat.join(' '))}</span>`
@@ -267,6 +310,7 @@ export function DotSheetModal({
           <td>${next ? `${dist} (${durasi}s)` : '-'}${panahHtml}</td>
           ${selLpc}
           ${selUk}
+          ${selXcA4}
         </tr>`,
         })
       }
@@ -280,7 +324,7 @@ export function DotSheetModal({
           const jrkLangkah = Math.round(Math.hypot(keSimpul.x - w.x, keSimpul.y - w.y) / sYd)
           const durMid = ((countLanjut * drill.beatsPerCount * 60) / Math.max(20, drill.tempo)).toFixed(1)
           const koorMid = coorTextSafe(w.x, w.y, drill.field)
-          const arahMid = panahArah(keSimpul.x - w.x, keSimpul.y - w.y)
+          const arahMid = panah(keSimpul.x - w.x, keSimpul.y - w.y)
           const panahMid = sertakanArah && arahMid ? ` <span class="panah">${arahMid}</span>` : ''
           const lpcMid =
             sertakanLpc
@@ -308,9 +352,18 @@ export function DotSheetModal({
           <td>${jrkLangkah} (${durMid}s)${panahMid}</td>
           ${lpcMid}
           ${ukMid}
+          ${kolomXcA4 ? '<td></td>' : ''}
         </tr>`,
             })
           }
+        })
+      }
+
+      // #26 — sub-baris xCount kartu lipat (opsional, satu baris tipis per perpindahan)
+      if (compact && teksXc) {
+        hasil.push({
+          setNomor: i + 1,
+          html: `<tr class="baris-xcount"><td></td><td colspan="${kosong + 1}">${esc(teksXc)}</td></tr>`,
         })
       }
     })
@@ -322,8 +375,9 @@ export function DotSheetModal({
     m: Member,
     compact: boolean,
     lpc: Map<string, MetrikPemain>[],
+    penjejak: (PenjejakSet | undefined)[] = [],
   ): string {
-    return susunBarisPemain(m, compact, lpc).map((b) => b.html).join('')
+    return susunBarisPemain(m, compact, lpc, penjejak).map((b) => b.html).join('')
   }
 
   function buildHtml(): string {
@@ -361,6 +415,10 @@ export function DotSheetModal({
       )
       return new Map(h.daftar.map((d) => [d.id, d]))
     })
+    /** #26 — penjejak lintasan per perpindahan, dibangun sekali untuk semua pemain. */
+    const penjejak: (PenjejakSet | undefined)[] = sertakanXCount
+      ? ordered.map((s, i) => (ordered[i + 1] ? buatPenjejakSet({ dari: s, ke: ordered[i + 1], anggota: roster }) : undefined))
+      : []
     /**
      * Kepala tabel set — dipakai tiga tempat: muka depan, muka belakang,
      * dan lembar A4. Judul kolomnya kontrak dengan uji (`sel()` di
@@ -376,11 +434,13 @@ export function DotSheetModal({
         : `<th>X (langkah)</th><th>Y (langkah)</th><th>Langkah${sertakanArah ? ' &amp; arah' : ''}</th>`
       const kepalaLpc = sertakanLpc ? `<th>${compact ? 'Lk/<br>cnt' : 'Lk/cnt'}</th>` : ''
       const kepalaUk = sertakanUkuran ? `<th>${compact ? 'Ukuran <br>langkah' : 'Ukuran langkah'}</th>` : ''
+      const kepalaXc = !compact && sertakanXCount ? '<th>Tengah &amp; xCount</th>' : ''
       return `<thead><tr>
             <th>#</th><th>Set</th><th>Cnt</th><th>Koordinat</th>
             ${kepalaLangkah}
             ${kepalaLpc}
             ${kepalaUk}
+            ${kepalaXc}
           </tr></thead>`
     }
 
@@ -418,11 +478,18 @@ export function DotSheetModal({
     }
 
     /** Kepala muka depan kartu: nama pemain + nama drill. */
+    /** #26 — catatan pemain bayangan/alternate di kepala kartu. */
+    function bayanganSub(m: Member): string {
+      const t = keteranganBayangan(drill, m.id, roster)
+      return t ? `<p class="sub bayangan">${esc(t)}</p>` : ''
+    }
+
     function kepalaMuka(m: Member): string {
       return `<header>
           <div>
             <h2>${esc(m.name)} <span class="code">${esc(m.code)}</span></h2>
             <p class="sub">${esc(sectionLabel(m.section))} · ${esc(m.instrument || '-')}</p>
+            ${bayanganSub(m)}
           </div>
           <div class="right">
             <p class="sub">${esc(drill.name)}</p>
@@ -488,7 +555,7 @@ export function DotSheetModal({
         <span class="lipat atas">— LIPAT —</span><span class="lipat bawah">— LIPAT —</span>
         <div class="muka depan">
           ${kepalaMuka(m)}
-          ${sertakanArah ? kompasHtml(patokOf(drill.field).aktif === 1) : ''}
+          ${sertakanArah ? kompasHtml(patokOf(drill.field).aktif === 1, perspektifPemain) : ''}
           <table>${kolomLipat()}${kepalaTabel(true)}<tbody>${barisPemain.slice(d0, d1).map((x) => x.html).join('')}</tbody></table>
           <p class="kaki">${kakiDepan}</p>
         </div>
@@ -500,8 +567,10 @@ export function DotSheetModal({
       }
 
       const semuaKartu = targets.flatMap((m) => {
-        const barisPemain = susunBarisPemain(m, true, lpc)
-        return rencanaKartu(barisPemain.length, KAP_DEPAN, kapBelakang, KAP_BELAKANG_TENGAH).map(
+        const barisPemain = susunBarisPemain(m, true, lpc, penjejak)
+        // #26 — baris kepala bayangan & keterangan perspektif memakan ±1 baris tabel.
+        const kapDepanM = KAP_DEPAN - (bayanganSub(m) ? 1 : 0) - (sertakanArah && perspektifPemain ? 1 : 0)
+        return rencanaKartu(barisPemain.length, kapDepanM, kapBelakang, KAP_BELAKANG_TENGAH).map(
           (r, k, semua) => kartuHtml(m, barisPemain, r, k, semua.length),
         )
       })
@@ -545,6 +614,8 @@ export function DotSheetModal({
          .mono { font-family: ui-monospace, monospace; white-space: nowrap; }
          .muted { color:#888; text-align:center; }
          .panah { font-size: 9px; }
+         .baris-xcount td { font-size: 6.5px; color:#92400e; font-family: ui-monospace, monospace; }
+         .sub.bayangan { color:#6d28d9; }
          .kompas { display:flex; gap:4px; align-items:center; margin-bottom:3px; padding:2px 3px; border:1px solid #cbd5e1; background:#f8fafc; font-size:6.5px; color:#475569; line-height:1.35; }
          .notes { margin-top: 3px; font-size: 7px; color:#333; }
          .legend { margin-top: 2px; font-size: 6.5px; color:#555; }
@@ -562,10 +633,10 @@ export function DotSheetModal({
       .map(
         (m) => `<section class="page">
         ${kepalaMuka(m)}
-        ${sertakanArah ? kompasHtml(patokOf(drill.field).aktif === 1) : ''}
+        ${sertakanArah ? kompasHtml(patokOf(drill.field).aktif === 1, perspektifPemain) : ''}
         <table>
           ${kepalaTabel(false)}
-          <tbody>${rowsFor(m, false, lpc)}</tbody>
+          <tbody>${rowsFor(m, false, lpc, penjejak)}</tbody>
         </table>
         ${legendaHtml()}
         ${htmlKruProperti(m)}
@@ -583,6 +654,8 @@ export function DotSheetModal({
          th, td { padding: 4px 6px; }
          .isyarat-a4 { font-size: 9px; color: #334155; font-weight: 600; margin-top: 1px; }
          .baris-midset td { background: #f8fafc; color: #0f172a; font-style: italic; }
+         td.xcount { font-size: 9px; color: #92400e; font-family: ui-monospace, monospace; }
+         .sub.bayangan { color:#6d28d9; }
          .notes { margin-top: 8px; font-size: 10.5px; }
          .legend { margin-top: 4px; font-size: 9px; color:#555; }
          .kompas { display:flex; gap:8px; align-items:center; margin-bottom:6px; padding:4px 6px; border:1px solid #cbd5e1; background:#f8fafc; font-size:9px; color:#475569; line-height:1.4; }
@@ -717,6 +790,37 @@ export function DotSheetModal({
           kepala kartu menjelaskan arah, lalu tiap baris cukup diberi satu panah. Arah mengikuti
           tampilan chart (S1/S2 · penonton/belakang), bukan arah hadap pemain, sehingga tidak
           berubah-ubah.
+        </span>
+      </label>
+      <label className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-400">
+        <input
+          type="checkbox"
+          data-testid="centang-dot-xcount"
+          checked={sertakanXCount}
+          onChange={(e) => (format === 'lipat' ? setXcLipat : setXcA4)(e.target.checked)}
+          className="mt-0.5 accent-sky-500"
+        />
+        <span>
+          <b className="text-slate-300">Sertakan xCount &amp; titik tengah</b> — pada hitungan ke
+          berapa pemain melintasi garis yard, hash, atau patok, plus koordinat di tengah
+          perpindahan (Halfway).{' '}
+          {format === 'lipat'
+            ? 'Di kartu lipat menjadi satu sub-baris tipis per perpindahan, jadi kartu memuat lebih sedikit set.'
+            : 'Di Lembar A4 menjadi kolom terakhir.'}
+        </span>
+      </label>
+      <label className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-400">
+        <input
+          type="checkbox"
+          data-testid="centang-dot-perspektif"
+          checked={perspektifPemain}
+          onChange={(e) => setPerspektifPemain(e.target.checked)}
+          className="mt-0.5 accent-sky-500"
+        />
+        <span>
+          <b className="text-slate-300">Sudut pandang pemain (180°)</b> — kompas dan panah arah
+          diputar seperti dilihat dari lapangan menghadap penonton (penonton di atas, S1 di kanan). Koordinat
+          tidak berubah.
         </span>
       </label>
       {countSheets.length > 0 && (

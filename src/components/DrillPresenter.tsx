@@ -41,6 +41,11 @@ import { FieldSurface } from './FieldSurface'
 import { LayarTerkunci, TombolKunci, pakaiKunciLayar } from './KunciPresenter'
 import { diDalamLayarKunci, kunciMenahan } from '../lib/kunciLayar'
 import { MarkerLayer } from './FieldMarkers'
+import { LaciBeamPartitur } from './drill/LaciBeamPartitur'
+import { PanelCleaningSet } from './drill/PanelCleaningSet'
+import { hitungPetaSetKeBirama } from '../lib/partiturFrasa'
+import { dariBeatsLama } from '../lib/birama'
+import { DEFAULT_SECTIONS } from '../lib/utils'
 
 /**
  * Mode Presenter — menampilkan formasi sebesar mungkin, tanpa menu editor.
@@ -190,6 +195,11 @@ export function DrillPresenter({
      Satu detak per count, aksen di count pertama tiap set. Menyertai baik
      perpindahan tunggal maupun mode urutan latihan. */
   const [klik, setKlik] = useState(false)
+  /**
+   * #26 — laci bawah (±40vh): partitur Beam untuk set aktif, atau catatan
+   * cleaning cepat dari lapangan. Hanya satu yang terbuka sekaligus.
+   */
+  const [laci, setLaci] = useState<null | 'beam' | 'cleaning'>(null)
   const metronomRef = useRef<Metronom>(new Metronom())
   const klikRef = useRef(klik)
   klikRef.current = klik
@@ -334,6 +344,22 @@ export function DrillPresenter({
   const sy = (y: number) => halfW - y
 
   const set = ordered[idx]
+  /** #26 — rentang birama set aktif (bila drill ditautkan ke lagu), untuk konteks catatan cleaning. */
+  const rentangBiramaSet = useMemo(() => {
+    if (!song || laci !== 'cleaning') return null
+    const peta = hitungPetaSetKeBirama(
+      ordered.map((s) => ({ counts: s.counts, name: s.name })),
+      {
+        bpm: song.bpm,
+        tandaBirama: song.tandaBirama ?? dariBeatsLama(song.beats),
+        tempoMap: song.tempoMap,
+        latih: song.latih ?? null,
+      },
+      { beatsPerCount: drill.beatsPerCount },
+    )
+    const b = peta[idx]
+    return b ? { dari: b.biramaDari, sampai: b.biramaSampai } : null
+  }, [song, laci, ordered, idx, drill.beatsPerCount])
 
   /* ---------------------------------------------------------------------- *
    * K3 — kemajuan latihan.
@@ -748,6 +774,18 @@ export function DrillPresenter({
         e.stopPropagation()
         return
       }
+      // #26 — mengetik catatan cleaning di laci tidak boleh memicu pintasan.
+      const sasaran = e.target as HTMLElement | null
+      const sedangMengetik =
+        !!sasaran &&
+        (sasaran.tagName === 'INPUT' || sasaran.tagName === 'TEXTAREA' || sasaran.tagName === 'SELECT' || sasaran.isContentEditable)
+      if (e.key === 'Escape' && laci) {
+        e.preventDefault()
+        e.stopPropagation()
+        setLaci(null)
+        return
+      }
+      if (sedangMengetik) return
       if (e.key === 'Escape') {
         e.preventDefault()
         e.stopPropagation()
@@ -776,7 +814,7 @@ export function DrillPresenter({
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [goNext, goPrev, idx, nextSet, onClose, mulaiUrutan, layarTerkunci])
+  }, [goNext, goPrev, idx, nextSet, onClose, mulaiUrutan, layarTerkunci, laci])
 
   /* --------------------- Tahan layar agar tidak mati ---------------------- */
 
@@ -1299,6 +1337,24 @@ export function DrillPresenter({
         >
           ↻ Ulang terus
         </Chip>
+        {song?.partitur && (
+          <Chip
+            data-testid="chip-beam"
+            active={laci === 'beam'}
+            onClick={() => setLaci((v) => (v === 'beam' ? null : 'beam'))}
+            title="Partitur birama set ini di bawah lapangan (Beam)"
+          >
+            ♫ Partitur
+          </Chip>
+        )}
+        <Chip
+          data-testid="chip-cleaning"
+          active={laci === 'cleaning'}
+          onClick={() => setLaci((v) => (v === 'cleaning' ? null : 'cleaning'))}
+          title="Catat temuan cleaning untuk set ini tanpa keluar dari presenter"
+        >
+          ✎ Cleaning
+        </Chip>
         <Chip
           data-testid="chip-kontras"
           active={tampilan.kontras}
@@ -1323,6 +1379,54 @@ export function DrillPresenter({
         presenter — termasuk kanvas, pip kemajuan, dan baris chip. Sentuhan
         ditahan olehnya; papan ketik ditahan oleh pakaiKunciLayar.
       */}
+      {laci && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-[210] flex max-h-[40vh] min-h-[30vh] flex-col border-t border-slate-700 bg-slate-950 shadow-2xl"
+          data-testid={`laci-presenter-${laci}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-2 border-b border-slate-800 px-3 py-1.5">
+            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-300">
+              {laci === 'beam' ? 'Partitur' : 'Catatan cleaning'} · {set?.name || `Set ${idx + 1}`}
+            </span>
+            <button
+              type="button"
+              data-testid="tutup-laci-presenter"
+              onClick={() => setLaci(null)}
+              className="rounded-md border border-slate-700 px-2 py-0.5 text-xs text-slate-300"
+            >
+              Tutup
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {laci === 'beam' ? (
+              <LaciBeamPartitur
+                song={song ?? null}
+                drill={drill}
+                sets={ordered}
+                idxSet={idx}
+                sectionsTim={settings?.sections}
+                namaTim={settings?.teamName}
+                onTutup={() => setLaci(null)}
+                gelap
+              />
+            ) : (
+              <PanelCleaningSet
+                drillId={drill.id}
+                namaDrill={drill.name}
+                namaTim={settings?.teamName ?? ''}
+                setId={set?.id}
+                setNomor={idx + 1}
+                namaSet={set?.name}
+                rentangBirama={rentangBiramaSet}
+                sections={settings?.sections ?? DEFAULT_SECTIONS}
+                varian="presenter"
+              />
+            )}
+          </div>
+        </div>
+      )}
       {layarTerkunci && <LayarTerkunci onBuka={bukaLayar} />}
     </div>
   )

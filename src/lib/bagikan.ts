@@ -96,6 +96,13 @@ export function kupasDataKhususStaf(b: ShareBundle): ShareBundle {
   delete salin.medisAnggota
   delete salin.kasIuran
   delete salin.arsipMusim
+  delete salin.tindakLanjut
+  // #26 — alasan hole (mis. "cedera") & pemain asalnya adalah info staf; labelnya saja yang dibagikan.
+  if (Array.isArray(b.drills) && b.drills.some((d) => d.holes?.length)) {
+    salin.drills = b.drills.map((d) =>
+      d.holes?.length ? { ...d, holes: d.holes.map((h) => ({ id: h.id, label: h.label, createdAt: h.createdAt })) } : d,
+    )
+  }
   return salin as unknown as ShareBundle
 }
 

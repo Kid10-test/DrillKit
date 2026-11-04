@@ -153,6 +153,7 @@ export async function tulisMuatanBackup(
       db.medisAnggota,
       db.kasIuran,
       db.arsipMusim,
+      db.tindakLanjut,
     ],
     async () => {
       if (diubah.members?.length) await db.members.bulkPut(diubah.members)
@@ -176,6 +177,7 @@ export async function tulisMuatanBackup(
       if (diubah.medisAnggota?.length) await db.medisAnggota.bulkPut(diubah.medisAnggota)
       if (diubah.kasIuran?.length) await db.kasIuran.bulkPut(diubah.kasIuran)
       if (diubah.arsipMusim?.length) await db.arsipMusim.bulkPut(diubah.arsipMusim)
+      if (diubah.tindakLanjut?.length) await db.tindakLanjut.bulkPut(diubah.tindakLanjut)
     },
   )
   if (diubah.settings) await db.settings.put({ ...diubah.settings, key: 'team' })
@@ -291,6 +293,7 @@ export function AlurPulihkanBackup({
         medisAnggota,
         kasIuran,
         arsipMusim,
+        tindakLanjut,
         partiturBerkas,
         judgeTapeAudio,
       ] = await Promise.all([
@@ -315,6 +318,7 @@ export function AlurPulihkanBackup({
         db.medisAnggota.toArray(),
         db.kasIuran.toArray(),
         db.arsipMusim.toArray(),
+        db.tindakLanjut.toArray(),
         db.partiturBerkas.toArray(),
         db.judgeTapeAudio.toArray(),
       ])
@@ -342,6 +346,7 @@ export function AlurPulihkanBackup({
         medisAnggota: kunci(medisAnggota),
         kasIuran: kunci(kasIuran),
         arsipMusim: kunci(arsipMusim),
+        tindakLanjut: kunci(tindakLanjut),
         partiturBerkas: kunci(partiturBerkas),
         judgeTapeAudio: kunci(judgeTapeAudio),
       })
