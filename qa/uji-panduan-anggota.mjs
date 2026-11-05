@@ -128,6 +128,8 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
     'Lihat mode anggota', 'Bersihkan & muat ulang', 'Aplikasi gagal dimuat',
     'Penyimpanan browser belum bisa dipakai',
     'Sudut pandang pemain', 'Partitur set ini',
+    // #28 — Studio Perkusi (battery/pit) di Layar Partitur.
+    '🥁 Perkusi',
   ]
   for (const l of LABEL) {
     uji(`label "${l}" disebut panduan & ada di aplikasi`, tSitus.includes(l) && sumber.includes(l),

@@ -70,6 +70,29 @@ export async function pasangPartiturDariPaket(
 }
 
 /**
+ * #28 — Pasang revisi sticking Studio Perkusi dari paket ke `db.anotasiPartitur`.
+ *
+ * Untuk setiap lagu yang partiturnya ikut paket, revisi lama di HP ini
+ * **diganti** isi paket (atau dihapus bila pelatih sudah tidak punya revisi),
+ * supaya revisi yang sudah dibatalkan pelatih tidak tertinggal di HP anggota.
+ */
+export async function pasangAnotasiDariPaket(
+  paket: Pick<ShareBundle, 'partiturPaket' | 'anotasiPartitur'>,
+): Promise<number> {
+  const idLagu = Object.entries(paket.partiturPaket ?? {})
+    .map(([k, lamp]) => (lamp && typeof lamp === 'object' ? lamp.songId || k : ''))
+    .filter(Boolean)
+  const masuk = Array.isArray(paket.anotasiPartitur)
+    ? paket.anotasiPartitur.filter((a) => a && typeof a.songId === 'string' && Array.isArray(a.revisi))
+    : []
+  const adaMasuk = new Set(masuk.map((a) => a.songId))
+  const hapus = idLagu.filter((id) => !adaMasuk.has(id))
+  if (hapus.length > 0) await db.anotasiPartitur.bulkDelete(hapus)
+  if (masuk.length > 0) await db.anotasiPartitur.bulkPut(masuk.map((a) => ({ ...a, id: a.songId })))
+  return masuk.length
+}
+
+/**
  * #13a — Pulihkan entri `audio/*` dari ZIP paket anggota ke `db.rekamanAudio` bila ada.
  */
 export async function pulihkanAudioDariZipPaket(bitaZip: Uint8Array): Promise<number> {
@@ -154,12 +177,14 @@ export async function simpanPaketAnggota(
   // #13a — pasang berkas partitur lebih dulu (aturan #11a §8: bita dulu, metadata kemudian).
   const jumlahPartitur = await pasangPartiturDariPaket(paket)
   if (paket.songs?.length) await db.songs.bulkPut(paket.songs)
+  await pasangAnotasiDariPaket(paket)
   if (paket.setlists?.length) await db.setlists.bulkPut(paket.setlists)
   // Simpan paket ke `db.packages` tanpa menyalin ulang bita `partiturPaket` yang
   // sudah mendarat di `db.partiturBerkas` supaya kuota IndexedDB tetap hemat.
   const paketRingan: ShareBundle = {
     ...paket,
     partiturPaket: undefined,
+    anotasiPartitur: undefined,
     ...(perubahanEfektif ? { perubahanPaket: perubahanEfektif } : {}),
   }
   await db.packages.put({ key: 'current', data: paketRingan, importedAt: Date.now() })

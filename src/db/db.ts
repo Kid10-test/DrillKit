@@ -30,6 +30,7 @@ import type {
   TransaksiKasIuran,
   ArsipMusim,
   TindakLanjut,
+  AnotasiPartitur,
 } from './types'
 
 /**
@@ -98,6 +99,8 @@ export class DrillKitDB extends Dexie {
   arsipMusim!: Table<ArsipMusim, string>
   /** #26 — catatan cleaning & tindak lanjut staf (temuan → fokus → beres), dipakai juga #34. */
   tindakLanjut!: Table<TindakLanjut, string>
+  /** #28 — revisi lapangan Studio Perkusi (sticking/aksen/flam) per lagu; id = songId. */
+  anotasiPartitur!: Table<AnotasiPartitur, string>
 
   constructor() {
     super('drillkit')
@@ -174,6 +177,10 @@ export class DrillKitDB extends Dexie {
     // #26 — satu store tindak lanjut terpadu (cleaning set, juri #20, Papan Staf #34) — penambahan murni v17.
     this.version(17).stores({
       tindakLanjut: 'id, status, drillId, setId, sumber, updatedAt',
+    })
+    // #28 — lapisan revisi lapangan Studio Perkusi per lagu (penambahan murni v18).
+    this.version(18).stores({
+      anotasiPartitur: 'id, songId, updatedAt',
     })
   }
 }

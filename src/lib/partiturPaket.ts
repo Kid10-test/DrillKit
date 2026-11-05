@@ -18,6 +18,7 @@
  *    aman ke skor penuh (tanpa jalan buntu).
  */
 import type {
+  AnotasiPartitur,
   LampiranPartiturPaket,
   Member,
   SectionDef,
@@ -377,4 +378,29 @@ export function saringPartiturPaketUntukAnggota(
     partiturPaket: Object.keys(petaBaru).length > 0 ? petaBaru : undefined,
     songs: songsHasil,
   }
+}
+
+/**
+ * #28 — Saring revisi lapangan Studio Perkusi (`anotasiPartitur`) untuk paket.
+ *
+ * - Hanya lagu yang partiturnya **ikut** paket (`peta`) yang membawa revisinya;
+ *   revisi tanpa skor tidak berguna di HP anggota.
+ * - Bila skor sudah dipangkas ke part anggota (`partTersaring`), revisi part
+ *   lain ikut dibuang — anggota Snare tidak menerima revisi Bass.
+ * - Lagu yang revisinya habis tersaring tidak dikirim sama sekali.
+ */
+export function saringAnotasiUntukPaket(
+  anotasi: AnotasiPartitur[] | undefined,
+  peta: Record<string, LampiranPartiturPaket> | undefined,
+): AnotasiPartitur[] | undefined {
+  if (!anotasi?.length || !peta) return undefined
+  const hasil: AnotasiPartitur[] = []
+  for (const a of anotasi) {
+    const lamp = peta[a.songId]
+    if (!lamp || lamp.tipe !== 'musicxml' || !Array.isArray(a.revisi)) continue
+    const set = lamp.partTersaring?.length ? new Set(lamp.partTersaring) : null
+    const revisi = set ? a.revisi.filter((r) => set.has(r.idPart)) : a.revisi
+    if (revisi.length > 0) hasil.push({ ...a, revisi })
+  }
+  return hasil.length > 0 ? hasil : undefined
 }

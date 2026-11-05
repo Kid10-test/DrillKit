@@ -179,6 +179,13 @@ bash bangun-logika.sh || exit 1
 # serta Catatan Cleaning terpadu `tindakLanjut` + Lembar Fokus Cleaning A4)
 # sehingga total regresi penuh menjadi 145 rangkaian.
 
+# Gelombang 2 v2.3.1 (#28) — menambahkan `perkusi-logika` & `perkusi-e2e`
+# (Studio Perkusi Battery & Pit: serap otomatis sticking `<words>`/lirik/
+# `<fingering>`, pengenal alat Snare/Tenor/Bass/Spock, revisi lapangan
+# `anotasiPartitur` yang disuntik ke salinan XML & tersaring per part di paket
+# anggota, bunyi battery terpilah, serta pemanasan Timing Grid + klik Snare)
+# sehingga total regresi penuh menjadi 150 rangkaian.
+
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika grid-patok-logika uji-situs uji-rilis uji-lapangan \
   buka-berkas-logika evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
@@ -189,11 +196,11 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet inventaris-logistik mode-kirab penilaian-juri administrasi-unit kanvas-parametrik midsets-tags-pointer-palet tabrakan-spasi-silang perspektif-tribun-video buku-saku-generasi-baru \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet inventaris-logistik mode-kirab penilaian-juri administrasi-unit kanvas-parametrik midsets-tags-pointer-palet tabrakan-spasi-silang perspektif-tribun-video buku-saku-generasi-baru perkusi-e2e \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika mscz-logika peta-partitur-logika mscz-e2e partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika kanvas-parametrik-logika midsets-tags-pointer-palet-logika tabrakan-spasi-silang-logika perspektif-tribun-video-logika buku-saku-generasi-baru-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika mscz-logika peta-partitur-logika mscz-e2e partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika kanvas-parametrik-logika midsets-tags-pointer-palet-logika tabrakan-spasi-silang-logika perspektif-tribun-video-logika buku-saku-generasi-baru-logika perkusi-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill m1-penggaris-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman m6-drill-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \

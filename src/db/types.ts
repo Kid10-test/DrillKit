@@ -997,6 +997,7 @@ import type { HitungMundur, TandaBirama } from '../lib/birama'
 // (`src/lib/partitur.ts`) tidak bisa berbeda diam-diam. Impor tipe: tidak ada
 // kode yang ikut masuk bundel.
 import type { BagianPartitur, PerubahanSukatPartitur, SukatPartitur } from '../lib/partitur'
+import type { RevisiPerkusiNot } from '../lib/perkusiSticking'
 
 /** Diteruskan supaya komponen cukup mengimpor dari `db/types`. */
 export type { HitungMundur, TandaBirama }
@@ -1016,6 +1017,8 @@ export interface BiramaPola {
   /** panjang = beats × subdiv */
   cells: TingkatKlik[]
   label?: string
+  /** #28 — sticking per kotak (`'R'`, `'L'`, `''`) dari pemanasan perkusi. */
+  sticking?: string[]
 }
 
 /** Suara kedua untuk poliritme (mis. 3 lawan 2) — merata sepanjang birama. */
@@ -1045,7 +1048,7 @@ export interface LatihTempo {
 }
 
 /** Jenis bunyi metronom. */
-export type SuaraKlik = 'klik' | 'kayu' | 'bel'
+export type SuaraKlik = 'klik' | 'kayu' | 'bel' | 'snare'
 
 /**
  * M2 — rentang birama yang diulang terus saat berlatih.
@@ -1255,6 +1258,24 @@ export interface PartiturBerkasItem {
   tipe: 'musicxml' | 'pdf'
   ukuran: number
   hash: string
+  updatedAt: number
+}
+
+/**
+ * #28 — Lapisan revisi lapangan Studio Perkusi untuk satu lagu
+ * (`db.anotasiPartitur`, Dexie v18). Kuncinya `id = songId`.
+ *
+ * Hanya menyimpan **perubahan** pelatih seksi terhadap *sticking* / aksen /
+ * flam / diddle / buzz bawaan skor; berkas MusicXML aslinya tidak pernah
+ * ditulis ulang. Ikut backup lengkap dan paket anggota, tersaring per part
+ * yang diterima anggota (`#13a`). Tanpa data pribadi anggota.
+ */
+export interface AnotasiPartitur {
+  id: string
+  songId: string
+  revisi: RevisiPerkusiNot[]
+  /** `PartiturMeta.hash` saat revisi terakhir dibuat (untuk peringatan skor diganti). */
+  hashPartitur?: string
   updatedAt: number
 }
 
@@ -1496,6 +1517,11 @@ export interface ShareBundle {
    * secara luring langsung dari paket anggota.
    */
   partiturPaket?: Record<string, LampiranPartiturPaket>
+  /**
+   * #28 — revisi lapangan Studio Perkusi per lagu (publik tim, tanpa data
+   * pribadi). Di berkas per anggota tersaring ke part yang diterima anggota.
+   */
+  anotasiPartitur?: AnotasiPartitur[]
   /** #14 — daftar target setoran hafalan tim/seksi (publik tim). */
   targetSetoran?: TargetSetoran[]
   /** #14 — status setoran hafalan khusus milik penerima paket (kosong di berkas grup). */
@@ -2122,6 +2148,8 @@ export interface ArsipMusim {
     audisi: CalonAudisi[]
     /** #26 — catatan cleaning/tindak lanjut musim itu (arsip lama tidak memilikinya). */
     tindakLanjut?: TindakLanjut[]
+    /** #28 — revisi sticking Studio Perkusi musim itu (arsip lama tidak memilikinya). */
+    anotasiPartitur?: AnotasiPartitur[]
   }
   createdAt: number
 }

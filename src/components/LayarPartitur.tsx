@@ -18,7 +18,9 @@
  * - Untuk berkas PDF, menampilkan bingkai pratinjau ditambah bilah latihan frasa
  *   serta tombol selalu-ada **Buka di tab baru** & **Unduh PDF** (D5 `#11b`).
  */
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../db/db'
 import type { Member, PartiturBerkasItem, SectionDef, Song } from '../db/types'
 import type { BagianPartitur } from '../lib/partitur'
 import {
@@ -73,6 +75,15 @@ import { DEFAULT_SECTIONS, cx } from '../lib/utils'
 import { IconDownload, IconLoop, IconMusic, IconPause, IconPlay, IconPrinter } from './Icons'
 import { PratinjauCetakPartitur } from './PratinjauCetakPartitur'
 import { Button } from './ui'
+import type { LapisanPerkusi, RevisiPerkusiNot } from '../lib/perkusiSticking'
+
+// #28 — Studio Perkusi dimuat malas: hanya skor yang memuat perkusi/sticking.
+const PanelStudioPerkusi = lazy(() => import('./musik/PanelStudioPerkusi'))
+type ModulPerkusi = typeof import('../lib/perkusiSticking')
+
+/** Saringan murah sebelum memuat modul perkusi (tanpa parse XML penuh). */
+const POLA_SKOR_PERKUSI =
+  /<unpitched[\s>]|<sticking|percussion|drum|snare|tenor|cymbal|marimba|vibraphone|xylophone|glockenspiel|timpani|perkusi/i
 
 const PILIHAN_PERSEN_CEPAT = [70, 80, 90, 100] as const
 
@@ -200,6 +211,13 @@ export function LayarPartitur({
   const [sedangBunyiNot, setSedangBunyiNot] = useState(false)
   const [posisiNot, setPosisiNot] = useState<{ birama: number; ketuk: number } | null>(null)
   const [teksXmlPartitur, setTeksXmlPartitur] = useState<string>('')
+  // #28 — Studio Perkusi: lapisan sticking skor + revisi lapangan (`db.anotasiPartitur`).
+  const [modPerkusi, setModPerkusi] = useState<ModulPerkusi | null>(null)
+  const [studioTerbuka, setStudioTerbuka] = useState(false)
+  const [biramaKlikStudio, setBiramaKlikStudio] = useState<number | null>(null)
+  const [tampilRevisi, setTampilRevisi] = useState(true)
+  const [xmlTersuntik, setXmlTersuntik] = useState<string | null>(null)
+  const anotasi = useLiveQuery(async () => db.anotasiPartitur.get(song.id), [song.id])
 
   const biramaAktif = sedangBunyiNot && posisiNot ? posisiNot.birama : biramaAktifLuar
   const sedangMain = sedangMainLuar || sedangBunyiNot
@@ -362,6 +380,82 @@ export function LayarPartitur({
     }
   }, [itemBerkas?.tipe, layarPenuh])
 
+  // #28 — Muat modul perkusi hanya bila skor tampak memuat perkusi/sticking.
+  const skorTampakPerkusi = Boolean(teksXmlPartitur) && POLA_SKOR_PERKUSI.test(teksXmlPartitur)
+  useEffect(() => {
+    if (!skorTampakPerkusi || modPerkusi) return
+    let hidup = true
+    void import('../lib/perkusiSticking')
+      .then((m) => {
+        if (hidup) setModPerkusi(m)
+      })
+      .catch(() => {
+        /* tanpa studio: partitur tetap tampil seperti biasa */
+      })
+    return () => {
+      hidup = false
+    }
+  }, [skorTampakPerkusi, modPerkusi])
+
+  const lapisanPerkusi = useMemo<LapisanPerkusi | null>(() => {
+    if (!modPerkusi || !skorTampakPerkusi) return null
+    try {
+      const l = modPerkusi.uraiLapisanPerkusi(teksXmlPartitur)
+      return l.didukung && l.parts.length > 0 ? l : null
+    } catch {
+      return null
+    }
+  }, [modPerkusi, skorTampakPerkusi, teksXmlPartitur])
+
+  // Klik birama di kanvas menggeser studio; birama aktif luar yang berubah mengambil alih lagi.
+  useEffect(() => {
+    setBiramaKlikStudio(null)
+  }, [biramaAktif])
+
+  // Rapikan revisi dari DB/paket (data lama/rusak tidak boleh memecah studio).
+  const revisiPerkusi = useMemo<RevisiPerkusiNot[]>(
+    () => (modPerkusi ? modPerkusi.rapikanDaftarRevisi(anotasi?.revisi) : []),
+    [anotasi, modPerkusi],
+  )
+
+  // Suntik revisi ke salinan XML (berkas asli tidak disentuh). Ditunda sejenak
+  // agar ketukan beruntun di editor tidak memicu render ulang OSMD berkali-kali.
+  useEffect(() => {
+    if (!modPerkusi || !lapisanPerkusi || !tampilRevisi || revisiPerkusi.length === 0) {
+      setXmlTersuntik(null)
+      return
+    }
+    const t = window.setTimeout(() => {
+      try {
+        const hasil = modPerkusi.sisipkanRevisiPerkusi(teksXmlPartitur, lapisanPerkusi, revisiPerkusi)
+        setXmlTersuntik(hasil.diterapkan > 0 ? hasil.xml : null)
+      } catch {
+        setXmlTersuntik(null)
+      }
+    }, 350)
+    return () => window.clearTimeout(t)
+  }, [modPerkusi, lapisanPerkusi, tampilRevisi, revisiPerkusi, teksXmlPartitur])
+
+  const blobCetak = useMemo(
+    () => (xmlTersuntik ? new Blob([xmlTersuntik], { type: 'application/vnd.recordare.musicxml+xml' }) : null),
+    [xmlTersuntik],
+  )
+
+  async function simpanRevisiPerkusi(daftar: RevisiPerkusiNot[]) {
+    if (hanyaPutar) return
+    if (daftar.length === 0) {
+      await db.anotasiPartitur.delete(song.id)
+      return
+    }
+    await db.anotasiPartitur.put({
+      id: song.id,
+      songId: song.id,
+      revisi: daftar,
+      hashPartitur: meta?.hash,
+      updatedAt: Date.now(),
+    })
+  }
+
   // 5. Render MusicXML secara malas & bertahap lewat OSMD.
   useEffect(() => {
     const wadah = wadahSvgRef.current
@@ -379,7 +473,7 @@ export function LayarPartitur({
 
     void renderPartiturMusicXml({
       wadah,
-      sumber: itemBerkas.blob,
+      sumber: xmlTersuntik ?? itemBerkas.blob,
       judulCadangan: meta?.judul || song.title,
       zoom,
       tataLetak,
@@ -418,6 +512,7 @@ export function LayarPartitur({
     }
   }, [
     itemBerkas,
+    xmlTersuntik,
     zoom,
     tataLetak,
     tandaFilterId,
@@ -483,11 +578,11 @@ export function LayarPartitur({
     () =>
       teksXmlPartitur
         ? uraiJadwalNadaMusicXml(
-            teksXmlPartitur,
+            xmlTersuntik ?? teksXmlPartitur,
             tandaFilterId === '__SEMUA__' ? null : tandaFilterId.split('\u0001'),
           )
         : null,
-    [teksXmlPartitur, tandaFilterId],
+    [teksXmlPartitur, xmlTersuntik, tandaFilterId],
   )
 
   const adaNadaUntukDibunyikan = (jadwalNadaPartitur?.nada.length ?? 0) > 0
@@ -689,6 +784,7 @@ export function LayarPartitur({
     }
 
     onLoncatBirama?.(biramaAwalKotak)
+    setBiramaKlikStudio(biramaAwalKotak)
   }
 
   function tanganiKlikSetDrill(s: InfoSetBirama, pakaiShift: boolean) {
@@ -889,6 +985,19 @@ export function LayarPartitur({
                     ))}
                   </select>
                 </label>
+
+                {lapisanPerkusi && (
+                  <Button
+                    size="sm"
+                    variant={studioTerbuka ? 'primary' : 'outline'}
+                    data-testid="partitur-studio-perkusi"
+                    aria-pressed={studioTerbuka}
+                    onClick={() => setStudioTerbuka((v) => !v)}
+                    title="Sticking battery & pit dari skor, plus revisi lapangan pelatih"
+                  >
+                    🥁 Perkusi{revisiPerkusi.length > 0 ? ` · ${revisiPerkusi.length}` : ''}
+                  </Button>
+                )}
 
                 {!galatRender && (
                   <Button
@@ -1530,6 +1639,28 @@ export function LayarPartitur({
 
         {itemBerkas && tipe === 'musicxml' && (
           <div className={cx('flex flex-col gap-3', layarPenuh && 'min-h-0 flex-1')}>
+            {studioTerbuka && lapisanPerkusi && (
+              <Suspense
+                fallback={
+                  <p className="text-xs" style={{ color: '#94a3b8' }}>
+                    Memuat Studio Perkusi…
+                  </p>
+                }
+              >
+                <PanelStudioPerkusi
+                  lapisan={lapisanPerkusi}
+                  revisi={revisiPerkusi}
+                  bisaSunting={!hanyaPutar}
+                  biramaAktif={biramaKlikStudio ?? biramaAktif}
+                  idPartDisukai={tandaFilterId === '__SEMUA__' ? null : tandaFilterId.split('\u0001')}
+                  tampilRevisi={tampilRevisi}
+                  onTampilRevisi={setTampilRevisi}
+                  onSimpanRevisi={(d) => void simpanRevisiPerkusi(d)}
+                  onLoncatBirama={onLoncatBirama}
+                  onTutup={() => setStudioTerbuka(false)}
+                />
+              </Suspense>
+            )}
             {galatRender && (
               <div
                 data-testid="partitur-render-galat"
@@ -1705,7 +1836,7 @@ export function LayarPartitur({
           open={cetakTerbuka}
           onClose={() => setCetakTerbuka(false)}
           song={song}
-          sumber={itemBerkas.blob}
+          sumber={blobCetak ?? itemBerkas.blob}
           daftarPart={daftarPartSkor}
           sectionsTim={sectionsTim}
           filterAwal={filterAktif}

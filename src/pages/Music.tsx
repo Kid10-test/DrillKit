@@ -90,6 +90,7 @@ import TunerDrone from '../components/TunerDrone'
 import { useSettings } from '../hooks/useSettings'
 import { DEFAULT_SECTIONS, cx, uid } from '../lib/utils'
 import { EditorBirama } from "../components/musik/EditorBirama"
+import { DAFTAR_PEMANASAN_PERKUSI, susunPemanasanPerkusi } from "../lib/pemanasanPerkusi"
 import { asumsiHitungan, blankSong, petaPanjang, SongModal } from "../components/musik/ModalLagu"
 import { PanelCountSheetMusik } from "../components/musik/PanelCountSheetSinkron"
 import { countSheetUntukAnggota } from "../lib/countSheet"
@@ -591,6 +592,23 @@ export default function Music({
       while (cells.length < panjang) cells.push(0)
       return { ...p, poly: { beats, subdiv, cells: cells.slice(0, panjang) as TingkatKlik[] } }
     })
+  }
+
+  /**
+   * #28 — Pasang pemanasan battery (Timing Grid) ke editor pola: pola +
+   * sticking per kotak, bunyi snare, dan latih tempo bertahap.
+   */
+  function pasangPemanasanPerkusi(id: string) {
+    const hasil = susunPemanasanPerkusi(id)
+    if (!hasil) return
+    setPola(hasil.pola)
+    setPakaiPola(true)
+    setSuara('snare')
+    setLatih(hasil.latih)
+    setBpm(hasil.latih.dari)
+    setUseMap(false)
+    setKotor(true)
+    toast.push(`Pemanasan "${hasil.nama}" dipasang — ${hasil.latih.dari}→${hasil.latih.ke} BPM`)
   }
 
   /** E3 — simpan pola & pengaturan metronom ke lagu yang dipilih. */
@@ -1321,6 +1339,7 @@ export default function Music({
                 <option value="klik">Klik (nada)</option>
                 <option value="kayu">Kayu (woodblock)</option>
                 <option value="bel">Bel (cowbell)</option>
+                <option value="snare">Snare (battery)</option>
               </Select>
             </Field>
             <Field label={`Volume ${Math.round(volume * 100)}%`}>
@@ -1534,7 +1553,23 @@ export default function Music({
                 </span>
               )}
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <select
+                data-testid="pilih-pemanasan-perkusi"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) pasangPemanasanPerkusi(e.target.value)
+                }}
+                className="max-w-[11rem] rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
+                title="Pemanasan battery: pola + sticking + bunyi snare + latih tempo"
+              >
+                <option value="">🥁 Pemanasan perkusi…</option>
+                {DAFTAR_PEMANASAN_PERKUSI.map((d) => (
+                  <option key={d.id} value={d.id} title={d.ringkas}>
+                    {d.nama}
+                  </option>
+                ))}
+              </select>
               <Button
                 size="sm"
                 variant="ghost"
@@ -1776,6 +1811,8 @@ export default function Music({
                     <ConfirmButton
                       onConfirm={async () => {
                         await db.songs.delete(song.id)
+                        // #28 — revisi sticking hanya berarti bersama lagunya.
+                        await db.anotasiPartitur.delete(song.id)
                         const penilaianTertaut = await db.penilaianLomba.where('songId').equals(song.id).toArray()
                         for (const pn of penilaianTertaut) {
                           await db.penilaianLomba.update(pn.id, { songId: undefined })

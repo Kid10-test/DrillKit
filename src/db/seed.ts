@@ -198,6 +198,7 @@ export async function wipeAllData() {
       db.kasIuran,
       db.arsipMusim,
       db.tindakLanjut,
+      db.anotasiPartitur,
     ],
     async () => {
       await Promise.all([
@@ -224,6 +225,7 @@ export async function wipeAllData() {
         db.kasIuran.clear(),
         db.arsipMusim.clear(),
         db.tindakLanjut.clear(),
+        db.anotasiPartitur.clear(),
       ])
     },
   )
