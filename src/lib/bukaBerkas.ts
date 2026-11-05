@@ -699,6 +699,7 @@ export const TABEL_BACKUP: { kolom: string; label: string }[] = [
   { kolom: 'attendance', label: 'Absensi' },
   { kolom: 'songs', label: 'Lagu' },
   { kolom: 'partiturBerkas', label: 'Berkas partitur' },
+  { kolom: 'anotasiPartitur', label: 'Revisi sticking perkusi' },
   { kolom: 'setlists', label: 'Set list' },
   { kolom: 'drills', label: 'Drill' },
   { kolom: 'sets', label: 'Set formasi' },

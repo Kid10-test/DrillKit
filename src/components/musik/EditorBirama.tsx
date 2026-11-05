@@ -32,7 +32,10 @@ export function EditorBirama({
   return (
     <div className="rounded-lg border border-slate-800 p-2.5" data-testid={`editor-birama-${index}`}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-semibold text-slate-400">Birama {index + 1}</span>
+        <span className="text-[11px] font-semibold text-slate-400">
+          Birama {index + 1}
+          {bar.label ? <span className="ml-1 font-normal text-slate-500">· {bar.label}</span> : null}
+        </span>
         <select
           value={bar.beats}
           onChange={(e) => onUbah({ beats: Number(e.target.value) })}
@@ -88,7 +91,18 @@ export function EditorBirama({
                 menyala && 'ring-2 ring-emerald-300',
               )}
             >
-              {c === 2 ? 'A' : c === 1 ? Math.floor(i / bar.subdiv) + 1 : '·'}
+              {bar.sticking?.[i] ? (
+                <span className="flex flex-col leading-none" data-testid={`sticking-${index}-${i}`}>
+                  <span className="text-[11px]">{bar.sticking[i]}</span>
+                  <span className="text-[8px] opacity-70">{c === 2 ? '>' : c === 1 ? '' : '·'}</span>
+                </span>
+              ) : c === 2 ? (
+                'A'
+              ) : c === 1 ? (
+                Math.floor(i / bar.subdiv) + 1
+              ) : (
+                '·'
+              )}
             </button>
           )
         })}

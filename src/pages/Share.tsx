@@ -30,7 +30,7 @@ import {
 import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
 import { kenaliBerkas, namaPaketGrup, namaZipAnggota } from '../lib/bukaBerkas'
 import { mintaPratinjau } from '../components/BukaBerkas'
-import { pasangPartiturDariPaket, pulihkanAudioDariZipPaket, simpanPaketAnggota } from '../lib/paketMasuk'
+import { pasangAnotasiDariPaket, pasangPartiturDariPaket, pulihkanAudioDariZipPaket, simpanPaketAnggota } from '../lib/paketMasuk'
 import { simpanLoncatLatih } from '../lib/partiturFrasa'
 import { buatLampiranPartiturPaket } from '../lib/partiturPaket'
 import {
@@ -95,6 +95,8 @@ function CoachExport() {
   const targetSetoran = useLiveQuery(() => db.targetSetoran.toArray(), [], [])
   const catatanSetoran = useLiveQuery(() => db.setoran.toArray(), [], [])
   const countSheets = useLiveQuery(() => db.countSheets.toArray(), [], [])
+  // #28 — revisi sticking Studio Perkusi ikut bersama partiturnya (tersaring per part di paket anggota).
+  const anotasiPartitur = useLiveQuery(() => db.anotasiPartitur.toArray(), [], [])
   const inventaris = useLiveQuery(() => db.inventaris.toArray(), [], [])
   const riwayatLogPerubahan = useLiveQuery(() => db.logPerubahan.toArray(), [], [])
   const settings = useLiveQuery(() => db.settings.get('team'), [], undefined)
@@ -278,6 +280,7 @@ function CoachExport() {
       // Set list mengikuti saklar repertoar: ia tidak ada artinya tanpa lagu.
       setlists: includeSongs ? (daftarSetList ?? []) : [],
       partiturPaket: Object.keys(partiturTerpilih).length > 0 ? partiturTerpilih : undefined,
+      anotasiPartitur: (anotasiPartitur ?? []).filter((x) => partiturTerpilih[x.songId] && x.revisi?.length > 0),
       targetSetoran: includeSetoran ? (targetSetoran ?? []) : [],
       setoran: includeSetoran ? (catatanSetoran ?? []) : [],
       countSheets: includeCountSheets ? (countSheets ?? []) : [],
@@ -788,8 +791,9 @@ function MemberView() {
       // #13a — pasang berkas partitur dari paket terbit ke `db.partiturBerkas`
       // lebih dulu, lalu simpan salinan paket ringan ke `db.packages`.
       await pasangPartiturDariPaket(digabung)
-      const digabungRingan: ShareBundle = digabung.partiturPaket
-        ? { ...digabung, partiturPaket: undefined }
+      await pasangAnotasiDariPaket(digabung)
+      const digabungRingan: ShareBundle = digabung.partiturPaket || digabung.anotasiPartitur
+        ? { ...digabung, partiturPaket: undefined, anotasiPartitur: undefined }
         : digabung
       await db.packages.put({
         key: 'current',

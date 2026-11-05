@@ -23,6 +23,7 @@ import type {
   TargetSetoran,
   TransaksiKasIuran,
   TindakLanjut,
+  AnotasiPartitur,
 } from '../db/types'
 import { hitungRekapPenilaian } from './penilaianJuri'
 
@@ -578,6 +579,8 @@ export interface MasukanSeasonRollover {
   audisi: CalonAudisi[]
   /** #26 — catatan cleaning/tindak lanjut musim berjalan. */
   tindakLanjut?: TindakLanjut[]
+  /** #28 — revisi lapangan Studio Perkusi (ikut lagu musim berjalan). */
+  anotasiPartitur?: AnotasiPartitur[]
   skorSimulasiPuncak?: number | null
 }
 
@@ -608,6 +611,7 @@ export const TABEL_MUSIMAN_DIARSIPKAN = [
   'kasIuran',
   'audisi',
   'tindakLanjut',
+  'anotasiPartitur',
 ] as const
 
 export function susunArsipMusim(m: MasukanSeasonRollover): ArsipMusim {
@@ -659,6 +663,7 @@ export function susunArsipMusim(m: MasukanSeasonRollover): ArsipMusim {
       penilaianLomba: m.penilaianLomba ?? [],
       kasIuran: m.kasIuran ?? [],
       tindakLanjut: m.tindakLanjut ?? [],
+      anotasiPartitur: m.anotasiPartitur ?? [],
       audisi: m.audisi ?? [],
     },
     createdAt: Date.now(),

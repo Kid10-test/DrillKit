@@ -519,11 +519,11 @@ export async function susunTerkunci(
   const terkunci: DataTerkunci = {}
   const tanpaKunci: string[] = []
 
-  // #13a, #15b, & #17 — `partiturPaket`, `perubahanPaket`, dan `countSheets` sudah
+  // #13a, #15b, #17, & #28 — `partiturPaket`, `perubahanPaket`, `countSheets`, dan `anotasiPartitur` sudah
   // tercantum sekali di bagian terbuka `grup` (`paket.json`), jadi tidak dienkripsi berulang.
   const tanpaLampiranPartitur: ShareBundle =
-    b.partiturPaket || b.perubahanPaket || b.countSheets
-      ? { ...b, partiturPaket: undefined, perubahanPaket: undefined, countSheets: undefined }
+    b.partiturPaket || b.perubahanPaket || b.countSheets || b.anotasiPartitur
+      ? { ...b, partiturPaket: undefined, perubahanPaket: undefined, countSheets: undefined, anotasiPartitur: undefined }
       : b
 
   for (const m of b.members) {

@@ -115,6 +115,10 @@ rakit src/lib/partiturFrasa.ts  partiturFrasa
 # #13 — penyaring partitur per suara di paket anggota & pengurai bunyi notasi WebAudio.
 rakit src/lib/partiturPaket.ts  partiturPaket
 rakit src/lib/partiturBunyi.ts  partiturBunyi
+# #28 — Studio Perkusi: pengenal alat battery, lapisan sticking + revisi lapangan, pemanasan.
+rakit src/lib/perkusiAlat.ts      perkusiAlat
+rakit src/lib/perkusiSticking.ts  perkusiSticking
+rakit src/lib/pemanasanPerkusi.ts pemanasanPerkusi
 # #14 — matriks setoran hafalan: jenjang bertahap, ringkasan kesiapan, & cetak A4 hex.
 rakit src/lib/setoran.ts        setoran
 # #15 — kolaborasi multi-pelatih seksi & log perubahan show otomatis (I1).

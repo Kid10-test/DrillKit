@@ -133,6 +133,7 @@ export async function buildBackupPayload() {
     kasIuran,
     arsipMusim,
     tindakLanjut,
+    anotasiPartitur,
   ] = await Promise.all([
     db.members.toArray(),
     db.sessions.toArray(),
@@ -156,6 +157,7 @@ export async function buildBackupPayload() {
     db.kasIuran.toArray(),
     db.arsipMusim.toArray(),
     db.tindakLanjut.toArray(),
+    db.anotasiPartitur.toArray(),
   ])
   return {
     format: 'drillkit-backup',
@@ -184,6 +186,7 @@ export async function buildBackupPayload() {
     kasIuran,
     arsipMusim,
     tindakLanjut,
+    anotasiPartitur,
   }
 }
 

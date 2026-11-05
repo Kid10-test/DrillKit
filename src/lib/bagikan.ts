@@ -26,7 +26,7 @@
 import type { Member, ShareBundle } from '../db/types'
 import { namaDenganPanggilan } from './namaAnggota'
 import { namaPaketAnggota } from './bukaBerkas'
-import { saringPartiturPaketUntukAnggota } from './partiturPaket'
+import { saringAnotasiUntukPaket, saringPartiturPaketUntukAnggota } from './partiturPaket'
 
 /**
  * Kolom yang **tidak pernah** meninggalkan perangkat pelatih.
@@ -119,6 +119,8 @@ export function paketGrup(b: ShareBundle): ShareBundle {
     // #18 — daftar aset & ukuran seragam pribadi tidak pernah ikut di berkas grup.
     perlengkapanPribadi: undefined,
     perlengkapanPerAnggota: undefined,
+    // #28 — berkas grup membawa skor utuh, jadi revisi semua part ikut (bila skornya ikut).
+    anotasiPartitur: saringAnotasiUntukPaket(dasar.anotasiPartitur, dasar.partiturPaket),
     mode: 'member',
     /*
      * Berkas grup bukan untuk siapa pun secara khusus — dibagikan ke semua
@@ -154,6 +156,8 @@ export function paketAnggota(b: ShareBundle, memberId: string): ShareBundle {
     ...dasar,
     songs: tersaring.songs,
     partiturPaket: tersaring.partiturPaket,
+    // #28 — revisi sticking hanya untuk lagu & part yang diterima anggota ini.
+    anotasiPartitur: dikenal ? saringAnotasiUntukPaket(dasar.anotasiPartitur, tersaring.partiturPaket) : undefined,
     members: b.members.map(bersihkanAnggota),
     targetSetoran: dikenal ? (b.targetSetoran ?? []) : [],
     countSheets: dikenal ? (b.countSheets ?? []) : [],

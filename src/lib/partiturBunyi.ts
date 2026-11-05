@@ -18,6 +18,13 @@
  *   (`#4`), serta rentang & pengulangan frasa (`#11d`).
  */
 import type { TempoSegment } from '../db/types'
+import {
+  klasifikasiNotPerkusi,
+  nilaiLetak,
+  peranDariNamaPart,
+  type AlatPerkusi,
+  type TeknikPerkusi,
+} from './perkusiAlat'
 
 export interface NadaMentahPartitur {
   idPart: string
@@ -34,6 +41,16 @@ export interface NadaMentahPartitur {
   midiKonser?: number
   /** Warna perkusi berdasarkan letak garis paranada bila `jenis === 'perkusi'`. */
   warnaPerkusi?: 'rendah' | 'sedang' | 'tinggi'
+  /** #28 — alat Battery terpilah (Snare, Tenor 1–5, Spock, Bass 1–5, Simbal). */
+  alatPerkusi?: AlatPerkusi
+  /** #28 — teknik pukulan (rimshot, rim, ping, …). */
+  teknikPerkusi?: TeknikPerkusi
+  /** #28 — 0 biasa, 1 aksen `>`, 2 marcato `^`. */
+  aksen?: 0 | 1 | 2
+  /** #28 — jumlah not hias sebelum not (1 = flam, 2 = drag). */
+  flam?: number
+  /** #28 — garis tremolo (1–2 = diddle, ≥ 3 = buzz). */
+  tremolo?: number
 }
 
 export interface InfoBiramaSkor {
@@ -62,6 +79,11 @@ export interface PeristiwaBunyiNada {
   frekuensiHz?: number
   midiKonser?: number
   warnaPerkusi?: 'rendah' | 'sedang' | 'tinggi'
+  alatPerkusi?: AlatPerkusi
+  teknikPerkusi?: TeknikPerkusi
+  aksen?: 0 | 1 | 2
+  flam?: number
+  tremolo?: number
 }
 
 export interface InfoWaktuBirama {
@@ -221,6 +243,21 @@ function pindaiInfoBiramaGlobal(xml: string): InfoBiramaSkor[] {
   return hasil
 }
 
+/** #28 — nama part & nama instrumen per `<score-instrument>` dari `<part-list>`. */
+function uraiInfoPartPerkusi(xml: string): Map<string, { nama: string; instrumen: Map<string, string> }> {
+  const hasil = new Map<string, { nama: string; instrumen: Map<string, string> }>()
+  const re = /<score-part\b[^>]*\bid=(["'])(.*?)\1[^>]*>([\s\S]*?)<\/score-part>/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(xml)) !== null) {
+    const instrumen = new Map<string, string>()
+    const reI = /<score-instrument\b[^>]*\bid=(["'])(.*?)\1[^>]*>([\s\S]*?)<\/score-instrument>/gi
+    let mi: RegExpExecArray | null
+    while ((mi = reI.exec(m[3])) !== null) instrumen.set(mi[2], bacaTeksTag(mi[3], 'instrument-name') ?? '')
+    hasil.set(m[2], { nama: bacaTeksTag(m[3], 'part-name') ?? '', instrumen })
+  }
+  return hasil
+}
+
 function tebakWarnaPerkusi(blokUnpitched: string): 'rendah' | 'sedang' | 'tinggi' {
   const step = (bacaTeksTag(blokUnpitched, 'display-step') ?? 'C').toUpperCase()
   const oct = Number(bacaTeksTag(blokUnpitched, 'display-octave') ?? '5')
@@ -257,9 +294,27 @@ export function uraiJadwalNadaMusicXml(
   const reTokenBirama =
     /<(attributes|backup|forward|note)\b[^>]*>[\s\S]*?<\/\1>|<note\b[^>]*\/>/gi
 
+  const infoPart = uraiInfoPartPerkusi(xml)
+
   for (const part of daftarPart) {
     let divisions = 1
     let geserSemiton = 0
+    // #28 — pengenal alat Battery per part (nama part + nama instrumen per not).
+    const info = infoPart.get(part.id)
+    const adaUnpitched = part.biramaBlok.some((b) => /<unpitched\b/i.test(b))
+    const peran = adaUnpitched ? peranDariNamaPart(info?.nama ?? '', true) : null
+    const setLetak = new Set<number>()
+    if (peran) {
+      for (const b of part.biramaBlok) {
+        const reUn = /<unpitched\b[^>]*>([\s\S]*?)<\/unpitched>/gi
+        let mu: RegExpExecArray | null
+        while ((mu = reUn.exec(b)) !== null) {
+          setLetak.add(nilaiLetak(bacaTeksTag(mu[1], 'display-step'), Number(bacaTeksTag(mu[1], 'display-octave') ?? '5')))
+        }
+      }
+    }
+    const letakPart = [...setLetak].sort((a, b) => b - a)
+    let graceTertunda = 0
     // Kunci sambungan `<tie>`: `${suara}:${kunciNada}` → objek NadaMentahPartitur yang masih terbuka.
     const tieTerbuka = new Map<string, NadaMentahPartitur>()
 
@@ -304,7 +359,12 @@ export function uraiJadwalNadaMusicXml(
         }
 
         // `<note ...>`
-        if (/<grace\b/i.test(blok)) continue
+        if (/<grace\b/i.test(blok)) {
+          graceTertunda += 1
+          continue
+        }
+        const jumlahGrace = graceTertunda
+        if (!/<chord\b/i.test(blok)) graceTertunda = 0
         const durDiv = Number(bacaTeksTag(blok, 'duration') ?? '0')
         if (!Number.isFinite(durDiv) || durDiv <= 0) continue
 
@@ -357,7 +417,10 @@ export function uraiJadwalNadaMusicXml(
           if (adaTieStart) tieTerbuka.set(kunciTie, item)
         } else if (blokUnpitched != null) {
           const warna = tebakWarnaPerkusi(blokUnpitched)
-          const kunciTie = `${suara}:p-${warna}`
+          // #28 — tie perkusi dikunci per letak + instrumen (Bass 1 ≠ Bass 3 di suara yang sama).
+          const kunciTie = `${suara}:p-${warna}:${bacaTeksTag(blokUnpitched, 'display-step') ?? ''}${
+            bacaTeksTag(blokUnpitched, 'display-octave') ?? ''
+          }:${/<instrument\b[^>]*\bid=(["'])(.*?)\1/i.exec(blok)?.[2] ?? ''}`
           if (adaTieStop && tieTerbuka.has(kunciTie)) {
             const sebelumnya = tieTerbuka.get(kunciTie)!
             sebelumnya.durasiPerempat += durasiPerempat
@@ -372,6 +435,30 @@ export function uraiJadwalNadaMusicXml(
             durasiPerempat,
             jenis: 'perkusi',
             warnaPerkusi: warna,
+          }
+          if (peran) {
+            const idIns = /<instrument\b[^>]*\bid=(["'])(.*?)\1/i.exec(blok)?.[2]
+            const kls = klasifikasiNotPerkusi({
+              peran,
+              namaInstrumen: idIns ? info?.instrumen.get(idIns) : null,
+              letak: nilaiLetak(
+                bacaTeksTag(blokUnpitched, 'display-step'),
+                Number(bacaTeksTag(blokUnpitched, 'display-octave') ?? '5'),
+              ),
+              letakPart,
+              kepala: bacaTeksTag(blok, 'notehead'),
+            })
+            item.alatPerkusi = kls.alat
+            if (kls.teknik) item.teknikPerkusi = kls.teknik
+          }
+          const aksen = /<strong-accent\b/i.test(blok) ? 2 : /<accent\b/i.test(blok) ? 1 : 0
+          if (aksen) item.aksen = aksen
+          if (jumlahGrace > 0) item.flam = Math.min(2, jumlahGrace)
+          const mTrem = /<tremolo\b([^>]*)>\s*(\d*)\s*<\/tremolo>/i.exec(blok)
+          if (mTrem && !/type\s*=\s*["'](start|stop)/i.test(mTrem[1])) {
+            item.tremolo = /unmeasured/i.test(mTrem[1]) ? 3 : Math.max(1, Number(mTrem[2] || '3'))
+          } else if (item.teknikPerkusi === 'buzz') {
+            item.tremolo = 3
           }
           semuaNada.push(item)
           if (adaTieStart) tieTerbuka.set(kunciTie, item)
@@ -492,6 +579,11 @@ export function jadwalkanDetikNada(
       frekuensiHz: n.midiKonser != null ? midiKeHz(n.midiKonser, a4) : undefined,
       midiKonser: n.midiKonser,
       warnaPerkusi: n.warnaPerkusi,
+      alatPerkusi: n.alatPerkusi,
+      teknikPerkusi: n.teknikPerkusi,
+      aksen: n.aksen,
+      flam: n.flam,
+      tremolo: n.tremolo,
     })
   }
 
@@ -573,7 +665,8 @@ export class PemutarNadaPartitur {
     master.gain.value = Math.max(0.05, Math.min(1, opsi.volume ?? 0.45))
     const filter = ctx.createBiquadFilter()
     filter.type = 'lowpass'
-    filter.frequency.value = 2800
+    // #28 — simbal & desis snare butuh frekuensi tinggi; nada tiup tetap dilembutkan.
+    filter.frequency.value = hasilJadwal.peristiwa.some((p) => p.alatPerkusi) ? 9000 : 2800
     master.connect(filter)
     filter.connect(ctx.destination)
     this.master = master
@@ -644,6 +737,10 @@ export class PemutarNadaPartitur {
     p: PeristiwaBunyiNada,
     mulai: number,
   ) {
+    if (p.jenis === 'perkusi' && p.alatPerkusi) {
+      this.bunyikanBattery(ctx, tujuan, p, mulai)
+      return
+    }
     if (p.jenis === 'perkusi') {
       const warna = p.warnaPerkusi ?? 'sedang'
       const osc = ctx.createOscillator()
@@ -698,6 +795,116 @@ export class PemutarNadaPartitur {
     g.connect(tujuan)
     osc.start(mulai)
     osc.stop(mulai + durasi + 0.015)
+  }
+
+  /**
+   * #28 — sintesis Battery terpilah: Snare (derau pita + badan), Rimshot
+   * (tambah klik logam), Tenor 1–5 & Spock (tom bernada menurun), Tonal Bass
+   * 1–5 (sinus rendah bertingkat), Simbal (derau tinggi berekor panjang).
+   * Aksen menebalkan volume; flam/drag menambah pukulan hias; diddle = dua
+   * pukulan rapat; buzz = rentetan pukulan halus sepanjang not.
+   */
+  private bunyikanBattery(ctx: AudioContext, tujuan: AudioNode, p: PeristiwaBunyiNada, mulai: number) {
+    const alat = p.alatPerkusi ?? 'perkusi-sedang'
+    const kuat = p.aksen === 2 ? 1.75 : p.aksen === 1 ? 1.45 : 1
+    const pukul = (t: number, v: number) => this.pukulBattery(ctx, tujuan, alat, p.teknikPerkusi, t, v)
+    const flam = p.flam ?? 0
+    for (let i = flam; i >= 1; i -= 1) pukul(Math.max(ctx.currentTime, mulai - 0.028 * i), 0.38)
+    const trem = p.tremolo ?? 0
+    if (trem >= 3) {
+      const akhir = mulai + Math.max(0.06, p.durasiDetik * 0.95)
+      let t = mulai
+      let ke = 0
+      while (t < akhir && ke < 64) {
+        pukul(t, (ke === 0 ? kuat : 0.55) * 0.75)
+        t += 0.026
+        ke += 1
+      }
+      return
+    }
+    if (trem > 0) {
+      const potong = Math.max(0.035, p.durasiDetik / 2)
+      pukul(mulai, kuat)
+      pukul(mulai + potong, 0.8)
+      return
+    }
+    pukul(mulai, kuat)
+  }
+
+  private pukulBattery(
+    ctx: AudioContext,
+    tujuan: AudioNode,
+    alat: AlatPerkusi,
+    teknik: TeknikPerkusi | undefined,
+    t: number,
+    v: number,
+  ) {
+    const derau = (hz: number, jenis: BiquadFilterType, gain: number, dur: number) => {
+      if (!this.bufferDerau) return
+      const src = ctx.createBufferSource()
+      src.buffer = this.bufferDerau
+      src.loop = dur > 0.07
+      const f = ctx.createBiquadFilter()
+      f.type = jenis
+      f.frequency.value = hz
+      const g = ctx.createGain()
+      g.gain.setValueAtTime(Math.max(0.0002, gain * v), t)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+      src.connect(f)
+      f.connect(g)
+      g.connect(tujuan)
+      src.start(t)
+      src.stop(t + dur + 0.02)
+    }
+    const nada = (hzAwal: number, hzAkhir: number, gain: number, dur: number, tipe: OscillatorType = 'sine') => {
+      const osc = ctx.createOscillator()
+      const g = ctx.createGain()
+      osc.type = tipe
+      osc.frequency.setValueAtTime(hzAwal, t)
+      osc.frequency.exponentialRampToValueAtTime(Math.max(20, hzAkhir), t + dur)
+      g.gain.setValueAtTime(0.0001, t)
+      g.gain.linearRampToValueAtTime(Math.max(0.0002, gain * v), t + 0.003)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+      osc.connect(g)
+      g.connect(tujuan)
+      osc.start(t)
+      osc.stop(t + dur + 0.02)
+    }
+    if (teknik === 'rim' || teknik === 'stick' || teknik === 'ping') {
+      nada(teknik === 'ping' ? 1650 : 2100, teknik === 'ping' ? 1500 : 1200, 0.3, teknik === 'ping' ? 0.12 : 0.035, 'triangle')
+      return
+    }
+    if (teknik === 'shell') {
+      nada(900, 600, 0.25, 0.05, 'square')
+      return
+    }
+    if (alat === 'snare') {
+      derau(2600, 'bandpass', 0.55, 0.13)
+      nada(240, 160, 0.3, 0.07, 'triangle')
+      if (teknik === 'rimshot') nada(1300, 900, 0.4, 0.05, 'square')
+      return
+    }
+    if (alat === 'simbal') {
+      derau(6500, 'highpass', 0.42, teknik === 'mute' ? 0.12 : 0.65)
+      return
+    }
+    if (alat === 'spock' || alat.startsWith('tenor')) {
+      const no = alat === 'spock' ? 0 : Number(alat.slice(5)) || 1
+      const hz = [470, 360, 300, 245, 200, 165][Math.min(5, no)]
+      nada(hz * 1.25, hz, 0.42, 0.2, 'triangle')
+      derau(1800, 'bandpass', 0.08, 0.04)
+      return
+    }
+    if (alat === 'bass-unison' || alat.startsWith('bass')) {
+      const no = alat === 'bass-unison' ? 3 : Number(alat.slice(4)) || 3
+      const hz = [0, 112, 94, 79, 66, 54][Math.min(5, Math.max(1, no))]
+      nada(hz * 1.35, hz, 0.7, 0.34, 'sine')
+      derau(900, 'lowpass', 0.12, 0.03)
+      return
+    }
+    const hz = alat === 'perkusi-rendah' ? 80 : alat === 'perkusi-tinggi' ? 520 : 220
+    nada(hz * 1.6, hz, 0.42, alat === 'perkusi-rendah' ? 0.14 : 0.07, 'triangle')
+    if (alat === 'perkusi-tinggi') derau(5000, 'highpass', 0.25, 0.08)
   }
 
   henti(): void {

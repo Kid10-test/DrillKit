@@ -42,7 +42,10 @@ import {
 } from './birama'
 
 /** #6 — matikan bunyi yang belum (atau baru saja) berbunyi, tanpa sisa letupan. */
-function hentikanSegera(osc: OscillatorNode | OscillatorNode[], ...lain: AudioNode[]): () => void {
+function hentikanSegera(
+  osc: AudioScheduledSourceNode | AudioScheduledSourceNode[],
+  ...lain: AudioNode[]
+): () => void {
   return () => {
     for (const o of Array.isArray(osc) ? osc : [osc]) {
       try {
@@ -492,7 +495,15 @@ export function rapikanBirama(bar: BiramaPola): BiramaPola {
   const panjang = Math.max(1, bar.beats * bar.subdiv)
   const cells = [...bar.cells]
   while (cells.length < panjang) cells.push(0)
-  return { ...bar, cells: cells.slice(0, panjang) }
+  const hasil: BiramaPola = { ...bar, cells: cells.slice(0, panjang) }
+  // #28 — sticking pemanasan perkusi ikut dipotong/ditambal sepanjang kotak.
+  if (bar.sticking) {
+    const st = bar.sticking.slice(0, panjang)
+    while (st.length < panjang) st.push('')
+    if (st.some((x) => x)) hasil.sticking = st
+    else delete hasil.sticking
+  }
+  return hasil
 }
 
 /** Putar tingkat kotak: diam → biasa → aksen → diam. */
@@ -1252,6 +1263,7 @@ export class Metronom {
     if (v <= 0) return () => undefined
     if (this.suara === 'kayu') return this.bunyiKayu(ctx, waktu, v, aksen, kedua)
     if (this.suara === 'bel') return this.bunyiBel(ctx, waktu, v, aksen, kedua)
+    if (this.suara === 'snare') return this.bunyiSnare(ctx, waktu, v, aksen, kedua)
     return this.bunyiKlik(ctx, waktu, v, aksen, kedua)
   }
 
@@ -1283,6 +1295,63 @@ export class Metronom {
     osc.start(waktu)
     osc.stop(waktu + 0.06)
     return hentikanSegera(osc, gain)
+  }
+
+  /** #28 — derau putih 0,25 dtk, dibuat sekali per AudioContext. */
+  private derauSnare: AudioBuffer | null = null
+
+  /**
+   * #28 — Klik *snare* untuk pemanasan battery: derau bandpass (kawat snare)
+   * + badan segitiga pendek. Suara kedua (poliritme) memakai rim click.
+   */
+  private bunyiSnare(ctx: AudioContext, waktu: number, v: number, aksen: boolean, kedua: boolean): () => void {
+    if (kedua) {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'square'
+      osc.frequency.value = 1700
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      gain.gain.setValueAtTime(v * 0.6, waktu)
+      gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.03)
+      osc.start(waktu)
+      osc.stop(waktu + 0.04)
+      return hentikanSegera(osc, gain)
+    }
+    if (!this.derauSnare || this.derauSnare.sampleRate !== ctx.sampleRate) {
+      const panjang = Math.floor(ctx.sampleRate * 0.25)
+      const buf = ctx.createBuffer(1, panjang, ctx.sampleRate)
+      const data = buf.getChannelData(0)
+      for (let i = 0; i < panjang; i++) data[i] = Math.random() * 2 - 1
+      this.derauSnare = buf
+    }
+    const derau = ctx.createBufferSource()
+    derau.buffer = this.derauSnare
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = aksen ? 3000 : 2600
+    filter.Q.value = 0.9
+    const gDerau = ctx.createGain()
+    derau.connect(filter)
+    filter.connect(gDerau)
+    gDerau.connect(ctx.destination)
+    const panjangEkor = aksen ? 0.16 : 0.11
+    gDerau.gain.setValueAtTime(v * (aksen ? 1.7 : 1.3), waktu)
+    gDerau.gain.exponentialRampToValueAtTime(0.0001, waktu + panjangEkor)
+    const badan = ctx.createOscillator()
+    const gBadan = ctx.createGain()
+    badan.type = 'triangle'
+    badan.frequency.setValueAtTime(aksen ? 260 : 230, waktu)
+    badan.frequency.exponentialRampToValueAtTime(160, waktu + 0.05)
+    badan.connect(gBadan)
+    gBadan.connect(ctx.destination)
+    gBadan.gain.setValueAtTime(v * 1.1, waktu)
+    gBadan.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.07)
+    derau.start(waktu)
+    derau.stop(waktu + panjangEkor + 0.02)
+    badan.start(waktu)
+    badan.stop(waktu + 0.09)
+    return hentikanSegera([derau, badan], filter, gDerau, gBadan)
   }
 
   /** Cowbell: dua osilator kotak (interval ~6th) seperti bel sapi. */
