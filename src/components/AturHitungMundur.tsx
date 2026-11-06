@@ -26,7 +26,10 @@ interface Props {
 const PILIHAN_SUARA: { nilai: HitungMundur['suara']; label: string }[] = [
   { nilai: 'klik', label: 'Klik' },
   { nilai: 'kayu', label: 'Kayu (woodblock)' },
-  { nilai: 'bel', label: 'Bel (cowbell)' },
+  { nilai: 'cowbell', label: 'Cowbell (lapangan)' },
+  { nilai: 'drbeat', label: 'Dr. Beat (lapangan)' },
+  { nilai: 'rim', label: 'Rim (lapangan)' },
+  { nilai: 'nada', label: 'Hitung bernada (tanpa suara HP)' },
   { nilai: 'suara', label: 'Suara manusia' },
 ]
 
@@ -81,7 +84,7 @@ export default function AturHitungMundur({ nilai, onChange, birama }: Props) {
               </Select>
             </Field>
             <Field label="Bunyi">
-              <Select value={nilai.suara} onChange={(e) => set({ suara: e.target.value as HitungMundur['suara'] })} data-testid="hm-suara">
+              <Select value={nilai.suara === 'bel' ? 'cowbell' : nilai.suara} onChange={(e) => set({ suara: e.target.value as HitungMundur['suara'] })} data-testid="hm-suara">
                 {PILIHAN_SUARA.map((s) => (
                   <option key={s.nilai} value={s.nilai}>
                     {s.label}
@@ -95,7 +98,8 @@ export default function AturHitungMundur({ nilai, onChange, birama }: Props) {
             <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
               {!bisaUcap() ? (
                 <p className="text-[11px] text-amber-300" data-testid="hm-tanpa-suara">
-                  Browser ini tidak punya suara ucapan. Ketukan hitung mundur tetap berbunyi seperti biasa.
+                  Browser ini tidak punya suara ucapan. Hitung mundur memakai <b>hitung bernada</b> sebagai gantinya —
+                  tiap angka punya nadanya sendiri, dan hitungan terakhir berbunyi ganda.
                 </p>
               ) : (
                 <>
@@ -113,6 +117,11 @@ export default function AturHitungMundur({ nilai, onChange, birama }: Props) {
                       ))}
                     </Select>
                   </Field>
+                  {suaraTersedia.length === 0 && (
+                    <p className="text-[11px] text-amber-300" data-testid="hm-suara-kosong">
+                      Belum ada paket suara di perangkat ini — saat diputar, <b>hitung bernada</b> dipakai sebagai gantinya.
+                    </p>
+                  )}
                   <Field label="Yang diucapkan (pisahkan koma — kosongkan untuk angka otomatis)">
                     <Input
                       value={(nilai.ucap ?? []).join(', ')}
@@ -158,6 +167,7 @@ export default function AturHitungMundur({ nilai, onChange, birama }: Props) {
           {nilai.suara !== 'suara' && (
             <p className="text-[11px] text-slate-500" data-testid="hm-info">
               {nilai.ulang}× · {posisi.length} ketuk tiap putaran · mengikuti {t.pembilang}/{t.penyebut} birama pertama
+              {nilai.suara === 'nada' && ' · nada naik tiap hitungan, hitungan terakhir berbunyi ganda "siap-"'}
             </p>
           )}
         </>

@@ -20,6 +20,8 @@ import {
   type ModeTemperamenDengung,
   type SetelanPenala,
 } from '../lib/tuner'
+import { cariToleransi, tambahJejak, warnaSen, type TitikJejak } from '../lib/intonasi'
+import { PanelKestabilanNada, PetaKecenderunganNada } from './musik/IntonasiPenala'
 
 /**
  * E4 — Penala (tuner) & nada dengung (drone).
@@ -39,7 +41,7 @@ import {
  * dilepas saat dimatikan atau saat komponen dibongkar — jadi tidak ada
  * indikator "mic menyala" yang tertinggal di HP.
  */
-export default function TunerDrone() {
+export default function TunerDrone({ namaPemain }: { namaPemain?: string } = {}) {
   const toast = useToast()
   const penalaRef = useRef<Penala | null>(null)
   const dengungRef = useRef<Dengung | null>(null)
@@ -49,6 +51,9 @@ export default function TunerDrone() {
   const [bunyi, setBunyi] = useState(false)
   const [hasil, setHasil] = useState<HasilNada | null>(null)
   const [pesan, setPesan] = useState('')
+  /** #29 — jejak sen bergulir untuk grafik kestabilan. */
+  const [jejak, setJejak] = useState<TitikJejak[]>([])
+  const [sekarang, setSekarang] = useState(0)
 
   const patch = (p: Partial<SetelanPenala>) => setSt((s) => ({ ...s, ...p }))
 
@@ -61,7 +66,18 @@ export default function TunerDrone() {
   useEffect(() => {
     if (!nyala) return
     const id = window.setInterval(() => {
-      setHasil(penalaRef.current?.baca(st.a4) ?? null)
+      const h = penalaRef.current?.baca(st.a4) ?? null
+      const t = performance.now()
+      setHasil(h)
+      // #29 — catat ke jejak (null = hening memutus garis grafik).
+      setJejak((j) =>
+        tambahJejak(j, {
+          t,
+          sen: h ? h.sen : null,
+          midi: h ? Math.round(69 + 12 * Math.log2(h.target / st.a4)) : undefined,
+        }),
+      )
+      setSekarang(t)
     }, 60)
     return () => window.clearInterval(id)
   }, [nyala, st.a4])
@@ -111,6 +127,12 @@ export default function TunerDrone() {
       setHasil(null)
       return
     }
+    await bukaMikrofon()
+  }
+
+  /** Buka mikrofon (juga dipakai alur peta kecenderungan nada). */
+  async function bukaMikrofon() {
+    if (nyala) return
     setPesan('')
     try {
       if (!penalaRef.current) penalaRef.current = new Penala()
@@ -141,7 +163,9 @@ export default function TunerDrone() {
   const sen = hasil?.sen ?? 0
   /** Posisi jarum 0–100 (50 = tepat di tengah). */
   const pos = 50 + Math.max(-50, Math.min(50, sen))
-  const warna = !hasil ? '#64748b' : Math.abs(sen) <= 5 ? '#10b981' : Math.abs(sen) <= 15 ? '#f59e0b' : '#f43f5e'
+  /** #29 — pita hijau & warna jarum mengikuti jenjang toleransi yang dipilih. */
+  const tol = cariToleransi(st.toleransi).sen
+  const warna = !hasil ? '#64748b' : warnaSen(sen, tol)
   const hzDengung = nadaKeHz(st.nada, st.oktaf, st.a4)
   const tr = cariTransposisi(st.transposisi)
   /** Label besar: nada tertulis untuk instrumen bertransposisi, konser bila tidak. */
@@ -194,7 +218,8 @@ export default function TunerDrone() {
             <div className="relative h-5 overflow-hidden rounded-full border border-slate-800 bg-slate-900">
               <div
                 className="absolute inset-y-0 bg-emerald-500/15"
-                style={{ left: '45%', width: '10%' }}
+                style={{ left: `${50 - tol}%`, width: `${tol * 2}%` }}
+                data-testid="pita-toleransi"
                 aria-hidden="true"
               />
               <div className="absolute inset-y-0 w-px bg-slate-600" style={{ left: '50%' }} aria-hidden="true" />
@@ -216,7 +241,7 @@ export default function TunerDrone() {
               ? 'Tekan Dengarkan untuk membaca nada dari mikrofon.'
               : !hasil
                 ? 'Belum ada nada yang terbaca — mainkan lebih keras atau dekati mikrofon.'
-                : Math.abs(sen) <= 5
+                : Math.abs(sen) <= tol
                   ? 'Tepat.'
                   : sen < 0
                     ? `${Math.abs(sen)} sen terlalu rendah.`
@@ -276,6 +301,15 @@ export default function TunerDrone() {
               {pesan}
             </p>
           )}
+
+          {/* #29 — grafik kestabilan nada bergulir & 3 jenjang toleransi */}
+          <PanelKestabilanNada
+            jejak={jejak}
+            toleransi={st.toleransi}
+            onToleransi={(id) => patch({ toleransi: id })}
+            sekarang={sekarang}
+            nyala={nyala}
+          />
         </div>
 
         {/* ---------------------------- Nada dengung ---------------------------- */}
@@ -478,6 +512,16 @@ export default function TunerDrone() {
           </p>
         </div>
       </div>
+
+      {/* #29 — peta kecenderungan nada per alat (memakai penala yang sama) */}
+      <PetaKecenderunganNada
+        hasil={hasil}
+        nyala={nyala}
+        a4={st.a4}
+        transposisi={tr.id}
+        onButuhMikrofon={bukaMikrofon}
+        namaBawaan={namaPemain}
+      />
     </Card>
   )
 }

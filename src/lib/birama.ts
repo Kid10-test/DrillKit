@@ -54,8 +54,15 @@ export interface HitungMundur {
    * false = hitung **tiap pulsa** saja (7/8 [2,2,3] → "1 2 3")
    */
   tiapNot: boolean
-  /** bunyi yang dipakai; 'suara' = suara manusia menyebut angka */
-  suara: 'klik' | 'kayu' | 'bel' | 'suara'
+  /**
+   * Bunyi yang dipakai; 'suara' = suara manusia menyebut angka (Web Speech).
+   *
+   * #29 — `drbeat`/`cowbell`/`rim` = klik lapangan; `nada` = **hitung
+   * bernada**: tiap angka hitungan punya nada sendiri (naik setangga) dan
+   * hitungan terakhir berbunyi ganda "siap" — murni WebAudio, tidak butuh
+   * paket suara TTS sistem operasi saat luring. `bel` = nilai lama (→ cowbell).
+   */
+  suara: 'klik' | 'kayu' | 'cowbell' | 'drbeat' | 'rim' | 'nada' | 'suara' | 'bel'
   /**
    * Ucapan per ketuk kalau `suara === 'suara'`. Kosong → angka otomatis
    * (1, 2, 3, …). Bisa diisi mis. ['siap', '1', '2'].
@@ -393,7 +400,7 @@ export function cariMeter(t: TandaBirama): MeterPilihan | undefined {
 /* ----------------------------- Hitung mundur ------------------------------ */
 
 export function hitungMundurDefault(): HitungMundur {
-  return { on: false, ulang: 1, tiapNot: false, suara: 'bel' }
+  return { on: false, ulang: 1, tiapNot: false, suara: 'cowbell' }
 }
 
 /**

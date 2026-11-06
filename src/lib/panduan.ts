@@ -68,7 +68,7 @@ const LANGKAH: [string, string][] = [
   ],
   [
     'Partitur, frasa, &amp; penala',
-    'Menu <b>Musik &amp; Metronom</b>: pasang partitur (<i>.mscz</i>/<i>.musicxml</i>/<i>.mxl</i>/<i>.pdf</i>) → <b>Tarik peta tempo</b> (sukat, BPM, rit., volta) → <b>Buka partitur</b> (filter part/seksi, <b>Pilih frasa di partitur</b> + tempo latihan, cetak buku saku Lyre A5) &amp; selaraskan MP3. Battery/Pit: <b>🥁 Perkusi</b> membaca sticking dari skor + revisi lapangan (oranye, hanya ke part perkusi anggota); <b>Pemanasan perkusi</b> di kartu Pola ritme. Kartu <b>Penala &amp; nada dengung</b>: pilih <b>Instrumen</b> (trumpet Bb, mellophone F, sax Eb), tombol <b>Bb konser</b> → <b>Putar dengung</b> → <b>Dengarkan</b>.',
+    'Menu <b>Musik &amp; Metronom</b>: pasang partitur (<i>.mscz</i>/<i>.musicxml</i>/<i>.mxl</i>/<i>.pdf</i>) → <b>Tarik peta tempo</b> (sukat, BPM, rit., volta) → <b>Buka partitur</b> (filter part/seksi, <b>Pilih frasa di partitur</b> + tempo latihan, cetak buku saku Lyre A5) &amp; selaraskan MP3. Battery/Pit: <b>🥁 Perkusi</b> membaca sticking dari skor + revisi lapangan (oranye, hanya ke part perkusi anggota); <b>Pemanasan perkusi</b> di kartu Pola ritme. Kartu <b>Penala &amp; nada dengung</b>: pilih <b>Instrumen</b> (trumpet Bb, mellophone F, sax Eb), tombol <b>Bb konser</b> → <b>Putar dengung</b> → <b>Dengarkan</b>; jenjang toleransi Pemula/Menengah/Mahir, grafik tahan stabil (scoop &amp; ekor), <b>Peta kecenderungan nada</b> per pemain → kartu A6. Klik lapangan (Dr. Beat/Cowbell/Rim) tembus megafon; <b>Birama hening</b> + <b>Mulai uji ketuk</b> mengukur tempo batin ±ms.',
   ],
   [
     'Jadwal, absensi, &amp; lomba',
@@ -268,7 +268,7 @@ function tabAnggota(): [string, string][] {
     ],
     [
       'Kuis',
-      `Latihan hafalan: ketuk di peta tempat kamu berdiri di set berikutnya, lalu <b>Kunci jawaban</b>. Dihitung <b>tepat</b> bila meleset paling jauh ${TOLERANSI_LANGKAH} langkah.`,
+      `<b>Tebak posisi</b>: ketuk di peta tempat kamu berdiri di set berikutnya, lalu <b>Kunci jawaban</b> (<b>tepat</b> bila meleset paling jauh ${TOLERANSI_LANGKAH} langkah). <b>Kuis show</b>: pilihan ganda xCount, dress, count sheet guard, simbol visual, urutan lagu &amp; tempo.`,
     ],
     [
       'Absensi',
@@ -363,7 +363,7 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
       <thead><tr><th style="width:26%">Pilih</th><th>Untuk</th></tr></thead>
       <tbody>${DAFTAR_TRANSPOSISI.map((t) => tr(`<b>${esc(t.label)}</b>`, esc(t.contoh))).join('')}</tbody>
     </table>
-    <p style="margin:2px 0 3px">Tekan <b>Putar dengung</b> (tombol cepat <b>Bb konser</b>), lalu <b>Dengarkan</b> dan mainkan nadanya. Jarum hijau di tengah (±5 sen) = tepat. Angka <b>minus</b> = terlalu rendah (dorong slide/mouthpiece masuk); <b>plus</b> = terlalu tinggi (tarik keluar).</p>`)
+    <p style="margin:2px 0 3px">Tekan <b>Putar dengung</b> (tombol cepat <b>Bb konser</b>), lalu <b>Dengarkan</b> dan mainkan nadanya. Jarum hijau di dalam pita hijau = tepat (jenjang Pemula ±15, Menengah ±8, Mahir/DCI ±3 sen); grafik di bawahnya mencatat tahan stabil, scoop, &amp; ekor nada. Angka <b>minus</b> = terlalu rendah (dorong slide/mouthpiece masuk); <b>plus</b> = terlalu tinggi (tarik keluar).</p>`)
 
   /* 5. Rekaman audio & partitur latihan */
   bagian.push(`<h2>5. Rekaman audio &amp; partitur latihan</h2>

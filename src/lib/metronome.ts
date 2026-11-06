@@ -21,7 +21,7 @@
  * tidak ada berkas audio yang perlu diunduh.
  */
 
-import type { BiramaPola, LatihTempo, PolaRitme, SuaraKlik, TingkatKlik } from '../db/types'
+import type { BiramaPola, LatihTempo, PolaRitme, SuaraKlik, SuaraKlikTersimpan, TingkatKlik } from '../db/types'
 import type { HitungMundur, TandaBirama } from './birama'
 import { rapikanNaik, tempoPutaran, terapkanLatihan, tujuanTercapai } from './tempoLatihan'
 import { createTempoTimeline, type TempoRampUnit, type TempoTimeline } from './tempoTimeline'
@@ -60,6 +60,45 @@ function hentikanSegera(
 }
 
 export type { SuaraKlik }
+
+/**
+ * #29 — pola **birama hening** (*drop-out click*): `bunyi` birama berbunyi,
+ * lalu `hening` birama senyap, berulang. Ketukan senyap tetap dilaporkan ke
+ * tampilan (`InfoKetuk.hening`) supaya pelatih ketuk bisa menilainya.
+ */
+export interface PolaHening {
+  bunyi: number
+  hening: number
+}
+
+/** #29 — pilihan siap pakai untuk birama hening. */
+export const PILIHAN_HENING: { id: string; label: string; pola: PolaHening | null }[] = [
+  { id: 'mati', label: 'Mati — klik terus', pola: null },
+  { id: '1-1', label: '1 bunyi + 1 hening', pola: { bunyi: 1, hening: 1 } },
+  { id: '2-2', label: '2 bunyi + 2 hening', pola: { bunyi: 2, hening: 2 } },
+  { id: '4-2', label: '4 bunyi + 2 hening', pola: { bunyi: 4, hening: 2 } },
+  { id: '4-4', label: '4 bunyi + 4 hening', pola: { bunyi: 4, hening: 4 } },
+  { id: '2-4', label: '2 bunyi + 4 hening (mahir)', pola: { bunyi: 2, hening: 4 } },
+]
+
+/** #29 — rapikan pola hening; tidak sah (bunyi < 1 atau hening < 1) → `null` (klik terus). */
+export function rapikanPolaHening(p: PolaHening | null | undefined): PolaHening | null {
+  if (!p) return null
+  const bunyi = Math.floor(Number(p.bunyi))
+  const hening = Math.floor(Number(p.hening))
+  if (!Number.isFinite(bunyi) || !Number.isFinite(hening) || bunyi < 1 || hening < 1) return null
+  return { bunyi: Math.min(16, bunyi), hening: Math.min(16, hening) }
+}
+
+/**
+ * #29 — apakah birama ke-`ke` (0-based, dihitung sejak lagu mulai —
+ * hitung mundur tidak ikut dihitung) jatuh di bagian senyap.
+ */
+export function biramaHening(ke: number, p: PolaHening | null | undefined): boolean {
+  const r = rapikanPolaHening(p)
+  if (!r || !Number.isFinite(ke) || ke < 0) return false
+  return Math.floor(ke) % (r.bunyi + r.hening) >= r.bunyi
+}
 
 /**
  * #6 — Jam lagu: rekaman sebagai **patokan waktu**.
@@ -354,6 +393,10 @@ export interface InfoKetuk {
   tahap?: 'hitung' | 'main'
   /** M1 — teks yang diucapkan, hanya diisi kalau hitung mundur memakai suara manusia. */
   ucap?: string
+  /** #29 — waktu `AudioContext` (detik) saat ketukan ini dijadwalkan berbunyi. */
+  waktu?: number
+  /** #29 — ketukan ini jatuh di birama hening: dijadwalkan tetapi tidak dibunyikan. */
+  hening?: boolean
 }
 
 export interface OpsiMetronom {
@@ -365,8 +408,10 @@ export interface OpsiMetronom {
   subdiv: number
   /** pola ritme per birama + poliritme; null = detak rata */
   pola?: PolaRitme | null
-  /** jenis bunyi */
-  suara?: SuaraKlik
+  /** jenis bunyi (#29: `bel` lama dibaca sebagai `cowbell`) */
+  suara?: SuaraKlikTersimpan
+  /** #29 — birama hening (*drop-out click*). Kosong = klik terus seperti dulu. */
+  hening?: PolaHening | null
   /** volume 0–1 */
   volume?: number
   /** getar tiap ketukan (HP) */
@@ -542,7 +587,12 @@ export class Metronom {
   /** #6 — bunyi yang sudah ditanam tetapi belum terdengar; bisa dibatalkan. */
   private terjadwal: { waktu: number; batalkan: () => void }[] = []
   private birama: TandaBirama | null = null
-  private suaraHitung: SuaraKlik = 'bel'
+  private suaraHitung: SuaraKlik = 'cowbell'
+  /** #29 — hitung mundur memakai hitung bernada (tanpa TTS). */
+  private hitungBernada = false
+  /** #29 — pola birama hening & penghitung birama lagu yang sudah dijadwalkan. */
+  private hening: PolaHening | null = null
+  private biramaKe = 0
   /** M1 — true kalau `opsi.pola` berisi pola buatan pemakai (bukan turunan meter). */
   private polaKustom = false
   /** M1 — ketukan & pembagian bawaan, dipakai kalau tidak ada meter sama sekali. */
@@ -594,6 +644,26 @@ export class Metronom {
     return this.timer !== null
   }
 
+  /**
+   * #29 — jam `AudioContext` saat ini (detik), untuk mencocokkan ketukan
+   * jari pemain dengan `InfoKetuk.waktu`. `null` bila mesin tidak berjalan.
+   */
+  waktuAudio(): number | null {
+    return this.ctx ? this.ctx.currentTime : null
+  }
+
+  /**
+   * #29 — perkiraan jeda keluaran audio (detik): klik yang dijadwalkan di
+   * `t` baru terdengar di `t + latensi`. Pemain mengetuk mengikuti yang
+   * DIDENGAR, jadi pelatih ketuk mengurangkan nilai ini.
+   */
+  latensiKeluar(): number {
+    const c = this.ctx as (AudioContext & { outputLatency?: number }) | null
+    if (!c) return 0
+    const v = (c.outputLatency ?? 0) || c.baseLatency || 0
+    return Number.isFinite(v) && v > 0 && v < 0.5 ? v : 0
+  }
+
   /*
    * Dulu ada `get tempo()` yang mengembalikan `hitungBpm(1)` — tempo pada
    * BIRAMA PERTAMA. N9: ia dihapus, bukan diperbaiki.
@@ -610,7 +680,10 @@ export class Metronom {
   mulai(opsi: OpsiMetronom) {
     this.berhenti()
     this.bpmDasar = this.batasi(opsi.bpm)
-    this.suara = opsi.suara ?? 'klik'
+    this.suara = normalisasiSuaraKlik(opsi.suara ?? 'klik')
+    this.hening = rapikanPolaHening(opsi.hening)
+    this.biramaKe = 0
+    this.hitungBernada = false
     this.volume = Math.min(1, Math.max(0, opsi.volume ?? 0.8))
     this.getar = opsi.getar ?? false
     this.latih = opsi.latih && opsi.latih.on ? opsi.latih : null
@@ -705,7 +778,8 @@ export class Metronom {
      * hitung mundur penuh, dan penomoran biramanya meleset.
      */
     if (h && h.on && ctxHitungValid(h) && this.birama && !this.jam) {
-      this.suaraHitung = h.suara === 'suara' ? 'bel' : h.suara
+      this.hitungBernada = h.suara === 'nada'
+      this.suaraHitung = h.suara === 'suara' || h.suara === 'nada' ? 'cowbell' : normalisasiSuaraKlik(h.suara)
       waktu = this.jadwalkanHitungMundur(h, waktu, mulaiDari)
     }
     this.waktuBirama = waktu
@@ -949,7 +1023,11 @@ export class Metronom {
     for (let r = 0; r < ulang; r++) {
       for (let i = 0; i < posisi.length; i++) {
         const w = waktu + posisi[i] * perNot
-        this.bunyiHitung(ctx, w, posisi[i] === 0)
+        if (this.hitungBernada) {
+          bunyikanHitungBernada(ctx, w, this.volume * 0.8, nadaHitungBernada(i, posisi.length, r === ulang - 1))
+        } else {
+          this.bunyiHitung(ctx, w, posisi[i] === 0)
+        }
         this.antrean.push({
           waktu: w,
           info: {
@@ -963,6 +1041,7 @@ export class Metronom {
             suara: 1,
             tahap: 'hitung',
             ucap: h.suara === 'suara' ? ucapan[i] : undefined,
+            waktu: w,
           },
         })
       }
@@ -990,7 +1069,7 @@ export class Metronom {
     while (this.antrean.length && this.antrean[0].waktu <= ctx.currentTime) {
       const e = this.antrean.shift()!
       this.onKetuk(e.info)
-      if (this.getar) bergetar(e.info.sel === 2 ? 28 : 12)
+      if (this.getar && !e.info.hening) bergetar(e.info.sel === 2 ? 28 : 12)
     }
 
     /*
@@ -1165,6 +1244,9 @@ export class Metronom {
       const durasiBarLagu = timeline
         ? timeline.secondsBetween(barMulaiQ, barSelesaiQ, praktikJam)
         : bar.beats * this.detikPerNotUntuk(this.hitungBpm(biramaAbsolut), meterAktif)
+      // #29 — birama hening: ketukan tetap dijadwalkan & dilaporkan, tanpa bunyi.
+      const senyap = biramaHening(this.biramaKe, this.hening)
+      this.biramaKe++
 
       // Pola utama: tiap kotak ditempatkan pada posisi notasinya, lalu waktu
       // dihitung dengan evaluator (termasuk perubahan tempo di tengah birama).
@@ -1184,7 +1266,7 @@ export class Metronom {
          * berbunyi bertumpuk sesudah lompatan.
          */
         if (jam && waktu < ctx.currentTime - 0.03) continue
-        this.terjadwal.push({ waktu, batalkan: this.bunyi(ctx, waktu, sel === 2) })
+        if (!senyap) this.terjadwal.push({ waktu, batalkan: this.bunyi(ctx, waktu, sel === 2) })
         this.antrean.push({
           waktu,
           info: {
@@ -1197,6 +1279,8 @@ export class Metronom {
             bpm: timeline?.tempoAtQuarter(quarter, this.latihan) ?? this.hitungBpm(biramaAbsolut),
             bpmAsli: timeline?.tempoAtQuarter(quarter) ?? this.hitungBpmAsli(biramaAbsolut),
             suara: 1,
+            waktu,
+            hening: senyap || undefined,
           },
         })
       }
@@ -1214,7 +1298,7 @@ export class Metronom {
             : (durasiBarLagu * j) / jumlah
           const waktu = awalCtx + offset / laju
           if (jam && waktu < ctx.currentTime - 0.03) continue
-          this.terjadwal.push({ waktu, batalkan: this.bunyi(ctx, waktu, sel === 2, true) })
+          if (!senyap) this.terjadwal.push({ waktu, batalkan: this.bunyi(ctx, waktu, sel === 2, true) })
           this.antrean.push({
             waktu,
             info: {
@@ -1226,6 +1310,8 @@ export class Metronom {
               bpm: timeline?.tempoAtQuarter(quarter, this.latihan) ?? this.hitungBpm(biramaAbsolut),
               bpmAsli: timeline?.tempoAtQuarter(quarter) ?? this.hitungBpmAsli(biramaAbsolut),
               suara: 2,
+              waktu,
+              hening: senyap || undefined,
             },
           })
         }
@@ -1250,133 +1336,396 @@ export class Metronom {
     }
   }
 
-  /** Satu bunyi klik. `aksen` = lebih keras & lebih tinggi, `kedua` = suara poliritme. */
   /**
    * #6 — bunyikan satu ketukan; kembalikan cara membatalkannya.
    *
    * Pembatalan dipakai kalau rekaman melompat (ulang bagian, geser): klik
    * yang sudah ditanam untuk posisi lama tetapi belum berbunyi harus dibuang,
    * kalau tidak ia berbunyi di tempat yang sudah tidak cocok lagi.
+   *
+   * #29 — sintesisnya dipindah ke `bunyikanKlik` (fungsi modul) supaya bisa
+   * dirender di `OfflineAudioContext` dan diukur spektrumnya oleh uji.
    */
   private bunyi(ctx: AudioContext, waktu: number, aksen: boolean, kedua = false): () => void {
-    const v = this.volume * (aksen ? 0.22 : 0.12)
-    if (v <= 0) return () => undefined
-    if (this.suara === 'kayu') return this.bunyiKayu(ctx, waktu, v, aksen, kedua)
-    if (this.suara === 'bel') return this.bunyiBel(ctx, waktu, v, aksen, kedua)
-    if (this.suara === 'snare') return this.bunyiSnare(ctx, waktu, v, aksen, kedua)
-    return this.bunyiKlik(ctx, waktu, v, aksen, kedua)
+    return bunyikanKlik(ctx, this.suara, waktu, this.volume, aksen, kedua)
   }
+}
 
-  private bunyiKlik(ctx: AudioContext, waktu: number, v: number, aksen: boolean, kedua: boolean) {
+/* ------------------------- #29 — sintesis bunyi klik ------------------------- */
+
+/** #29 — tiga profil klik lapangan beserta forman (pusat energi) bunyinya. */
+export const PROFIL_KLIK_LAPANGAN: Record<
+  'drbeat' | 'cowbell' | 'rim',
+  { label: string; forman: number; keterangan: string }
+> = {
+  drbeat: {
+    label: 'Dr. Beat (lapangan)',
+    forman: 3200,
+    keterangan: 'pip elektronik tajam ala metronom panggung — paling tembus di megafon',
+  },
+  cowbell: {
+    label: 'Cowbell (lapangan)',
+    forman: 2800,
+    keterangan: 'bel sapi logam, terdengar di atas brass tanpa terasa menusuk',
+  },
+  rim: {
+    label: 'Rim (lapangan)',
+    forman: 3600,
+    keterangan: 'pukulan pinggir drum kering — tetap terdengar di tengah battery',
+  },
+}
+
+/** #29 — apakah sebuah bunyi termasuk klik lapangan (melewati rantai forman + kompresor). */
+export function klikLapangan(s: SuaraKlik): s is 'drbeat' | 'cowbell' | 'rim' {
+  return s === 'drbeat' || s === 'cowbell' || s === 'rim'
+}
+
+/**
+ * #29 — baca nilai `suara` dari lagu/cadangan/hitung mundur lama dengan aman.
+ * `bel` (sebelum v2.3.2) = `cowbell`; nilai tak dikenal jatuh ke `klik`.
+ */
+export function normalisasiSuaraKlik(s: unknown): SuaraKlik {
+  if (s === 'bel') return 'cowbell'
+  return s === 'klik' || s === 'kayu' || s === 'snare' || s === 'drbeat' || s === 'cowbell' || s === 'rim'
+    ? s
+    : 'klik'
+}
+
+/** Derau putih 0,25 dtk per AudioContext (snare & rim). */
+const derauPerCtx = new WeakMap<BaseAudioContext, AudioBuffer>()
+function derauUntuk(ctx: BaseAudioContext): AudioBuffer {
+  let buf = derauPerCtx.get(ctx)
+  if (!buf) {
+    const panjang = Math.floor(ctx.sampleRate * 0.25)
+    buf = ctx.createBuffer(1, panjang, ctx.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let i = 0; i < panjang; i++) data[i] = Math.random() * 2 - 1
+    derauPerCtx.set(ctx, buf)
+  }
+  return buf
+}
+
+/**
+ * #29 — rantai keluaran klik lapangan: penguat forman 3,2 kHz (+9 dB) →
+ * kompresor cepat → penguat susulan. Dibuat sekali per AudioContext lalu
+ * dipakai bersama, jadi menambah klik tidak menambah simpul permanen.
+ */
+const rantaiPerCtx = new WeakMap<BaseAudioContext, AudioNode>()
+function rantaiLapangan(ctx: BaseAudioContext, tujuan: AudioNode): AudioNode {
+  if (tujuan !== ctx.destination) return buatRantaiLapangan(ctx, tujuan)
+  let r = rantaiPerCtx.get(ctx)
+  if (!r) {
+    r = buatRantaiLapangan(ctx, tujuan)
+    rantaiPerCtx.set(ctx, r)
+  }
+  return r
+}
+function buatRantaiLapangan(ctx: BaseAudioContext, tujuan: AudioNode): AudioNode {
+  const forman = ctx.createBiquadFilter()
+  forman.type = 'peaking'
+  forman.frequency.value = 3200
+  forman.Q.value = 1.1
+  forman.gain.value = 9
+  const potong = ctx.createBiquadFilter()
+  // Buang dengung rendah yang hanya memakan daya ampli tanpa menambah keterdengaran.
+  potong.type = 'highpass'
+  potong.frequency.value = 450
+  const komp = ctx.createDynamicsCompressor()
+  komp.threshold.value = -20
+  komp.knee.value = 6
+  komp.ratio.value = 6
+  komp.attack.value = 0.001
+  komp.release.value = 0.08
+  const susul = ctx.createGain()
+  susul.gain.value = 1.8
+  forman.connect(potong)
+  potong.connect(komp)
+  komp.connect(susul)
+  susul.connect(tujuan)
+  return forman
+}
+
+/**
+ * #29 — sintesis satu klik metronom di `waktu`. `volume` 0–1 (volume
+ * pemakai); `aksen` lebih keras/tinggi; `kedua` = suara poliritme.
+ * Mengembalikan fungsi pembatal (lihat `hentikanSegera`).
+ *
+ * Sengaja menerima `BaseAudioContext` supaya bisa dirender luring
+ * (`OfflineAudioContext`) dan diukur — uji memeriksa forman klik lapangan
+ * benar-benar jatuh di 2,5–4 kHz, bukan sekadar percaya pada komentar.
+ */
+export function bunyikanKlik(
+  ctx: BaseAudioContext,
+  suara: SuaraKlik,
+  waktu: number,
+  volume: number,
+  aksen: boolean,
+  kedua = false,
+  tujuan: AudioNode = ctx.destination,
+): () => void {
+  const v = volume * (aksen ? 0.22 : 0.12)
+  if (v <= 0) return () => undefined
+  switch (suara) {
+    case 'kayu':
+      return bunyiKayu(ctx, tujuan, waktu, v, aksen, kedua)
+    case 'snare':
+      return bunyiSnare(ctx, tujuan, waktu, v, aksen, kedua)
+    case 'drbeat':
+      return bunyiDrBeat(ctx, rantaiLapangan(ctx, tujuan), waktu, v, aksen, kedua)
+    case 'cowbell':
+      return bunyiCowbell(ctx, rantaiLapangan(ctx, tujuan), waktu, v, aksen, kedua)
+    case 'rim':
+      return bunyiRim(ctx, rantaiLapangan(ctx, tujuan), waktu, v, aksen, kedua)
+    default:
+      return bunyiKlik(ctx, tujuan, waktu, v, aksen, kedua)
+  }
+}
+
+function bunyiKlik(ctx: BaseAudioContext, ke: AudioNode, waktu: number, v: number, aksen: boolean, kedua: boolean) {
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+  osc.connect(gain)
+  gain.connect(ke)
+  osc.type = 'sine'
+  osc.frequency.value = kedua ? (aksen ? 1500 : 1100) : aksen ? 1400 : 1000
+  gain.gain.setValueAtTime(v, waktu)
+  gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.05)
+  osc.start(waktu)
+  osc.stop(waktu + 0.07)
+  return hentikanSegera(osc, gain)
+}
+
+/** Woodblock: segitiga pendek dengan bunyi "tok" yang lebih padat. */
+function bunyiKayu(ctx: BaseAudioContext, ke: AudioNode, waktu: number, v: number, aksen: boolean, kedua: boolean) {
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+  osc.connect(gain)
+  gain.connect(ke)
+  osc.type = 'triangle'
+  osc.frequency.setValueAtTime(kedua ? 1200 : aksen ? 1000 : 820, waktu)
+  osc.frequency.exponentialRampToValueAtTime(kedua ? 700 : aksen ? 560 : 480, waktu + 0.03)
+  gain.gain.setValueAtTime(v * 1.2, waktu)
+  gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.045)
+  osc.start(waktu)
+  osc.stop(waktu + 0.06)
+  return hentikanSegera(osc, gain)
+}
+
+/**
+ * #28 — Klik *snare* untuk pemanasan battery: derau bandpass (kawat snare)
+ * + badan segitiga pendek. Suara kedua (poliritme) memakai rim click.
+ */
+function bunyiSnare(ctx: BaseAudioContext, ke: AudioNode, waktu: number, v: number, aksen: boolean, kedua: boolean): () => void {
+  if (kedua) {
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
+    osc.type = 'square'
+    osc.frequency.value = 1700
     osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.type = 'sine'
-    osc.frequency.value = kedua ? (aksen ? 1500 : 1100) : aksen ? 1400 : 1000
-    gain.gain.setValueAtTime(v, waktu)
-    gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.05)
+    gain.connect(ke)
+    gain.gain.setValueAtTime(v * 0.6, waktu)
+    gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.03)
     osc.start(waktu)
-    osc.stop(waktu + 0.07)
+    osc.stop(waktu + 0.04)
     return hentikanSegera(osc, gain)
   }
+  const derau = ctx.createBufferSource()
+  derau.buffer = derauUntuk(ctx)
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'bandpass'
+  filter.frequency.value = aksen ? 3000 : 2600
+  filter.Q.value = 0.9
+  const gDerau = ctx.createGain()
+  derau.connect(filter)
+  filter.connect(gDerau)
+  gDerau.connect(ke)
+  const panjangEkor = aksen ? 0.16 : 0.11
+  gDerau.gain.setValueAtTime(v * (aksen ? 1.7 : 1.3), waktu)
+  gDerau.gain.exponentialRampToValueAtTime(0.0001, waktu + panjangEkor)
+  const badan = ctx.createOscillator()
+  const gBadan = ctx.createGain()
+  badan.type = 'triangle'
+  badan.frequency.setValueAtTime(aksen ? 260 : 230, waktu)
+  badan.frequency.exponentialRampToValueAtTime(160, waktu + 0.05)
+  badan.connect(gBadan)
+  gBadan.connect(ke)
+  gBadan.gain.setValueAtTime(v * 1.1, waktu)
+  gBadan.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.07)
+  derau.start(waktu)
+  derau.stop(waktu + panjangEkor + 0.02)
+  badan.start(waktu)
+  badan.stop(waktu + 0.09)
+  return hentikanSegera([derau, badan], filter, gDerau, gBadan)
+}
 
-  /** Woodblock: segitiga pendek dengan bunyi "tok" yang lebih padat. */
-  private bunyiKayu(ctx: AudioContext, waktu: number, v: number, aksen: boolean, kedua: boolean) {
+/**
+ * #29 — Dr. Beat: pip elektronik pendek. Kotak di separuh forman (harmonik
+ * ganjilnya mengisi 2,5–4 kHz) + sinus tepat di forman untuk "gigitan",
+ * disaring bandpass sempit. Aksen naik sepertiga (seperti aksen metronom
+ * panggung), suara kedua turun.
+ */
+function bunyiDrBeat(ctx: BaseAudioContext, ke: AudioNode, waktu: number, v: number, aksen: boolean, kedua: boolean) {
+  const forman = PROFIL_KLIK_LAPANGAN.drbeat.forman * (kedua ? 0.8 : aksen ? 1.12 : 1)
+  const bp = ctx.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.frequency.value = forman
+  bp.Q.value = 1.6
+  const gain = ctx.createGain()
+  bp.connect(gain)
+  gain.connect(ke)
+  const kotak = ctx.createOscillator()
+  kotak.type = 'square'
+  kotak.frequency.value = forman / 2
+  const sinus = ctx.createOscillator()
+  sinus.type = 'sine'
+  sinus.frequency.value = forman
+  const gSinus = ctx.createGain()
+  gSinus.gain.value = 0.8
+  kotak.connect(bp)
+  sinus.connect(gSinus)
+  gSinus.connect(bp)
+  const ekor = aksen ? 0.06 : 0.04
+  gain.gain.setValueAtTime(v * 2.2, waktu)
+  gain.gain.setValueAtTime(v * 2.2, waktu + 0.012)
+  gain.gain.exponentialRampToValueAtTime(0.0001, waktu + ekor)
+  kotak.start(waktu)
+  sinus.start(waktu)
+  kotak.stop(waktu + ekor + 0.02)
+  sinus.stop(waktu + ekor + 0.02)
+  return hentikanSegera([kotak, sinus], bp, gSinus, gain)
+}
+
+/**
+ * #29 — Cowbell lapangan (pengganti `bel`): dua osilator kotak berjarak
+ * ~6th seperti bel sapi, tetapi badan logamnya disaring ke forman 2,8 kHz
+ * sehingga energinya pindah ke wilayah yang tembus ampli.
+ */
+function bunyiCowbell(ctx: BaseAudioContext, ke: AudioNode, waktu: number, v: number, aksen: boolean, kedua: boolean) {
+  const bp = ctx.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.frequency.value = PROFIL_KLIK_LAPANGAN.cowbell.forman * (kedua ? 0.9 : 1)
+  bp.Q.value = 2.2
+  const gain = ctx.createGain()
+  bp.connect(gain)
+  gain.connect(ke)
+  const osilator: OscillatorNode[] = []
+  for (const f of kedua ? [680, 1010] : aksen ? [620, 930] : [540, 800]) {
     const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
+    osc.type = 'square'
+    osc.frequency.value = f
+    osc.connect(bp)
+    osc.start(waktu)
+    osc.stop(waktu + (aksen ? 0.22 : 0.16))
+    osilator.push(osc)
+  }
+  gain.gain.setValueAtTime(v * 2.4, waktu)
+  gain.gain.exponentialRampToValueAtTime(v * 0.6, waktu + 0.03)
+  gain.gain.exponentialRampToValueAtTime(0.0001, waktu + (aksen ? 0.2 : 0.14))
+  return hentikanSegera(osilator, bp, gain)
+}
+
+/**
+ * #29 — Rim lapangan: semburan derau 20 ms disaring sempit di 3,6 kHz
+ * (retakan kayu/logam pinggir drum) + denting segitiga pendek.
+ */
+function bunyiRim(ctx: BaseAudioContext, ke: AudioNode, waktu: number, v: number, aksen: boolean, kedua: boolean) {
+  const forman = PROFIL_KLIK_LAPANGAN.rim.forman * (kedua ? 0.85 : 1)
+  const derau = ctx.createBufferSource()
+  derau.buffer = derauUntuk(ctx)
+  const bp = ctx.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.frequency.value = forman
+  bp.Q.value = 2.4
+  const gDerau = ctx.createGain()
+  derau.connect(bp)
+  bp.connect(gDerau)
+  gDerau.connect(ke)
+  const ekor = aksen ? 0.035 : 0.022
+  gDerau.gain.setValueAtTime(v * 3.2, waktu)
+  gDerau.gain.exponentialRampToValueAtTime(0.0001, waktu + ekor)
+  const ping = ctx.createOscillator()
+  ping.type = 'triangle'
+  // Nada "tok" pelek tetap di dalam pita tembus megafon (2,5–4 kHz).
+  ping.frequency.value = forman * (aksen ? 0.8 : 0.74)
+  const gPing = ctx.createGain()
+  ping.connect(gPing)
+  gPing.connect(ke)
+  gPing.gain.setValueAtTime(v * 0.9, waktu)
+  gPing.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.03)
+  derau.start(waktu)
+  derau.stop(waktu + ekor + 0.01)
+  ping.start(waktu)
+  ping.stop(waktu + 0.04)
+  return hentikanSegera([derau, ping], bp, gDerau, gPing)
+}
+
+/* --------------------- #29 — hitung masuk bernada (tanpa TTS) --------------------- */
+
+/** Tangga mayor (semitone) untuk tangga nada hitung masuk. */
+const TANGGA_HITUNG = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19]
+
+/**
+ * #29 — nada untuk ketukan hitung masuk ke-`i` (0-based) dari `jumlah`
+ * ketukan per putaran. Nada naik setangga mayor dari 880 Hz, jadi telinga
+ * tahu "ini hitungan ke berapa" tanpa ucapan; ketukan TERAKHIR di putaran
+ * terakhir berbunyi ganda ("siap-") agar semua masuk bersamaan.
+ */
+export function nadaHitungBernada(
+  i: number,
+  jumlah: number,
+  putaranTerakhir: boolean,
+): { hz: number; ganda: boolean; aksen: boolean } {
+  const k = Math.max(0, Math.floor(i))
+  const langkah = TANGGA_HITUNG[k % TANGGA_HITUNG.length] + 12 * Math.floor(k / TANGGA_HITUNG.length)
+  return {
+    hz: Math.round(880 * Math.pow(2, langkah / 12) * 100) / 100,
+    ganda: putaranTerakhir && k === Math.max(1, Math.floor(jumlah)) - 1,
+    aksen: k === 0,
+  }
+}
+
+/** #29 — sintesis satu ketukan hitung bernada (lewat rantai lapangan agar tembus). */
+export function bunyikanHitungBernada(
+  ctx: BaseAudioContext,
+  waktu: number,
+  volume: number,
+  nada: { hz: number; ganda: boolean; aksen: boolean },
+  tujuan: AudioNode = ctx.destination,
+): () => void {
+  const v = volume * (nada.aksen ? 0.22 : 0.16)
+  if (v <= 0) return () => undefined
+  const ke = rantaiLapangan(ctx, tujuan)
+  const batal: (() => void)[] = []
+  const pip = (t: number, hz: number, panjang: number) => {
+    const osc = ctx.createOscillator()
     osc.type = 'triangle'
-    osc.frequency.setValueAtTime(kedua ? 1200 : aksen ? 1000 : 820, waktu)
-    osc.frequency.exponentialRampToValueAtTime(kedua ? 700 : aksen ? 560 : 480, waktu + 0.03)
-    gain.gain.setValueAtTime(v * 1.2, waktu)
-    gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.045)
-    osc.start(waktu)
-    osc.stop(waktu + 0.06)
-    return hentikanSegera(osc, gain)
+    osc.frequency.value = hz
+    const atas = ctx.createOscillator()
+    atas.type = 'sine'
+    atas.frequency.value = hz * 3
+    const gAtas = ctx.createGain()
+    gAtas.gain.value = 0.35
+    const g = ctx.createGain()
+    osc.connect(g)
+    atas.connect(gAtas)
+    gAtas.connect(g)
+    g.connect(ke)
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(v * 2, t + 0.004)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + panjang)
+    osc.start(t)
+    atas.start(t)
+    osc.stop(t + panjang + 0.02)
+    atas.stop(t + panjang + 0.02)
+    batal.push(hentikanSegera([osc, atas], gAtas, g))
   }
-
-  /** #28 — derau putih 0,25 dtk, dibuat sekali per AudioContext. */
-  private derauSnare: AudioBuffer | null = null
-
-  /**
-   * #28 — Klik *snare* untuk pemanasan battery: derau bandpass (kawat snare)
-   * + badan segitiga pendek. Suara kedua (poliritme) memakai rim click.
-   */
-  private bunyiSnare(ctx: AudioContext, waktu: number, v: number, aksen: boolean, kedua: boolean): () => void {
-    if (kedua) {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'square'
-      osc.frequency.value = 1700
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      gain.gain.setValueAtTime(v * 0.6, waktu)
-      gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.03)
-      osc.start(waktu)
-      osc.stop(waktu + 0.04)
-      return hentikanSegera(osc, gain)
-    }
-    if (!this.derauSnare || this.derauSnare.sampleRate !== ctx.sampleRate) {
-      const panjang = Math.floor(ctx.sampleRate * 0.25)
-      const buf = ctx.createBuffer(1, panjang, ctx.sampleRate)
-      const data = buf.getChannelData(0)
-      for (let i = 0; i < panjang; i++) data[i] = Math.random() * 2 - 1
-      this.derauSnare = buf
-    }
-    const derau = ctx.createBufferSource()
-    derau.buffer = this.derauSnare
-    const filter = ctx.createBiquadFilter()
-    filter.type = 'bandpass'
-    filter.frequency.value = aksen ? 3000 : 2600
-    filter.Q.value = 0.9
-    const gDerau = ctx.createGain()
-    derau.connect(filter)
-    filter.connect(gDerau)
-    gDerau.connect(ctx.destination)
-    const panjangEkor = aksen ? 0.16 : 0.11
-    gDerau.gain.setValueAtTime(v * (aksen ? 1.7 : 1.3), waktu)
-    gDerau.gain.exponentialRampToValueAtTime(0.0001, waktu + panjangEkor)
-    const badan = ctx.createOscillator()
-    const gBadan = ctx.createGain()
-    badan.type = 'triangle'
-    badan.frequency.setValueAtTime(aksen ? 260 : 230, waktu)
-    badan.frequency.exponentialRampToValueAtTime(160, waktu + 0.05)
-    badan.connect(gBadan)
-    gBadan.connect(ctx.destination)
-    gBadan.gain.setValueAtTime(v * 1.1, waktu)
-    gBadan.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.07)
-    derau.start(waktu)
-    derau.stop(waktu + panjangEkor + 0.02)
-    badan.start(waktu)
-    badan.stop(waktu + 0.09)
-    return hentikanSegera([derau, badan], filter, gDerau, gBadan)
+  if (nada.ganda) {
+    pip(waktu, nada.hz, 0.06)
+    pip(waktu + 0.09, nada.hz * 2, 0.09)
+  } else {
+    pip(waktu, nada.hz, nada.aksen ? 0.14 : 0.1)
   }
-
-  /** Cowbell: dua osilator kotak (interval ~6th) seperti bel sapi. */
-  private bunyiBel(ctx: AudioContext, waktu: number, v: number, aksen: boolean, kedua: boolean): () => void {
-    const gain = ctx.createGain()
-    const filter = ctx.createBiquadFilter()
-    filter.type = 'bandpass'
-    filter.frequency.value = kedua ? 2600 : 2200
-    filter.Q.value = 4
-    gain.connect(filter)
-    filter.connect(ctx.destination)
-    const osilator: OscillatorNode[] = []
-    for (const f of kedua ? [680, 1010] : aksen ? [620, 930] : [540, 800]) {
-      const osc = ctx.createOscillator()
-      osc.type = 'square'
-      osc.frequency.value = f
-      osc.connect(gain)
-      osc.start(waktu)
-      osc.stop(waktu + 0.14)
-      osilator.push(osc)
-    }
-    gain.gain.setValueAtTime(v * 0.5, waktu)
-    gain.gain.exponentialRampToValueAtTime(0.0001, waktu + 0.16)
-    return hentikanSegera(osilator, gain)
-  }
+  return () => batal.forEach((b) => b())
 }
 
 /** Getar pendek — diam-diam dilewati kalau browser/HP tidak mendukung. */

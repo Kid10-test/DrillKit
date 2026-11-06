@@ -168,6 +168,11 @@ rakit src/lib/pyware.ts     pyware
 rakit src/lib/pywareTulis.ts pywareTulis
 rakit src/lib/simpanAnggota.ts simpanAnggota
 # #8 — PIN pelatih tim (PBKDF2). Hash kosong = perilaku lama.
+# #29 — Studio Intonasi & Ketuk Presisi: grafik kestabilan & peta kecenderungan
+# nada, pelatih ketuk birama hening, dan kartu saku peta nada A6/A5.
+rakit src/lib/intonasi.ts                intonasi
+rakit src/lib/pelatihKetuk.ts            pelatihKetuk
+rakit src/lib/petaNadaCetak.ts           petaNadaCetak
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'

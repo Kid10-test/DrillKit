@@ -274,7 +274,7 @@ console.log('\n— Hitung mundur —')
     uji('pratinjau ucapan menampilkan 1 · 2 · 3', /1 · 2 · 3/.test(pratinjau), pratinjau)
     uji('pratinjau menyebut diulang 2×', /diulang 2×/.test(pratinjau), pratinjau)
   }
-  await pilihBerdasarkanTeks('[data-testid="hm-suara"]', 'Bel (cowbell)')
+  await pilihBerdasarkanTeks('[data-testid="hm-suara"]', 'Cowbell (lapangan)')
 }
 
 console.log('\n— Mulai dari birama 45 + hitung mundur benar-benar berjalan —')
