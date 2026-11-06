@@ -608,6 +608,11 @@ export interface SetelanPenala {
    * trumpet dan HP pemain mellophone memang harus berbeda.
    */
   transposisi: string
+  /**
+   * #29 — jenjang toleransi intonasi (`pemula` ±15 · `menengah` ±8 ·
+   * `mahir` ±3 sen). Menentukan pita hijau jarum & grafik kestabilan.
+   */
+  toleransi: 'pemula' | 'menengah' | 'mahir'
 }
 
 const KUNCI_SETELAN = 'drillkit.penala'
@@ -622,6 +627,7 @@ export const SETELAN_BAKU: SetelanPenala = {
   harmoni: 'kuinta',
   temperamen: 'murni',
   transposisi: 'c',
+  toleransi: 'menengah',
 }
 
 /** Baca setelan tersimpan; kalau gagal (mode penyamaran/penyimpanan penuh) pakai bawaan. */
@@ -654,6 +660,8 @@ export function bacaSetelan(): SetelanPenala {
       // Setelan dari versi sebelum J1 tidak punya kolom ini → konser, persis
       // perilaku lama. Id yang tidak dikenal juga jatuh ke konser.
       transposisi: cariTransposisi(typeof d.transposisi === 'string' ? d.transposisi : undefined).id,
+      // #29 — setelan lama tanpa kolom ini → Menengah (±8 sen).
+      toleransi: d.toleransi === 'pemula' || d.toleransi === 'mahir' ? d.toleransi : 'menengah',
     }
   } catch {
     return { ...SETELAN_BAKU }

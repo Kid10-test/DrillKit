@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import type {
@@ -20,13 +20,18 @@ import type {
 } from '../db/types'
 import {
   Metronom,
+  PILIHAN_HENING,
+  PROFIL_KLIK_LAPANGAN,
   jepitTempo,
   jejakLuncuran,
+  normalisasiSuaraKlik,
   polaBaku,
   putarSel,
   rapikanBirama,
   ringkasLuncuran,
 } from '../lib/metronome'
+import { PelatihKetuk } from '../components/musik/PelatihKetuk'
+import { bisaUcap, daftarSuara } from '../lib/ucap'
 import { createTempoTimeline } from '../lib/tempoTimeline'
 import type { InfoKetuk, JamLagu } from '../lib/metronome'
 import {
@@ -197,6 +202,15 @@ export default function Music({
   const [latih, setLatih] = useState<LatihTempo>({ on: false, dari: 100, ke: 140, langkah: 2, tiap: 4 })
   /** Jenis bunyi, getar, dan volume. */
   const [suara, setSuara] = useState<SuaraKlik>('klik')
+  /** #29 — birama hening (drop-out click) & pendengar uji ketuk. */
+  const [polaHening, setPolaHening] = useState('mati')
+  const heningAktif = PILIHAN_HENING.find((p) => p.id === polaHening)?.pola ?? null
+  const pendengarKetukRef = useRef<((i: InfoKetuk) => void) | null>(null)
+  /** #29 — pendengar ketukan untuk uji ketuk (stabil antar-render). */
+  const daftarkanPendengarKetuk = useCallback((fn: ((i: InfoKetuk) => void) | null) => {
+    pendengarKetukRef.current = fn
+  }, [])
+
   const [getar, setGetar] = useState(false)
   const [volume, setVolume] = useState(0.8)
   /** Kotak yang sedang berbunyi — untuk menyorot editor pola. */
@@ -513,7 +527,7 @@ export default function Music({
         setPola(song.pola ?? null)
         setPakaiPola(!!song.pola && song.pola.bars.length > 0)
         setLatih(song.latih ?? { on: false, dari: song.bpm, ke: song.bpm + 20, langkah: 2, tiap: 4 })
-        setSuara(song.suara ?? 'klik')
+        setSuara(normalisasiSuaraKlik(song.suara ?? 'klik'))
         setGetar(song.getar === 1)
         setVolume(song.volume ?? 0.8)
       }
@@ -682,7 +696,8 @@ export default function Music({
         pakaiTempoMap: useMap && segs.length > 0,
         birama,
         mulaiDari: mulai,
-        hitungMundur: jam ? null : hitungMundur,
+        hitungMundur: jam ? null : hitungMundurSiap(hitungMundur),
+        hening: heningAktif,
         jam,
         // M5 — batas akhir lagu & ulang.
         biramaAkhir: panjangBirama,
@@ -723,6 +738,7 @@ export default function Music({
           setPutaran(null)
         },
         onKetuk: (i) => {
+          pendengarKetukRef.current?.(i)
           setMeasure(i.birama)
           setAktif(i)
           // M1 — ucapkan angka hitung mundur. Ucapan hanya lapisan: ketukannya
@@ -805,7 +821,7 @@ export default function Music({
       beats: meter.pembilang,
       subdiv,
       pola: pakaiPolaLagu ? s.pola : null,
-      suara: s.suara ?? suara,
+      suara: normalisasiSuaraKlik(s.suara ?? suara),
       volume: s.rekaman?.modeBunyi === 'rekaman' ? 0 : (s.volume ?? volume) * (s.rekaman?.volumeKlik ?? 1.0),
       getar: s.getar === 1 || getar,
       latih: s.latih ?? null,
@@ -818,7 +834,8 @@ export default function Music({
       // #6 — rekaman menjadi patokan waktu; hitung mundur dimatikan (kalau
       // tidak, klik tertinggal satu hitung mundur penuh dari lagunya).
       jam: s.rekaman ? jamLagu(s.rekaman) : null,
-      hitungMundur: s.rekaman ? null : hitungMundur,
+      hitungMundur: s.rekaman ? null : hitungMundurSiap(hitungMundur),
+      hening: heningAktif,
       // M5 — berhenti di akhir lagu ini, lalu `selesai` memajukan set list.
       biramaAkhir: s.panjangBirama ?? 0,
       ulang: false,
@@ -827,6 +844,7 @@ export default function Music({
         selesai()
       },
       onKetuk: (i: InfoKetuk) => {
+        pendengarKetukRef.current?.(i)
         setMeasure(i.birama)
         setAktif(i)
         if (i.tahap === 'hitung' && i.ucap) ucapkan(i.ucap)
@@ -1338,8 +1356,14 @@ export default function Music({
               >
                 <option value="klik">Klik (nada)</option>
                 <option value="kayu">Kayu (woodblock)</option>
-                <option value="bel">Bel (cowbell)</option>
                 <option value="snare">Snare (battery)</option>
+                <optgroup label="Klik lapangan — tembus megafon/ampli">
+                  {(['drbeat', 'cowbell', 'rim'] as const).map((id) => (
+                    <option key={id} value={id}>
+                      {PROFIL_KLIK_LAPANGAN[id].label}
+                    </option>
+                  ))}
+                </optgroup>
               </Select>
             </Field>
             <Field label={`Volume ${Math.round(volume * 100)}%`}>
@@ -1372,6 +1396,23 @@ export default function Music({
             <h3 className="mb-2 text-xs font-semibold text-slate-300">Hitung mundur</h3>
             <AturHitungMundur nilai={hitungMundur} onChange={setHitungMundur} birama={birama} />
           </div>
+
+          {/* #29 — birama hening & uji ketuk (memakai mesin metronom yang sama) */}
+          <PelatihKetuk
+            engine={engineRef.current}
+            berjalan={running}
+            polaHening={polaHening}
+            onPolaHening={(id) => {
+              setPolaHening(id)
+              // Pola hening dibaca saat mesin dinyalakan → nyalakan ulang bila sedang jalan.
+              if (running) toast.push('Birama hening berlaku saat metronom dimulai lagi')
+            }}
+            onMulai={() => nyalakan(mulaiDari)}
+            onBerhenti={() => {
+              if (running) toggle()
+            }}
+            daftarkan={daftarkanPendengarKetuk}
+          />
 
           {/* M2 — ulang satu bagian saja, untuk berlatih bagian yang sulit */}
           <div
@@ -1716,7 +1757,7 @@ export default function Music({
         )}
 
         {/* E4 — Penala & nada dengung */}
-        <TunerDrone />
+        <TunerDrone namaPemain={anggotaAktif?.name} />
 
         {/* Repertoar */}
         <Card className="min-w-0">
@@ -2084,4 +2125,15 @@ export default function Music({
       )}
     </div>
   )
+}
+
+/**
+ * #29 — hitung mundur "Suara manusia" di perangkat tanpa paket suara TTS
+ * (umum di Linux/HP murah saat luring) diganti **hitung bernada** WebAudio,
+ * supaya pemain tetap mendengar angka hitungan lewat nadanya — bukan klik
+ * polos yang tidak memberi tahu "ini hitungan ke berapa".
+ */
+function hitungMundurSiap(h: HitungMundur): HitungMundur {
+  if (h.suara !== 'suara') return h
+  return bisaUcap() && daftarSuara().length > 0 ? h : { ...h, suara: 'nada' }
 }

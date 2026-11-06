@@ -1047,8 +1047,21 @@ export interface LatihTempo {
   tiap: number
 }
 
-/** Jenis bunyi metronom. */
-export type SuaraKlik = 'klik' | 'kayu' | 'bel' | 'snare'
+/**
+ * Jenis bunyi metronom.
+ *
+ * #29 — `drbeat`, `cowbell`, dan `rim` adalah **klik lapangan**: berforman
+ * tajam 2,5–4 kHz dan dipadatkan kompresor supaya tetap tembus lewat megafon /
+ * ampli melawan battery & brass. `cowbell` menggantikan `bel` lama (keduanya
+ * cowbell — tidak boleh ada dua pilihan untuk bunyi yang sama).
+ */
+export type SuaraKlik = 'klik' | 'kayu' | 'snare' | 'drbeat' | 'cowbell' | 'rim'
+
+/**
+ * #29 — nilai `suara` yang mungkin tersimpan di lagu/cadangan lama. `bel`
+ * (sebelum v2.3.2) dibaca sebagai `cowbell` oleh `normalisasiSuaraKlik`.
+ */
+export type SuaraKlikTersimpan = SuaraKlik | 'bel'
 
 /**
  * M2 — rentang birama yang diulang terus saat berlatih.
@@ -1079,8 +1092,8 @@ export interface Song {
   pola?: PolaRitme | null
   /** E3 — latih tempo (naik/turun bertahap). */
   latih?: LatihTempo | null
-  /** E3 — jenis bunyi. */
-  suara?: SuaraKlik
+  /** E3 — jenis bunyi. #29: `bel` lama tetap terbaca (→ `cowbell`). */
+  suara?: SuaraKlikTersimpan
   /** E3 — getar tiap ketukan (0/1 seperti kebiasaan tabel lain di aplikasi ini). */
   getar?: 0 | 1
   /** E3 — volume 0–1. */

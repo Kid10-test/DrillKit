@@ -46,7 +46,17 @@ import {
 import { sectionDot, STATUS_META, daysFromToday, formatDateLong, pct, todayISO } from "../../lib/utils"
 import { apakahModeParade, coordText, facingDeg, stepYd, ukurTitik } from "../../lib/field"
 import { posisiSafBanjarAnggota } from "../../lib/parade"
-import { acakUrutan, bangunSoal, nilaiTebakan, TOLERANSI_LANGKAH, type NilaiTebakan } from "../../lib/kuis"
+import {
+  acakUrutan,
+  bangunSoal,
+  bangunSoalShow,
+  LABEL_JENIS_SOAL,
+  nilaiTebakan,
+  rekapSkorShow,
+  TOLERANSI_LANGKAH,
+  type JenisSoalShow,
+  type NilaiTebakan,
+} from "../../lib/kuis"
 import {
   bacaPerspektifPemain,
   infoXCountPemain,
@@ -656,6 +666,211 @@ export function MemberDrill({ bundle, me, members }: { bundle: ShareBundle; me: 
  * kunci. Baca-saja: tidak menulis apa pun ke basis data.
  */
 export function MemberKuis({ bundle, me, members }: { bundle: ShareBundle; me: Member; members: Member[] }) {
+  const [mode, setMode] = useState<"posisi" | "show">("posisi")
+  return (
+    <div className="space-y-3" data-kiosk-allow>
+      <div className="flex gap-1 rounded-xl border border-slate-800 bg-slate-900/60 p-1" role="tablist">
+        {([
+          ["posisi", "Tebak posisi"],
+          ["show", "Kuis show"],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={mode === id}
+            data-testid={`mode-kuis-${id}`}
+            onClick={() => setMode(id)}
+            className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+              mode === id ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-100"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === "posisi" ? (
+        <MemberKuisPosisi bundle={bundle} me={me} members={members} />
+      ) : (
+        <MemberKuisShow bundle={bundle} me={me} members={members} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * #29 — Kuis Show: pilihan ganda dari materi show milik anggota sendiri —
+ * xCount & dress (#26), count sheet guard (#17), simbol visual (#16), serta
+ * urutan lagu, tempo, & sukat. Baca-saja, tanpa menulis ke basis data.
+ */
+function MemberKuisShow({ bundle, me, members }: { bundle: ShareBundle; me: Member; members: Member[] }) {
+  const [drillId, setDrillId] = useState(bundle.drills[0]?.id ?? "")
+  const [benih, setBenih] = useState(0)
+  const [saring, setSaring] = useState<JenisSoalShow | "semua">("semua")
+  const [idx, setIdx] = useState(0)
+  const [jawaban, setJawaban] = useState<Record<string, number>>({})
+  const drill = bundle.drills.find((d) => d.id === drillId) ?? bundle.drills[0]
+  const semuaSoal = useMemo(
+    () =>
+      bangunSoalShow({
+        sets: bundle.sets.filter((st) => st.drillId === drill?.id),
+        members,
+        memberId: me.id,
+        field: drill?.field ?? DEFAULT_FIELD,
+        countSheets: bundle.countSheets,
+        sections: bundle.team?.sections,
+        songs: bundle.songs,
+        setlists: bundle.setlists,
+      }),
+    [bundle, drill, members, me.id],
+  )
+  const jenisAda = useMemo(() => [...new Set(semuaSoal.map((x) => x.jenis))], [semuaSoal])
+  const soal = useMemo(
+    () => acakUrutan(semuaSoal.filter((x) => saring === "semua" || x.jenis === saring), benih),
+    [semuaSoal, saring, benih],
+  )
+  const kini = soal[idx]
+  const dijawab = kini ? jawaban[kini.id] : undefined
+  const selesai = soal.length > 0 && idx >= soal.length
+  const benar = soal.filter((x) => jawaban[x.id] === x.kunci).length
+  const terjawab = soal.filter((x) => x.id in jawaban).length
+
+  function ulang(acak: boolean) {
+    setIdx(0)
+    setJawaban({})
+    setBenih(acak ? Date.now() : 0)
+  }
+
+  return (
+    <div className="space-y-3" data-testid="kuis-show">
+      <Card>
+        {bundle.drills.length > 1 && (
+          <Select
+            value={drill?.id ?? ""}
+            onChange={(e) => {
+              setDrillId(e.target.value)
+              ulang(false)
+            }}
+            className="mb-2 w-full"
+          >
+            {bundle.drills.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        )}
+        <div className="flex flex-wrap gap-1.5" data-testid="saring-kuis-show">
+          {(["semua", ...jenisAda] as const).map((j) => (
+            <button
+              key={j}
+              type="button"
+              data-testid={`saring-${j}`}
+              onClick={() => {
+                setSaring(j)
+                setIdx(0)
+              }}
+              className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
+                saring === j
+                  ? "border-emerald-600/40 bg-emerald-600/15 text-emerald-200"
+                  : "border-slate-800 text-slate-400 hover:bg-slate-800/50"
+              }`}
+            >
+              {j === "semua" ? `Semua (${semuaSoal.length})` : `${LABEL_JENIS_SOAL[j]} (${semuaSoal.filter((x) => x.jenis === j).length})`}
+            </button>
+          ))}
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <p data-testid="soal-show-ke" className="text-xs text-slate-400">
+            {soal.length ? (selesai ? `Selesai — ${soal.length} soal` : `Soal ${idx + 1} dari ${soal.length}`) : "Belum ada soal"}
+          </p>
+          <p data-testid="skor-kuis-show" className="text-xs font-medium text-slate-300">
+            Benar {benar} dari {terjawab}
+          </p>
+        </div>
+      </Card>
+
+      {!soal.length ? (
+        <EmptyState
+          title="Belum ada soal show"
+          desc="Soal dibuat dari xCount, dress, count sheet, simbol visual, dan lagu di paketmu. Minta pelatih melengkapinya."
+        />
+      ) : selesai ? (
+        <Card data-testid="selesai-kuis-show">
+          <h3 className="mb-1 text-sm font-semibold text-slate-200">Kuis show selesai</h3>
+          <p className="mb-2 text-sm text-slate-400">
+            Skor: <b className="text-emerald-400">{benar}</b> benar dari {soal.length} soal
+            {benar === soal.length ? " — hafal semua!" : "."}
+          </p>
+          <ul className="mb-3 space-y-0.5 text-[11px] text-slate-400" data-testid="rekap-kuis-show">
+            {rekapSkorShow(soal, jawaban).map((r) => (
+              <li key={r.jenis}>
+                {LABEL_JENIS_SOAL[r.jenis]}: <b className="text-slate-200">{r.benar}/{r.total}</b>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2">
+            <Button data-testid="ulang-kuis-show" onClick={() => ulang(false)} className="flex-1">
+              Main lagi
+            </Button>
+            <Button variant="ghost" onClick={() => ulang(true)} className="flex-1">
+              Acak & main lagi
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        kini && (
+          <Card data-testid="soal-show">
+            <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-emerald-400">{LABEL_JENIS_SOAL[kini.jenis]}</p>
+            <p className="mb-3 text-sm text-slate-100" data-testid="tanya-show">
+              {kini.tanya}
+            </p>
+            <div className="space-y-1.5">
+              {kini.pilihan.map((p, i) => {
+                const terpilih = dijawab === i
+                const kunci = dijawab !== undefined && i === kini.kunci
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    data-testid={`pilihan-show-${i}`}
+                    data-kunci={dijawab !== undefined && i === kini.kunci ? "1" : undefined}
+                    disabled={dijawab !== undefined}
+                    onClick={() => setJawaban((j) => ({ ...j, [kini.id]: i }))}
+                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
+                      kunci
+                        ? "border-emerald-500/60 bg-emerald-600/15 text-emerald-200"
+                        : terpilih
+                          ? "border-rose-500/60 bg-rose-600/15 text-rose-200"
+                          : "border-slate-800 text-slate-200 hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <span className="mr-2 font-mono text-slate-500">{String.fromCharCode(65 + i)}</span>
+                    {p}
+                  </button>
+                )
+              })}
+            </div>
+            {dijawab !== undefined && (
+              <div className="mt-3" data-testid="hasil-show">
+                <p className={`text-sm font-semibold ${dijawab === kini.kunci ? "text-emerald-400" : "text-amber-400"}`}>
+                  {dijawab === kini.kunci ? "Tepat!" : "Belum tepat."}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">{kini.penjelasan}</p>
+                <Button data-testid="lanjut-kuis-show" onClick={() => setIdx((n) => n + 1)} className="mt-3 w-full">
+                  {idx + 1 >= soal.length ? "Lihat skor" : "Lanjut"}
+                </Button>
+              </div>
+            )}
+          </Card>
+        )
+      )}
+    </div>
+  )
+}
+
+/** C2 — tebak posisi sendiri di set berikutnya (mode kuis asli). */
+function MemberKuisPosisi({ bundle, me, members }: { bundle: ShareBundle; me: Member; members: Member[] }) {
   const [drillId, setDrillId] = useState(bundle.drills[0]?.id ?? '')
   /** 0 = urutan set; selain itu benih acakan (lihat `acakUrutan`). */
   const [benih, setBenih] = useState(0)

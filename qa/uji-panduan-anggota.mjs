@@ -98,6 +98,8 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
     'src/components/share/TabAnggotaKonten.tsx',
     'src/components/PengingatJadwal.tsx',
     'src/components/TunerDrone.tsx',
+    'src/components/musik/IntonasiPenala.tsx',
+    'src/components/musik/PelatihKetuk.tsx',
     'src/components/PilihMode.tsx',
     'src/components/ModePerangkat.tsx',
     'src/pages/Music.tsx',
@@ -130,6 +132,8 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
     'Sudut pandang pemain', 'Partitur set ini',
     // #28 — Studio Perkusi (battery/pit) di Layar Partitur.
     '🥁 Perkusi',
+    // #29 — Studio Intonasi & Ketuk Presisi.
+    'Tebak posisi', 'Kuis show',
   ]
   for (const l of LABEL) {
     uji(`label "${l}" disebut panduan & ada di aplikasi`, tSitus.includes(l) && sumber.includes(l),
