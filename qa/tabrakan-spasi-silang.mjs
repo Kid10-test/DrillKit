@@ -187,7 +187,14 @@ try {
 
   /* ---- 3. Pratinjau Kanvas & Tukar 1-Klik (2-Opt) + Undo 1 Langkah ---- */
   await page.click('[data-testid="pratinjau-tukar-0"]')
-  await tunggu(250)
+  // Tunggu lapisannya benar-benar tergambar (bukan jeda tetap 250 ms yang
+  // pernah terlalu pendek di runner CI yang lambat — v2.4.0, PR #48).
+  await page
+    .waitForFunction(
+      () => document.querySelector('[data-testid="lapisan-pratinjau-tukar"]')?.outerHTML.includes('#10b981'),
+      { timeout: 8000 },
+    )
+    .catch(() => undefined)
   const adaPratinjauKanvas = await page.evaluate(() => {
     const el = document.querySelector('[data-testid="lapisan-pratinjau-tukar"]')
     if (!el) return false
