@@ -30,6 +30,7 @@ import {
 import { namaBerkasAnggota, paketAnggota, paketGrup } from '../lib/bagikan'
 import { kenaliBerkas, namaPaketGrup, namaZipAnggota } from '../lib/bukaBerkas'
 import { mintaPratinjau } from '../components/BukaBerkas'
+import { AksiKirimBerkas, TombolTerimaQr, type BerkasSiapKirim } from '../components/EstafetBerkas'
 import { pasangAnotasiDariPaket, pasangPartiturDariPaket, pulihkanAudioDariZipPaket, simpanPaketAnggota } from '../lib/paketMasuk'
 import { simpanLoncatLatih } from '../lib/partiturFrasa'
 import { buatLampiranPartiturPaket } from '../lib/partiturPaket'
@@ -110,6 +111,8 @@ function CoachExport() {
   const [includePartitur, setIncludePartitur] = useState(true)
   /** #13a — opsional sertakan rekaman audio panduan lagu ke dalam ZIP per anggota. */
   const [includeAudioZip, setIncludeAudioZip] = useState(false)
+  /** #30 — anggota yang dikirimi berkas pribadinya langsung (Bagikan/QR). */
+  const [anggotaKirim, setAnggotaKirim] = useState('')
   const [includeAttendance, setIncludeAttendance] = useState(true)
   /** Catatan evaluasi — dulu SELALU ikut berkas tanpa saklar apa pun. */
   const [includeNotes, setIncludeNotes] = useState(true)
@@ -304,9 +307,13 @@ function CoachExport() {
    *
    * Tidak memuat data pribadi siapa pun, jadi aman dibagikan ke mana saja.
    */
+  function siapkanGrup(): BerkasSiapKirim {
+    return { nama: namaPaketGrup(), isi: JSON.stringify(paketGrup(build())) }
+  }
+
   function unduhGrup() {
-    const bundle = paketGrup(build())
-    downloadFile(namaPaketGrup(), JSON.stringify(bundle))
+    const b = siapkanGrup()
+    downloadFile(b.nama, b.isi as string)
     void catatAcuanTerbitan(false)
     toast.push('Berkas grup diunduh — tanpa data pribadi, aman dibagikan ke mana saja')
   }
@@ -317,11 +324,25 @@ function CoachExport() {
    * Tiap berkas hanya memuat absensi & catatan anggota itu sendiri, serta
    * partitur MusicXML yang sudah dipangkas ke part instrumen/seksinya (#13a).
    */
-  async function unduhPerAnggota() {
+  /**
+   * #30 — satu berkas untuk SATU anggota (dikirim langsung ke HP anak itu
+   * lewat lembar berbagi atau QR). Isinya sama dengan berkasnya di dalam ZIP.
+   */
+  function siapkanSatuAnggota(): BerkasSiapKirim | null {
+    const dasar = build()
+    const m = dasar.members.find((x) => x.id === anggotaKirim)
+    if (!m) {
+      toast.push('Pilih anggotanya dulu', 'err')
+      return null
+    }
+    return { nama: namaBerkasAnggota(m), isi: JSON.stringify(paketAnggota(dasar, m.id)) }
+  }
+
+  async function siapkanZipAnggota(): Promise<(BerkasSiapKirim & { jumlah: number }) | null> {
     const dasar = build()
     if (dasar.members.length === 0) {
       toast.push('Belum ada anggota untuk dibagikan', 'err')
-      return
+      return null
     }
     const entri: EntriZip[] = dasar.members.map((m) => ({
       nama: namaBerkasAnggota(m),
@@ -353,10 +374,16 @@ function CoachExport() {
         })
       }
     }
-    downloadBlob(namaZipAnggota(namaTim()), bikinZip(entri))
+    return { nama: namaZipAnggota(namaTim()), isi: bikinZip(entri), mime: 'application/zip', jumlah: dasar.members.length }
+  }
+
+  async function unduhPerAnggota() {
+    const b = await siapkanZipAnggota()
+    if (!b) return
+    downloadBlob(b.nama, b.isi as Uint8Array)
     await catatAcuanTerbitan(false)
     toast.push(
-      `${dasar.members.length} berkas anggota dibungkus — tiap berkas hanya memuat data & partitur suaranya sendiri`,
+      `${b.jumlah} berkas anggota dibungkus — tiap berkas hanya memuat data & partitur suaranya sendiri`,
     )
   }
 
@@ -538,6 +565,14 @@ function CoachExport() {
             >
               <IconDownload size={14} /> Unduh berkas grup
             </Button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <AksiKirimBerkas
+                testId="kirim-grup"
+                judul="Berkas grup DrillKit"
+                siapkan={siapkanGrup}
+                onTerkirim={() => void catatAcuanTerbitan(false)}
+              />
+            </div>
             {BISA_AMBIL && (
               <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
                 <b>Untuk tombol Perbarui anggota:</b> tekan <b>Terbitkan ke anggota</b> di atas,
@@ -597,6 +632,48 @@ function CoachExport() {
             >
               <IconDownload size={14} /> Unduh {members?.length ?? 0} berkas (ZIP)
             </Button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <AksiKirimBerkas
+                testId="kirim-zip-anggota"
+                judul="Berkas per anggota (ZIP)"
+                qr={false}
+                siapkan={siapkanZipAnggota}
+                onTerkirim={() => void catatAcuanTerbitan(false)}
+              />
+            </div>
+            <div className="mt-3 border-t border-emerald-900/40 pt-2" data-testid="kirim-satu-anggota">
+              <p className="text-[11px] leading-relaxed text-slate-400">
+                <b>Kirim langsung ke satu anak</b> — berkas pribadinya saja, lewat lembar berbagi atau QR dari layar
+                ini ke HP-nya (tanpa sinyal).
+              </p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <select
+                  data-testid="pilih-anggota-kirim"
+                  value={anggotaKirim}
+                  onChange={(e) => setAnggotaKirim(e.target.value)}
+                  className="min-w-0 max-w-full rounded-lg px-2 py-1.5 text-xs"
+                  style={{ backgroundColor: '#0f172a', color: '#e2e8f0', border: '1px solid #334155' }}
+                >
+                  <option value="">Pilih anggota…</option>
+                  {[...(members ?? [])]
+                    .sort((a, b) => a.name.localeCompare(b.name, 'id'))
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {namaDenganPanggilan(m)}
+                      </option>
+                    ))}
+                </select>
+                {anggotaKirim && (
+                  <AksiKirimBerkas
+                    testId="kirim-satu-anggota"
+                    judul={`Berkas ${namaDenganPanggilan((members ?? []).find((m) => m.id === anggotaKirim) ?? { name: '' })}`}
+                    siapkan={siapkanSatuAnggota}
+                    peringatanQr="Berisi absensi & catatan pribadi anak ini — tunjukkan hanya ke HP anak yang bersangkutan."
+                    onTerkirim={() => void catatAcuanTerbitan(false)}
+                  />
+                )}
+              </div>
+            </div>
           </div>
 
           <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
@@ -996,6 +1073,12 @@ function MemberView() {
               >
                 <IconUpload size={16} /> Buka paket tim
               </Button>
+              <TombolTerimaQr
+                testId="terima-qr-anggota"
+                variant="ghost"
+                onBerkas={openPackage}
+                petunjuk="Minta pelatih membuka Berbagi → Kirim langsung ke satu anak → Kirim lewat QR, lalu arahkan kamera ke layarnya. Tanpa sinyal pun bisa."
+              />
             </>
           }
         />
@@ -1025,6 +1108,7 @@ function MemberView() {
             <Button onClick={() => document.getElementById('pkg-input2')?.click()}>
               <IconUpload size={16} /> Ganti paket
             </Button>
+            <TombolTerimaQr testId="terima-qr-anggota-ganti" variant="ghost" label="Paket lewat QR" onBerkas={openPackage} />
           </>
         }
       />

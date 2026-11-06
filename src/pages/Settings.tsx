@@ -7,7 +7,7 @@ import {
   type Ambil,
   type HasilPeriksa,
 } from '../lib/situs'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { db } from '../db/db'
 import type { TeamSettings } from '../db/types'
 import { seedDemoData, wipeAllData } from '../db/seed'
@@ -25,7 +25,8 @@ import {
   useToast,
 } from '../components/ui'
 import { IconDownload, IconUpload } from '../components/Icons'
-import { backupNotes, daysSince, downloadBackup, downloadBackupZip, formatBytes, lastBackup } from '../lib/backup'
+import { backupNotes, daysSince, downloadBackup, downloadBackupZip, formatBytes, lastBackup, noteBackup, siapkanBackup, type BackupNote } from '../lib/backup'
+import { AksiKirimBerkas } from '../components/EstafetBerkas'
 import { KartuSimpanOtomatis } from '../components/SimpanOtomatis'
 import { AMBANG, AMBANG_LANGKAH } from '../lib/analitik'
 import type { AmbangTingkat } from '../db/types'
@@ -125,6 +126,8 @@ export default function Settings() {
   /** Riwayat backup — diisi saat halaman dibuka & setelah mengunduh backup. */
   const [catatanBackup, setCatatanBackup] = useState(() => backupNotes())
   useEffect(() => setCatatanBackup(backupNotes()), [])
+  /** #30 — catatan backup yang sedang menunggu lembar berbagi selesai. */
+  const catatanBagikan = useRef<BackupNote | null>(null)
   const backupTerakhir = lastBackup()
   const hariSejakBackup = daysSince(backupTerakhir?.at)
 
@@ -156,6 +159,20 @@ export default function Settings() {
     await downloadBackup()
     setCatatanBackup(backupNotes())
     toast.push('Backup diunduh — simpan di tempat aman')
+  }
+
+  /**
+   * #30 — "Bagikan langsung" backup JSON (mis. ke Drive/WhatsApp sendiri).
+   * Riwayat backup baru dicatat setelah lembar berbagi benar-benar mengirim.
+   */
+  async function siapkanBagikanBackup() {
+    const b = await siapkanBackup()
+    catatanBagikan.current = b.catatan
+    return { nama: b.nama, isi: b.teks, mime: 'application/json' }
+  }
+  function backupTerbagi() {
+    if (catatanBagikan.current) noteBackup(catatanBagikan.current)
+    setCatatanBackup(backupNotes())
   }
 
   /** #6/#11a — Unduh ZIP bersama data, audio, dan berkas partitur biner. */
@@ -574,6 +591,14 @@ export default function Settings() {
             <Button onClick={exportBackupZip} variant="outline" title="Ekspor data tim beserta rekaman audio dan berkas partitur MusicXML/PDF">
               <IconDownload size={16} /> Backup + rekaman (ZIP)
             </Button>
+            <AksiKirimBerkas
+              size="md"
+              testId="backup"
+              judul="Backup DrillKit"
+              qr={false}
+              siapkan={siapkanBagikanBackup}
+              onTerkirim={backupTerbagi}
+            />
             <Button
               onClick={() => document.getElementById('restore-input')?.click()}
             >

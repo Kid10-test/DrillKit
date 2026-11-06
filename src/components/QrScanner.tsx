@@ -6,6 +6,7 @@ import { cx, formatTime } from '../lib/utils'
 import { bacaModeNama, cocokCari, namaTampil } from '../lib/namaAnggota'
 import { NamaTampil } from './NamaTampil'
 import { IconCheck, IconQr, IconSearch } from './Icons'
+import { useKameraQr } from './useKameraQr'
 
 /**
  * Berapa lama satu kode dianggap "baru saja dibaca".
@@ -59,9 +60,6 @@ export default function ScanQrModal({
   onUndo: (recordId: string) => Promise<void>
 }) {
   const toast = useToast()
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  const [camError, setCamError] = useState('')
   const [flash, setFlash] = useState<Flash | null>(null)
   const [recent, setRecent] = useState<Recent[]>([])
   const [manual, setManual] = useState('')
@@ -108,124 +106,51 @@ export default function ScanQrModal({
     return () => window.clearTimeout(t)
   }, [flash])
 
-  useEffect(() => {
-    if (!open) return
-    let cancelled = false
-    let stream: MediaStream | undefined
-    let raf = 0
-    let busy = false
-    let lastScan = 0
-    setCamError('')
+  /** Satu kode terbaca — tentukan: catat, sudah ada, atau tidak dikenal. */
+  function proses(raw: string) {
+    const now = Date.now()
+    const terakhir = seenRef.current.get(raw)
+    if (terakhir && now - terakhir < DEDUPE_MS) return // kartu masih di depan kamera
+    seenRef.current.set(raw, now)
 
-    /** Matikan kamera dan hentikan loop. */
-    function beres() {
-      cancelAnimationFrame(raf)
-      stream?.getTracks().forEach((t) => t.stop())
-      stream = undefined
-      if (videoRef.current) videoRef.current.srcObject = null
+    const key = raw.trim().toLowerCase()
+    const m = membersRef.current.find(
+      (x) => x.token === raw || x.token.toLowerCase() === key || x.code.toLowerCase() === key,
+    )
+
+    if (!m) {
+      if (soundRef.current) beep('unknown')
+      if (vibRef.current) buzz('unknown')
+      setFlash({ kind: 'unknown', text: 'Kode tidak dikenal', sub: raw.slice(0, 14), at: now })
+      return
     }
 
-    /** Satu kode terbaca — tentukan: catat, sudah ada, atau tidak dikenal. */
-    function proses(raw: string) {
-      const now = Date.now()
-      const terakhir = seenRef.current.get(raw)
-      if (terakhir && now - terakhir < DEDUPE_MS) return // kartu masih di depan kamera
-      seenRef.current.set(raw, now)
-
-      const key = raw.trim().toLowerCase()
-      const m = membersRef.current.find(
-        (x) => x.token === raw || x.token.toLowerCase() === key || x.code.toLowerCase() === key,
-      )
-
-      if (!m) {
-        if (soundRef.current) beep('unknown')
-        if (vibRef.current) buzz('unknown')
-        setFlash({ kind: 'unknown', text: 'Kode tidak dikenal', sub: raw.slice(0, 14), at: now })
-        return
-      }
-
-      const sudah = recordsRef.current.some(
-        (r) => r.sessionId === sessionIdRef.current && r.memberId === m.id && r.status === 'hadir',
-      )
-      if (sudah) {
-        if (soundRef.current) beep('dupe')
-        if (vibRef.current) buzz('dupe')
-        setFlash({ kind: 'dupe', text: `${namaTampil(m, bacaModeNama())} sudah tercatat`, sub: m.code, at: now })
-        return
-      }
-
-      void onMarkRef.current(m.id).then((recordId) => {
-        if (recordId) setRecent((s) => [{ recordId, memberId: m.id, raw, at: now }, ...s].slice(0, MAX_RECENT))
-      })
-      if (soundRef.current) beep('ok')
-      if (vibRef.current) buzz('ok')
-      setFlash({ kind: 'ok', text: namaTampil(m, bacaModeNama()), sub: m.code, at: now })
-      setCamError('')
+    const sudah = recordsRef.current.some(
+      (r) => r.sessionId === sessionIdRef.current && r.memberId === m.id && r.status === 'hadir',
+    )
+    if (sudah) {
+      if (soundRef.current) beep('dupe')
+      if (vibRef.current) buzz('dupe')
+      setFlash({ kind: 'dupe', text: `${namaTampil(m, bacaModeNama())} sudah tercatat`, sub: m.code, at: now })
+      return
     }
 
-    async function mulai() {
-      // 1. Nyalakan kamera. Kalau kamera belakang tidak ada, coba apa saja.
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } })
-      } catch {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true })
-        } catch {
-          setCamError('Kamera tidak tersedia atau izinnya ditolak. Pakai kolom ketik kode di bawah.')
-          return
-        }
-      }
-      if (cancelled) return beres()
+    void onMarkRef.current(m.id).then((recordId) => {
+      if (recordId) setRecent((s) => [{ recordId, memberId: m.id, raw, at: now }, ...s].slice(0, MAX_RECENT))
+    })
+    if (soundRef.current) beep('ok')
+    if (vibRef.current) buzz('ok')
+    setFlash({ kind: 'ok', text: namaTampil(m, bacaModeNama()), sub: m.code, at: now })
+  }
 
-      const video = videoRef.current
-      if (!video) return beres()
-      video.srcObject = stream
-      await video.play().catch(() => undefined)
-
-      // 2. Pemindaian otomatis butuh BarcodeDetector.
-      const BD = (window as unknown as {
-        BarcodeDetector?: new (o?: { formats: string[] }) => {
-          detect: (src: CanvasImageSource) => Promise<{ rawValue: string }[]>
-        }
-      }).BarcodeDetector
-      if (!BD) {
-        setCamError(
-          'Browser ini belum bisa memindai otomatis. Kamera tetap menyala; pakai kolom ketik kode di bawah.',
-        )
-        return
-      }
-
-      // 3. Loop pemindaian. Kamera tetap menyala terus sampai modal ditutup.
-      const detector = new BD({ formats: ['qr_code'] })
-      const tick = (t: number) => {
-        if (cancelled) return
-        raf = requestAnimationFrame(tick)
-        const v = videoRef.current
-        if (busy || !v || v.readyState < 2) return
-        if (t - lastScan < SCAN_EVERY_MS) return
-        lastScan = t
-        busy = true
-        detector
-          .detect(v)
-          .then((codes) => {
-            const raw = codes[0]?.rawValue
-            if (raw) proses(raw)
-          })
-          .catch(() => undefined)
-          .finally(() => {
-            busy = false
-          })
-      }
-      raf = requestAnimationFrame(tick)
-    }
-
-    void mulai()
-
-    return () => {
-      cancelled = true
-      beres()
-    }
-  }, [open, facing])
+  // Kamera & loop pemindaian dipakai bersama dengan "Terima lewat QR" (#30).
+  const { videoRef, galat } = useKameraQr({ aktif: open, facing, onKode: proses, jedaMs: SCAN_EVERY_MS })
+  const camError =
+    galat === 'kamera'
+      ? 'Kamera tidak tersedia atau izinnya ditolak. Pakai kolom ketik kode di bawah.'
+      : galat === 'detektor'
+        ? 'Browser ini belum bisa memindai otomatis. Kamera tetap menyala; pakai kolom ketik kode di bawah.'
+        : ''
 
   /**
    * Menandai hadir dari ketikan manual (kode/nama).

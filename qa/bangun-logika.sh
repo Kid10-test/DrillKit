@@ -173,6 +173,10 @@ rakit src/lib/simpanAnggota.ts simpanAnggota
 rakit src/lib/intonasi.ts                intonasi
 rakit src/lib/pelatihKetuk.ts            pelatihKetuk
 rakit src/lib/petaNadaCetak.ts           petaNadaCetak
+# #30 — estafet QR berantai (Base45, CRC32 per bingkai, deflate-raw) dan
+# Web Share berkas.
+rakit src/lib/estafetQr.ts               estafetQr
+rakit src/lib/bagikanBerkas.ts           bagikanBerkas
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'
