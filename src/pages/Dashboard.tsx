@@ -26,6 +26,10 @@ import { TombolBukaBerkas } from '../components/BukaBerkas'
 import { PengingatJadwal } from '../components/PengingatJadwal'
 import { NamaTampil, useModeNama } from '../components/NamaTampil'
 
+/** #30 — tombol estafet QR dimuat malas supaya bundel awal tetap ramping. */
+const TombolTerimaQrMalas = lazy(() =>
+  import('../components/EstafetBerkas').then((m) => ({ default: m.TombolTerimaQr })),
+)
 const DialogPanduanMalas = lazy(() =>
   import('../components/Panduan').then((m) => ({ default: m.DialogPanduanDasbor })),
 )
@@ -154,6 +158,10 @@ export default function Dashboard() {
                 <Button variant="primary">Tambah anggota</Button>
               </Link>
               <Button onClick={loadDemo}>Muat data contoh</Button>
+              {/* #30 — HP baru, tanpa sinyal: salin data dari layar HP pelatih lain. */}
+              <Suspense fallback={null}>
+                <TombolTerimaQrMalas testId="terima-qr-dasbor" variant="ghost" />
+              </Suspense>
             </div>
           }
         />
@@ -237,10 +245,16 @@ export default function Dashboard() {
             <h2 className="text-sm font-semibold text-slate-200">Buka berkas DrillKit</h2>
             <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
               Punya berkas dari pelatih lain atau perangkat lain? Buka di sini — jenisnya dikenali
-              otomatis, isinya diperlihatkan dulu sebelum diterapkan.
+              otomatis, isinya diperlihatkan dulu sebelum diterapkan. Tanpa sinyal? Terima lewat QR
+              berantai dari layar HP pengirim.
             </p>
           </div>
-          <TombolBukaBerkas testId="buka-berkas-dasbor" petunjuk={false} />
+          <div className="flex flex-wrap gap-2">
+            <TombolBukaBerkas testId="buka-berkas-dasbor" petunjuk={false} />
+            <Suspense fallback={null}>
+              <TombolTerimaQrMalas testId="terima-qr-dasbor" />
+            </Suspense>
+          </div>
         </div>
       </Card>
 

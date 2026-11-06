@@ -120,6 +120,7 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
     'src/components/PanelPartitur.tsx',
     'src/components/LayarPartitur.tsx',
     'src/components/drill/LaciBeamPartitur.tsx',
+    'src/components/EstafetBerkas.tsx',
   ].map(baca).join('\n').replace(/&amp;/g, '&')
   const LABEL = [
     'Saya anggota', 'Ambil materi dari situs', 'Buka paket tim', 'Ganti paket', 'Ganti nama',
@@ -134,6 +135,8 @@ uji('nama pelatih di catatan kaki', tSitus.includes('pelatih: Pak Budi'))
     '🥁 Perkusi',
     // #29 — Studio Intonasi & Ketuk Presisi.
     'Tebak posisi', 'Kuis show',
+    // #30 — estafet QR berantai tanpa sinyal.
+    'Terima lewat QR',
   ]
   for (const l of LABEL) {
     uji(`label "${l}" disebut panduan & ada di aplikasi`, tSitus.includes(l) && sumber.includes(l),

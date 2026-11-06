@@ -38,6 +38,7 @@ import {
 import { IconDownload, IconUpload, IconShare } from '../components/Icons'
 import { DEFAULT_SECTIONS, downloadFile, uid } from '../lib/utils'
 import { intipTitipan, mintaPratinjau, TombolBukaBerkas, useTitipan } from '../components/BukaBerkas'
+import { AksiKirimBerkas, TombolTerimaQr, type BerkasSiapKirim } from '../components/EstafetBerkas'
 import { capTanggal, kenaliBerkas, kenaliTeks, namaData, namaSetoranSeksi } from '../lib/bukaBerkas'
 import {
   LABEL_RENTANG_SEKSI,
@@ -280,7 +281,10 @@ export default function Data() {
           </Link>
         </div>
         <div className="mt-3 border-t border-slate-800 pt-3">
-          <TombolBukaBerkas testId="buka-berkas-data" />
+          <div className="flex flex-wrap items-start gap-2">
+            <TombolBukaBerkas testId="buka-berkas-data" />
+            <TombolTerimaQr testId="terima-qr-data" />
+          </div>
         </div>
       </Card>
 
@@ -417,10 +421,11 @@ function AlurPindah({
     [sumberKolab, seksiKolabEfektif, rentangKolab],
   )
 
-  function unduhSetoranSeksi() {
+  /** #30 — berkas setoran seksi yang SAMA untuk Unduh, Bagikan, dan QR. */
+  function siapkanSetoranSeksi(): (BerkasSiapKirim & { labelSeksi: string }) | null {
     if (!seksiKolabEfektif) {
       toast.push('Pilih seksinya terlebih dahulu', 'err')
-      return
+      return null
     }
     const defSeksi = pilihanSeksi.find((s) => s.id === seksiKolabEfektif)
     const labelSeksi = defSeksi?.label ?? seksiKolabEfektif
@@ -434,9 +439,16 @@ function AlurPindah({
     })
     if (totalBerkas(berkas) === 0) {
       toast.push(`Belum ada data seksi ${labelSeksi} pada rentang tersebut`, 'err')
-      return
+      return null
     }
-    downloadFile(namaSetoranSeksi(labelSeksi, oleh), JSON.stringify(berkas, null, 2))
+    return { nama: namaSetoranSeksi(labelSeksi, oleh), isi: JSON.stringify(berkas, null, 2), labelSeksi }
+  }
+
+  function unduhSetoranSeksi() {
+    const b = siapkanSetoranSeksi()
+    if (!b) return
+    const { labelSeksi } = b
+    downloadFile(b.nama, b.isi as string)
     toast.push(`Setoran seksi ${labelSeksi} diunduh — kirim ke Pelatih Kepala`)
   }
 
@@ -474,7 +486,8 @@ function AlurPindah({
     JENIS_PILIH.includes(j) ? pilihEntitas.size > 0 : jumlah(j) > 0,
   )
 
-  function ekspor() {
+  /** #30 — berkas data pilihan (mis. tambalan set) untuk Unduh, Bagikan, dan QR. */
+  function siapkanEkspor(): BerkasSiapKirim | null {
     const berkas: BerkasPindah = { format: 'drillkit-data', versi: 1, dibuat: Date.now() }
     for (const j of URUTAN_JENIS_DATA) {
       if (!pilihJenis.has(j)) continue
@@ -486,9 +499,15 @@ function AlurPindah({
     }
     if (totalBerkas(berkas) === 0) {
       toast.push('Tidak ada data yang dipilih', 'err')
-      return
+      return null
     }
-    downloadFile(namaData(), JSON.stringify(berkas, null, 2))
+    return { nama: namaData(), isi: JSON.stringify(berkas, null, 2) }
+  }
+
+  function ekspor() {
+    const b = siapkanEkspor()
+    if (!b) return
+    downloadFile(b.nama, b.isi as string)
     toast.push('Berkas data diunduh')
   }
 
@@ -771,6 +790,7 @@ function AlurPindah({
             <b>{pratinjauSeksi.catatan}</b> catatan ·{' '}
             <b>{pratinjauSeksi.kemajuanCentang}</b> centang kemajuan
           </p>
+          <div className="flex flex-wrap gap-2">
           <Button
             variant="primary"
             size="sm"
@@ -780,6 +800,13 @@ function AlurPindah({
           >
             <IconDownload size={14} /> Unduh Setoran Seksi
           </Button>
+          <AksiKirimBerkas
+            testId="kirim-setoran-seksi"
+            judul="Setoran seksi"
+            siapkan={siapkanSetoranSeksi}
+            onTerkirim={(cara) => cara === 'bagikan' && toast.push('Setoran seksi dibagikan — Pelatih Kepala tinggal membukanya')}
+          />
+          </div>
         </div>
       </Card>
 
@@ -834,6 +861,7 @@ function AlurPindah({
           <Button variant="primary" data-testid="ekspor-data" onClick={ekspor} disabled={!bisaEkspor}>
             <IconDownload size={16} /> Unduh data
           </Button>
+          {bisaEkspor && <AksiKirimBerkas testId="ekspor-data" judul="Data pilihan DrillKit" siapkan={siapkanEkspor} />}
           {!bisaEkspor && (
             <span className="text-[11px] text-slate-600">Centang dulu jenis datanya.</span>
           )}

@@ -191,22 +191,34 @@ export async function buildBackupPayload() {
 }
 
 /**
+ * #30 — susun berkas backup JSON (nama + teks + catatan riwayatnya) TANPA
+ * mengunduh: dipakai bersama oleh Unduh dan "Bagikan langsung".
+ */
+export async function siapkanBackup(): Promise<{ nama: string; teks: string; catatan: BackupNote }> {
+  const payload = await buildBackupPayload()
+  const teks = JSON.stringify(payload, null, 2)
+  return {
+    nama: namaBackup(new Date(payload.exportedAt)),
+    teks,
+    catatan: {
+      at: payload.exportedAt,
+      bytes: new Blob([teks]).size,
+      members: payload.members.length,
+      drills: payload.drills.length,
+      sets: payload.sets.length,
+    },
+  }
+}
+
+/**
  * Unduh berkas backup, lalu catat ke riwayat.
  * Mengembalikan catatan backup yang baru dibuat.
  */
 export async function downloadBackup(): Promise<BackupNote> {
-  const payload = await buildBackupPayload()
-  const text = JSON.stringify(payload, null, 2)
-  downloadFile(namaBackup(new Date(payload.exportedAt)), text)
-  const note: BackupNote = {
-    at: payload.exportedAt,
-    bytes: new Blob([text]).size,
-    members: payload.members.length,
-    drills: payload.drills.length,
-    sets: payload.sets.length,
-  }
-  noteBackup(note)
-  return note
+  const b = await siapkanBackup()
+  downloadFile(b.nama, b.teks)
+  noteBackup(b.catatan)
+  return b.catatan
 }
 
 /**

@@ -80,7 +80,7 @@ const LANGKAH: [string, string][] = [
   ],
   [
     'Buka berkas &amp; kolaborasi pelatih',
-    'Seret berkas apa pun ke layar atau klik <b>Buka berkas DrillKit</b> (di Dashboard / <b>Impor &amp; ekspor data</b>) untuk pratinjau otomatis. Untuk bagi tugas set antar pelatih: tombol ⚙ di drill → <b>Ekspor show</b> / <b>Impor show</b>.',
+    'Seret berkas apa pun ke layar atau klik <b>Buka berkas DrillKit</b> (di Dashboard / <b>Impor &amp; ekspor data</b>) untuk pratinjau otomatis. Tanpa sinyal: <b>Kirim lewat QR</b> → HP lain <b>Terima lewat QR</b>; ada juga <b>Bagikan langsung</b> (Quick Share/AirDrop/WA). Untuk bagi tugas set antar pelatih: tombol ⚙ di drill → <b>Ekspor show</b> / <b>Impor show</b>.',
   ],
 ]
 
@@ -345,6 +345,7 @@ export function bodyPanduanAnggota(d: DataPanduanAnggota): string {
           ? '<li>Tekan <b>Ambil materi dari situs</b>. Atau, bila pelatih mengirim berkas <i>.json</i>: unduh berkasnya, tekan <b>Buka paket tim</b>, lalu pilih berkas itu.</li>'
           : '<li>Pelatih juga mengirim berkas <i>.json</i>. Unduh berkasnya, tekan <b>Buka paket tim</b>, lalu pilih berkas itu dari folder Unduhan.</li>'
       }
+      <li>Tanpa sinyal? Tekan <b>Terima lewat QR</b> lalu arahkan kamera ke QR yang berputar di layar HP pelatih sampai semua kotak terisi.</li>
       <li>Berkas <b>atas namamu</b> (mis. <i>DrillKit-Nama-Kode.json</i>) langsung mengenali namamu. Berkas <b>grup</b>: ketik nama atau kodemu di <b>Pilih namamu dulu</b> — cukup sekali. Salah nama? Tekan <b>Ganti nama</b>.</li>
       <li><b>Absensi</b>, <b>Catatan</b>, serta <b>Alat &amp; Seragam Pinjamanku</b> hanya tampil dari berkas atas namamu (atau QR kunci pribadimu); berkas grup tidak memuat data pribadi siapa pun.</li>
     </ol>`)
