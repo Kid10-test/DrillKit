@@ -246,6 +246,7 @@ export function salinSesi(s: Session, tanggal: string, buatId: () => string, sek
   salin.createdAt = sekarangMs
   salin.checklist = salin.checklist.map((c) => ({ ...c, done: 0 }))
   delete salin.realisasiLatihan
+  delete salin.logRep
   delete salin.mulaiNyata
   delete salin.selesaiNyata
   delete salin.seriId

@@ -18,7 +18,7 @@
  * Sengaja **murni** (tidak menyentuh Dexie, React, atau DOM) supaya bisa
  * diuji langsung dari node, seperti `runsheet.ts` dan `lomba.ts`.
  */
-import type { BlokLatihan, JenisBlok, RealisasiBlok } from '../db/types'
+import type { BlokLatihan, JenisBlok, LogRepSet, RealisasiBlok, Session } from '../db/types'
 
 /** Satu blok rencana, sudah dihitung waktu absolutnya. */
 export interface BarisRencana {
@@ -262,4 +262,98 @@ export function formatGeser(geser: number): string {
   const g = Math.round(geser)
   if (Math.abs(g) < 1) return 'tepat waktu'
   return g > 0 ? `terlambat ${formatMenit(g)}` : `lebih cepat ${formatMenit(-g)}`
+}
+
+/* ------------------- #31 — Pencatat pengulangan blok (Rep Counter) ------------------- */
+
+/** Batas baris log per sesi — pengaman supaya satu sesi tidak membengkak. */
+export const MAKS_BARIS_LOG_REP = 200
+
+/** "Set 12–16" — label rentang set yang sama di presenter, Pacu, dan ringkasan. */
+export function labelRentangSet(dari: number, sampai: number): string {
+  return dari === sampai ? `Set ${dari}` : `Set ${dari}–${sampai}`
+}
+
+/**
+ * Tambah satu pengulangan rentang set ke log sesi (murni, mengembalikan
+ * salinan baru). Rentang dirapikan: bilangan bulat ≥ 1, dibalik bila
+ * terbalik. Rentang satu set (tanpa perpindahan) diabaikan.
+ */
+export function tambahLogRep(
+  log: readonly LogRepSet[] | undefined,
+  e: { drillId: string; namaDrill?: string; dari: number; sampai: number },
+  waktu: number,
+): LogRepSet[] {
+  const daftar = [...(log ?? [])]
+  if (!e.drillId || !Number.isFinite(e.dari) || !Number.isFinite(e.sampai)) return daftar
+  let a = Math.max(1, Math.floor(e.dari))
+  let b = Math.max(1, Math.floor(e.sampai))
+  if (a > b) [a, b] = [b, a]
+  if (a === b) return daftar
+  const i = daftar.findIndex((r) => r.drillId === e.drillId && r.dari === a && r.sampai === b)
+  if (i >= 0) {
+    const lama = daftar[i]
+    daftar[i] = { ...lama, kali: Math.max(0, lama.kali) + 1, terakhir: waktu, namaDrill: e.namaDrill ?? lama.namaDrill }
+    return daftar
+  }
+  if (daftar.length >= MAKS_BARIS_LOG_REP) return daftar
+  daftar.push({ drillId: e.drillId, ...(e.namaDrill ? { namaDrill: e.namaDrill } : {}), dari: a, sampai: b, kali: 1, terakhir: waktu })
+  return daftar
+}
+
+export interface BarisRingkasRep extends LogRepSet {
+  label: string
+}
+
+/**
+ * Ringkasan log pengulangan untuk ringkasan sesi: diurutkan per drill lalu
+ * nomor set awal; baris rusak (kali ≤ 0, rentang tak sah) dibuang.
+ */
+export function ringkasLogRep(log: readonly LogRepSet[] | undefined): { baris: BarisRingkasRep[]; total: number } {
+  const baris = (log ?? [])
+    .filter((r) => r && r.drillId && r.kali > 0 && r.dari >= 1 && r.sampai > r.dari)
+    .map((r) => ({ ...r, label: labelRentangSet(r.dari, r.sampai) }))
+    .sort(
+      (x, y) =>
+        (x.namaDrill ?? x.drillId).localeCompare(y.namaDrill ?? y.drillId, 'id') ||
+        x.drillId.localeCompare(y.drillId) ||
+        x.dari - y.dari ||
+        x.sampai - y.sampai,
+    )
+  return { baris, total: baris.reduce((t, r) => t + r.kali, 0) }
+}
+
+/** "YYYY-MM-DD" menurut jam lokal perangkat. */
+export function tanggalLokal(kini: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${kini.getFullYear()}-${p(kini.getMonth() + 1)}-${p(kini.getDate())}`
+}
+
+const JENIS_SESI_LATIHAN = new Set(['latihan', 'section', 'gabungan'])
+
+/**
+ * Sesi tempat Rep Counter menyimpan hitungannya: sesi **hari ini**.
+ * Urutan pilihan: yang sedang berjalan (ditandai mulai, belum selesai) →
+ * yang jamnya sedang berlangsung → sesi jenis latihan pertama → sesi apa
+ * pun hari ini. `null` bila hari ini tidak ada sesi sama sekali.
+ */
+export function pilihSesiLatihan(sesi: readonly Session[] | undefined, kini: Date): Session | null {
+  const hariIni = tanggalLokal(kini)
+  const kandidat = (sesi ?? []).filter((s) => s.date === hariIni)
+  if (kandidat.length === 0) return null
+  const urut = [...kandidat].sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
+  const berjalan = urut.find((s) => s.mulaiNyata != null && s.selesaiNyata == null)
+  if (berjalan) return berjalan
+  const menit = kini.getHours() * 60 + kini.getMinutes()
+  const keMenit = (j: string) => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(j || '')
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null
+  }
+  const sedang = urut.find((s) => {
+    const a = keMenit(s.startTime)
+    const b = keMenit(s.endTime)
+    return a != null && b != null && a <= menit && menit <= b
+  })
+  if (sedang) return sedang
+  return urut.find((s) => JENIS_SESI_LATIHAN.has(s.type)) ?? urut[0]
 }

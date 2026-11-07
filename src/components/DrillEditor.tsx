@@ -6443,6 +6443,12 @@ export function Editor({
           ) : undefined}
           labelLatihan={adaLatihanDrill ? labelLatihan(latihanDrill) : null}
           onTempoAsli={adaLatihanDrill ? () => drill.songId && tl.keAsli([drill.songId]) : undefined}
+          persenLatihan={!latihanDrill ? 100 : latihanDrill.mode === 'persen' ? latihanDrill.persen : null}
+          onTempoLatihan={
+            drill.songId && lagu
+              ? (persen) => tl.aturTempo(drill.songId, { mode: 'persen', persen, geser: 0 })
+              : undefined
+          }
           roster={roster}
           startIdx={idx}
           song={lagu ?? null}

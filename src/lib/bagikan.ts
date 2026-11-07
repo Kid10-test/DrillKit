@@ -97,6 +97,14 @@ export function kupasDataKhususStaf(b: ShareBundle): ShareBundle {
   delete salin.kasIuran
   delete salin.arsipMusim
   delete salin.tindakLanjut
+  // #31 — log pengulangan blok (Rep Counter) adalah catatan staf latihan.
+  if (Array.isArray(b.sessions) && b.sessions.some((x) => x.logRep)) {
+    salin.sessions = b.sessions.map((x) => {
+      if (!x.logRep) return x
+      const { logRep: _logRep, ...sisa } = x
+      return sisa
+    })
+  }
   // #26 — alasan hole (mis. "cedera") & pemain asalnya adalah info staf; labelnya saja yang dibagikan.
   if (Array.isArray(b.drills) && b.drills.some((d) => d.holes?.length)) {
     salin.drills = b.drills.map((d) =>
