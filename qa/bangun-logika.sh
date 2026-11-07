@@ -177,6 +177,8 @@ rakit src/lib/petaNadaCetak.ts           petaNadaCetak
 # Web Share berkas.
 rakit src/lib/estafetQr.ts               estafetQr
 rakit src/lib/bagikanBerkas.ts           bagikanBerkas
+# #31 — Mode Podium: pemilih Set/Huruf/Birama, count-in, plakat 40 m, setelan.
+rakit src/lib/podium.ts                  podium
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'

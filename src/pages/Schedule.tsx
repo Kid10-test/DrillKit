@@ -21,7 +21,7 @@ import { unduhICS } from '../components/PengingatJadwal'
 import { PacuLatihan } from '../components/PacuLatihan'
 import { PenandaSesi, RekapPenanda } from '../components/PenandaSesi'
 import { lamaSlot, menitDariJam } from '../lib/runsheet'
-import { LABEL_BLOK, URUTAN_BLOK, formatMenit, lebihRencana, totalRencana } from '../lib/latihan'
+import { LABEL_BLOK, URUTAN_BLOK, formatMenit, lebihRencana, ringkasLogRep, totalRencana } from '../lib/latihan'
 import { URUTAN_JENIS, formatDateLong, relativeDay, sesiMeta, toCSV, downloadFile, nowTime, todayISO, uid } from '../lib/utils'
 import { bangunICS } from '../lib/pengingat'
 import { cetakAtauUnduh, rapikanPredikat } from '../lib/laporan'
@@ -943,6 +943,7 @@ function SesiKartu({
       )}
 
       <RencanaRingkas s={s} />
+      <RepRingkas s={s} />
 
       <PenandaSesi s={s} />
 
@@ -1155,6 +1156,26 @@ function RencanaRingkas({ s }: { s: Session }) {
           · sisa {formatMenit(-lebih)} di slotnya
         </span>
       )}
+    </p>
+  )
+}
+
+/** #31 — ringkasan Rep Counter Mode Podium: blok mana yang paling sering diulang. */
+function RepRingkas({ s }: { s: Session }) {
+  const { baris, total } = ringkasLogRep(s.logRep)
+  if (baris.length === 0) return null
+  const teratas = [...baris].sort((a, b) => b.kali - a.kali).slice(0, 3)
+  return (
+    <p className="mt-1 text-xs text-slate-500" data-testid={`ringkas-rep-${s.id}`}>
+      Pengulangan blok: {total}× ·{' '}
+      {teratas.map((r, i) => (
+        <span key={`${r.drillId}-${r.dari}-${r.sampai}`}>
+          {i > 0 ? ', ' : ''}
+          {r.namaDrill ? `${r.namaDrill} ` : ''}
+          {r.label} <b className="text-amber-300">×{r.kali}</b>
+        </span>
+      ))}
+      {baris.length > teratas.length ? ` (+${baris.length - teratas.length} lagi)` : ''}
     </p>
   )
 }
