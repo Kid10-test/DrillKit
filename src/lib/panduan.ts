@@ -60,7 +60,7 @@ function tr(a: string, b: string): string {
 const LANGKAH: [string, string][] = [
   [
     'Susun formasi &amp; impor Pyware',
-    'Menu <b>Drill &amp; Formasi</b>: tambah set (atau tombol <b>Pyware</b> untuk impor CSV koordinat Pyware 3D), geser titik (Panah = 1 langkah, Shift + Panah = 4), cocokkan garis waktu segmen lagu × set, lalu <b>Putar</b>. Tombol <b>F</b> membuka presenter layar penuh.',
+    'Menu <b>Drill &amp; Formasi</b>: tambah set (atau <b>Pyware</b> untuk impor CSV Pyware 3D), geser titik (Panah = 1 langkah, Shift + Panah = 4), cocokkan segmen lagu × set, lalu <b>Putar</b>. <b>F</b> = presenter; chip <b>⚑ Podium</b> = komando lapangan (count-in, papan aba-aba 40 m).',
   ],
   [
     'Bawa ke lapangan',

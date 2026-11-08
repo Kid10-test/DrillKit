@@ -23,7 +23,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { db } from '../db/db'
 import type { Session } from '../db/types'
 import { jamDariMenit, menitDariJam } from '../lib/runsheet'
-import { LABEL_BLOK, formatGeser, formatMenit, posisiLatihan, susunRencana } from '../lib/latihan'
+import { LABEL_BLOK, formatGeser, formatMenit, posisiLatihan, ringkasLogRep, susunRencana } from '../lib/latihan'
 import { PenandaSesi } from './PenandaSesi'
 
 /** Jam berjalan, diperbarui tiap detik. */
@@ -73,6 +73,9 @@ export function PacuLatihan({ sesi, onClose }: { sesi: Session; onClose: () => v
   async function resetRealisasi() {
     await db.sessions.update(sesi.id, { realisasiLatihan: [] })
   }
+
+  /** #31 — pengulangan blok yang dicatat otomatis oleh Mode Podium presenter. */
+  const rep = useMemo(() => ringkasLogRep(sesi.logRep), [sesi.logRep])
 
   const sisa = pos.sisaBlok
   const lewat = sisa != null && sisa < 0
@@ -288,6 +291,39 @@ export function PacuLatihan({ sesi, onClose }: { sesi: Session; onClose: () => v
                   </li>
                 )
               })}
+            </ul>
+          </div>
+        )}
+
+        {/* #31 — Rep Counter: ringkasan pengulangan blok dari presenter (catatan staf) */}
+        {rep.baris.length > 0 && (
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4" data-testid="log-rep-pacu">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Pengulangan blok · {rep.total}×
+              </p>
+              <button
+                type="button"
+                data-testid="reset-log-rep"
+                onClick={() => db.sessions.update(sesi.id, { logRep: [] })}
+                className="rounded px-2 py-1 text-[11px] text-slate-500 hover:bg-slate-800 hover:text-rose-300"
+              >
+                Kosongkan
+              </button>
+            </div>
+            <ul className="space-y-1">
+              {rep.baris.map((r) => (
+                <li
+                  key={`${r.drillId}-${r.dari}-${r.sampai}`}
+                  data-testid="baris-log-rep"
+                  className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {r.namaDrill || 'Drill'} · <b>{r.label}</b>
+                  </span>
+                  <span className="shrink-0 tabular-nums text-amber-300">×{r.kali}</span>
+                </li>
+              ))}
             </ul>
           </div>
         )}

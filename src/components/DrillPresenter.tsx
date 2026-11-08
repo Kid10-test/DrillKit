@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
-import type { Drill, DrillSet, Member, Song } from '../db/types'
+import type { Drill, DrillSet, LogRepSet, Member, Song } from '../db/types'
 import { facingDeg, ukurTitik } from '../lib/field'
 import {
   bangunPetaFtl,
@@ -46,6 +46,17 @@ import { PanelCleaningSet } from './drill/PanelCleaningSet'
 import { hitungPetaSetKeBirama } from '../lib/partiturFrasa'
 import { dariBeatsLama } from '../lib/birama'
 import { DEFAULT_SECTIONS } from '../lib/utils'
+import { HitunganBesar, PanelPodium, PlakatPodium } from './drill/PanelPodium'
+import {
+  bacaSetelanPodium,
+  bpmHitungMasuk,
+  daftarHurufLatihan,
+  langkahHitungMasuk,
+  rancangHitungMasuk,
+  tulisSetelanPodium,
+} from '../lib/podium'
+import type { LangkahHitungMasuk, SetelanPodium } from '../lib/podium'
+import { pilihSesiLatihan, tambahLogRep, tanggalLokal } from '../lib/latihan'
 
 /**
  * Mode Presenter — menampilkan formasi sebesar mungkin, tanpa menu editor.
@@ -75,6 +86,8 @@ export function DrillPresenter({
   song,
   detikMulaiPerSet,
   lajuPerSet,
+  persenLatihan,
+  onTempoLatihan,
 }: {
   drill: Drill
   sets: DrillSet[]
@@ -104,6 +117,13 @@ export function DrillPresenter({
   detikMulaiPerSet?: number[]
   /** #6 — laju rekaman tiap set (tempo latihan ÷ tempo partitur) */
   lajuPerSet?: number[]
+  /**
+   * #31 — persen tempo latihan lagu yang berlaku (100 = asli; `null` bila
+   * tempo latihan memakai mode BPM). Hanya bermakna untuk drill bertaut lagu.
+   */
+  persenLatihan?: number | null
+  /** #31 — setel tempo latihan lagu (#4) dari Mode Podium, dalam persen. */
+  onTempoLatihan?: (persen: number) => void
 }) {
   /**
    * G2b — kunci layar.
@@ -122,6 +142,18 @@ export function DrillPresenter({
     }
   }, [layarTerkunci, onTempoAsli, labelLatihan])
 
+  /**
+   * #31 — tempo latihan untuk drill **tanpa** lagu (podium 70–100%). Drill
+   * bertaut lagu memakai tempo latihan lagu (#4) lewat `onTempoLatihan`,
+   * jadi halaman Musik & editor ikut melihat angka yang sama.
+   */
+  const [persenLokal, setPersenLokal] = useState(100)
+  const persenLokalRef = useRef(persenLokal)
+  persenLokalRef.current = persenLokal
+  useEffect(() => {
+    if (layarTerkunci) setPersenLokal(100)
+  }, [layarTerkunci])
+
   useEffect(() => () => {
     if (song?.id && song.rekaman) {
       PemutarRekaman.get().jeda()
@@ -129,7 +161,9 @@ export function DrillPresenter({
   }, [song?.id])
 
   /** M1 — tempo untuk set ke-`i`: dari lagu kalau ada, selain itu tempo drill. */
-  const tempoUntuk = (i: number) => tempoPerSet?.[i] ?? drill.tempo
+  const tempoUntuk = (i: number) => tempoPerSet?.[i] ?? (drill.tempo * persenLokalRef.current) / 100
+  const labelLatihanEf = labelLatihan ?? (!tempoPerSet && persenLokal !== 100 ? `Latihan ${persenLokal}%` : null)
+  const onTempoAsliEf = onTempoAsli ?? (!tempoPerSet && persenLokal !== 100 ? () => setPersenLokal(100) : undefined)
   const tempoPerSetRef = useRef(tempoPerSet)
   tempoPerSetRef.current = tempoPerSet
   const durasiPerSetRef = useRef(durasiPerSet)
@@ -204,6 +238,38 @@ export function DrillPresenter({
   const klikRef = useRef(klik)
   klikRef.current = klik
 
+  /* ------------------ #31 — Mode Podium Gitapati / Field Commander ------------------
+     Tata letak di dalam presenter (bukan pemutar tandingan): pemilih cepat
+     Set ↔ Huruf ↔ Birama, tempo latihan 70–100%, count-in "Standby + Mark
+     Time" dengan klik lapangan #29, hitungan besar, papan aba-aba 40 m, dan
+     pencatat pengulangan blok. Mesin animasi/urutan/klik tetap yang di bawah. */
+  const [podium, setPodium] = useState(false)
+  const podiumRef = useRef(podium)
+  podiumRef.current = podium
+  const [setelanPodium, setSetelanPodium] = useState<SetelanPodium>(bacaSetelanPodium)
+  const setelanPodiumRef = useRef(setelanPodium)
+  setelanPodiumRef.current = setelanPodium
+  const ubahSetelanPodium = useCallback((x: SetelanPodium) => {
+    setSetelanPodium(x)
+    tulisSetelanPodium(x)
+  }, [])
+  /** Set akhir blok pilihan (0-based); `null` = sampai set terakhir. */
+  const [sampaiPodium, setSampaiPodium] = useState<number | null>(null)
+  /** Blok yang sedang dihitung-masuk / dijalankan — dipatok supaya label tidak ikut bergeser. */
+  const [blokPodium, setBlokPodium] = useState<{ dari: number; sampai: number } | null>(null)
+  const [langkahHitung, setLangkahHitung] = useState<LangkahHitungMasuk | null>(null)
+  const [menghitung, setMenghitung] = useState(false)
+  const hitungMasukRef = useRef<Metronom | null>(null)
+  const [plakat, setPlakat] = useState<string | null>(null)
+  /** Batas akhir urutan (0-based) untuk blok podium; `null` = urutan biasa sampai set terakhir. */
+  const batasUrutanRef = useRef<number | null>(null)
+  const hentiHitungMasuk = useCallback(() => {
+    hitungMasukRef.current?.berhenti()
+    setMenghitung(false)
+    setLangkahHitung(null)
+  }, [])
+  useEffect(() => () => hitungMasukRef.current?.berhenti(), [])
+
   const mulaiKlik = useCallback(
     (counts: number, keSet: number) => {
       if (!klikRef.current) return
@@ -214,16 +280,23 @@ export function DrillPresenter({
           bpm: tempoUntuk(keSet),
           beats: counts,
           subdiv: 1,
-          suara: 'kayu',
-          volume: 0.9,
+          suara: podiumRef.current ? setelanPodiumRef.current.profil : 'kayu',
+          volume: podiumRef.current ? 1 : 0.9,
           jadwalKlik: jadwal,
         })
       } else {
-        metronomRef.current.mulai({ bpm: k.bpm, beats: k.beats, subdiv: 1, suara: 'kayu', volume: 0.9 })
+        metronomRef.current.mulai({
+          bpm: k.bpm,
+          beats: k.beats,
+          subdiv: 1,
+          // #31 — di Mode Podium klik memakai profil lapangan #29 (Dr. Beat/Cowbell/Rim).
+          suara: podiumRef.current ? setelanPodiumRef.current.profil : 'kayu',
+          volume: podiumRef.current ? 1 : 0.9,
+        })
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [drill.tempo, drill.beatsPerCount, tempoPerSet, offsetKlikPerSet],
+    [drill.tempo, drill.beatsPerCount, tempoPerSet, offsetKlikPerSet, persenLokal],
   )
   const mulaiKlikRef = useRef(mulaiKlik)
   mulaiKlikRef.current = mulaiKlik
@@ -333,6 +406,7 @@ export function DrillPresenter({
     drill.setelanJarak,
     drill.tempo,
     tempoPerSet,
+    persenLokal,
     settings?.ambangGerak,
   ])
 
@@ -345,9 +419,10 @@ export function DrillPresenter({
 
   const set = ordered[idx]
   /** #26 — rentang birama set aktif (bila drill ditautkan ke lagu), untuk konteks catatan cleaning. */
-  const rentangBiramaSet = useMemo(() => {
-    if (!song || laci !== 'cleaning') return null
-    const peta = hitungPetaSetKeBirama(
+  /** Peta set → birama lagu (#26 cleaning & #31 pemilih Huruf/Birama podium). */
+  const petaBirama = useMemo(() => {
+    if (!song || (laci !== 'cleaning' && !podium)) return null
+    return hitungPetaSetKeBirama(
       ordered.map((s) => ({ counts: s.counts, name: s.name })),
       {
         bpm: song.bpm,
@@ -357,9 +432,53 @@ export function DrillPresenter({
       },
       { beatsPerCount: drill.beatsPerCount },
     )
-    const b = peta[idx]
+  }, [song, laci, podium, ordered, drill.beatsPerCount])
+  const rentangBiramaSet = useMemo(() => {
+    if (laci !== 'cleaning' || !petaBirama) return null
+    const b = petaBirama[idx]
     return b ? { dari: b.biramaDari, sampai: b.biramaSampai } : null
-  }, [song, laci, ordered, idx, drill.beatsPerCount])
+  }, [petaBirama, laci, idx])
+  /** #31 — huruf latihan dari label segmen tempo map (hasil impor MusicXML #27). */
+  const hurufLatihan = useMemo(() => (podium ? daftarHurufLatihan(song?.tempoMap) : []), [podium, song?.tempoMap])
+
+  /* ------------------- #31 — Rep Counter (pengulangan blok) ------------------- */
+  const sesiHariIni = useLiveQuery(async () => {
+    const kini = new Date()
+    return pilihSesiLatihan(await db.sessions.where('date').equals(tanggalLokal(kini)).toArray(), kini)
+  }, [])
+  /** Cadangan bila hari ini tidak ada sesi: hitungan hanya hidup di layar ini. */
+  const [logRepLayar, setLogRepLayar] = useState<LogRepSet[]>([])
+  const logRepTampil = useMemo(
+    () => (sesiHariIni ? (sesiHariIni.logRep ?? []) : logRepLayar).filter((r) => r.drillId === drill.id),
+    [sesiHariIni, logRepLayar, drill.id],
+  )
+  /**
+   * Catat satu pengulangan rentang set `a`→`b` (indeks 0-based). Dipanggil
+   * otomatis oleh mesin putar: perpindahan tunggal yang tuntas, putaran
+   * urutan/blok, dan tiap ulangan "Ulang terus". Disimpan ke sesi hari ini.
+   */
+  const catatRep = useCallback(
+    (a: number, b: number) => {
+      if (!(a >= 0) || !(b > a)) return
+      const e = { drillId: drill.id, namaDrill: drill.name, dari: a + 1, sampai: b + 1 }
+      const waktu = Date.now()
+      setLogRepLayar((l) => tambahLogRep(l, e, waktu))
+      void (async () => {
+        try {
+          const kini = new Date()
+          await db.transaction('rw', db.sessions, async () => {
+            const sesi = pilihSesiLatihan(await db.sessions.where('date').equals(tanggalLokal(kini)).toArray(), kini)
+            if (sesi) await db.sessions.update(sesi.id, { logRep: tambahLogRep(sesi.logRep, e, waktu) })
+          })
+        } catch {
+          /* gagal menulis — hitungan tetap tampil di layar */
+        }
+      })()
+    },
+    [drill.id, drill.name],
+  )
+  const catatRepRef = useRef(catatRep)
+  catatRepRef.current = catatRep
 
   /* ---------------------------------------------------------------------- *
    * K3 — kemajuan latihan.
@@ -419,25 +538,102 @@ export function DrillPresenter({
    */
   const mulaiUrutan = useCallback(() => {
     setPlaying(false)
+    hentiHitungMasuk()
     if (urutan) {
       setUrutan(false)
       return
     }
     if (ordered.length < 2) return
     if (idx >= ordered.length - 1) setIdx(0)
+    batasUrutanRef.current = null
+    setBlokPodium(null)
     setUrutan(true)
-  }, [urutan, ordered.length, idx])
+  }, [urutan, ordered.length, idx, hentiHitungMasuk])
 
   const goNext = useCallback(() => {
     setUrutan(false)
     setPlaying(false)
+    hentiHitungMasuk()
     setIdx((i) => Math.min(i + 1, ordered.length - 1))
-  }, [ordered.length])
+  }, [ordered.length, hentiHitungMasuk])
   const goPrev = useCallback(() => {
     setUrutan(false)
     setPlaying(false)
+    hentiHitungMasuk()
     setIdx((i) => Math.max(i - 1, 0))
-  }, [])
+  }, [hentiHitungMasuk])
+
+  /* ------------------------- #31 — Podium: lompat & jalan ------------------------- */
+
+  /** Akhir blok yang berlaku: pilihan pelatih, minimal satu set sesudah set aktif. */
+  const sampaiEf = Math.min(ordered.length - 1, Math.max(idx + 1, sampaiPodium ?? ordered.length - 1))
+  /** Lompat ke set (dari pemilih Set/Huruf/Birama) — menghentikan apa pun yang sedang berjalan. */
+  const lompatPodium = useCallback(
+    (i: number) => {
+      if (!(i >= 0)) return
+      setUrutan(false)
+      setPlaying(false)
+      hentiHitungMasuk()
+      setBlokPodium(null)
+      setIdx(Math.min(i, Math.max(0, ordered.length - 1)))
+    },
+    [ordered.length, hentiHitungMasuk],
+  )
+  /** Persen tempo latihan yang berlaku untuk podium; `null` bila tempo lagu memakai mode BPM. */
+  const persenPodium = tempoPerSet ? (persenLatihan === undefined ? 100 : persenLatihan) : persenLokal
+  const aturPersenPodium = useCallback(
+    (p: number) => {
+      if (tempoPerSet && onTempoLatihan) onTempoLatihan(p)
+      else if (!tempoPerSet) setPersenLokal(p)
+    },
+    [tempoPerSet, onTempoLatihan],
+  )
+  /**
+   * ▶ Hitung masuk & jalan: count-in Standby + Mark Time dengan klik lapangan,
+   * lalu urutan latihan berjalan dari set aktif sampai akhir blok — tanpa
+   * jeda diam, seperti run sungguhan. Ditekan lagi = berhenti.
+   */
+  const mulaiPodium = useCallback(() => {
+    if (menghitung || urutan) {
+      hentiHitungMasuk()
+      setUrutan(false)
+      setBlokPodium(null)
+      return
+    }
+    if (sampaiEf <= idx) return
+    setPlaying(false)
+    const blok = { dari: idx, sampai: sampaiEf }
+    setBlokPodium(blok)
+    const r = rancangHitungMasuk(setelanPodium.standby, setelanPodium.markTime)
+    const jalan = () => {
+      setMenghitung(false)
+      setLangkahHitung(null)
+      batasUrutanRef.current = blok.sampai
+      setUrutan(true)
+    }
+    if (r.total === 0) {
+      jalan()
+      return
+    }
+    const m = (hitungMasukRef.current ??= new Metronom())
+    setMenghitung(true)
+    m.mulai({
+      bpm: bpmHitungMasuk(tempoUntuk(idx), drill.beatsPerCount),
+      beats: r.bars[0].beats,
+      subdiv: 1,
+      pola: { bars: r.bars, poly: null },
+      suara: setelanPodium.profil,
+      volume: 1,
+      biramaAkhir: r.bars.length,
+      onKetuk: (info) => setLangkahHitung(langkahHitungMasuk(r, info.birama, info.beat)),
+      onSelesai: jalan,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menghitung, urutan, sampaiEf, idx, setelanPodium, drill.beatsPerCount, hentiHitungMasuk, tempoPerSet, persenLokal])
+  // Blok podium selesai (urutan berhenti) → label kembali mengikuti set aktif.
+  useEffect(() => {
+    if (!urutan && !menghitung) setBlokPodium(null)
+  }, [urutan, menghitung])
 
   /**
    * DD4 — pemain yang mengikuti **busur putaran** pada satu perpindahan.
@@ -565,12 +761,17 @@ export function DrillPresenter({
         g.setAttribute('transform', `translate(${tx} ${ty})`)
       }
       if (adaPropGerak) setProgresProp(p)
+      // #31 — hitungan besar podium ikut berdetak.
+      const besar = document.querySelector('[data-testid="presenter"] [data-live-count-besar]')
+      if (besar) besar.textContent = String(Math.max(1, Math.min(counts, Math.ceil(p * counts))))
       if (p < 1) {
         rafRef.current = requestAnimationFrame(loop)
       } else {
         for (const [id] of vec) dotRefs.current.get(id)?.removeAttribute('transform')
         if (adaPropGerak) setProgresProp(0)
         hentiKlik()
+        // #31 — perpindahan tunggal yang tuntas = satu pengulangan rentang set ini.
+        catatRepRef.current(idx, idx + 1)
         setPlaying(false)
         setIdx((i) => Math.min(i + 1, ordered.length - 1))
       }
@@ -586,7 +787,7 @@ export function DrillPresenter({
       for (const [id] of vec) dotRefs.current.get(id)?.removeAttribute('transform')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, set, nextSet, drill.beatsPerCount, drill.tempo, tempoPerSet, durasiPerSet, offsetKlikPerSet, ordered.length])
+  }, [playing, set, nextSet, drill.beatsPerCount, drill.tempo, tempoPerSet, durasiPerSet, offsetKlikPerSet, ordered.length, persenLokal])
 
   /* --------------------- B3 — Urutan latihan otomatis ---------------------- */
 
@@ -601,7 +802,8 @@ export function DrillPresenter({
   const orderedRef = useRef(ordered)
   orderedRef.current = ordered
   const diamRef = useRef(diam)
-  diamRef.current = diam
+  // #31 — blok podium berjalan tanpa jeda diam, seperti run sungguhan di lapangan.
+  diamRef.current = podium ? 0 : diam
 
   useEffect(() => {
     if (!urutan) return
@@ -615,6 +817,14 @@ export function DrillPresenter({
      * memang dibatalkan di tengah jalan.
      */
     let rampung = false
+    /**
+     * #31 — blok podium: urutan berhenti (atau berputar) di `batas`, bukan di
+     * set terakhir. `awalBlok` = set awal putaran yang sedang berjalan, untuk
+     * Rep Counter; `-1` berarti putaran itu sudah dicatat.
+     */
+    const batas = batasUrutanRef.current
+    const awalTetap = idxRef.current
+    let awalBlok = idxRef.current
     const msPerCountFor = (index: number) =>
       drill.beatsPerCount * (60_000 / Math.max(20, tempoPerSetRef.current?.[index] ?? tempoUntuk(index)))
     const tunda = (ms: number) => new Promise<void>((r) => setTimeout(r, Math.max(50, ms)))
@@ -680,6 +890,8 @@ export function DrillPresenter({
           // elemen `[data-live-count]`, dan letaknya lebih awal di DOM.
           const lbl = document.querySelector('[data-testid="presenter"] [data-live-count]')
           if (lbl) lbl.textContent = `Count ${Math.min(counts, Math.ceil(p * counts) || 0)}/${counts}`
+          const besar = document.querySelector('[data-testid="presenter"] [data-live-count-besar]')
+          if (besar) besar.textContent = String(Math.max(1, Math.min(counts, Math.ceil(p * counts))))
           if (p < 1) requestAnimationFrame(loop)
           else {
             for (const [id] of vec) dotRefs.current.get(id)?.removeAttribute('transform')
@@ -708,15 +920,21 @@ export function DrillPresenter({
           if (batal) break
           setHitung(0)
         } else {
-          await tunda(nDiam * msPerCount)
+          if (nDiam > 0) await tunda(nDiam * msPerCount)
           if (batal) break
         }
         const daftar = orderedRef.current
-        if (i >= daftar.length - 1) {
-          // Sudah di set terakhir: ulang dari awal atau selesai.
+        const akhir = batas == null ? daftar.length - 1 : Math.min(batas, daftar.length - 1)
+        if (i >= akhir) {
+          // #31 — satu putaran utuh (urutan/blok) = satu pengulangan rentangnya.
+          catatRepRef.current(awalBlok, i)
+          awalBlok = -1
+          // Sudah di set terakhir (atau akhir blok): ulang dari awal atau selesai.
           if (!ulangRef.current) break
-          setIdx(0)
-          while (!batal && idxRef.current !== 0) await tungguRender()
+          const kembali = batas == null ? 0 : awalTetap
+          awalBlok = kembali
+          setIdx(kembali)
+          while (!batal && idxRef.current !== kembali) await tungguRender()
           continue
         }
         // B5 — klik dimulai lagi di tiap set supaya aksen jatuh pada count 1.
@@ -727,7 +945,10 @@ export function DrillPresenter({
         // K2 — ulangi perpindahan yang sama. Transform titik sudah dibersihkan
         // di akhir `mainkanPerpindahan`, jadi formasi kembali ke posisi set ini
         // dengan sendirinya tanpa perlu menyetel ulang apa pun.
-        if (ulangPerRef.current) continue
+        if (ulangPerRef.current) {
+          catatRepRef.current(i, i + 1)
+          continue
+        }
         setIdx(i + 1)
         while (!batal && idxRef.current !== i + 1) await tungguRender()
       }
@@ -749,6 +970,8 @@ export function DrillPresenter({
       if (!rampung) {
         setTahap(null)
         setHitung(0)
+        // #31 — dihentikan di tengah jalan: bagian yang sudah dilalui tetap dihitung.
+        if (awalBlok >= 0) catatRepRef.current(awalBlok, idxRef.current)
       }
       for (const [, g] of dotRefs.current) if (g.hasAttribute('transform')) g.removeAttribute('transform')
     }
@@ -779,6 +1002,13 @@ export function DrillPresenter({
       const sedangMengetik =
         !!sasaran &&
         (sasaran.tagName === 'INPUT' || sasaran.tagName === 'TEXTAREA' || sasaran.tagName === 'SELECT' || sasaran.isContentEditable)
+      // #31 — plakat aba-aba menutupi semuanya: Esc/Enter/Spasi cukup menutupnya.
+      if (plakat && (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault()
+        e.stopPropagation()
+        setPlakat(null)
+        return
+      }
       if (e.key === 'Escape' && laci) {
         e.preventDefault()
         e.stopPropagation()
@@ -814,7 +1044,7 @@ export function DrillPresenter({
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [goNext, goPrev, idx, nextSet, onClose, mulaiUrutan, layarTerkunci, laci])
+  }, [goNext, goPrev, idx, nextSet, onClose, mulaiUrutan, layarTerkunci, laci, plakat])
 
   /* --------------------- Tahan layar agar tidak mati ---------------------- */
 
@@ -876,13 +1106,24 @@ export function DrillPresenter({
         </button>
       </div>
 
+      {/* #31 — Mode Podium: lapangan + panel komando berdampingan (lanskap) atau bertumpuk (tegak). */}
+      <div className={podium ? 'flex min-h-0 flex-1 flex-col landscape:flex-row' : 'contents'} data-testid="tata-podium">
       {/* Kanvas lapangan — ketuk untuk maju (kalau diaktifkan) */}
       <div
-        className="relative min-h-0 flex-1 px-2"
+        className="relative min-h-0 min-w-0 flex-1 px-2"
         onClick={tapNext ? goNext : undefined}
         data-testid="kanvas-presenter"
         style={{ touchAction: 'manipulation' }}
       >
+        {podium && (langkahHitung || urutan || playing) && (
+          <HitunganBesar
+            langkah={langkahHitung}
+            labelJalan={
+              nextSet && !(blokPodium && idx >= blokPodium.sampai) ? `SET ${idx + 1} → ${idx + 2}` : `SET ${idx + 1}`
+            }
+            totalJalan={Math.max(1, set?.counts ?? 8)}
+          />
+        )}
         {/*
           K1 — Kartu petunjuk asisten.
 
@@ -1127,21 +1368,48 @@ export function DrillPresenter({
           </g>
         </svg>
       </div>
+      {podium && (
+        <aside
+          className="max-h-[42vh] shrink-0 overflow-y-auto px-2 pb-2 landscape:max-h-none landscape:w-[min(26rem,46vw)]"
+          data-testid="aside-podium"
+        >
+          <PanelPodium
+            sets={ordered}
+            idx={blokPodium?.dari ?? idx}
+            sampai={blokPodium?.sampai ?? sampaiEf}
+            onLompat={lompatPodium}
+            onSampai={(i) => setSampaiPodium(i)}
+            huruf={hurufLatihan}
+            petaBirama={petaBirama}
+            adaLagu={!!song}
+            persen={persenPodium}
+            onPersen={aturPersenPodium}
+            setelan={setelanPodium}
+            onSetelan={ubahSetelanPodium}
+            berjalan={menghitung || urutan}
+            onMulai={mulaiPodium}
+            onPlakat={setPlakat}
+            logRep={logRepTampil}
+            namaSesi={sesiHariIni ? sesiHariIni.title || 'Sesi hari ini' : null}
+          />
+        </aside>
+      )}
+      </div>
 
       {/* #4 — presenter ikut melambat mengikuti tempo latihan lagu */}
-      {labelLatihan && (
+      {labelLatihanEf && (
         <div
           className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 sm:mx-5"
           data-testid="presenter-latihan"
         >
           <span className="text-xs text-amber-200">
-            <b>{labelLatihan}</b> · {Math.round(tempoUntuk(idx))} BPM
+            <b>{labelLatihanEf}</b> · {Math.round(tempoUntuk(idx))} BPM
             {tempoAsliPerSet?.[idx] != null ? ` (asli ${Math.round(tempoAsliPerSet[idx])})` : ''}
           </span>
-          {onTempoAsli && (
+          {onTempoAsliEf && (
             <button
               type="button"
-              onClick={onTempoAsli}
+              onClick={onTempoAsliEf}
               className="rounded-lg border border-amber-500/40 px-2 py-1 text-xs font-medium text-amber-100 active:scale-[.98]"
               data-testid="presenter-tempo-asli"
             >
@@ -1189,8 +1457,9 @@ export function DrillPresenter({
         </button>
       </div>
 
-      {/* B3 — Urutan latihan: jalankan semua set otomatis mengikuti tempo */}
-      <div className="flex items-center gap-2 px-3 pb-1 sm:px-5">
+      {/* B3 — Urutan latihan: jalankan semua set otomatis mengikuti tempo.
+          #31 — di Mode Podium tombol ini digantikan "▶ Hitung masuk & jalan". */}
+      <div className={podium ? 'hidden' : 'flex items-center gap-2 px-3 pb-1 sm:px-5'}>
         <button
           type="button"
           data-testid="tombol-urutan"
@@ -1251,7 +1520,7 @@ export function DrillPresenter({
         tinggal melihat pip mana yang masih kosong.
       */}
       <div
-        className="flex items-center gap-1.5 overflow-x-auto px-3 pb-1 sm:px-5"
+        className={podium ? 'hidden' : 'flex items-center gap-1.5 overflow-x-auto px-3 pb-1 sm:px-5'}
         data-testid="baris-kemajuan"
       >
         <span className="shrink-0 text-[11px] text-slate-500">Kemajuan:</span>
@@ -1288,6 +1557,23 @@ export function DrillPresenter({
 
       {/* Pengaturan tampilan */}
       <div className="flex flex-wrap items-center gap-2 px-3 pb-4 sm:px-5">
+        <Chip
+          data-testid="chip-podium"
+          active={podium}
+          onClick={() => {
+            if (podium) {
+              hentiHitungMasuk()
+              setPodium(false)
+            } else {
+              // Podium = komando lapangan: klik lapangan #29 langsung menyala.
+              setPodium(true)
+              setKlik(true)
+            }
+          }}
+          title="Mode Podium: lompat Set/Huruf/Birama, tempo latihan, count-in, papan aba-aba 40 m"
+        >
+          ⚑ Podium
+        </Chip>
         <Chip active={showCodes} onClick={() => setShowCodes((v) => !v)}>
           Kode
         </Chip>
@@ -1427,6 +1713,7 @@ export function DrillPresenter({
           </div>
         </div>
       )}
+      {plakat && <PlakatPodium teks={plakat} palet={setelanPodium.palet} onTutup={() => setPlakat(null)} />}
       {layarTerkunci && <LayarTerkunci onBuka={bukaLayar} />}
     </div>
   )

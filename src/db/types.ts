@@ -168,6 +168,29 @@ export interface Session {
    * lebih buruk daripada mengaku belum tahu.
    */
   selesaiNyata?: number
+
+  /**
+   * #31 — catatan pengulangan blok (*Rep Counter*) dari Mode Podium presenter.
+   * Opsional & tambahan (tanpa naik versi Dexie): satu baris per drill ×
+   * rentang set. **Catatan staf** — dikupas dari berkas yang dibagikan.
+   */
+  logRep?: LogRepSet[]
+}
+
+/**
+ * #31 — berapa kali satu rentang set sebuah drill diulang pada satu sesi.
+ * `dari`/`sampai` adalah nomor set (1-based, inklusif). Set tunggal
+ * (`dari === sampai`) tidak pernah dicatat: pengulangan selalu sebuah
+ * perpindahan, minimal dari satu set ke set berikutnya.
+ */
+export interface LogRepSet {
+  drillId: string
+  namaDrill?: string
+  dari: number
+  sampai: number
+  kali: number
+  /** Epoch ms pengulangan terakhir. */
+  terakhir: number
 }
 
 /**
