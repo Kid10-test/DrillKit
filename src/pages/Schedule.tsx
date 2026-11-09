@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
-import type { AttendanceRecord, BlokLatihan, ChecklistItem, JenisBlok, Session, SessionType } from '../db/types'
+import type { AttendanceRecord, ChecklistItem, Session, SessionType } from '../db/types'
 import {
   Badge,
   Button,
@@ -21,7 +21,14 @@ import { unduhICS } from '../components/PengingatJadwal'
 import { PacuLatihan } from '../components/PacuLatihan'
 import { PenandaSesi, RekapPenanda } from '../components/PenandaSesi'
 import { lamaSlot, menitDariJam } from '../lib/runsheet'
-import { LABEL_BLOK, URUTAN_BLOK, formatMenit, lebihRencana, ringkasLogRep, totalRencana } from '../lib/latihan'
+import { formatMenit, lebihRencana, ringkasLogRep, totalRencana } from '../lib/latihan'
+import { komposisiRencana, labelKomposisi, neracaSesi } from '../lib/ranahSesi'
+import { RencanaEditor } from '../components/jadwal/RencanaEditor'
+import { BilahKomposisi } from '../components/jadwal/BilahKomposisi'
+import { PolaSesiModal } from '../components/jadwal/PolaSesiModal'
+import { TampilanNeraca } from '../components/jadwal/TampilanNeraca'
+import { CetakJadwalModal, useModulCetakJadwal } from '../components/jadwal/CetakJadwalModal'
+import { useSeksiAktif } from '../hooks/useSeksiAktif'
 import { URUTAN_JENIS, formatDateLong, relativeDay, sesiMeta, toCSV, downloadFile, nowTime, todayISO, uid } from '../lib/utils'
 import { bangunICS } from '../lib/pengingat'
 import { cetakAtauUnduh, rapikanPredikat } from '../lib/laporan'
@@ -29,13 +36,13 @@ import { useSettings } from '../hooks/useSettings'
 import {
   KUNCI_TAMPILAN,
   NAMA_BULAN,
+  awalMinggu,
   NAMA_HARI_PANJANG,
   NAMA_HARI_SENIN,
   buatSeri,
   gabungICS,
   geserBulan,
   hariSenin,
-  htmlKalenderBulan,
   kelompokPerMinggu,
   nadaKehadiran,
   penampilanTerdekat,
@@ -55,6 +62,9 @@ import {
 } from '../lib/kalender'
 
 const TYPES: SessionType[] = [...URUTAN_JENIS] as SessionType[]
+
+/** #35 — id seksi aktif untuk komposisi ranah di kartu & agenda (satu kueri untuk seluruh halaman). */
+const SeksiCtx = createContext<string[]>([])
 
 function bacaTampilan(): TampilanJadwal {
   let simpan: string | null = null
@@ -119,6 +129,13 @@ export default function Schedule() {
   const [hariPilih, setHariPilih] = useState<string>(hariIni)
   const [lihatLewat, setLihatLewat] = useState(false)
   const [duplikat, setDuplikat] = useState<Session | null>(null)
+  /* #35 — pola sesi, neraca mingguan, dan pilihan cetak */
+  const seksiAktif = useSeksiAktif()
+  const idSeksi = useMemo(() => seksiAktif.map((x) => x.id), [seksiAktif])
+  const [polaBuka, setPolaBuka] = useState(false)
+  const [cetakBuka, setCetakBuka] = useState(false)
+  const [neracaAwal, setNeracaAwal] = useState(() => awalMinggu(hariIni))
+  const modCetak = useModulCetakJadwal(tampilan === 'neraca')
   /** Menunggu pilihan "hanya sesi ini / semua berikutnya". */
   const [tanyaSeri, setTanyaSeri] = useState<{ lama: Session; baru: Session } | null>(null)
   const [hapusSeri, setHapusSeri] = useState<Session | null>(null)
@@ -308,12 +325,19 @@ export default function Schedule() {
   }
 
   function cetakBulan() {
-    const { tahun, bulan } = bulanAktif
-    const html = htmlKalenderBulan(tahun, bulan, tersaring, {
+    setCetakBuka(true)
+  }
+
+  /** #35 — lembar rencana satu minggu (A4 tegak) dengan jalur paralel per seksi & neraca. */
+  function cetakMinggu(awal: string) {
+    if (!modCetak) return
+    const html = modCetak.htmlRencanaMinggu(awal, tersaring, {
       namaTim: settings?.teamName,
+      seksi: seksiAktif,
+      target: settings?.targetNeraca ?? null,
       label: (t) => sesiMeta(t).label,
     })
-    const dicetak = cetakAtauUnduh(html, `jadwal-${tahun}-${String(bulan).padStart(2, '0')}.html`)
+    const dicetak = cetakAtauUnduh(html, `rencana-minggu-${awal}.html`)
     if (!dicetak) toast.push('Jendela cetak diblokir — berkas HTML diunduh, buka lalu tekan Ctrl+P', 'info')
   }
 
@@ -332,6 +356,7 @@ export default function Schedule() {
   const penampilan = penampilanTerdekat(tersaring, hariIni)
 
   return (
+    <SeksiCtx.Provider value={idSeksi}>
     <div>
       <PageHeader
         title="Jadwal"
@@ -344,6 +369,9 @@ export default function Schedule() {
             <Button data-testid="ics-semua" onClick={unduhSemuaICS}>
               <IconCalendar size={16} /> .ics semua
             </Button>
+            <Button data-testid="buka-pola-sesi" onClick={() => setPolaBuka(true)}>
+              Pola sesi
+            </Button>
             <Button variant="primary" data-testid="tambah-jadwal" onClick={() => bukaBaru()}>
               <IconPlus size={16} /> Tambah jadwal
             </Button>
@@ -354,7 +382,7 @@ export default function Schedule() {
       <Card className="mb-4">
         <div className="flex flex-wrap items-end gap-3">
           <div role="tablist" className="flex rounded-lg border border-slate-700 p-0.5">
-            {(['bulan', 'agenda', 'daftar'] as const).map((t) => (
+            {(['bulan', 'agenda', 'neraca', 'daftar'] as const).map((t) => (
               <button
                 key={t}
                 role="tab"
@@ -365,7 +393,7 @@ export default function Schedule() {
                   tampilan === t ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                {t === 'bulan' ? 'Bulan' : t === 'agenda' ? 'Agenda' : 'Daftar'}
+                {t === 'bulan' ? 'Bulan' : t === 'agenda' ? 'Agenda' : t === 'neraca' ? 'Neraca' : 'Daftar'}
               </button>
             ))}
           </div>
@@ -435,6 +463,15 @@ export default function Schedule() {
         />
       ) : tampilan === 'daftar' ? (
         <TampilanDaftar sesi={tersaring} absensi={absensi ?? []} ambang={ambang} hariIni={hariIni} aksi={aksi} />
+      ) : tampilan === 'neraca' ? (
+        <TampilanNeraca
+          sesi={tersaring}
+          awal={neracaAwal}
+          setAwal={setNeracaAwal}
+          onEdit={aksi.onEdit}
+          onPola={() => setPolaBuka(true)}
+          onCetakMinggu={cetakMinggu}
+        />
       ) : (
         <TampilanAgenda
           sesi={tersaring}
@@ -444,6 +481,10 @@ export default function Schedule() {
           lihatLewat={lihatLewat}
           setLihatLewat={setLihatLewat}
           aksi={aksi}
+          onNeraca={(awal) => {
+            setNeracaAwal(awal)
+            setTampilan('neraca')
+          }}
         />
       )}
 
@@ -514,7 +555,17 @@ export default function Schedule() {
       <DuplikatModal sesi={duplikat} onClose={() => setDuplikat(null)} onSimpan={simpanDuplikat} />
 
       {pacuSesi && <PacuLatihan sesi={pacuSesi} onClose={() => setPacuId(null)} />}
+
+      <PolaSesiModal open={polaBuka} onClose={() => setPolaBuka(false)} sesi={sessions ?? []} />
+      <CetakJadwalModal
+        open={cetakBuka}
+        onClose={() => setCetakBuka(false)}
+        tahun={bulanAktif.tahun}
+        bulan={bulanAktif.bulan}
+        sesi={tersaring}
+      />
     </div>
+    </SeksiCtx.Provider>
   )
 }
 
@@ -711,6 +762,7 @@ function TampilanAgenda({
   lihatLewat,
   setLihatLewat,
   aksi,
+  onNeraca,
 }: {
   sesi: Session[]
   absensi: AttendanceRecord[]
@@ -719,8 +771,10 @@ function TampilanAgenda({
   lihatLewat: boolean
   setLihatLewat: (b: boolean) => void
   aksi: Aksi
+  onNeraca: (awal: string) => void
 }) {
   const [buka, setBuka] = useState<string | null>(null)
+  const idSeksi = useContext(SeksiCtx)
   const sekarang = new Date()
   const berikut = sesiBerikutnya(sesi, hariIni, nowTime())
   const mendatang = sesi.filter((s) => s.date >= hariIni && s.id !== berikut?.id)
@@ -744,6 +798,11 @@ function TampilanAgenda({
           </span>
           <span className="w-12 shrink-0 text-xs text-slate-500">{s.startTime}</span>
           <span className="min-w-0 flex-1 truncate text-sm text-slate-200">{s.title}</span>
+          {(s.rencanaLatihan?.length ?? 0) > 0 && (
+            <span className="hidden w-14 shrink-0 sm:block" title={labelKomposisi(komposisiRencana(s.rencanaLatihan, idSeksi).rataRata)}>
+              <BilahKomposisi m={komposisiRencana(s.rencanaLatihan, idSeksi).rataRata} tinggi={5} />
+            </span>
+          )}
           <span className="shrink-0 text-[11px] text-slate-500">
             {s.date < hariIni
               ? r.persenHadir != null && <span className={NADA[nadaKehadiran(r.persenHadir, ambang)]}>{r.persenHadir}%</span>
@@ -775,7 +834,7 @@ function TampilanAgenda({
 
       {kelompok.map((k) => (
         <div key={k.awal}>
-          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{k.label}</h2>
+          <KepalaMinggu label={k.label} awal={k.awal} sesi={k.sesi} idSeksi={idSeksi} onNeraca={onNeraca} />
           <Card className="p-1">
             <ul className="divide-y divide-slate-800">{k.sesi.map(baris)}</ul>
           </Card>
@@ -886,7 +945,7 @@ function SesiKartu({
             {s.place ? ` · ${s.place}` : ''}
           </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {(s.rencanaLatihan?.length ?? 0) > 0 && (
             <Button
               size="sm"
@@ -943,6 +1002,7 @@ function SesiKartu({
       )}
 
       <RencanaRingkas s={s} />
+      <KomposisiRingkas s={s} />
       <RepRingkas s={s} />
 
       <PenandaSesi s={s} />
@@ -1160,6 +1220,61 @@ function RencanaRingkas({ s }: { s: Session }) {
   )
 }
 
+/** #35 — komposisi ranah sesi: label otomatis ("Fisik + Visual") dan bilahnya. */
+function KomposisiRingkas({ s }: { s: Session }) {
+  const idSeksi = useContext(SeksiCtx)
+  if (!(s.rencanaLatihan?.length ?? 0)) return null
+  const k = komposisiRencana(s.rencanaLatihan, idSeksi)
+  if (k.total <= 0) return null
+  return (
+    <div className="mt-1.5" data-testid={`komposisi-${s.id}`}>
+      <BilahKomposisi m={k.rataRata} tinggi={5} />
+      <p className="mt-0.5 text-[11px] text-slate-500">
+        Isi: <span className="text-slate-300">{labelKomposisi(k.rataRata)}</span>
+        {k.adaParalel && <span className="text-cyan-400/80"> · ⇉ paralel per seksi</span>}
+      </p>
+    </div>
+  )
+}
+
+/** #35 — kepala minggu di Agenda: bilah neraca ringkas + tautan ke tab Neraca. */
+function KepalaMinggu({
+  label,
+  awal,
+  sesi,
+  idSeksi,
+  onNeraca,
+}: {
+  label: string
+  awal: string
+  sesi: Session[]
+  idSeksi: string[]
+  onNeraca: (awal: string) => void
+}) {
+  const n = neracaSesi(sesi, idSeksi)
+  const ada = n.sesi.some((x) => x.adaRencana)
+  return (
+    <div className="mb-1 flex items-center gap-2">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</h2>
+      {ada && (
+        <span className="hidden w-24 sm:block" title={labelKomposisi(n.rataRata.menit)}>
+          <BilahKomposisi m={n.rataRata.menit} tinggi={5} />
+        </span>
+      )}
+      {n.sesi.length > 0 && (
+        <button
+          type="button"
+          data-testid={`ke-neraca-${awal}`}
+          onClick={() => onNeraca(awal)}
+          className="ml-auto text-[11px] text-emerald-400 hover:underline"
+        >
+          Neraca ›{n.peringatan.length ? ` ⚠${n.peringatan.length}` : ''}
+        </button>
+      )}
+    </div>
+  )
+}
+
 /** #31 — ringkasan Rep Counter Mode Podium: blok mana yang paling sering diulang. */
 function RepRingkas({ s }: { s: Session }) {
   const { baris, total } = ringkasLogRep(s.logRep)
@@ -1177,149 +1292,6 @@ function RepRingkas({ s }: { s: Session }) {
       ))}
       {baris.length > teratas.length ? ` (+${baris.length - teratas.length} lagi)` : ''}
     </p>
-  )
-}
-
-/**
- * Penyunting rencana latihan di dalam modal jadwal.
- *
- * Durasi disimpan per blok (bukan jam absolut), jadi menggeser jam mulai
- * sesi otomatis menggeser seluruh blok tanpa perlu disusun ulang.
- */
-function RencanaEditor({ s, setS }: { s: Session; setS: (x: Session) => void }) {
-  const [judul, setJudul] = useState('')
-  const [jenis, setJenis] = useState<JenisBlok>('pemanasan')
-  const [menit, setMenit] = useState('15')
-
-  const blok = s.rencanaLatihan ?? []
-  const lama = lamaSlot(menitDariJam(s.startTime), menitDariJam(s.endTime))
-  const lebih = lebihRencana(lama, blok)
-
-  function tambah() {
-    const n = Number(menit)
-    if (!judul.trim() || !Number.isFinite(n) || n <= 0) return
-    const b: BlokLatihan = { id: uid('b_'), judul: judul.trim(), jenis, menit: Math.round(n) }
-    setS({ ...s, rencanaLatihan: [...blok, b] })
-    setJudul('')
-  }
-
-  function hapus(id: string) {
-    setS({ ...s, rencanaLatihan: blok.filter((b) => b.id !== id) })
-  }
-
-  function geser(i: number, arah: -1 | 1) {
-    const j = i + arah
-    if (j < 0 || j >= blok.length) return
-    const salin = [...blok]
-    ;[salin[i], salin[j]] = [salin[j], salin[i]]
-    setS({ ...s, rencanaLatihan: salin })
-  }
-
-  return (
-    <div>
-      <label className="mb-1 block text-xs font-medium text-slate-400">
-        Rencana latihan <span className="text-slate-600">— opsional</span>
-      </label>
-      <p className="mb-2 text-[11px] text-slate-500">
-        Bagi sesi menjadi blok waktu. Waktu tiap blok dihitung otomatis dari jam mulai sesi, jadi
-        menggeser jam mulai cukup sekali.
-      </p>
-
-      {blok.length > 0 && (
-        <ul data-testid="daftar-blok" className="mb-2 space-y-1">
-          {blok.map((b, i) => (
-            <li key={b.id} data-testid={`blok-${b.id}`} className="flex items-center gap-2 rounded bg-slate-800/50 px-2 py-1.5">
-              <span className="text-[11px] text-slate-600">{i + 1}.</span>
-              <span className="flex-1 text-sm text-slate-200">{b.judul}</span>
-              <span className="rounded border border-slate-600 px-1.5 py-0.5 text-[10px] text-slate-400">
-                {LABEL_BLOK[b.jenis]}
-              </span>
-              <span className="w-16 text-right text-xs text-slate-300">{b.menit} mnt</span>
-              <button
-                onClick={() => geser(i, -1)}
-                disabled={i === 0}
-                data-testid={`naik-${b.id}`}
-                className="rounded px-1 text-slate-500 hover:bg-slate-700 hover:text-slate-200 disabled:opacity-25"
-                title="Naikkan"
-              >
-                ↑
-              </button>
-              <button
-                onClick={() => geser(i, 1)}
-                disabled={i === blok.length - 1}
-                data-testid={`turun-${b.id}`}
-                className="rounded px-1 text-slate-500 hover:bg-slate-700 hover:text-slate-200 disabled:opacity-25"
-                title="Turunkan"
-              >
-                ↓
-              </button>
-              <button
-                onClick={() => hapus(b.id)}
-                data-testid={`hapus-${b.id}`}
-                className="rounded px-1 text-slate-500 hover:bg-slate-700 hover:text-rose-300"
-              >
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-[10rem] flex-1">
-          <Input
-            data-testid="nama-blok"
-            value={judul}
-            onChange={(e) => setJudul(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                tambah()
-              }
-            }}
-            placeholder="mis. Pemanasan & tuning"
-          />
-        </div>
-        <Select data-testid="jenis-blok" value={jenis} onChange={(e) => setJenis(e.target.value as JenisBlok)} className="w-32">
-          {URUTAN_BLOK.map((t) => (
-            <option key={t} value={t}>
-              {LABEL_BLOK[t]}
-            </option>
-          ))}
-        </Select>
-        <Input
-          data-testid="menit-blok"
-          type="number"
-          min={1}
-          value={menit}
-          onChange={(e) => setMenit(e.target.value)}
-          className="w-20"
-        />
-        <Button data-testid="tambah-blok" onClick={tambah}>
-          Tambah
-        </Button>
-      </div>
-
-      {blok.length > 0 && (
-        <p data-testid="ringkasan-rencana" className="mt-2 text-[11px]">
-          <span className="text-slate-500">
-            Total rencana {formatMenit(totalRencana(blok))}
-            {lama != null && <> · slot {formatMenit(lama)}</>}
-          </span>
-          {lebih == null ? (
-            <span className="ml-1 text-slate-500">· slotnya tidak terbaca, jadi tidak bisa dinilai</span>
-          ) : lebih > 0 ? (
-            <span data-testid="rencana-lebih" className="ml-1 font-semibold text-rose-300">
-              · lebih {formatMenit(lebih)} dari slotnya — bagian akhir akan kehabisan waktu
-            </span>
-          ) : (
-            <span data-testid="rencana-muat" className="ml-1 text-emerald-400">
-              · muat, sisa {formatMenit(-lebih)}
-            </span>
-          )}
-        </p>
-      )}
-    </div>
   )
 }
 

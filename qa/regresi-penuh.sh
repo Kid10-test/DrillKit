@@ -206,6 +206,11 @@ bash bangun-logika.sh || exit 1
 # hitungan besar, papan aba-aba 40 m hex murni, & Rep Counter ke sesi hari
 # ini) sehingga total regresi penuh menjadi 156 rangkaian.
 
+# v2.5.0 (#35) — menambahkan `ranah-sesi-logika` & `ranah-sesi-e2e` (isi
+# sesi per ranah, blok paralel per seksi, pustaka pola sesi & terapkan massal,
+# neraca ranah mingguan + target, kalender A4 tegak & lembar rencana minggu)
+# sehingga total regresi penuh menjadi 158 rangkaian.
+
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika grid-patok-logika uji-situs uji-rilis uji-lapangan \
   buka-berkas-logika evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
@@ -216,11 +221,11 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet inventaris-logistik mode-kirab penilaian-juri administrasi-unit kanvas-parametrik midsets-tags-pointer-palet tabrakan-spasi-silang perspektif-tribun-video buku-saku-generasi-baru perkusi-e2e studio-intonasi-e2e estafet-qr-e2e podium-e2e \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet inventaris-logistik mode-kirab penilaian-juri administrasi-unit kanvas-parametrik midsets-tags-pointer-palet tabrakan-spasi-silang perspektif-tribun-video buku-saku-generasi-baru perkusi-e2e studio-intonasi-e2e estafet-qr-e2e podium-e2e ranah-sesi-e2e \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika mscz-logika peta-partitur-logika mscz-e2e partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika kanvas-parametrik-logika midsets-tags-pointer-palet-logika tabrakan-spasi-silang-logika perspektif-tribun-video-logika buku-saku-generasi-baru-logika perkusi-logika studio-intonasi-logika estafet-qr-logika podium-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika mscz-logika peta-partitur-logika mscz-e2e partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika kanvas-parametrik-logika midsets-tags-pointer-palet-logika tabrakan-spasi-silang-logika perspektif-tribun-video-logika buku-saku-generasi-baru-logika perkusi-logika studio-intonasi-logika estafet-qr-logika podium-logika ranah-sesi-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill m1-penggaris-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman m6-drill-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \

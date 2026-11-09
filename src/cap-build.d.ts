@@ -2,3 +2,5 @@
 declare const __CAP_BUILD__: string
 /** Hash PBKDF2 dari PIN_PELATIH (kosong = tidak dipasang). PIN polos tidak masuk bundle. */
 declare const __PIN_PELATIH_HASH__: string
+/** Versi dari package.json, disuntikkan saat build (bilah sisi). */
+declare const __VERSI_APP__: string

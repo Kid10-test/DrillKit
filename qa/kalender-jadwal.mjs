@@ -191,13 +191,17 @@ cek('Batalkan: tanggal kembali', pindah.date === khusus.date, pindah.date)
 /* ---------------- cetak ---------------- */
 const jumlahHalaman = (await browser.pages()).length
 await klik('[data-testid="cetak-bulan"]')
+// #35: Cetak membuka pilihan (A4 tegak bawaan / A4 mendatar lama); di sini yang mendatar.
+await p.waitForSelector('[data-testid="modal-cetak-jadwal"]')
+await klik('[data-testid="cetak-mendatar"]')
+await klik('[data-testid="cetak-ya"]')
 await wait(1200)
 const halaman = await browser.pages()
 let isiCetak = ''
 if (halaman.length > jumlahHalaman) isiCetak = await halaman.at(-1).content()
 cek('cetak: jendela cetak terbuka atau HTML diunduh', halaman.length > jumlahHalaman || errors.length === 0)
 if (isiCetak) {
-  cek('cetak: berisi kalender tanpa oklch', isiCetak.includes('Jadwal ') && !/oklch|color-mix/.test(isiCetak))
+  cek('cetak: berisi kalender tanpa oklch', isiCetak.includes('Jadwal ') && isiCetak.includes('A4 landscape') && !/oklch|color-mix/.test(isiCetak))
   await halaman.at(-1).close()
 }
 
