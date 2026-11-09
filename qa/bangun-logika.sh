@@ -183,6 +183,8 @@ rakit src/lib/podium.ts                  podium
 # dan cetakan A4 Jadwal (kalender tegak + lembar rencana minggu).
 rakit src/lib/ranahSesi.ts               ranahSesi
 rakit src/lib/jadwalCetak.ts             jadwalCetak
+# #36 — Program Latsar (generator berfase) & Pemantau Syarat Pelantikan.
+rakit src/lib/programLatsar.ts           programLatsar
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'

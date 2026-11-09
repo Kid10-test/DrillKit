@@ -25,6 +25,7 @@ import {
   type Menit,
 } from '../../lib/ranahSesi'
 import { todayISO } from '../../lib/utils'
+import { targetMinggu } from '../../lib/programLatsar'
 import { useSettings } from '../../hooks/useSettings'
 import { useSeksiAktif } from '../../hooks/useSeksiAktif'
 import { BilahKomposisi, LegendaRanah } from './BilahKomposisi'
@@ -54,7 +55,7 @@ export function TampilanNeraca({
   const seksi = useSeksiAktif()
   const ids = useMemo(() => seksi.map((s) => s.id), [seksi])
   const label = (id: string) => seksi.find((s) => s.id === id)?.label ?? (id === '*' ? 'Semua' : id)
-  const target = settings.targetNeraca ?? null
+  const { target, asal } = targetMinggu(settings.programLatihan, awal, settings.targetNeraca)
   const akhir = tambahHari(awal, 6)
   const dalam = useMemo(() => sesi.filter((s) => s.date >= awal && s.date <= akhir), [sesi, awal, akhir])
   const n = useMemo(() => neracaSesi(dalam, ids, { target, label }), [dalam, ids, target, seksi])
@@ -157,7 +158,7 @@ export function TampilanNeraca({
             </div>
           </Card>
 
-          <PanelTarget target={target} />
+          <PanelTarget target={target} asal={asal} tim={settings.targetNeraca ?? null} />
 
           {(n.selisih.length > 0 || n.peringatan.length > 0) && (
             <Card className="p-3">
@@ -227,9 +228,9 @@ export function TampilanNeraca({
 }
 
 /** Target proporsi ranah — disimpan di pengaturan tim. */
-function PanelTarget({ target }: { target: TargetNeraca | null }) {
+function PanelTarget({ target, asal, tim }: { target: TargetNeraca | null; asal: string | null; tim: TargetNeraca | null }) {
   const [buka, setBuka] = useState(false)
-  const [draf, setDraf] = useState<TargetNeraca>(() => target ?? { nama: 'Target sendiri', persen: {} })
+  const [draf, setDraf] = useState<TargetNeraca>(() => tim ?? { nama: 'Target sendiri', persen: {} })
   const jumlah = jumlahTarget(draf)
 
   async function simpan(t: TargetNeraca | null) {
@@ -257,17 +258,22 @@ function PanelTarget({ target }: { target: TargetNeraca | null }) {
                 .join(' · ')}
             </span>
           )}
+          {asal && (
+            <span data-testid="asal-target" className="block text-[11px] text-slate-500">
+              dari {asal} — ubah di Program; target tim berlaku di luar fase program
+            </span>
+          )}
         </p>
         <Button
           size="sm"
           variant="ghost"
           data-testid="ubah-target"
           onClick={() => {
-            setDraf(target ?? { nama: 'Target sendiri', persen: {} })
+            setDraf(tim ?? { nama: 'Target sendiri', persen: {} })
             setBuka(!buka)
           }}
         >
-          {buka ? 'Tutup' : 'Atur target'}
+          {buka ? 'Tutup' : asal ? 'Atur target tim' : 'Atur target'}
         </Button>
       </div>
       {buka && (
@@ -305,7 +311,7 @@ function PanelTarget({ target }: { target: TargetNeraca | null }) {
             Jumlah {jumlah}%{jumlah === 100 ? '' : ' — sebaiknya tepat 100%'}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
-            {target && (
+            {tim && (
               <Button size="sm" variant="ghost" data-testid="hapus-target" onClick={() => simpan(null)}>
                 Hapus target
               </Button>

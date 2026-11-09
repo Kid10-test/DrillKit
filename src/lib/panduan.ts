@@ -72,7 +72,7 @@ const LANGKAH: [string, string][] = [
   ],
   [
     'Jadwal, absensi, &amp; lomba',
-    '<b>Jadwal</b>: kalender/agenda &amp; ekspor .ics. <b>Absensi</b>: isi manual atau scan QR · tab <b>Rekap</b> untuk laporan &amp; kartu kehadiran. <b>Run sheet hari lomba</b> untuk jadwal hari H.',
+    '<b>Jadwal</b>: kalender/agenda, .ics, &amp; <b>Program</b> Latsar (fase → sesi). <b>Absensi</b>: manual/scan QR, izin bercap jam · tab <b>Rekap</b> &amp; <b>Syarat pelantikan</b>. <b>Run sheet</b> untuk hari H.',
   ],
   [
     'Terbitkan ke anggota',
@@ -88,8 +88,8 @@ const LANGKAH: [string, string][] = [
 const MENU: [string, string][] = [
   ['Dashboard', 'Ringkasan kehadiran, jadwal terdekat, komposisi tim, &amp; pintu <b>Buka berkas DrillKit</b>'],
   ['Anggota', 'Data anggota, <b>Audisi</b>, <b>Inventaris &amp; seragam</b>, <b>Dispensasi &amp; medis</b>, <b>Kas</b>, QR'],
-  ['Absensi &amp; Evaluasi', 'Scan QR / manual, tab <b>Rekap</b> laporan, <b>Evaluasi</b>, &amp; <b>Setoran hafalan</b>'],
-  ['Jadwal &amp; Lomba', 'Kalender, .ics, <b>Run sheet</b>, <b>Manifes truk</b>, &amp; <b>Simulasi juri/Judge Tape</b>'],
+  ['Absensi &amp; Evaluasi', 'Scan QR / manual, <b>Rekap</b>, <b>Syarat pelantikan</b>, <b>Evaluasi</b>, &amp; <b>Setoran</b>'],
+  ['Jadwal &amp; Lomba', 'Kalender, <b>Program Latsar</b>, <b>Run sheet</b>, <b>Manifes truk</b>, &amp; <b>Judge Tape</b>'],
   ['Drill &amp; Formasi', 'Editor formasi, <b>Mode Kirab/Parade</b>, FTL/Ripple, <b>Count Sheet Guard</b>, dress/hole/bayangan, buku saku'],
   ['Musik &amp; Metronom', 'Metronom &amp; tempo map, tempo latihan, rekaman MP3, partitur &amp; cetak Lyre, penala'],
   ['Berbagi', 'Terbitkan paket grup / terkunci QR per anggota, log perubahan show, &amp; panduan anggota'],
@@ -272,7 +272,7 @@ function tabAnggota(): [string, string][] {
     ],
     [
       'Absensi',
-      'Rekap kehadiranmu menurut catatan pelatih. <b>Belum dicatat</b> artinya pelatih belum mengisi sesi itu — <b>bukan</b> berarti kamu tidak hadir.',
+      'Rekap kehadiranmu menurut catatan pelatih. <b>Belum dicatat</b> artinya pelatih belum mengisi sesi itu — <b>bukan</b> berarti kamu tidak hadir. Izin kabari pelatih <b>sebelum jam mulai</b>; sakit paling lambat 24 jam sesudahnya.',
     ],
     ['Catatan', 'Catatan evaluasi dari pelatih, khusus untukmu.'],
     [
