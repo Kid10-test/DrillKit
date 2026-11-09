@@ -378,6 +378,15 @@ export interface AttendanceRecord {
   status: AttendanceStatus
   checkInAt?: number
   note?: string
+  /**
+   * #36 — kapan izin/sakit **dilaporkan** (epoch ms), bukan kapan dicatat.
+   * Pelatih sering mencatatnya belakangan dari pesan WA; jamnya bisa diubah.
+   * Dipakai Pemantau Syarat Pelantikan: izin sah bila tertulis sebelum jam
+   * mulai sesi, sakit sah bila dilaporkan paling lambat N jam sesudahnya.
+   */
+  dilaporAt?: number
+  /** #36 — putusan pelatih yang mengalahkan aturan jam (izin "jelas & bertanggung jawab"). */
+  putusanIzin?: 'sah' | 'tidak-sah'
 }
 
 /* ------------------------------- Drill ---------------------------------- */
@@ -1486,6 +1495,82 @@ export interface TeamSettings {
   polaSesi?: PolaSesi[]
   /** #35 — target proporsi ranah untuk neraca mingguan. Kosong = tanpa target. */
   targetNeraca?: TargetNeraca
+  /**
+   * #36 — program latihan berfase (mis. Latsar anggota baru) beserta peserta
+   * & aturan pelantikannya. Disimpan di pengaturan tim (ikut backup), TIDAK
+   * ikut paket bagikan — paket hanya membawa field tim yang didaftar putih.
+   */
+  programLatihan?: ProgramLatihan[]
+}
+
+/* ------------- #36 — Program Latsar & Pemantau Syarat Pelantikan ------------- */
+
+export interface FaseProgram {
+  id: string
+  nama: string
+  /** Rentang ISO inklusif. */
+  dari: string
+  sampai: string
+  /** Pola isi sesi per hari (kunci 0 = Senin … 6 = Minggu → id `PolaSesi`). */
+  polaPerHari: Record<string, string>
+  /** Target neraca fase ini; Tab Neraca memakainya untuk minggu di dalam fase. */
+  target?: TargetNeraca
+}
+
+export type JenisTonggak = 'acara' | 'tes' | 'pelantikan' | 'camp' | 'libur'
+
+export interface TonggakProgram {
+  id: string
+  nama: string
+  jenis: JenisTonggak
+  /** Kosong = tanggal belum ditentukan (mis. camp). */
+  dari?: string
+  sampai?: string
+  jamMulai?: string
+  jamSelesai?: string
+}
+
+export interface PesertaProgram {
+  memberId: string
+  /** Tanggal mulai ikut (ISO). Sesi wajib sebelum tanggal ini tidak dihitung. */
+  bergabung: string
+}
+
+export interface AturanPelantikan {
+  /** Persen hadir minimal dari sesi wajib setelah dikurangi izin/sakit sah. */
+  persenMin: number
+  /** Minimal hadir fisik, apa pun hasil persennya. */
+  hadirMin: number
+  /** Bergabung setelah tanggal ini → pelantikan susulan. Kosong = tanpa batas. */
+  batasGabung?: string
+  /** Sakit sah bila dilaporkan paling lambat sekian jam setelah sesi mulai. */
+  sakitMaksJam: number
+}
+
+export interface ProgramLatihan {
+  id: string
+  nama: string
+  mulai: string
+  selesai: string
+  /** Hari latihan rutin, 0 = Senin … 6 = Minggu. */
+  hari: number[]
+  jamMulai: string
+  jamSelesai: string
+  tempat?: string
+  /** Tanggal latihan di luar pola mingguan (mis. Minggu 29 Nov). */
+  tambahan: string[]
+  /** Tanggal pola mingguan yang ditiadakan. */
+  libur: string[]
+  fase: FaseProgram[]
+  tonggak: TonggakProgram[]
+  /** Sesi jadwal milik program (dibuat atau ditautkan generator). */
+  sesiIds: string[]
+  /** Sesi yang dihitung untuk syarat pelantikan. */
+  wajibIds: string[]
+  peserta: PesertaProgram[]
+  aturan: AturanPelantikan
+  dibuat: number
+  diubah: number
 }
 
 export interface KopSuratUnit {

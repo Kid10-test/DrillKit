@@ -26,3 +26,7 @@ qa/unduhan-*/
 qa/berkas-*/
 qa/berkas-shot/
 qa/dl*/
+
+# Data pribadi milik unit (daftar nama anggota, dsb.) — JANGAN pernah terkomit:
+# repo ini publik. Simpan berkasnya di sini hanya untuk diimpor di aplikasi.
+pribadi/

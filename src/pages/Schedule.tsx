@@ -26,6 +26,9 @@ import { komposisiRencana, labelKomposisi, neracaSesi } from '../lib/ranahSesi'
 import { RencanaEditor } from '../components/jadwal/RencanaEditor'
 import { BilahKomposisi } from '../components/jadwal/BilahKomposisi'
 import { PolaSesiModal } from '../components/jadwal/PolaSesiModal'
+import { ProgramModal } from '../components/jadwal/ProgramModal'
+import { WARNA_FASE, infoSesiProgram, targetMinggu } from '../lib/programLatsar'
+import type { ProgramLatihan } from '../db/types'
 import { TampilanNeraca } from '../components/jadwal/TampilanNeraca'
 import { CetakJadwalModal, useModulCetakJadwal } from '../components/jadwal/CetakJadwalModal'
 import { useSeksiAktif } from '../hooks/useSeksiAktif'
@@ -65,6 +68,8 @@ const TYPES: SessionType[] = [...URUTAN_JENIS] as SessionType[]
 
 /** #35 — id seksi aktif untuk komposisi ranah di kartu & agenda (satu kueri untuk seluruh halaman). */
 const SeksiCtx = createContext<string[]>([])
+/** #36 — program latihan tim, untuk label fase & sesi wajib di kartu. */
+const ProgramCtx = createContext<ProgramLatihan[]>([])
 
 function bacaTampilan(): TampilanJadwal {
   let simpan: string | null = null
@@ -133,6 +138,7 @@ export default function Schedule() {
   const seksiAktif = useSeksiAktif()
   const idSeksi = useMemo(() => seksiAktif.map((x) => x.id), [seksiAktif])
   const [polaBuka, setPolaBuka] = useState(false)
+  const [programBuka, setProgramBuka] = useState(false)
   const [cetakBuka, setCetakBuka] = useState(false)
   const [neracaAwal, setNeracaAwal] = useState(() => awalMinggu(hariIni))
   const modCetak = useModulCetakJadwal(tampilan === 'neraca')
@@ -334,7 +340,7 @@ export default function Schedule() {
     const html = modCetak.htmlRencanaMinggu(awal, tersaring, {
       namaTim: settings?.teamName,
       seksi: seksiAktif,
-      target: settings?.targetNeraca ?? null,
+      target: targetMinggu(settings?.programLatihan, awal, settings?.targetNeraca).target,
       label: (t) => sesiMeta(t).label,
     })
     const dicetak = cetakAtauUnduh(html, `rencana-minggu-${awal}.html`)
@@ -357,6 +363,7 @@ export default function Schedule() {
 
   return (
     <SeksiCtx.Provider value={idSeksi}>
+    <ProgramCtx.Provider value={settings?.programLatihan ?? []}>
     <div>
       <PageHeader
         title="Jadwal"
@@ -368,6 +375,9 @@ export default function Schedule() {
             </Button>
             <Button data-testid="ics-semua" onClick={unduhSemuaICS}>
               <IconCalendar size={16} /> .ics semua
+            </Button>
+            <Button data-testid="buka-program" onClick={() => setProgramBuka(true)}>
+              Program
             </Button>
             <Button data-testid="buka-pola-sesi" onClick={() => setPolaBuka(true)}>
               Pola sesi
@@ -557,6 +567,7 @@ export default function Schedule() {
       {pacuSesi && <PacuLatihan sesi={pacuSesi} onClose={() => setPacuId(null)} />}
 
       <PolaSesiModal open={polaBuka} onClose={() => setPolaBuka(false)} sesi={sessions ?? []} />
+      <ProgramModal open={programBuka} onClose={() => setProgramBuka(false)} sesi={sessions ?? []} />
       <CetakJadwalModal
         open={cetakBuka}
         onClose={() => setCetakBuka(false)}
@@ -565,6 +576,7 @@ export default function Schedule() {
         sesi={tersaring}
       />
     </div>
+    </ProgramCtx.Provider>
     </SeksiCtx.Provider>
   )
 }
@@ -922,6 +934,8 @@ function SesiKartu({
 }) {
   const { onToggle, onEdit, onDelete, onDeleteSeri, onPacu, onDuplikat } = aksi
   const r = ringkasSesi(s, absensi)
+  const prog = infoSesiProgram(useContext(ProgramCtx), s)
+  const iFase = prog?.fase ? prog.program.fase.findIndex((f) => f.id === prog.fase!.id) : -1
   return (
     <Card data-testid={`kartu-${s.id}`} className={`${muted ? 'opacity-80' : ''} ${besar ? 'border-emerald-500/40' : ''}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -933,6 +947,16 @@ function SesiKartu({
               {s.startTime}–{s.endTime}
             </span>
             {s.seriId && <span className="text-[10px] text-slate-500" title="Jadwal berulang">↻ berulang</span>}
+            {prog && (
+              <span data-testid={`program-${s.id}`} className="flex items-center gap-1 text-[10px] text-slate-400" title={prog.program.nama}>
+                {iFase >= 0 && (
+                  <span className="rounded px-1 font-semibold text-white" style={{ background: WARNA_FASE[iFase % WARNA_FASE.length] }}>
+                    F{iFase + 1}
+                  </span>
+                )}
+                {prog.wajib ? `wajib ${prog.urutWajib}/${prog.program.wajibIds.length}` : prog.program.nama}
+              </span>
+            )}
             {muted && r.persenHadir != null && (
               <span data-testid={`hadir-${s.id}`} className={`text-[11px] font-semibold ${NADA[nadaKehadiran(r.persenHadir, ambang)]}`}>
                 hadir {r.persenHadir}%

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import type { AttendanceRecord, AttendanceStatus, Member, Session } from '../db/types'
@@ -19,6 +19,12 @@ import AttendanceRecap from './AttendanceRecap'
 import { bacaModeNama, cocokCari, namaTampil } from '../lib/namaAnggota'
 import { NamaTampil } from '../components/NamaTampil'
 import ScanQrModal from '../components/QrScanner'
+import { useSettings } from '../hooks/useSettings'
+import { aturanUntukSesi, infoSesiProgram, keabsahanIzin, batasLapor } from '../lib/programLatsar'
+import type { AturanPelantikan } from '../db/types'
+
+/** #36 — pemantau syarat pelantikan dimuat saat tabnya dibuka. */
+const PemantauPelantikan = lazy(() => import('../components/absensi/PemantauPelantikan'))
 import {
   sectionLabel,
   STATUS_META,
@@ -50,7 +56,9 @@ export default function Attendance() {
   const [q, setQ] = useState('')
   const [scanOpen, setScanOpen] = useState(false)
   const [historyFor, setHistoryFor] = useState<Member | null>(null)
-  const [tab, setTab] = useState<'isi' | 'rekap'>('isi')
+  const [tab, setTab] = useState<'isi' | 'rekap' | 'pelantikan'>('isi')
+  const settings = useSettings()
+  const [laporFor, setLaporFor] = useState<AttendanceRecord | null>(null)
 
   /** D3 — daftar sesi yang lolos penyaring jenis kegiatan. */
   const sesiTampil = useMemo(
@@ -91,6 +99,9 @@ export default function Attendance() {
   }, [records, sessionId])
 
   const filled = counts.hadir + counts.izin + counts.sakit + counts.alpha
+  const programSesi = session ? infoSesiProgram(settings.programLatihan, session) : null
+  const aturan: AturanPelantikan = aturanUntukSesi(settings.programLatihan, sessionId)
+  const adaProgram = (settings.programLatihan ?? []).length > 0
   const rate = pct(counts.hadir, filled)
 
   const list = active.filter((m) => {
@@ -106,10 +117,15 @@ export default function Attendance() {
       await db.attendance.delete(existing.id)
       return
     }
+    // #36 — izin/sakit diberi cap jam lapor (bisa diubah); status lain melepasnya.
+    const izinSakit = status === 'izin' || status === 'sakit'
     if (existing) {
+      const tetapCap = izinSakit && (existing.status === 'izin' || existing.status === 'sakit')
       await db.attendance.update(existing.id, {
         status,
         checkInAt: status === 'hadir' ? Date.now() : existing.checkInAt,
+        dilaporAt: izinSakit ? (tetapCap ? existing.dilaporAt : Date.now()) : undefined,
+        putusanIzin: tetapCap ? existing.putusanIzin : undefined,
       })
     } else {
       await db.attendance.put({
@@ -118,6 +134,7 @@ export default function Attendance() {
         memberId,
         status,
         checkInAt: status === 'hadir' ? Date.now() : undefined,
+        ...(izinSakit ? { dilaporAt: Date.now() } : {}),
       })
     }
   }
@@ -198,11 +215,13 @@ export default function Attendance() {
           [
             ['isi', 'Isi absensi'],
             ['rekap', 'Rekap'],
+            ...(adaProgram ? ([['pelantikan', 'Syarat pelantikan']] as const) : []),
           ] as const
         ).map(([id, label]) => (
           <button
             key={id}
             data-kiosk-allow
+            data-testid={`tab-absensi-${id}`}
             onClick={() => setTab(id)}
             className={cx(
               'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition',
@@ -221,7 +240,11 @@ export default function Attendance() {
           records={records ?? []}
         />
       )}
-      {tab === 'rekap' && <div className="hidden" />}
+      {tab === 'pelantikan' && (
+        <Suspense fallback={<p className="text-sm text-slate-500">Memuat…</p>}>
+          <PemantauPelantikan />
+        </Suspense>
+      )}
 
 {tab === 'isi' && (
       <>
@@ -276,6 +299,14 @@ export default function Attendance() {
             </div>
           </div>
         </div>
+        {programSesi && (
+          <p data-testid="info-sesi-program" className="mt-2 text-[11px] text-slate-400">
+            <b className="text-slate-200">{programSesi.program.nama}</b>
+            {programSesi.fase ? ` · ${programSesi.fase.nama}` : ''}
+            {programSesi.wajib ? ` · sesi wajib ${programSesi.urutWajib}/${programSesi.program.wajibIds.length}` : ' · tidak dihitung untuk pelantikan'}
+            {' — '}izin sah bila tertulis sebelum {session?.startTime}; sakit dilaporkan paling lambat {aturan.sakitMaksJam} jam sesudahnya.
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <Button size="sm" variant="primary" onClick={markAllHadir}>
             Tandai semua hadir
@@ -328,12 +359,16 @@ export default function Attendance() {
                       </p>
                     </div>
                   </button>
+                  {r && session && (r.status === 'izin' || r.status === 'sakit') && (
+                    <ChipLapor r={r} session={session} aturan={aturan} onClick={() => setLaporFor(r)} />
+                  )}
                   <div className="flex shrink-0 gap-1">
                     {ORDER.map((s) => {
                       const on = r?.status === s
                       return (
                         <button
                           key={s}
+                          data-testid={`absen-${m.id}-${s}`}
                           onClick={() => setStatus(m.id, s)}
                           title={STATUS_META[s].label}
                           className={cx(
@@ -377,6 +412,13 @@ export default function Attendance() {
       />
 
       <HistoryModal member={historyFor} onClose={() => setHistoryFor(null)} sessions={sessions ?? []} />
+      <LaporIzinModal
+        rec={laporFor}
+        session={session}
+        aturan={aturan}
+        nama={laporFor ? namaTampil(active.find((m) => m.id === laporFor.memberId) ?? { name: '' }, bacaModeNama()) : ''}
+        onClose={() => setLaporFor(null)}
+      />
     </div>
   )
 }
@@ -428,6 +470,156 @@ function HistoryModal({
       <div className="flex justify-end">
         <Button variant="ghost" onClick={onClose}>
           Tutup
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+/* ------------------------ #36 — cap jam lapor izin/sakit ------------------------ */
+
+const dua = (n: number) => String(n).padStart(2, '0')
+function keLokal(ms: number): string {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${dua(d.getMonth() + 1)}-${dua(d.getDate())}T${dua(d.getHours())}:${dua(d.getMinutes())}`
+}
+function jamPendek(ms: number, sesiTanggal: string): string {
+  const d = new Date(ms)
+  const iso = `${d.getFullYear()}-${dua(d.getMonth() + 1)}-${dua(d.getDate())}`
+  const jam = `${dua(d.getHours())}.${dua(d.getMinutes())}`
+  return iso === sesiTanggal ? jam : `${d.getDate()}/${d.getMonth() + 1} ${jam}`
+}
+
+function ChipLapor({
+  r,
+  session,
+  aturan,
+  onClick,
+}: {
+  r: AttendanceRecord
+  session: Session
+  aturan: AturanPelantikan
+  onClick: () => void
+}) {
+  const k = keabsahanIzin(r, session, aturan)
+  const warna =
+    k === 'sah' ? 'border-emerald-500/40 text-emerald-300' : k === 'telat' ? 'border-rose-500/50 text-rose-300' : 'border-amber-500/50 text-amber-300'
+  const teks =
+    k === 'tanpa-cap'
+      ? 'jam lapor?'
+      : `${r.dilaporAt ? jamPendek(r.dilaporAt, session.date) : ''}${r.putusanIzin ? ' · putusan' : ''} · ${k === 'sah' ? 'sah' : 'tidak sah'}`
+  return (
+    <button
+      type="button"
+      data-testid={`lapor-${r.memberId}`}
+      data-sah={k ?? ''}
+      onClick={onClick}
+      title="Jam lapor izin/sakit — ketuk untuk mengubah"
+      className={cx('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium', warna)}
+    >
+      {teks}
+    </button>
+  )
+}
+
+function LaporIzinModal({
+  rec,
+  session,
+  aturan,
+  nama,
+  onClose,
+}: {
+  rec: AttendanceRecord | null
+  session: Session | undefined
+  aturan: AturanPelantikan
+  nama: string
+  onClose: () => void
+}) {
+  const [waktu, setWaktu] = useState('')
+  const [putusan, setPutusan] = useState<'' | 'sah' | 'tidak-sah'>('')
+  const [catatan, setCatatan] = useState('')
+  useEffect(() => {
+    if (!rec) return
+    setWaktu(rec.dilaporAt ? keLokal(rec.dilaporAt) : '')
+    setPutusan(rec.putusanIzin ?? '')
+    setCatatan(rec.note ?? '')
+  }, [rec])
+  if (!rec || !session || (rec.status !== 'izin' && rec.status !== 'sakit')) return null
+  const ms = waktu ? new Date(waktu).getTime() : undefined
+  const uji = { ...rec, dilaporAt: Number.isFinite(ms) ? ms : undefined, putusanIzin: putusan || undefined }
+  const k = keabsahanIzin(uji, session, aturan)
+  const batas = batasLapor(rec.status, session, aturan)
+
+  async function simpan() {
+    if (!rec) return
+    await db.attendance.update(rec.id, {
+      dilaporAt: uji.dilaporAt,
+      putusanIzin: putusan || undefined,
+      note: catatan.trim() || undefined,
+    })
+    onClose()
+  }
+
+  return (
+    <Modal open={!!rec} onClose={onClose} title={`${rec.status === 'izin' ? 'Izin' : 'Sakit'} — ${nama}`} testId="modal-lapor-izin">
+      <p className="text-[12px] text-slate-400">
+        Isi jam pesan izin/sakit <b className="text-slate-200">diterima</b> (mis. jam pesan WA), bukan jam mencatat.{' '}
+        {rec.status === 'izin'
+          ? `Izin sah bila tertulis sebelum ${session.startTime} pada hari sesi.`
+          : `Sakit sah bila dilaporkan paling lambat ${aturan.sakitMaksJam} jam sesudah sesi mulai (${jamPendek(batas, session.date)}).`}
+      </p>
+      <label className="block text-[11px] text-slate-400">
+        Dilaporkan pada
+        <input
+          type="datetime-local"
+          data-testid="lapor-waktu"
+          value={waktu}
+          onChange={(e) => setWaktu(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+        />
+      </label>
+      <div className="flex flex-wrap gap-1.5">
+        <Button size="sm" data-testid="lapor-sekarang" onClick={() => setWaktu(keLokal(Date.now()))}>
+          Sekarang
+        </Button>
+        <Button size="sm" variant="ghost" data-testid="lapor-hapus" onClick={() => setWaktu('')}>
+          Kosongkan
+        </Button>
+      </div>
+      <label className="block text-[11px] text-slate-400">
+        Keputusan
+        <Select data-testid="lapor-putusan" value={putusan} onChange={(e) => setPutusan(e.target.value as '' | 'sah' | 'tidak-sah')}>
+          <option value="">Otomatis menurut jam lapor</option>
+          <option value="sah">Sah — keputusan pelatih (izin jelas & bertanggung jawab)</option>
+          <option value="tidak-sah">Tidak sah — dihitung tanpa keterangan</option>
+        </Select>
+      </label>
+      <label className="block text-[11px] text-slate-400">
+        Alasan / catatan
+        <input
+          data-testid="lapor-catatan"
+          value={catatan}
+          onChange={(e) => setCatatan(e.target.value)}
+          placeholder="mis. acara keluarga, surat dari orang tua"
+          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+        />
+      </label>
+      <p
+        data-testid="lapor-hasil"
+        className={cx('text-sm font-medium', k === 'sah' ? 'text-emerald-300' : k === 'telat' ? 'text-rose-300' : 'text-amber-300')}
+      >
+        {k === 'sah'
+          ? 'Sah — tidak mengurangi jatah'
+          : k === 'telat'
+            ? 'Tidak sah — dihitung tanpa keterangan'
+            : 'Belum ada jam lapor — dihitung tanpa keterangan sampai diisi'}
+      </p>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onClose}>
+          Batal
+        </Button>
+        <Button variant="primary" data-testid="lapor-simpan" onClick={simpan}>
+          Simpan
         </Button>
       </div>
     </Modal>
