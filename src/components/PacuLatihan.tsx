@@ -21,10 +21,46 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { db } from '../db/db'
-import type { Session } from '../db/types'
+import type { BlokLatihan, Session } from '../db/types'
 import { jamDariMenit, menitDariJam } from '../lib/runsheet'
 import { LABEL_BLOK, formatGeser, formatMenit, posisiLatihan, ringkasLogRep, susunRencana } from '../lib/latihan'
 import { PenandaSesi } from './PenandaSesi'
+import { useSeksiAktif } from '../hooks/useSeksiAktif'
+
+/** #35 — jalur paralel per seksi di blok: siapa, apa, bersama siapa, di mana. */
+function JalurParalel({ b, besar }: { b: BlokLatihan | undefined; besar?: boolean }) {
+  const seksi = useSeksiAktif()
+  const cabang = b?.cabang ?? []
+  if (!cabang.length) {
+    const info = [b?.pelatih, b?.tempat].filter(Boolean).join(' · ')
+    return info ? <p className={besar ? 'mt-1 text-sm text-slate-300' : 'block text-[11px] text-slate-500'}>{info}</p> : null
+  }
+  const nama = (id: string) => seksi.find((s) => s.id === id)?.label ?? id
+  return (
+    <ul data-testid="jalur-paralel" className={besar ? 'mt-3 grid gap-2 sm:grid-cols-2' : 'mt-0.5 space-y-0.5'}>
+      {cabang.map((c) => (
+        <li
+          key={c.id}
+          className={besar ? 'rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-2' : 'text-[11px] text-slate-400'}
+        >
+          <span className={besar ? 'block text-xs font-semibold uppercase tracking-wide text-cyan-300' : 'font-semibold text-cyan-300/90'}>
+            {c.seksi.map(nama).join(' + ') || '—'}
+          </span>
+          <span className={besar ? 'block text-base text-slate-100' : ''}>
+            {besar ? '' : ': '}
+            {c.judul || '—'}
+          </span>
+          {(c.pelatih || c.tempat) && (
+            <span className={besar ? 'block text-xs text-slate-400' : ''}>
+              {besar ? '' : ' · '}
+              {[c.pelatih, c.tempat].filter(Boolean).join(' · ')}
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 /** Jam berjalan, diperbarui tiap detik. */
 function pakaiJam() {
@@ -135,6 +171,7 @@ export function PacuLatihan({ sesi, onClose }: { sesi: Session; onClose: () => v
                   ? ` · ${jamDariMenit(pos.blok.mulai)}–${jamDariMenit(pos.blok.selesai)}`
                   : ''}
               </p>
+              <JalurParalel b={blok.find((x) => x.id === pos.blok!.id)} besar />
               <p
                 className={`mt-3 text-5xl font-semibold tabular-nums sm:text-7xl ${
                   lewat ? 'text-rose-300' : ''
@@ -267,6 +304,7 @@ export function PacuLatihan({ sesi, onClose }: { sesi: Session; onClose: () => v
                         {b.mulai != null && ` · ${jamDariMenit(b.mulai)}`}
                         {sudah && r && ` · nyata ${formatMenit((r.selesai! - r.mulai) / 60000)}`}
                       </span>
+                      {!sudah && <JalurParalel b={blok.find((x) => x.id === b.id)} />}
                     </span>
                     {!sudah && !aktif && (
                       <button

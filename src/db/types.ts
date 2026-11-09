@@ -288,8 +288,29 @@ export interface CatatanSetoran {
   catatan?: string
 }
 
-/** Jenis blok dalam rencana latihan. Terpisah dari `SessionType` yang ada. */
-export type JenisBlok = 'pemanasan' | 'section' | 'gabungan' | 'pendingin' | 'lainnya'
+/**
+ * Jenis (ranah) blok dalam rencana latihan. Terpisah dari `SessionType`.
+ *
+ * #35 — satu kolom ini sekaligus **ranah** blok: fisik, visual, musik
+ * bersama, section, drill, dst. Lima nilai lama (`pemanasan`, `section`,
+ * `gabungan`, `pendingin`, `lainnya`) tetap sah sehingga data lama tidak
+ * berubah arti. Neraca mingguan mengelompokkannya lewat
+ * `ranahDariJenis()` di `lib/ranahSesi.ts`.
+ */
+export type JenisBlok =
+  | 'apel'
+  | 'pemanasan'
+  | 'fisik'
+  | 'visual'
+  | 'musik'
+  | 'section'
+  | 'drill'
+  | 'gabungan'
+  | 'teori'
+  | 'tes'
+  | 'istirahat'
+  | 'pendingin'
+  | 'lainnya'
 
 export interface BlokLatihan {
   id: string
@@ -298,6 +319,45 @@ export interface BlokLatihan {
   /** Durasi yang direncanakan, dalam menit. Nol atau negatif dianggap tidak sah. */
   menit: number
   catatan?: string
+  /** #35 — pelatih penanggung jawab blok bersama (opsional, nama staf). */
+  pelatih?: string
+  /** #35 — tempat blok bersama, mis. "Lapangan" / "Aula" (opsional). */
+  tempat?: string
+  /**
+   * #35 — blok paralel per seksi: di jam yang sama tiap seksi punya
+   * kegiatannya sendiri. Kosong/tidak ada = blok bersama semua seksi.
+   * Durasinya selalu durasi blok induk, jadi jam sesi tetap satu garis.
+   */
+  cabang?: CabangBlok[]
+}
+
+/** #35 — satu jalur kegiatan di dalam blok paralel. */
+export interface CabangBlok {
+  id: string
+  /** Id seksi (`SectionDef.id`) yang ikut jalur ini — boleh lebih dari satu. */
+  seksi: string[]
+  judul: string
+  /** Ranah jalur ini. Kosong = ikut ranah blok induk. */
+  jenis?: JenisBlok
+  pelatih?: string
+  tempat?: string
+}
+
+/**
+ * #35 — pola isi sesi yang bisa dipakai ulang (mis. "Latsar A — Fisik +
+ * Visual"). Disimpan di pengaturan tim, bukan tabel baru (Dexie tetap v18).
+ */
+export interface PolaSesi {
+  id: string
+  nama: string
+  rencana: BlokLatihan[]
+  dibuat: number
+}
+
+/** #35 — target proporsi ranah materi (persen, jumlah idealnya 100). */
+export interface TargetNeraca {
+  nama: string
+  persen: Partial<Record<'fisik' | 'visual' | 'musik' | 'section' | 'drill' | 'gabungan' | 'teori', number>>
 }
 
 export interface RealisasiBlok {
@@ -1422,6 +1482,10 @@ export interface TeamSettings {
   ambangPredikat?: AmbangPredikat
   /** #21b — Pengaturan Kop Surat & Penanda Tangan Resmi Unit (opsional). */
   kopSurat?: KopSuratUnit
+  /** #35 — pustaka pola isi sesi (Pola A/B/C …). */
+  polaSesi?: PolaSesi[]
+  /** #35 — target proporsi ranah untuk neraca mingguan. Kosong = tanpa target. */
+  targetNeraca?: TargetNeraca
 }
 
 export interface KopSuratUnit {

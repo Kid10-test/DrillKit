@@ -11,6 +11,9 @@
 /** Cap ISO dari saat aplikasi dirakit. */
 export const capBuild: string = typeof __CAP_BUILD__ === 'string' ? __CAP_BUILD__ : ''
 
+/** Versi rilis (package.json), mis. "2.5.0". */
+export const versiApp: string = typeof __VERSI_APP__ === 'string' ? __VERSI_APP__ : ''
+
 /** Capnya dalam bentuk yang bisa dibaca orang, memakai lokal Indonesia. */
 export function capBuildTeks(): string {
   if (!capBuild) return 'tidak diketahui'

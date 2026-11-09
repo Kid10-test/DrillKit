@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -62,9 +63,15 @@ function hashPinPelatihEnv(): string {
  */
 const CAP_BUILD = JSON.stringify(new Date().toISOString())
 
+/** Versi aplikasi dari package.json — dulu ditulis tangan di bilah sisi dan tertinggal (v1.2.1). */
+const VERSI_APP = JSON.stringify(
+  (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }).version,
+)
+
 export default defineConfig({
   define: {
     __CAP_BUILD__: CAP_BUILD,
+    __VERSI_APP__: VERSI_APP,
     __PIN_PELATIH_HASH__: hashPinPelatihEnv(),
   },
   /**

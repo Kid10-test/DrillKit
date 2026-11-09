@@ -282,7 +282,8 @@ const BIDANG_SERI = ['title', 'type', 'startTime', 'endTime', 'place', 'notes', 
  * Terapkan perubahan sesi `baru` ke seri.
  * - `'ini'`: hanya sesi ini, dan sesi itu **dilepas** dari seri.
  * - `'berikutnya'`: sesi ini + sesi seri yang sama pada/sesudah tanggal
- *   **asli**-nya. Status centang checklist tiap sesi dipertahankan bila
+ *   **asli**-nya. Hanya bidang yang berbeda antara `lama` dan `baru` yang
+ *   diterapkan (#35). Status centang checklist tiap sesi dipertahankan bila
  *   teks butirnya sama.
  * Mengembalikan sesi-sesi yang perlu disimpan.
  */
@@ -297,10 +298,16 @@ export function ubahSeri(semua: Session[], lama: Session, baru: Session, cakupan
     if (s.id === lama.id || s.seriId !== lama.seriId || s.date < lama.date) continue
     const u: Session = { ...s }
     for (const k of BIDANG_SERI) {
+      // #35 — hanya bidang yang benar-benar **diubah** yang diterapkan. Dulu
+      // semua bidang disalin, sehingga mengubah jam satu sesi ikut menimpa
+      // rencana Pola A/B/C yang berbeda-beda di sesi-sesi seri berikutnya.
+      if (JSON.stringify(baru[k] ?? null) === JSON.stringify(lama[k] ?? null)) continue
       ;(u as unknown as Record<string, unknown>)[k] = JSON.parse(JSON.stringify(baru[k] ?? null)) ?? undefined
     }
-    const doneLama = new Map(s.checklist.map((c) => [c.text, c.done]))
-    u.checklist = (baru.checklist ?? []).map((c) => ({ ...c, done: doneLama.get(c.text) ?? 0 }))
+    if (JSON.stringify(baru.checklist ?? []) !== JSON.stringify(lama.checklist ?? [])) {
+      const doneLama = new Map(s.checklist.map((c) => [c.text, c.done]))
+      u.checklist = (baru.checklist ?? []).map((c) => ({ ...c, done: doneLama.get(c.text) ?? 0 }))
+    }
     hasil.push(u)
   }
   return hasil
@@ -407,12 +414,12 @@ export function gabungICS(potongan: string[]): string {
 
 /* ----------------------------- pilihan tampilan ----------------------------- */
 
-/** `daftar` = tampilan lama (semua kartu terbuka), tetap tersedia. */
-export type TampilanJadwal = 'bulan' | 'agenda' | 'daftar'
+/** `daftar` = tampilan lama (semua kartu terbuka), tetap tersedia. `neraca` = #35. */
+export type TampilanJadwal = 'bulan' | 'agenda' | 'neraca' | 'daftar'
 export const KUNCI_TAMPILAN = 'drillkit.jadwal.tampilan'
 
 /** Bawaan: kalender di layar lebar, agenda di HP. Pilihan tersimpan menang. */
 export function tampilanAwal(tersimpan: string | null, lebarLayar: number): TampilanJadwal {
-  if (tersimpan === 'bulan' || tersimpan === 'agenda' || tersimpan === 'daftar') return tersimpan
+  if (tersimpan === 'bulan' || tersimpan === 'agenda' || tersimpan === 'neraca' || tersimpan === 'daftar') return tersimpan
   return lebarLayar >= 768 ? 'bulan' : 'agenda'
 }

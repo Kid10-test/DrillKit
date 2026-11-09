@@ -179,6 +179,10 @@ rakit src/lib/estafetQr.ts               estafetQr
 rakit src/lib/bagikanBerkas.ts           bagikanBerkas
 # #31 — Mode Podium: pemilih Set/Huruf/Birama, count-in, plakat 40 m, setelan.
 rakit src/lib/podium.ts                  podium
+# #35 — isi sesi per ranah, blok paralel per seksi, pola sesi, neraca mingguan,
+# dan cetakan A4 Jadwal (kalender tegak + lembar rencana minggu).
+rakit src/lib/ranahSesi.ts               ranahSesi
+rakit src/lib/jadwalCetak.ts             jadwalCetak
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'
