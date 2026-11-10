@@ -9,6 +9,7 @@ import type { SectionDef, TindakLanjut } from '../db/types'
 import { esc, printShell } from './print'
 import {
   LABEL_STATUS_TL,
+  LABEL_SUMBER_TL,
   WARNA_STATUS_TL_HEX,
   hitungStatusTL,
   konteksTL,
@@ -22,6 +23,10 @@ export function buatLembarFokusCleaningHtml(opsi: {
   namaTim: string
   namaDrill: string
   tanggal: string
+  /** #34a — judul lembar; Papan Staf memakai "Lembar Fokus Latihan & Cleaning". */
+  judul?: string
+  /** #34a — tampilkan lencana asal (Juri/Staf) di kolom temuan. */
+  tandaiSumber?: boolean
   daftar: TindakLanjut[]
   sections?: SectionDef[]
   /** Sertakan catatan yang sudah beres (bawaan: hanya yang beres hari ini). */
@@ -49,7 +54,7 @@ export function buatLembarFokusCleaningHtml(opsi: {
         <td><span class="lencana" style="color:${w.teks};background:${w.latar};border-color:${w.garis}">${LABEL_STATUS_TL[t.status]}</span>${t.prioritas === 'tinggi' ? ' <b class="prio">!</b>' : ''}</td>
         <td class="ktx">${esc(ktx || '—')}</td>
         <td>${esc(labelSeksi(t.seksi))}</td>
-        <td class="judul">${esc(t.judul)}${t.catatan ? `<div class="cat">${esc(t.catatan)}</div>` : ''}</td>
+        <td class="judul">${opsi.tandaiSumber && t.sumber !== 'cleaning' ? `<span class="sumber">${LABEL_SUMBER_TL[t.sumber]}</span> ` : ''}${esc(t.judul)}${t.catatan ? `<div class="cat">${esc(t.catatan)}</div>` : ''}</td>
         <td class="cek"><span class="kotak"></span></td>
       </tr>`
     })
@@ -58,11 +63,11 @@ export function buatLembarFokusCleaningHtml(opsi: {
   const kosong = `<tr><td colspan="6" class="kosong">Belum ada temuan terbuka — lapangan bersih hari ini.</td></tr>`
 
   return printShell(
-    `Lembar Fokus Cleaning — ${opsi.namaDrill}`,
+    `${opsi.judul ?? 'Lembar Fokus Cleaning'} — ${opsi.namaDrill}`,
     `<section class="lembar" data-lembar-cleaning="1">
       <header>
         <div>
-          <h1>Lembar Fokus Cleaning Harian</h1>
+          <h1>${esc(opsi.judul ?? 'Lembar Fokus Cleaning Harian')}</h1>
           <p class="sub">${esc(opsi.namaTim)} · ${esc(opsi.namaDrill)}</p>
         </div>
         <div class="kanan">
@@ -79,7 +84,7 @@ export function buatLembarFokusCleaningHtml(opsi: {
         <thead><tr><th>#</th><th>Status</th><th>Set / Birama</th><th>Seksi</th><th>Temuan &amp; perbaikan</th><th>Cek</th></tr></thead>
         <tbody>${baris || kosong}</tbody>
       </table>
-      ${sisa > 0 ? `<p class="sisa">+${sisa} catatan lain tidak muat di satu halaman — lihat panel Cleaning di aplikasi.</p>` : ''}
+      ${sisa > 0 ? `<p class="sisa">+${sisa} catatan lain tidak muat di satu halaman — lihat aplikasi.</p>` : ''}
       <p class="kaki">Urutan: Fokus → Temuan → Beres hari ini · centang kolom Cek saat sudah diulang bersih di lapangan · DrillKit</p>
     </section>`,
     `@page { size: A4 portrait; margin: 12mm; }
@@ -98,6 +103,7 @@ export function buatLembarFokusCleaningHtml(opsi: {
      .cat { font-weight:400; color:#334155; font-size:9.5px; margin-top:1px; }
      .lencana { display:inline-block; border:1px solid; border-radius:3px; padding:0 4px; font-size:9px; font-weight:700; }
      .prio { color:#b91c1c; }
+     .sumber { display:inline-block; border:1px solid #64748b; border-radius:3px; padding:0 3px; font-size:8.5px; font-weight:700; color:#334155; }
      td.cek { text-align:center; }
      .kotak { display:inline-block; width:10px; height:10px; border:1.2px solid #0f172a; }
      .kosong { text-align:center; color:#64748b; padding:14px; }

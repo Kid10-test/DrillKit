@@ -5,7 +5,7 @@
  * Papan Staf `#34`): **temuan → fokus → beres**. Modul ini tidak menyentuh
  * Dexie supaya bisa diuji tanpa peramban; penulisan ada di komponen panel.
  */
-import type { StatusTindakLanjut, SumberTindakLanjut, TindakLanjut } from '../db/types'
+import type { PenandaJudgeTape, PenilaianLomba, StatusTindakLanjut, SumberTindakLanjut, TindakLanjut } from '../db/types'
 
 export const URUTAN_STATUS_TL: StatusTindakLanjut[] = ['temuan', 'fokus', 'beres']
 
@@ -23,6 +23,16 @@ export const WARNA_STATUS_TL_HEX: Record<StatusTindakLanjut, { teks: string; lat
 }
 
 export type FilterStatusTL = StatusTindakLanjut | 'semua' | 'terbuka'
+
+/** #34a — asal catatan, ditampilkan sebagai lencana di Papan Staf. */
+export const LABEL_SUMBER_TL: Record<SumberTindakLanjut, string> = {
+  cleaning: 'Cleaning',
+  juri: 'Juri',
+  staf: 'Staf',
+}
+
+/** #34a — kolom Fokus sebaiknya hanya 3–5 butir supaya benar-benar fokus. */
+export const BATAS_FOKUS = 5
 
 /** Status berikutnya saat chip status diketuk (beres → kembali temuan). */
 export function statusBerikut(s: StatusTindakLanjut): StatusTindakLanjut {
@@ -82,10 +92,11 @@ export function ubahStatusTL(tl: TindakLanjut, status: StatusTindakLanjut, sekar
 /** Saring catatan untuk satu drill (opsional satu set) & filter status. */
 export function saringTindakLanjut(
   daftar: TindakLanjut[],
-  opsi: { drillId?: string; setId?: string; status?: FilterStatusTL; seksi?: string },
+  opsi: { drillId?: string; setId?: string; status?: FilterStatusTL; seksi?: string; sumber?: SumberTindakLanjut | 'semua' },
 ): TindakLanjut[] {
   const st = opsi.status ?? 'semua'
   return daftar.filter((t) => {
+    if (opsi.sumber && opsi.sumber !== 'semua' && t.sumber !== opsi.sumber) return false
     if (opsi.drillId && t.drillId !== opsi.drillId) return false
     if (opsi.setId && t.setId !== opsi.setId) return false
     if (opsi.seksi && opsi.seksi !== 'semua' && t.seksi && t.seksi !== opsi.seksi) return false
@@ -125,4 +136,49 @@ export function konteksTL(t: Pick<TindakLanjut, 'setNomor' | 'biramaDari' | 'bir
     )
   }
   return bagian.join(' · ')
+}
+
+/** #34a — geser satu kolom ke kiri/kanan di Papan Staf (tanpa berputar). */
+export function geserStatusTL(tl: TindakLanjut, arah: -1 | 1, sekarang = Date.now()): TindakLanjut {
+  const i = URUTAN_STATUS_TL.indexOf(tl.status) + arah
+  if (i < 0 || i >= URUTAN_STATUS_TL.length) return tl
+  return ubahStatusTL(tl, URUTAN_STATUS_TL[i], sekarang)
+}
+
+/** #34a — catatan yang sudah dibuat dari satu komentar Judge Tape (bila ada). */
+export function cariTLPenanda(daftar: TindakLanjut[], penilaianId: string, penandaId: string): TindakLanjut | undefined {
+  return daftar.find((t) => t.penilaianId === penilaianId && t.penandaId === penandaId)
+}
+
+function mmss(detik: number): string {
+  const d = Math.max(0, Math.round(detik))
+  return `${Math.floor(d / 60)}:${String(d % 60).padStart(2, '0')}`
+}
+
+/**
+ * #34a — "Jadikan tindak lanjut" dari satu komentar Judge Tape (#20):
+ * tertaut drill, set, birama, prioritas tinggi bila ditandai penting, dan
+ * menyimpan asal komentar supaya tombolnya tidak membuat kartu kembar.
+ */
+export function tindakLanjutDariPenanda(
+  p: Pick<PenilaianLomba, 'id' | 'judul' | 'drillId'>,
+  c: PenandaJudgeTape,
+  opsi: { id: string; setNomor?: number; labelFokus?: string; sekarang?: number },
+): TindakLanjut | null {
+  const tl = buatTindakLanjut({
+    id: opsi.id,
+    judul: c.teks,
+    sumber: 'juri',
+    drillId: p.drillId,
+    setId: c.setId,
+    setNomor: opsi.setNomor,
+    biramaDari: c.birama,
+    prioritas: c.tingkat === 'penting' ? 'tinggi' : undefined,
+    catatan: `Judge Tape “${p.judul}” ${mmss(c.detik)}${opsi.labelFokus ? ` · ${opsi.labelFokus}` : ''}`,
+    sekarang: opsi.sekarang,
+  })
+  if (!tl) return null
+  tl.penilaianId = p.id
+  tl.penandaId = c.id
+  return tl
 }

@@ -185,6 +185,8 @@ rakit src/lib/ranahSesi.ts               ranahSesi
 rakit src/lib/jadwalCetak.ts             jadwalCetak
 # #36 — Program Latsar (generator berfase) & Pemantau Syarat Pelantikan.
 rakit src/lib/programLatsar.ts           programLatsar
+# #34a — musim TC: H-Minus, gerbang kesiapan mundur, & titik hitung mundur terpadu.
+rakit src/lib/manajemenMusim.ts          manajemenMusim
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/db'
 import type {
+  TindakLanjut,
   ButirSubCaption,
   KelompokCaption,
   PenaltiLomba,
@@ -23,6 +24,7 @@ import {
   urutkanCatatanJudgeTape,
 } from '../../lib/penilaianJuri'
 import { bangunHtmlRekapPenilaian } from '../../lib/penilaianJuriCetak'
+import { LABEL_STATUS_TL, cariTLPenanda, tindakLanjutDariPenanda } from '../../lib/tindakLanjut'
 import { downloadHtmlFile, printHtml } from '../../lib/print'
 import { cx, slugify, uid } from '../../lib/utils'
 import { IconDownload, IconPlay, IconPlus, IconPrinter, IconTrash } from '../Icons'
@@ -65,6 +67,8 @@ export function PanelPenilaianJuri({
   const drills = useLiveQuery(() => db.drills.toArray(), [], [])
   const semuaSet = useLiveQuery(() => db.sets.toArray(), [], [])
   const songs = useLiveQuery(() => db.songs.toArray(), [], [])
+  // #34a — komentar yang sudah dijadikan tindak lanjut (Papan Staf).
+  const tlJuri = useLiveQuery(() => db.tindakLanjut.where('sumber').equals('juri').toArray(), [], [] as TindakLanjut[])
 
   const daftarUrut = useMemo(
     () =>
@@ -1455,6 +1459,38 @@ export function PanelPenilaianJuri({
                   )}
                   <span className="text-slate-100">{c.teks}</span>
                 </div>
+                {(() => {
+                  // #34a — 1 klik: komentar juri → kartu Temuan di Papan Staf.
+                  const tl = cariTLPenanda(tlJuri, draf.id, c.id)
+                  if (tl)
+                    return (
+                      <span data-testid={`tl-judgetape-${c.id}`} data-status={tl.status} className="rounded border border-sky-700/50 px-1.5 py-0.5 text-[10px] text-sky-300" title="Sudah ada di Papan Staf (Evaluasi)">
+                        ✓ Papan: {LABEL_STATUS_TL[tl.status]}
+                      </span>
+                    )
+                  if (c.tingkat === 'pujian') return null
+                  return (
+                    <button
+                      type="button"
+                      data-testid={`jadikan-tl-${c.id}`}
+                      onClick={async () => {
+                        const idx = c.setId ? setsDrillTertaut.findIndex((x) => x.id === c.setId) : -1
+                        const baru = tindakLanjutDariPenanda(draf, c, {
+                          id: uid('tl_'),
+                          setNomor: idx >= 0 ? idx + 1 : undefined,
+                          labelFokus: c.fokus === 'umum' ? 'Umum' : LABEL_KELOMPOK_CAPTION[c.fokus],
+                        })
+                        if (!baru) return
+                        await db.tindakLanjut.put(baru)
+                        toast.push('Masuk Papan Staf sebagai Temuan (Evaluasi → Musim & Papan Staf)')
+                      }}
+                      className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300 hover:border-sky-500 hover:text-sky-300"
+                      title="Jadikan kartu tindak lanjut di Papan Staf"
+                    >
+                      → Tindak lanjut
+                    </button>
+                  )
+                })()}
                 <button
                   type="button"
                   onClick={() => hapusCatatanJudgeTape(c.id)}
