@@ -39,6 +39,17 @@ import {
   pecahCsv,
 } from '../lib/namaAnggota'
 import { kumpulkanTagRoster, punyaTag, uraiInputTag } from '../lib/tagAnggota'
+import {
+  type AksiMassal,
+  type RencanaImpor,
+  kelompokRosterAktif,
+  kelompokRosterBawaan,
+  rencanakanImporCsv,
+  tebakPemisahCsv,
+  teksAksiMassal,
+  terapkanAksiMassal,
+} from '../lib/rosterAnggota'
+import { ImporCsvAnggota } from '../components/anggota/ImporCsvAnggota'
 import { catatanCsvSatuArah, kenaliBerkas, tampakCsvAnggota } from '../lib/bukaBerkas'
 import { mintaPratinjau, useTitipan } from '../components/BukaBerkas'
 import { NamaTampil, useModeNama } from '../components/NamaTampil'
@@ -65,6 +76,9 @@ const PanelDispensasiMedisLazy = lazy(() =>
 const muatPanelKasIuran = () => import('../components/anggota/PanelKasIuran')
 const PanelKasIuranLazy = lazy(() =>
   muatPanelKasIuran().then((m) => ({ default: m.PanelKasIuran })),
+)
+const RekapRosterLazy = lazy(() =>
+  import('../components/anggota/RekapRoster').then((m) => ({ default: m.RekapRoster })),
 )
 
 type TabHalamanAnggota =
@@ -100,6 +114,12 @@ export default function Members() {
   const [qrFor, setQrFor] = useState<Member | null>(null)
   const [gabung, setGabung] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // v2.7.1 — pratinjau impor CSV, aksi massal, & rekap roster
+  const [rencanaImpor, setRencanaImpor] = useState<{ rencana: RencanaImpor; nama?: string; kunci: number } | null>(null)
+  const [modePilih, setModePilih] = useState(false)
+  const [terpilih, setTerpilih] = useState<Set<string>>(() => new Set())
+  const [tagMassal, setTagMassal] = useState('')
+  const [rekapOpen, setRekapOpen] = useState(false)
 
   const daftarTagAnggota = useMemo(() => kumpulkanTagRoster(members), [members])
 
@@ -214,13 +234,21 @@ export default function Members() {
     toast.push(`${m.name} dihapus`, 'info')
   }
 
-  /** Unduh contoh berkas CSV supaya mudah diisi di Excel lalu diimpor. */
+  /**
+   * Unduh contoh berkas CSV supaya mudah diisi di Excel lalu diimpor. Kolom
+   * Tag memakai kelompok roster tim (atau contoh bawaan pergantian musim).
+   */
   function downloadTemplate() {
+    const th = new Date().getFullYear()
+    const bawaan = kelompokRosterBawaan(th)
+    const kel = kelompokRosterAktif(settings?.kelompokRoster, members)
+    const baruTag = kel[0] ?? bawaan[0]
+    const tunggu = kel.find((k) => /menunggu|tunggu|belum/i.test(k)) ?? bawaan[2]
     const rows: unknown[][] = [
       JUDUL_CSV_ANGGOTA,
-      ['C01', 'Contoh Nama Satu', 'Dede', 'Brass', 'Trumpet', 'Anggota', new Date().getFullYear(), '0812xxxxxxx1', 'Aktif', ''],
-      ['C02', 'Contoh Nama Dua', '', 'Battery', 'Snare', 'Ketua Section', new Date().getFullYear(), '', 'Aktif', ''],
-      ['C03', 'Contoh Nama Tiga', '', 'Color Guard', 'Flag', 'Anggota', new Date().getFullYear(), '', 'Aktif', 'Perlu pendampingan langkah'],
+      ['', 'Contoh Nama Satu', 'Dede', 'Brass', 'Trumpet', 'Anggota', th, '0812xxxxxxx1', 'Aktif', '', baruTag],
+      ['', 'Contoh Nama Dua', '', 'Battery', 'Snare', 'Anggota', th, '', 'Aktif', '', baruTag],
+      ['', 'Contoh Returner', '', 'Color Guard', 'Flag', 'Anggota', th - 1, '', 'Nonaktif', 'Menunggu konfirmasi', tunggu],
     ]
     downloadFile('template-anggota.csv', toCSV(rows), 'text/csv')
     toast.push('Template diunduh — isi di Excel, lalu Impor')
@@ -237,7 +265,7 @@ export default function Members() {
 
   // #7 — titipan dari pintu "Buka berkas DrillKit": CSV anggota yang
   // diteruskan ke sini langsung diproses, tanpa dipilih ulang.
-  useTitipan(['csv-anggota'], (t) => void terimaTeksCsv(t.teks))
+  useTitipan(['csv-anggota'], (t) => void terimaTeksCsv(t.teks, t.nama))
 
   async function importCSV(file: File) {
     // #7 — tombol lama menerima SEMUA jenis: yang bukan CSV anggota
@@ -245,7 +273,7 @@ export default function Members() {
     const bita = new Uint8Array(await file.arrayBuffer())
     const kenal = kenaliBerkas(file.name, bita)
     if (kenal.jenis === 'csv-anggota') {
-      await terimaTeksCsv(kenal.teks ?? '')
+      await terimaTeksCsv(kenal.teks ?? '', file.name)
       return
     }
     if (kenal.jenis === 'tak-dikenal') {
@@ -254,44 +282,55 @@ export default function Members() {
       // menerima kolom apa pun yang ada — pertahankan itu. Kecuali CSV satu
       // arah (laporan), yang tidak boleh masuk sebagai anggota.
       if (!catatanCsvSatuArah(teks) && tampakCsvAnggota(teks)) {
-        await terimaTeksCsv(teks)
+        await terimaTeksCsv(teks, file.name)
         return
       }
     }
     mintaPratinjau(kenal, bita)
   }
 
-  async function terimaTeksCsv(text: string) {
+  /**
+   * v2.7.1 — CSV tidak langsung ditulis: nama dicocokkan dulu dengan anggota
+   * yang sudah ada, lalu pratinjau (`ImporCsvAnggota`) menunggu persetujuan.
+   */
+  async function terimaTeksCsv(text: string, nama?: string) {
     try {
-      const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(Boolean)
+      const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim())
       const [judulMentah, ...rows] = lines
-      const judul = judulMentah ? pecahCsv(judulMentah) : null
+      const pemisah = judulMentah ? tebakPemisahCsv(judulMentah) : undefined
+      const judul = judulMentah ? pecahCsv(judulMentah, pemisah) : null
       const sections = visibleSections()
-      let added = 0
-      for (const line of rows) {
-        const baris = bacaBarisCsvAnggota(pecahCsv(line), judul, sections)
-        if (!baris) continue
-        await db.members.put({
-          id: uid('m_'),
-          code: baris.code || autoCode(members, added),
-          name: baris.name,
-          panggilan: baris.panggilan,
-          section: baris.section,
-          instrument: baris.instrument,
-          role: baris.role,
-          joinYear: baris.joinYear,
-          phone: baris.phone,
-          notes: baris.notes,
-          active: baris.active,
-          token: uid('t_'),
-          createdAt: Date.now(),
-        })
-        added++
+      const daftar = rows
+        .map((line) => bacaBarisCsvAnggota(pecahCsv(line, pemisah), judul, sections))
+        .filter((b): b is NonNullable<typeof b> => !!b)
+      if (!daftar.length) {
+        toast.push('Tidak ada baris anggota di berkas ini', 'err')
+        return
       }
-      toast.push(`${added} anggota diimpor`)
+      const semua = await db.members.toArray()
+      setRencanaImpor({
+        rencana: rencanakanImporCsv(daftar, semua, { section: sectionLabel, peran: (r) => ROLE_LABEL[r] ?? r }),
+        nama,
+        kunci: Date.now(),
+      })
     } catch (e) {
       toast.push('Gagal membaca file CSV', 'err')
     }
+  }
+
+  async function jalankanAksiMassal(aksi: AksiMassal) {
+    const ubah = terapkanAksiMassal(members, terpilih, aksi)
+    if (ubah.length) await db.members.bulkPut(ubah)
+    toast.push(teksAksiMassal(aksi, ubah.length), ubah.length ? 'ok' : 'info')
+  }
+
+  function alihPilih(id: string) {
+    setTerpilih((lama) => {
+      const baru = new Set(lama)
+      if (baru.has(id)) baru.delete(id)
+      else baru.add(id)
+      return baru
+    })
   }
 
   return (
@@ -447,7 +486,7 @@ export default function Members() {
                 </option>
               ))}
               {daftarTagAnggota.length > 0 && (
-                <optgroup label="Tag Lintas-Seksi">
+                <optgroup label="Tag / kelompok roster">
                   {daftarTagAnggota.map(({ tag, memberIds }) => (
                     <option key={`tag:${tag}`} value={`tag:${tag}`}>
                       #{tag} ({memberIds.length})
@@ -459,9 +498,79 @@ export default function Members() {
           </div>
         </div>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <Toggle checked={showInactive} onChange={setShowInactive} label="Tampilkan anggota nonaktif" />
+          <Toggle checked={showInactive} onChange={setShowInactive} label="Tampilkan anggota nonaktif" testId="toggle-anggota-nonaktif" />
           <PilihModeNama />
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3">
+          <Button
+            size="sm"
+            variant={modePilih ? 'primary' : 'outline'}
+            data-testid="tombol-pilih-anggota"
+            aria-pressed={modePilih}
+            onClick={() => {
+              setModePilih((v) => !v)
+              setTerpilih(new Set())
+            }}
+          >
+            {modePilih ? 'Selesai memilih' : 'Pilih banyak'}
+          </Button>
+          <Button size="sm" variant="outline" data-testid="tombol-rekap-roster" onClick={() => setRekapOpen(true)}>
+            Rekap roster
+          </Button>
+          <span className="text-[11px] text-slate-500">Tandai CAB / returner dengan tag, lalu lihat celah per instrumen.</span>
+        </div>
+        {modePilih && (
+          <div className="mt-3 space-y-2 rounded-lg border border-emerald-700/40 bg-emerald-950/20 p-2.5" data-testid="bilah-aksi-massal">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <b className="text-emerald-200" data-testid="jumlah-terpilih">{terpilih.size} dipilih</b>
+              <button
+                type="button"
+                data-testid="pilih-semua-tampil"
+                className="rounded-md border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-slate-800"
+                onClick={() => setTerpilih(new Set(list.map((m) => m.id)))}
+              >
+                Pilih semua yang tampil ({list.length})
+              </button>
+              <button
+                type="button"
+                data-testid="kosongkan-pilihan"
+                disabled={terpilih.size === 0}
+                className="rounded-md border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-slate-800 disabled:opacity-40"
+                onClick={() => setTerpilih(new Set())}
+              >
+                Kosongkan
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <input
+                data-testid="tag-massal"
+                list="daftar-tag-massal"
+                value={tagMassal}
+                onChange={(e) => setTagMassal(e.target.value)}
+                placeholder="Tag, mis. Returner 2027"
+                className="w-48 min-w-0 rounded-md border border-slate-700 bg-slate-950/60 px-2 py-1 text-xs text-slate-200 outline-none focus:border-emerald-500"
+              />
+              <datalist id="daftar-tag-massal">
+                {daftarTagAnggota.map(({ tag }) => (
+                  <option key={tag} value={tag} />
+                ))}
+              </datalist>
+              <Button size="sm" variant="soft" data-testid="massal-tambah-tag" disabled={!terpilih.size || !tagMassal.trim()} onClick={() => void jalankanAksiMassal({ jenis: 'tambahTag', tag: tagMassal })}>
+                + Pasang tag
+              </Button>
+              <Button size="sm" variant="ghost" data-testid="massal-lepas-tag" disabled={!terpilih.size || !tagMassal.trim()} onClick={() => void jalankanAksiMassal({ jenis: 'lepasTag', tag: tagMassal })}>
+                − Lepas tag
+              </Button>
+              <span className="mx-1 h-4 w-px bg-slate-700" />
+              <Button size="sm" variant="soft" data-testid="massal-aktifkan" disabled={!terpilih.size} onClick={() => void jalankanAksiMassal({ jenis: 'status', aktif: true })}>
+                Aktifkan
+              </Button>
+              <Button size="sm" variant="ghost" data-testid="massal-nonaktifkan" disabled={!terpilih.size} onClick={() => void jalankanAksiMassal({ jenis: 'status', aktif: false })}>
+                Nonaktifkan
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {list.length === 0 ? (
@@ -484,6 +593,16 @@ export default function Members() {
               <ul className="divide-y divide-slate-800/70">
                 {arr.map((m) => (
                   <li key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+                    {modePilih && (
+                      <input
+                        type="checkbox"
+                        data-testid={`pilih-${m.id}`}
+                        aria-label={`Pilih ${m.name}`}
+                        checked={terpilih.has(m.id)}
+                        onChange={() => alihPilih(m.id)}
+                        className="h-4 w-4 shrink-0 accent-emerald-500"
+                      />
+                    )}
                     <Avatar m={m} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -562,6 +681,20 @@ export default function Members() {
       />
       <QrModal member={qrFor} onClose={() => setQrFor(null)} />
       <GabungAnggota open={gabung} anggota={members} onClose={() => setGabung(false)} />
+      {rencanaImpor && (
+        <ImporCsvAnggota
+          key={rencanaImpor.kunci}
+          rencana={rencanaImpor.rencana}
+          namaBerkas={rencanaImpor.nama}
+          lokal={members}
+          onClose={() => setRencanaImpor(null)}
+        />
+      )}
+      {rekapOpen && (
+        <Suspense fallback={null}>
+          <RekapRosterLazy open={rekapOpen} anggota={members} onClose={() => setRekapOpen(false)} />
+        </Suspense>
+      )}
     </div>
   )
 }

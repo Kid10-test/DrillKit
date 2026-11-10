@@ -87,7 +87,7 @@ const LANGKAH: [string, string][] = [
 /** Isi tiap menu — mengikuti nama menu yang tampil di aplikasi. */
 const MENU: [string, string][] = [
   ['Dashboard', 'Kehadiran, jadwal, <b>hitung mundur H-Minus</b> &amp; fokus minggu ini, <b>Buka berkas</b>'],
-  ['Anggota', 'Data anggota, <b>Audisi</b>, <b>Inventaris &amp; seragam</b>, <b>Dispensasi &amp; medis</b>, <b>Kas</b>, QR'],
+  ['Anggota', 'Impor CSV + tag, <b>Pilih banyak</b>, <b>Rekap roster</b>, <b>Audisi</b>, <b>Inventaris</b>, <b>Medis</b>, <b>Kas</b>, QR'],
   ['Absensi &amp; Evaluasi', 'QR / manual, <b>Rekap</b>, <b>Syarat pelantikan</b>, <b>Evaluasi</b>, <b>Setoran</b>, <b>Papan Staf</b>'],
   ['Jadwal &amp; Lomba', 'Kalender, <b>Program Latsar</b>, <b>Run sheet</b>, <b>Manifes truk</b>, &amp; <b>Judge Tape</b>'],
   ['Drill &amp; Formasi', 'Editor formasi, <b>Mode Kirab/Parade</b>, FTL/Ripple, <b>Count Sheet Guard</b>, dress/hole/bayangan, buku saku'],

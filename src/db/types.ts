@@ -1507,6 +1507,13 @@ export interface TeamSettings {
    * ikut backup, TIDAK ikut paket bagikan (daftar putih `team`).
    */
   musimTc?: MusimTc[]
+  /**
+   * v2.7.1 — Tag yang dipakai sebagai **kelompok roster** (mis. "CAB 42",
+   * "Returner 2027", "Returner – menunggu", "Alumni"): urutan kolom Rekap
+   * roster & contoh di template CSV. Hanya pengaturan tampilan pelatih —
+   * ikut backup, tidak ikut paket bagikan (daftar putih `team`).
+   */
+  kelompokRoster?: string[]
 }
 
 /** #34a — jenis gerbang menentukan bukti otomatis yang dibaca dari data. */
