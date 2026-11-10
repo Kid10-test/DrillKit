@@ -13,8 +13,9 @@
  *      langsung ke IndexedDB untuk menguji status: lulus / berjalan / kritis /
  *      susulan (kurang hadir & bergabung terlambat), dan peringatan izin tanpa
  *      jam lapor. Kartu sesi di Jadwal menampilkan chip program.
- *   3. Absensi: banner sesi program, izin bercap otomatis (sah sebelum jam
- *      mulai), ubah jam lapor → tidak sah, putusan pelatih, sakit ≤ 24 jam.
+ *   3. Absensi: banner sesi program, izin bercap otomatis (v2.8: sah sebelum
+ *      jam mulai + kategori + bukti), ubah jam lapor → tidak sah, putusan
+ *      pelatih, sakit ≤ 24 jam. Syarat v2.8 berbasis rasio (7/12 · 1/4 · 1/6).
  *   4. Tab Syarat pelantikan: ringkasan, saring status, daftar susulan, kelola
  *      peserta (saring tahun masuk, pilih yang tampil), cetak A4.
  *   5. HP 360 px tanpa gulir mendatar; nol galat konsol.
@@ -70,12 +71,13 @@ const ANGGOTA = [
 ]
 /** status per sesi lewat (10) untuk tiap anggota; '-' = kosong. */
 const POLA = {
-  mA: 'HHHHHHHHAA', // hadir 8, butuh 9, sisa 2 → berjalan (boleh absen 1×)
-  mB: 'HHHHHHHAAA', // hadir 7, sisa 2 → maks 9 = butuh → kritis
-  mC: 'HHHAAAAAAA', // maks 5 → susulan
-  mD: 'HHHHHHHHHI', // hadir 9 + izin sah → butuh ⌈0,7×11⌉ = 8 → lulus
+  // v2.8 rasio: N = 12 → hadir ≥ 7, alpa ≤ 3, jatah telat 2.
+  mA: 'HHHHHHAAII', // hadir 6 + sisa 2, alpa 2 → berjalan (boleh tidak hadir 1×, alpa maks 1×)
+  mB: 'HHHHHIIIAA', // hadir 5 + sisa 2 = 7 = butuh → kritis
+  mC: 'HHHAAAAAAA', // alpa 7 > 3 → susulan
+  mD: 'HHHHHHHHHI', // hadir 9 ≥ 7 → lulus
   mE: '----------', // bergabung sesudah batas → susulan
-  mF: 'HHHHHHHHHN', // izin tanpa jam lapor → peringatan; hadir 9 = butuh → tetap lulus
+  mF: 'HHHHHHHHHN', // izin tanpa jam lapor → peringatan; hadir 9 → tetap lulus
 }
 
 try {
@@ -192,6 +194,7 @@ try {
     if (js) await isi(`[data-testid="tonggak-jam-selesai-${i}"]`, js)
   }
   await isi('[data-testid="aturan-batas"]', '2026-11-24')
+  cek('editor aturan: rasio bawaan 7/12 · 1/4 · 1/6', (await p.$eval('[data-testid="aturan-rasio-hadir-a"]', (e) => e.value)) === '7' && (await p.$eval('[data-testid="aturan-rasio-hadir-b"]', (e) => e.value)) === '12')
   await klik('[data-testid="usul-fase"]')
   await p.waitForSelector('[data-testid="fase-2"]', { timeout: 8000 }).catch(() => {})
   const fase = await p.$$eval('[data-testid^="fase-nama-"]', (xs) => xs.map((x) => x.value))
@@ -203,6 +206,12 @@ try {
   const latihan = rencana.filter((t) => /^rencana-\d{4}-\d\d-\d\d$/.test(t))
   cek('pratinjau: 18 sesi latihan', latihan.length === 18, String(latihan.length))
   cek('pratinjau: 12 sesi wajib', (await teks('[data-testid="program-jumlah-wajib"]')) === '12')
+  const nAturan = [await teks('[data-testid="aturan-n-hadir"]'), await teks('[data-testid="aturan-n-alpa"]'), await teks('[data-testid="aturan-n-telat"]')].join('/')
+  cek('editor aturan: N = 12 → hadir 7 · alpa 3 · telat 2', nAturan === '7/3/2', nAturan)
+  await isi('[data-testid="aturan-rasio-hadir-a"]', '8')
+  await wait(150)
+  cek('editor aturan: rasio 8/12 → hadir 8', (await teks('[data-testid="aturan-n-hadir"]')) === '8')
+  await isi('[data-testid="aturan-rasio-hadir-a"]', '7')
   cek('Kamis 12 Nov sesi pertama, Selasa 10 Nov tidak ada', latihan[0] === 'rencana-2026-11-12' && !latihan.includes('rencana-2026-11-10'))
   cek('Hakrab & pelantikan ikut dijadwalkan sebagai tonggak', rencana.some((t) => t.startsWith('rencana-2026-11-22-')) && rencana.some((t) => t.startsWith('rencana-2026-12-05-')))
   const wajibHakrab = await p.$$eval('[data-testid^="wajib-2026-11-22"]', (xs) => xs.map((x) => x.checked ?? x.getAttribute('aria-pressed')))
@@ -214,6 +223,7 @@ try {
   const cab = (t1.programLatihan ?? []).find((x) => x.nama === 'Latsar CAB 42')
   cek('program tersimpan', !!cab)
   cek('program: 12 sesi wajib, batas gabung 24 Nov', cab?.wajibIds.length === 12 && cab?.aturan.batasGabung === '2026-11-24')
+  cek('program: aturan rasio lengkap tersimpan (tanpa persenMin)', cab?.aturan.rasioHadir?.join('/') === '7/12' && cab?.aturan.kategoriIzin?.length === 7 && !('persenMin' in (cab?.aturan ?? {})))
   const sesiDb = await semua('sessions')
   const sesiCab = sesiDb.filter((s) => cab?.sesiIds.includes(s.id))
   cek('sesi latihan tertulis 18:00–20:00', sesiCab.filter((s) => s.type === 'latihan').length === 18 && sesiCab.filter((s) => s.type === 'latihan').every((s) => s.startTime === '18:00' && s.endTime === '20:00'))
@@ -238,7 +248,7 @@ try {
             const s = a.sesi[i]
             const mulai = new Date(`${s.date}T18:00`).getTime()
             const rec = { id: `a_${++n}`, sessionId: s.id, memberId: m, status: { H: 'hadir', A: 'alpha', I: 'izin', N: 'izin' }[c] }
-            if (c === 'I') rec.dilaporAt = mulai - 3 * 3600000
+            if (c === 'I') Object.assign(rec, { dilaporAt: mulai - 3 * 3600000, bukti: 'ada', kategoriIzin: 'kuliah' })
             tx.objectStore('attendance').put(rec)
           })
         const g = tx.objectStore('settings').get('team')
@@ -286,7 +296,18 @@ try {
   cek('banner: program & urutan wajib', banner.includes('Latsar Uji') && banner.includes('sesi wajib 11/12'), banner)
   await klik('[data-testid="absen-mA-izin"]')
   await p.waitForSelector('[data-testid="lapor-mA"]', { timeout: 5000 })
-  cek('izin sebelum jam mulai → sah otomatis', (await sah('mA')) === 'sah')
+  cek('izin sebelum jam mulai tanpa bukti → bukti?', (await sah('mA')) === 'tanpa-bukti')
+  await klik('[data-testid="lapor-mA"]')
+  await p.waitForSelector('[data-testid="modal-lapor-izin"]')
+  await p.select('[data-testid="lapor-kategori"]', 'kuliah')
+  await klik('[data-testid="bukti-ada"]')
+  await wait(150)
+  cek('modal lapor: kategori + bukti → pratinjau sah', (await teks('[data-testid="lapor-hasil"]')).startsWith('Sah'))
+  await klik('[data-testid="lapor-simpan"]')
+  await wait(400)
+  cek('izin sebelum jam mulai + bukti → sah', (await sah('mA')) === 'sah')
+  const recA = (await semua('attendance')).find((r) => r.sessionId === 's_w11' && r.memberId === 'mA')
+  cek('kategori & bukti tersimpan', recA?.kategoriIzin === 'kuliah' && recA?.bukti === 'ada')
   await klik('[data-testid="lapor-mA"]')
   await p.waitForSelector('[data-testid="modal-lapor-izin"]')
   await isi('[data-testid="lapor-waktu"]', `${hari(3)}T19:00`)
@@ -307,6 +328,7 @@ try {
   await klik('[data-testid="lapor-mB"]')
   await p.waitForSelector('[data-testid="modal-lapor-izin"]')
   await isi('[data-testid="lapor-waktu"]', `${hari(3)}T21:30`)
+  await isi('[data-testid="bukti-tautan"]', 'https://drive.google.com/open?id=surat')
   await klik('[data-testid="lapor-simpan"]')
   await wait(400)
   cek('sakit dilaporkan 3½ jam sesudahnya → sah', (await sah('mB')) === 'sah')
@@ -314,7 +336,7 @@ try {
   await wait(300)
   cek('ganti ke hadir → chip lapor hilang', !(await ada('[data-testid="lapor-mB"]')))
   const recB = (await semua('attendance')).find((r) => r.sessionId === 's_w11' && r.memberId === 'mB')
-  cek('cap jam lapor dilepas saat status bukan izin/sakit', recB && recB.status === 'hadir' && recB.dilaporAt == null)
+  cek('cap jam lapor, kategori & bukti dilepas saat status bukan izin/sakit', recB && recB.status === 'hadir' && recB.dilaporAt == null && recB.bukti == null && recB.kategoriIzin == null)
   await klik('[data-testid="absen-mA-izin"]') // hapus lagi agar rekap status tidak bergeser
   await wait(300)
   await klik('[data-testid="absen-mB-hadir"]')
@@ -328,13 +350,16 @@ try {
   await p.waitForSelector('[data-testid="status-mA"]', { timeout: 8000 })
   const status = {}
   for (const id of ['mA', 'mB', 'mC', 'mD', 'mE', 'mF']) status[id] = await p.$eval(`[data-testid="peserta-${id}"]`, (e) => e.dataset.status).catch(() => null)
-  cek('berjalan: hadir 8, butuh 9, sisa 2', status.mA === 'berjalan', JSON.stringify(status))
+  cek('berjalan: hadir 6, butuh 7, sisa 2', status.mA === 'berjalan', JSON.stringify(status))
   cek('kritis: wajib hadir di semua sisa sesi', status.mB === 'kritis')
-  cek('susulan: tidak mungkin lagi memenuhi', status.mC === 'susulan')
-  cek('lulus: izin sah mengurangi pembagi', status.mD === 'lulus')
+  cek('susulan: alpa melebihi batas', status.mC === 'susulan')
+  cek('lulus: hadir ≥ 7/12 × 12', status.mD === 'lulus')
   cek('susulan: bergabung sesudah batas', status.mE === 'susulan')
   cek('anggota bukan peserta tidak tampil', !(await ada('[data-testid="peserta-mG"]')))
-  cek('alasan berjalan menyebut jatah absen', (await teks('[data-testid="alasan-mA"]')).includes('boleh absen 1×'))
+  cek('alasan berjalan menyebut kelonggaran & jatah alpa', (await teks('[data-testid="alasan-mA"]')).includes('boleh tidak hadir 1× (alpa maks. 1×)'), await teks('[data-testid="alasan-mA"]'))
+  cek('baris: hadir/butuh · alpa/batas · telat/jatah', (await teks('[data-testid="hadir-mA"]')) === 'hadir 6/7' && (await teks('[data-testid="alpa-mC"]')) === 'alpa 7/3' && (await teks('[data-testid="telat-mA"]')) === 'telat 0/2')
+  const atr = await teks('[data-testid="aturan-pelantikan"]')
+  cek('teks aturan: rasio & angka N = 12 (aturan lama dibaca sebagai rasio)', atr.includes('7/12') && atr.includes('N = 12 → hadir min. 7, alpa maks. 3, jatah telat 2') && atr.includes('18.30') && atr.includes('19.00'), atr)
   const jumlah = {}
   for (const s of ['lulus', 'berjalan', 'kritis', 'susulan']) jumlah[s] = (await teks(`[data-testid="jumlah-${s}"]`)).replace(/\D/g, '')
   cek('ringkasan: 2 lulus (mD, mF) · 1 berjalan · 1 kritis · 2 susulan', JSON.stringify(jumlah) === '{"lulus":"2","berjalan":"1","kritis":"1","susulan":"2"}', JSON.stringify(jumlah))
@@ -356,6 +381,7 @@ try {
   cek('cetak A4 tegak berjudul', html.includes('size: A4 portrait') && html.includes('Rekap Syarat Pelantikan — Latsar Uji'))
   cek('cetak: 6 baris peserta + daftar susulan', (html.match(/<td class="nm">/g) ?? []).length === 6 && html.includes('Pelantikan susulan'))
   cek('cetak: warna hex saja', !/(?:bg|text)-(?:slate|rose|emerald)-|oklch|var\(--/.test(html))
+  cek('cetak: aturan rasio & kolom alpa/telat', html.includes('7/12') && html.includes('<th class="num">Alpa</th>') && html.includes('<th class="num">Telat</th>'))
 
   await klik('[data-testid="kelola-peserta"]')
   await p.waitForSelector('[data-testid="modal-peserta"]')

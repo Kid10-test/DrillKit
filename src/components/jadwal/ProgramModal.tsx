@@ -18,6 +18,7 @@ import {
   LABEL_TONGGAK,
   WARNA_FASE,
   cariPolaLatsar,
+  lengkapiAturan,
   periksaProgram,
   programBaru,
   rencanakanProgram,
@@ -30,6 +31,7 @@ import { todayISO, uid } from '../../lib/utils'
 import { useSettings } from '../../hooks/useSettings'
 import { useSeksiAktif } from '../../hooks/useSeksiAktif'
 import { GarisWaktuProgram } from './GarisWaktuProgram'
+import { EditorAturanPelantikan } from './EditorAturanPelantikan'
 
 const buatId = (awalan: string) => uid(awalan)
 const salin = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
@@ -78,7 +80,9 @@ export function ProgramModal({ open, onClose, sesi }: { open: boolean; onClose: 
   const ubah = (x: Partial<ProgramLatihan>) => draf && setDraf({ ...draf, ...x })
   const hariPola = draf ? [...new Set([...draf.hari, ...draf.tambahan.map(hariSenin)])].sort() : []
 
-  async function simpanDaftar(p: ProgramLatihan) {
+  async function simpanDaftar(p0: ProgramLatihan) {
+    // v2.8 — simpan aturan yang sudah dilengkapi (membuang persenMin/hadirMin #36).
+    const p = { ...p0, aturan: lengkapiAturan(p0.aturan) }
     const ada = daftar.some((x) => x.id === p.id)
     await saveSettings({ programLatihan: ada ? daftar.map((x) => (x.id === p.id ? p : x)) : [...daftar, p] })
   }
@@ -364,56 +368,7 @@ export function ProgramModal({ open, onClose, sesi }: { open: boolean; onClose: 
           </section>
 
           {/* ------------------------------ aturan ------------------------------ */}
-          <section className="space-y-2" data-testid="program-aturan">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Syarat pelantikan</h3>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <label className="text-[11px] text-slate-400">
-                Hadir minimal (%)
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  data-testid="aturan-persen"
-                  value={draf.aturan.persenMin}
-                  onChange={(e) => ubah({ aturan: { ...draf.aturan, persenMin: Math.max(0, Math.min(100, Number(e.target.value) || 0)) } })}
-                />
-              </label>
-              <label className="text-[11px] text-slate-400">
-                Minimal hadir fisik
-                <Input
-                  type="number"
-                  min={0}
-                  data-testid="aturan-hadir-min"
-                  value={draf.aturan.hadirMin}
-                  onChange={(e) => ubah({ aturan: { ...draf.aturan, hadirMin: Math.max(0, Math.round(Number(e.target.value) || 0)) } })}
-                />
-              </label>
-              <label className="text-[11px] text-slate-400">
-                Batas bergabung
-                <Input
-                  type="date"
-                  data-testid="aturan-batas"
-                  value={draf.aturan.batasGabung ?? ''}
-                  onChange={(e) => ubah({ aturan: { ...draf.aturan, batasGabung: e.target.value || undefined } })}
-                />
-              </label>
-              <label className="text-[11px] text-slate-400">
-                Lapor sakit maks. (jam)
-                <Input
-                  type="number"
-                  min={0}
-                  data-testid="aturan-sakit"
-                  value={draf.aturan.sakitMaksJam}
-                  onChange={(e) => ubah({ aturan: { ...draf.aturan, sakitMaksJam: Math.max(0, Number(e.target.value) || 0) } })}
-                />
-              </label>
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Hadir ≥ {draf.aturan.persenMin}% dari sesi wajib setelah dikurangi izin/sakit sah, dan minimal {draf.aturan.hadirMin}× hadir
-              fisik. Izin sah bila tertulis sebelum jam mulai sesi; sakit sah bila dilaporkan paling lambat {draf.aturan.sakitMaksJam} jam
-              sesudahnya. Bergabung sesudah batas → pelantikan susulan.
-            </p>
-          </section>
+          <EditorAturanPelantikan aturan={draf.aturan} nWajib={tanggalWajib.size} onChange={(aturan) => ubah({ aturan })} />
 
           {/* ------------------------------ pratinjau ------------------------------ */}
           <section className="space-y-2" data-testid="program-pratinjau">

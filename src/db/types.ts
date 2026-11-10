@@ -175,6 +175,15 @@ export interface Session {
    * rentang set. **Catatan staf** — dikupas dari berkas yang dibagikan.
    */
   logRep?: LogRepSet[]
+
+  /**
+   * v2.8 — isian Google Form presensi sesi ini: memberId → cap waktu isian
+   * (epoch ms), dari impor CSV jawaban Form. Disimpan di sesi, bukan di
+   * catatan absensi, karena mengisi Form belum berarti datang: anak yang
+   * mengisi Form tapi tidak datang tidak boleh tercatat hadir. **Catatan
+   * staf** — dikupas dari berkas yang dibagikan.
+   */
+  formPresensi?: Record<string, number>
 }
 
 /**
@@ -387,6 +396,19 @@ export interface AttendanceRecord {
   dilaporAt?: number
   /** #36 — putusan pelatih yang mengalahkan aturan jam (izin "jelas & bertanggung jawab"). */
   putusanIzin?: 'sah' | 'tidak-sah'
+  /**
+   * v2.8 — jam datang (epoch ms) yang **dicatat dengan sengaja** (absen fisik
+   * admin / impor CSV), bukan jam tombol ditekan. `checkInAt` tetap ada untuk
+   * riwayat, tetapi tidak dipakai menilai telat: pelatih sering mengisi absen
+   * sesudah latihan, sehingga semua anak akan tampak terlambat.
+   */
+  datangAt?: number
+  /** v2.8 — alasan datang terlambat (beserta bukti) — syarat memakai jatah telat. */
+  alasanTelat?: string
+  /** v2.8 — id kategori izin (`AturanPelantikan.kategoriIzin`); `lain` = di luar daftar. */
+  kategoriIzin?: string
+  /** v2.8 — bukti izin/sakit/telat: tautan berkas Google Form, atau `ada` bila diterima lewat WA. */
+  bukti?: string
 }
 
 /* ------------------------------- Drill ---------------------------------- */
@@ -1579,11 +1601,45 @@ export interface PesertaProgram {
   bergabung: string
 }
 
+/** v2.8 — pecahan [pembilang, penyebut] dari jumlah sesi wajib (N). */
+export type RasioSesi = [number, number]
+
+/** v2.8 — satu kategori izin yang diterima musim ini, dengan bukti yang diminta. */
+export interface KategoriIzin {
+  id: string
+  nama: string
+  bukti: string
+}
+
+/**
+ * Syarat pelantikan. v2.8 mengganti model persen + minimal hadir (#36)
+ * dengan **rasio dari jumlah sesi wajib**, karena jumlah sesi Latsar
+ * berubah tiap musim: hadir ≥ ⌈7/12·N⌉, alpa ≤ ⌊1/4·N⌉, telat berjatah
+ * ≤ ⌊1/6·N⌉. Semua field baru opsional — data lama dilengkapi
+ * `lengkapiAturan()` (programLatsar.ts) saat dibaca.
+ */
 export interface AturanPelantikan {
-  /** Persen hadir minimal dari sesi wajib setelah dikurangi izin/sakit sah. */
-  persenMin: number
-  /** Minimal hadir fisik, apa pun hasil persennya. */
-  hadirMin: number
+  /** Hadir minimal = ⌈a/b · N⌉ (bawaan 7/12). */
+  rasioHadir?: RasioSesi
+  /** Alpa maksimal = bulat(a/b · N) (bawaan 1/4). Lewat → pelantikan susulan. */
+  rasioAlpa?: RasioSesi
+  /** Jatah telat beralasan = bulat(a/b · N) (bawaan 1/6). */
+  rasioTelat?: RasioSesi
+  /** Datang ≤ sekian menit sesudah jam mulai masih dihitung hadir tepat (bawaan 30 → 18.30). */
+  toleransiMenit?: number
+  /**
+   * Telat berjatah hanya sampai sekian menit sesudah jam mulai. Kosong =
+   * separuh durasi sesi (18.00–20.00 → 19.00; 15.00–19.00 → 17.00).
+   */
+  batasJatahMenit?: number
+  /** Hadir hanya dihitung bila juga mengisi Google Form presensi sesi itu. */
+  wajibForm?: boolean
+  /** Izin/sakit/telat beralasan hanya sah bila buktinya sudah diterima. */
+  wajibBukti?: boolean
+  /** Batas lapor izin pada hari-H ("HH:MM"). Kosong = sebelum jam mulai sesi. */
+  batasIzin?: string
+  /** Kategori izin yang diterima musim ini. Kosong = 7 kategori bawaan. */
+  kategoriIzin?: KategoriIzin[]
   /** Bergabung setelah tanggal ini → pelantikan susulan. Kosong = tanpa batas. */
   batasGabung?: string
   /** Sakit sah bila dilaporkan paling lambat sekian jam setelah sesi mulai. */

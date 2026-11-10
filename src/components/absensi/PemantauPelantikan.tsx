@@ -21,11 +21,15 @@ import { htmlRekapPelantikan } from '../../lib/pelantikanCetak'
 import {
   LABEL_KODE,
   LABEL_STATUS,
+  LEGENDA_KODE,
   SINGKAT_KODE,
   WARNA_KODE,
   WARNA_STATUS,
   barisCsvPelantikan,
+  jendelaDatang,
+  lengkapiAturan,
   rekapPelantikan,
+  ringkasAturan,
   tambahPeserta,
   tonggakCamp,
   urutkanRekap,
@@ -60,6 +64,13 @@ export default function PemantauPelantikan() {
   )
   if (!program || !rekap) return null
   const camp = tonggakCamp(program)
+  const aturan = lengkapiAturan(program.aturan)
+  const contohSesi = rekap.wajib[0]
+  const jam = (ms: number) => {
+    const d = new Date(ms)
+    return `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`
+  }
+  const jendela = contohSesi ? jendelaDatang(contohSesi, aturan) : null
   const baris = urutkanRekap(rekap.baris).filter(
     (b) =>
       (saring === 'semua' || b.status === saring) &&
@@ -109,12 +120,19 @@ export default function PemantauPelantikan() {
         </div>
         <GarisWaktuProgram program={program} wajib={new Set(rekap.wajib.map((s) => s.date))} hariIni={hariIni} />
         <p data-testid="aturan-pelantikan" className="text-[11px] text-slate-400">
-          Lulus: hadir ≥ <b className="text-slate-200">{program.aturan.persenMin}%</b> dari{' '}
-          <b className="text-slate-200">{rekap.wajib.length} sesi wajib</b> (dikurangi izin/sakit sah) dan minimal{' '}
-          <b className="text-slate-200">{program.aturan.hadirMin}×</b> hadir fisik · izin tertulis sebelum jam mulai · sakit ≤{' '}
-          {program.aturan.sakitMaksJam} jam
-          {program.aturan.batasGabung && <> · bergabung paling lambat {tgl(program.aturan.batasGabung)}</>} · {lewat}/{rekap.wajib.length} sesi
-          wajib sudah lewat
+          Memenuhi: <b className="text-slate-200">{ringkasAturan(aturan, rekap.wajib.length)}</b> (N dihitung sejak bergabung).
+          {jendela && (
+            <>
+              {' '}
+              Datang ≤ {jam(jendela.tepat)} = hadir · s.d. {jam(jendela.batasJatah)} beralasan{aturan.wajibBukti ? ' + bukti' : ''} = jatah telat ·
+              lewat = alpa.
+            </>
+          )}{' '}
+          Izin sebelum {aturan.batasIzin ? aturan.batasIzin.replace(':', '.') : 'jam mulai'}
+          {aturan.wajibBukti ? ' + bukti' : ''} · sakit ≤ {aturan.sakitMaksJam} jam
+          {aturan.wajibForm && rekap.sesiBerForm > 0 && <> · Google Form wajib ({rekap.sesiBerForm} sesi diimpor)</>}
+          {aturan.batasGabung && <> · bergabung paling lambat {tgl(aturan.batasGabung)}</>} · {lewat}/{rekap.wajib.length} sesi wajib sudah
+          lewat
         </p>
       </Card>
 
@@ -139,6 +157,17 @@ export default function PemantauPelantikan() {
             ))}
           </div>
 
+          {rekap.tanpaBukti > 0 && (
+            <p data-testid="peringatan-tanpa-bukti" className="rounded-lg border border-pink-500/40 bg-pink-500/10 px-3 py-2 text-[12px] text-pink-200">
+              {rekap.tanpaBukti} catatan izin/sakit di sesi wajib belum punya bukti dan sementara dihitung alpa. Tandai “bukti diterima” di{' '}
+              <b>Isi absensi</b> setelah buktinya masuk.
+            </p>
+          )}
+          {rekap.kosong > 0 && (
+            <p data-testid="peringatan-kosong" className="rounded-lg border border-slate-600 bg-slate-800/60 px-3 py-2 text-[12px] text-slate-300">
+              {rekap.kosong} sel sesi wajib yang sudah lewat belum diisi — dihitung tidak hadir, tetapi belum dihitung alpa sampai diisi.
+            </p>
+          )}
           {rekap.tanpaCap > 0 && (
             <p data-testid="peringatan-tanpa-cap" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
               {rekap.tanpaCap} catatan izin/sakit di sesi wajib belum punya jam lapor dan sementara dihitung tanpa keterangan. Lengkapi
@@ -182,8 +211,18 @@ export default function PemantauPelantikan() {
                       {b.anggota ? <NamaTampil anggota={b.anggota} /> : '(anggota terhapus)'}
                       <span className="ml-1.5 text-[11px] font-normal text-slate-500">{b.anggota ? sectionLabel(b.anggota.section) : ''}</span>
                     </span>
-                    <span className="text-[11px] tabular-nums text-slate-300" title="hadir / dibutuhkan">
+                    <span className="text-[11px] tabular-nums text-slate-300" title="hadir / dibutuhkan" data-testid={`hadir-${b.memberId}`}>
                       hadir <b>{b.hadir}</b>/{b.butuh}
+                    </span>
+                    <span
+                      className={`text-[11px] tabular-nums ${b.alpa > b.maksAlpa ? 'font-semibold text-rose-300' : 'text-slate-400'}`}
+                      title="alpa / batas alpa"
+                      data-testid={`alpa-${b.memberId}`}
+                    >
+                      alpa {b.alpa}/{b.maksAlpa}
+                    </span>
+                    <span className="text-[11px] tabular-nums text-slate-400" title="telat berjatah / jatah telat" data-testid={`telat-${b.memberId}`}>
+                      telat {b.telatJatah}/{b.maksTelat}
                     </span>
                     <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-white" style={{ background: WARNA_STATUS[b.status] }} data-testid={`status-${b.memberId}`}>
                       {LABEL_STATUS[b.status]}
@@ -204,7 +243,7 @@ export default function PemantauPelantikan() {
                                 : { background: WARNA_KODE[k], color: '#ffffff' }
                           }
                         >
-                          {k == null || k === 'mendatang' ? '' : SINGKAT_KODE[k].slice(0, 1)}
+                          {k == null || k === 'mendatang' ? '' : SINGKAT_KODE[k]}
                         </span>
                       ))}
                     </div>
@@ -217,7 +256,7 @@ export default function PemantauPelantikan() {
               {baris.length === 0 && <li className="py-3 text-sm text-slate-500">Tidak ada peserta yang cocok.</li>}
             </ul>
             <p className="text-[10px] text-slate-500">
-              {(['hadir', 'izin-sah', 'sakit-sah', 'izin-telat', 'sakit-telat', 'tanpa-cap', 'alpha', 'kosong'] as const).map((k) => (
+              {LEGENDA_KODE.map((k) => (
                 <span key={k} className="mr-2 inline-flex items-center gap-1">
                   <i className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: WARNA_KODE[k] }} />
                   {LABEL_KODE[k]}
