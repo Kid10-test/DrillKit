@@ -30,6 +30,8 @@ import { NamaTampil, useModeNama } from '../components/NamaTampil'
 const TombolTerimaQrMalas = lazy(() =>
   import('../components/EstafetBerkas').then((m) => ({ default: m.TombolTerimaQr })),
 )
+// #34a — hitung mundur H-Minus terpadu & "Fokus minggu ini" (dimuat malas).
+const KartuMusimDasbor = lazy(() => import('../components/musim/KartuMusimDasbor'))
 const DialogPanduanMalas = lazy(() =>
   import('../components/Panduan').then((m) => ({ default: m.DialogPanduanDasbor })),
 )
@@ -197,6 +199,10 @@ export default function Dashboard() {
       <div className="mb-4">
         <PengingatJadwal sessions={sessions} prefix="ingat-coach" />
       </div>
+
+      <Suspense fallback={null}>
+        <KartuMusimDasbor sessions={sessions} />
+      </Suspense>
 
       {/* #18 — pengingat kesiapan inventaris & barang lomba belum kembali ke gudang */}
       {(jmlAsetButuhPerhatian > 0 || jmlBarangBelumKembali > 0) && (

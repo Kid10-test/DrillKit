@@ -14,7 +14,7 @@
  * Semua hitungan ada di `lib/evaluasi.ts` (murni, teruji di node); halaman
  * ini hanya menyajikan.
  */
-import { useMemo, useState } from 'react'
+import { Suspense, lazy, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { NamaTampil, useModeNama } from '../components/NamaTampil'
 import { PanelSetoranHafalan } from '../components/PanelSetoranHafalan'
@@ -53,18 +53,23 @@ import {
   warnaTren,
 } from '../lib/evaluasi'
 
+// #34a — musim TC (H-Minus) & Papan Tindak Lanjut Staf dimuat malas.
+const PanelMusim = lazy(() => import('../components/musim/PanelMusim'))
+const PapanTindakLanjut = lazy(() => import('../components/musim/PapanTindakLanjut'))
+type TabEvaluasi = 'berkala' | 'setoran' | 'papan'
+
 export default function Evaluasi() {
   const toast = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
-  const tabAktif: 'berkala' | 'setoran' =
-    searchParams.get('tab') === 'setoran' ? 'setoran' : 'berkala'
+  const tabParam = searchParams.get('tab')
+  const tabAktif: TabEvaluasi = tabParam === 'setoran' || tabParam === 'papan' ? tabParam : 'berkala'
   const members = useLiveQuery(() => db.members.toArray(), [], [])
   const daftar = useLiveQuery(() => db.evaluasi.toArray(), [], [])
   const jmlTargetSetoran = useLiveQuery(() => db.targetSetoran.count(), [], 0)
 
-  function pilihTab(tab: 'berkala' | 'setoran') {
+  function pilihTab(tab: TabEvaluasi) {
     const p = new URLSearchParams(searchParams)
-    if (tab === 'setoran') p.set('tab', 'setoran')
+    if (tab !== 'berkala') p.set('tab', tab)
     else p.delete('tab')
     setSearchParams(p, { replace: true })
   }
@@ -173,9 +178,29 @@ export default function Evaluasi() {
           Matriks Setoran Hafalan
           {jmlTargetSetoran > 0 ? ` (${jmlTargetSetoran})` : ''}
         </button>
+        <button
+          type="button"
+          data-testid="tab-papan-staf"
+          onClick={() => pilihTab('papan')}
+          className={cx(
+            'flex-1 rounded-md px-3 py-2 text-xs font-semibold transition',
+            tabAktif === 'papan'
+              ? 'bg-emerald-600 text-white'
+              : 'text-slate-400 hover:text-slate-100',
+          )}
+        >
+          Musim &amp; Papan Staf
+        </button>
       </div>
 
-      {tabAktif === 'setoran' ? (
+      {tabAktif === 'papan' ? (
+        <Suspense fallback={<p className="text-sm text-slate-500">Memuat…</p>}>
+          <div className="space-y-4">
+            <PanelMusim />
+            <PapanTindakLanjut />
+          </div>
+        </Suspense>
+      ) : tabAktif === 'setoran' ? (
         <PanelSetoranHafalan />
       ) : (
         <>

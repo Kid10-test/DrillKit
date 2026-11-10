@@ -1501,6 +1501,42 @@ export interface TeamSettings {
    * ikut paket bagikan — paket hanya membawa field tim yang didaftar putih.
    */
   programLatihan?: ProgramLatihan[]
+  /**
+   * #34a — musim TC: tanggal kejuaraan utama (H-0) & gerbang kesiapan
+   * mundur (H-90 … H-3). Disimpan di pengaturan tim seperti program latihan:
+   * ikut backup, TIDAK ikut paket bagikan (daftar putih `team`).
+   */
+  musimTc?: MusimTc[]
+}
+
+/** #34a — jenis gerbang menentukan bukti otomatis yang dibaca dari data. */
+export type JenisGerbangMusim = 'musik' | 'drill' | 'fullrun' | 'perlengkapan' | 'juri' | 'logistik' | 'lain'
+
+/** #34a — satu gerbang kesiapan mundur, mis. "H-60 Seluruh drill terpasang". */
+export interface GerbangMusim {
+  id: string
+  nama: string
+  /** Berapa hari sebelum H-0 (60 = H-60). */
+  hMinus: number
+  jenis: JenisGerbangMusim
+  /** Ditandai tercapai oleh pelatih (epoch ms); menang atas bukti otomatis. */
+  tercapaiAt?: number
+  catatan?: string
+}
+
+/** #34a — satu musim TC menuju kejuaraan utama. */
+export interface MusimTc {
+  id: string
+  nama: string
+  /** Tanggal kejuaraan utama (H-0), YYYY-MM-DD. */
+  tanggalH0: string
+  /** Sesi penampilan H-0 di Jadwal (opsional) — set list-nya dipakai gerbang musik. */
+  sessionId?: string
+  /** Drill show yang dipersiapkan (opsional) — dipakai gerbang drill & juri. */
+  drillId?: string
+  gerbang: GerbangMusim[]
+  dibuat: number
+  diubah: number
 }
 
 /* ------------- #36 — Program Latsar & Pemantau Syarat Pelantikan ------------- */
@@ -2374,6 +2410,9 @@ export interface TindakLanjut {
   /** Id seksi (`SectionDef.id`) yang menjadi sasaran perbaikan. */
   seksi?: string
   prioritas?: 'tinggi' | 'normal'
+  /** #34a — asal komentar Judge Tape (`sumber: 'juri'`) supaya tidak tercatat dua kali. */
+  penilaianId?: string
+  penandaId?: string
   createdAt: number
   updatedAt: number
   beresAt?: number
