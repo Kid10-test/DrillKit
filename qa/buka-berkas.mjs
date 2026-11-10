@@ -356,6 +356,11 @@ cek('pintu mengenali csv anggota', (await teks('[data-testid="buka-jenis"]')) ==
 await klik('[data-testid="buka-lanjut-csv"]')
 await wait(2500)
 cek('diteruskan ke halaman Anggota', (await isiBody()).includes('Buka Kirana'))
+// v2.7.1 — CSV anggota kini dipratinjau dulu (cocok nama) sebelum ditulis.
+cek('pratinjau impor anggota tampil', await ada('[data-testid="impor-csv-anggota"]'))
+await klik('[data-testid="impor-csv-terapkan"]')
+await wait(800)
+cek('csv anggota masuk setelah Terapkan', (await bacaDb('members')).some((m) => m.name === 'Buka Kirana'))
 
 // Berkas asing: dikenali sebagai tak-dikenal, tidak ada yang diubah.
 await ke('#/data')

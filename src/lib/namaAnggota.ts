@@ -39,7 +39,7 @@ import type {
 } from '../db/types'
 import { gabungCatatanSetoran, idCatatanSetoran } from './setoran'
 import { gabungProfilUkuranSeragam } from './inventarisLogistik'
-import { gabungDaftarTag } from './tagAnggota'
+import { gabungDaftarTag, normalisasiDaftarTag } from './tagAnggota'
 import { uid } from './utils'
 
 /* ------------------------------ Nama tampil -------------------------------- */
@@ -1350,6 +1350,7 @@ export const JUDUL_CSV_ANGGOTA = [
   'No. HP',
   'Status',
   'Catatan',
+  'Tag',
 ]
 
 const PERAN_DARI_TEKS: Record<string, MemberRole> = {
@@ -1364,8 +1365,11 @@ const PERAN_DARI_TEKS: Record<string, MemberRole> = {
   asisten: 'assistant',
 }
 
-/** Parser CSV sederhana: kutip, koma di dalam nilai, dan pemisah `;`. */
-export function pecahCsv(line: string): string[] {
+/**
+ * Parser CSV sederhana: kutip, koma di dalam nilai, dan pemisah `;`.
+ * Tanpa `pemisah`, koma dan titik koma sama-sama memisah (perilaku lama).
+ */
+export function pecahCsv(line: string, pemisah?: ',' | ';' | '\t'): string[] {
   const out: string[] = []
   let cur = ''
   let kutip = false
@@ -1379,7 +1383,7 @@ export function pecahCsv(line: string): string[] {
         } else kutip = false
       } else cur += ch
     } else if (ch === '"') kutip = true
-    else if (ch === ',' || ch === ';') {
+    else if (pemisah ? ch === pemisah : ch === ',' || ch === ';') {
       out.push(cur)
       cur = ''
     } else cur += ch
@@ -1404,8 +1408,22 @@ export function barisCsvAnggota(
     m.phone ?? '',
     m.active ? 'Aktif' : 'Nonaktif',
     m.notes ?? '',
+    (m.tags ?? []).join(', '),
   ]
 }
+
+/** Kolom CSV yang benar-benar terisi — hanya kolom ini yang boleh menimpa data lama. */
+export type KolomCsvAnggota =
+  | 'code'
+  | 'panggilan'
+  | 'section'
+  | 'instrument'
+  | 'role'
+  | 'joinYear'
+  | 'phone'
+  | 'active'
+  | 'notes'
+  | 'tags'
 
 export interface BarisCsvAnggota {
   code: string
@@ -1418,6 +1436,13 @@ export interface BarisCsvAnggota {
   phone: string
   active: number
   notes: string
+  /** Kolom Tag (pisah koma/titik koma), mis. "CAB 42" atau "Returner 2027". */
+  tags?: string[]
+  /**
+   * Kolom yang selnya berisi nilai yang dikenali. Saat impor memperbarui
+   * anggota yang sudah ada, sel kosong tidak boleh menghapus data lama.
+   */
+  terisi: KolomCsvAnggota[]
 }
 
 /**
@@ -1454,16 +1479,37 @@ export function bacaBarisCsvAnggota(
   const status = adaPanggilan || judul ? ambil('Status', 7) : (sel[7] ?? '')
   const tahun = Number(adaPanggilan || judul ? ambil('Tahun Masuk', 5) : sel[5])
   const panggilan = adaPanggilan ? ambil('Panggilan', -1).trim() : ''
+  const code = (adaPanggilan || judul ? ambil('Kode', 0) : (sel[0] ?? '')).trim()
+  const instrument = (adaPanggilan || judul ? ambil('Instrumen', 3) : (sel[3] ?? '')).trim()
+  const phone = (adaPanggilan || judul ? ambil('No. HP', 6) : (sel[6] ?? '')).trim()
+  const notes = (adaPanggilan || judul ? ambil('Catatan', 8) : (sel[8] ?? '')).trim()
+  // Kolom Tag hanya dikenali lewat judulnya (berkas lama tidak punya).
+  const iTag = judul ? judul.findIndex((h) => ['tag', 'tags', 'kelompok'].includes(norm(h))) : -1
+  const tags = iTag >= 0 ? normalisasiDaftarTag(sel[iTag] ?? '') : []
+  const tahunSah = Number.isFinite(tahun) && tahun > 1900 && tahun < 3000
+  const terisi: KolomCsvAnggota[] = []
+  if (code) terisi.push('code')
+  if (panggilan) terisi.push('panggilan')
+  if (sec) terisi.push('section')
+  if (instrument) terisi.push('instrument')
+  if (PERAN_DARI_TEKS[norm(peranMentah)]) terisi.push('role')
+  if (tahunSah) terisi.push('joinYear')
+  if (phone) terisi.push('phone')
+  if (norm(status) === 'aktif' || norm(status) === 'nonaktif') terisi.push('active')
+  if (notes) terisi.push('notes')
+  if (tags.length) terisi.push('tags')
   return {
-    code: (adaPanggilan || judul ? ambil('Kode', 0) : (sel[0] ?? '')).trim(),
+    code,
     name,
     panggilan: panggilan || undefined,
     section: sec?.id ?? 'other',
-    instrument: adaPanggilan || judul ? ambil('Instrumen', 3) : (sel[3] ?? ''),
+    instrument,
     role,
-    joinYear: Number.isFinite(tahun) && tahun > 0 ? tahun : new Date().getFullYear(),
-    phone: adaPanggilan || judul ? ambil('No. HP', 6) : (sel[6] ?? ''),
+    joinYear: tahunSah ? tahun : new Date().getFullYear(),
+    phone,
     active: norm(status) === 'nonaktif' ? 0 : 1,
-    notes: adaPanggilan || judul ? ambil('Catatan', 8) : (sel[8] ?? ''),
+    notes,
+    tags: tags.length ? tags : undefined,
+    terisi,
   }
 }

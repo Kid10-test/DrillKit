@@ -187,6 +187,9 @@ rakit src/lib/jadwalCetak.ts             jadwalCetak
 rakit src/lib/programLatsar.ts           programLatsar
 # #34a — musim TC: H-Minus, gerbang kesiapan mundur, & titik hitung mundur terpadu.
 rakit src/lib/manajemenMusim.ts          manajemenMusim
+# v2.7.1 — roster pergantian musim: impor CSV cocok-nama, aksi massal, rekap roster.
+rakit src/lib/rosterAnggota.ts           rosterAnggota
+rakit src/lib/rosterCetak.ts            rosterCetak
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'
