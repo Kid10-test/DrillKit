@@ -176,18 +176,30 @@ Posisi disimpan dalam **yard** relatif ke titik tengah lapangan:
 Selain standar football, aplikasi mendukung **lapangan cara Indonesia**:
 
 * **Preset:** DCI/kampus, SMA/NFHS, Pro/NFL, tanpa hash, **Sepak bola (105 × 68 m)**,
-  **Indoor/GOR (40 × 20 m)**, **Indoor tanpa patok (40 × 20 m, grid 2 m)**, atau
-  **kustom bebas** (panjang, lebar, jarak grid/subgrid, warna/ketebalan garis hex,
-  serta jarak antar patok diatur sendiri disertai **pratinjau SVG langsung**).
+  **Indoor/GOR (40 × 20 m)**, **Indoor tanpa patok (40 × 20 m)**, atau
+  **kustom bebas** (panjang, lebar, warna/ketebalan garis hex, serta jarak antar
+  patok diatur sendiri disertai **pratinjau SVG langsung**).
+* **Satu grid (v2.9):** garis lapangan **adalah** garis patok — huruf tiap 8
+  langkah, `#` tiap 4 langkah, `T` tiap 8 langkah — dihitung dari **A** dan
+  **T0**. Tanpa patok, garisnya garis yard tiap 5 yard dari garis 50. Label
+  (`A B C` / `50 45 40`) hanya nama garis yang sama; garis bantu tipis tiap
+  1 langkah bisa dinyalakan. Snap ½/¼/1 langkah dihitung dari titik nol yang
+  sama, jadi titik selalu jatuh tepat di patok; **Tempel ke patok** tersedia
+  sebagai tombol terpisah.
 * **Satuan tampilan** bisa **yard**, **meter**, atau **langkah** — nilai tersimpan
   tetap yard, jadi drill lama tetap terbaca persis seperti semula tanpa geser geometri.
 * **Patok** mengikuti kebiasaan tim. Bawaan: **`A` di titik tengah**, lalu
   keluar ke dua sisi — `# C # B # A # B # C #`. Pola lurus dari tepi
   (`A # B # C …`) juga tersedia. Jarak huruf→huruf, huruf→#, dan T→T diatur
-  dalam **langkah**, **yard fisik**, atau **meter fisik**, patok huruf bisa dipasang
-  di sumbu melintang atau membujur, dan tersedia tombol cepat **Tanpa patok** untuk
+  dalam **langkah** (ikut ukuran langkah tim), patok huruf bisa dipasang di
+  sumbu melintang atau membujur, dan tersedia tombol cepat **Tanpa patok** untuk
   aula/GOR kecil.
-* Patok angka bisa ditulis **`T1`, `T2`** atau cukup **`1`, `2`**.
+* Patok angka dimulai dari **`T0` di tepi depan** (sejajar deretan patok huruf),
+  lalu `T1`, `T2`, … ke belakang — bisa ditulis **`T0`, `T1`** atau cukup **`0`, `1`**.
+* **Lembar Meteran** (editor lapangan → Cetak A4): jarak tiap patok dari A dan
+  T0 dalam langkah & meter, plus tanda pita meteran tiap 4 langkah (2,29 m pada
+  8-to-5). Inspektor titik juga menulis jarak meternya, mis. *5,72 m dari A ·
+  13,72 m dari T0*.
 * Karena `A` di tengah, huruf yang sama ada di dua sisi. Bila perlu, satu sisi
   diberi tanda koma atas (`B'` · `B`) supaya tidak rancu di buku saku — tanda
   ini dipakai sampai ke `A` sendiri, jadi `A +2` berarti *dua langkah ke sisi

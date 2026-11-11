@@ -53,7 +53,9 @@ import {
   apakahModeParade,
   coordText as coorTextSafe,
   facingDeg,
+  patokOf,
   stepYd,
+  teksMeterAcuan,
   ukurTitik,
 } from '../lib/field'
 import {
@@ -245,6 +247,8 @@ type Tampilan = {
   /** #22.4 — resolusi pembulatan langkah mandiri pada sumbu X & Y. */
   langkahX: LangkahBulat
   langkahY: LangkahBulat
+  /** v2.9 — snap menempel ke garis patok terdekat (bukan per langkah). */
+  tempelPatok: boolean
   /** #23.3 — mode input pointer kanvas (`otomatis`, `sentuh`, `tetikus`). */
   modeInput: ModeInputKanvas
 }
@@ -266,6 +270,7 @@ const TAMPILAN_AWAL: Tampilan = {
   kunciSumbu: 'bebas',
   langkahX: 1,
   langkahY: 1,
+  tempelPatok: false,
   modeInput: 'otomatis',
 }
 
@@ -1844,9 +1849,9 @@ export function Editor({
       snapAktif: view.snap,
       langkahX: view.langkahX,
       langkahY: view.langkahY,
-      hormatiPatok: true,
+      tempelPatok: view.tempelPatok,
     }),
-    [view.snap, view.langkahX, view.langkahY],
+    [view.snap, view.langkahX, view.langkahY, view.tempelPatok],
   )
   const opsiPembulatanRef = useRef(opsiPembulatan)
   opsiPembulatanRef.current = opsiPembulatan
@@ -1893,7 +1898,7 @@ export function Editor({
       snapAktif: true,
       langkahX: view.langkahX || 1,
       langkahY: view.langkahY || 1,
-      hormatiPatok: true,
+      tempelPatok: view.tempelPatok,
     })
     const pts = { ...set.points, ...hasil }
     set.points = pts
@@ -2719,6 +2724,8 @@ export function Editor({
     const p = points[ids[0]]
     const el = document.querySelector('[data-live-coord]')
     if (el) el.textContent = coorTextSafe(p.x, p.y, f)
+    const elM = document.querySelector('[data-live-meter]')
+    if (elM) elM.textContent = teksMeterAcuan(p.x, p.y, f)
     const ixEl = document.querySelector<HTMLInputElement>('[data-live-x]')
     if (ixEl) ixEl.value = String(Math.round((p.x / sYd) * 4) / 4)
     const iyEl = document.querySelector<HTMLInputElement>('[data-live-y]')
@@ -6023,7 +6030,11 @@ export function Editor({
             <Toggle
               checked={view.snap}
               onChange={(v) => ubah('snap', v)}
-              label={`Snap ke grid (${Math.round((1 / sYd) * 10) / 10} langkah/yard)`}
+              label={
+                patokOf(f).aktif === 1
+                  ? 'Snap ke langkah (dihitung dari A & T0)'
+                  : `Snap ke langkah (${Math.round((1 / sYd) * 10) / 10} langkah/yard)`
+              }
             />
             {view.snap && (
               <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-800/80 bg-slate-900/40 p-2">
@@ -6061,6 +6072,16 @@ export function Editor({
                     <option value="0">Bebas</option>
                   </Select>
                 </div>
+                {patokOf(f).aktif === 1 && (
+                  <div className="col-span-2">
+                    <Toggle
+                      testId="tempel-patok"
+                      checked={view.tempelPatok}
+                      onChange={(v) => ubah('tempelPatok', v)}
+                      label="Tempel ke patok (huruf, #, T)"
+                    />
+                  </div>
+                )}
               </div>
             )}
             <Toggle checked={view.kode} onChange={(v) => ubah('kode', v)} label="Tampilkan kode pemain" />

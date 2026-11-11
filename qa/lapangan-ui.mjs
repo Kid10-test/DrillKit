@@ -87,25 +87,23 @@ try {
     })
     await wait(400)
     cek('0b: panjang awal DCI = 100 yard', (await nilai(p, 'kolom-panjang')) === '100', await nilai(p, 'kolom-panjang'))
-    cek('0b: grid awal DCI = 5 yard', (await nilai(p, 'kolom-grid-jarak')) === '5', await nilai(p, 'kolom-grid-jarak'))
+    // v2.9 — satu grid: tidak ada lagi kolom jarak grid terpisah
+    cek('0b: v2.9 kolom jarak grid terpisah sudah tidak ada (garis = patok / garis yard)', !(await ada(p, 'kolom-grid-jarak')))
 
     // Ganti ke meter -> 100 yd ≈ 91.44 m, grid 5 yd ≈ 4.57 m
     await p.click('[data-testid="satuan-m"]')
     await wait(300)
     cek('0b: satuan meter menampilkan panjang 91.44 m', (await nilai(p, 'kolom-panjang')) === '91.44', await nilai(p, 'kolom-panjang'))
-    cek('0b: satuan meter menampilkan grid 4.57 m', (await nilai(p, 'kolom-grid-jarak')) === '4.57', await nilai(p, 'kolom-grid-jarak'))
 
     // Ganti ke langkah -> pada 8-to-5, 100 yd = 160 langkah, grid 5 yd = 8 langkah
     await p.click('[data-testid="satuan-langkah"]')
     await wait(300)
     cek('0b: satuan langkah menampilkan panjang 160 langkah', (await nilai(p, 'kolom-panjang')) === '160', await nilai(p, 'kolom-panjang'))
-    cek('0b: satuan langkah menampilkan grid 8 langkah', (await nilai(p, 'kolom-grid-jarak')) === '8', await nilai(p, 'kolom-grid-jarak'))
 
     // Kembali ke yard -> kembali tepat 100 yd & 5 yd tanpa pergeseran geometri
     await p.click('[data-testid="satuan-yd"]')
     await wait(300)
     cek('0b: kembali ke yard tetap tepat 100 yd tanpa geser geometri', (await nilai(p, 'kolom-panjang')) === '100', await nilai(p, 'kolom-panjang'))
-    cek('0b: kembali ke yard tetap tepat grid 5 yd', (await nilai(p, 'kolom-grid-jarak')) === '5', await nilai(p, 'kolom-grid-jarak'))
 
     // Pratinjau SVG memakai hex murni (tanpa oklch/rgba/color-mix) & 5 titik contoh ikut skala titik
     const auditSvg = await p.evaluate(() => {
@@ -139,10 +137,9 @@ try {
     cek('0c: titik contoh di pratinjau langsung membesar saat ukuran titik diubah ke 150%',
       rBesar > (auditSvg?.r0 ?? 0) * 1.4, `${auditSvg?.r0} -> ${rBesar}`)
 
-    // Ubah warna garis grid ke emas (#fde047) & jarak grid kustom ke 10 yd -> 11 garis + subgrid aktif
+    // Ubah warna garis ke emas (#fde047) & nyalakan garis bantu tiap langkah
     await p.select('[data-testid="pilih-warna-grid"]', 'emas')
-    await isiKolom(p, 'kolom-grid-jarak', '10')
-    await p.select('[data-testid="pilih-subgrid-tampil"]', '1')
+    await p.select('[data-testid="pilih-garis-langkah"]', '1')
     await wait(400)
     const setelahKustom = await p.evaluate(() => {
       const svg = document.querySelector('[data-testid="svg-pratinjau-lapangan"]')
@@ -156,11 +153,13 @@ try {
         info,
       }
     })
-    cek('0d: jarak grid kustom 10 yd langsung memperbarui pratinjau menjadi 11 garis emas (#fde047)',
-      setelahKustom.jmlGaris === 11 && setelahKustom.stroke === '#fde047' && setelahKustom.info.includes('11 garis grid'),
+    cek('0d: warna emas langsung memperbarui pratinjau (21 garis yard #fde047)',
+      setelahKustom.jmlGaris === 21 && setelahKustom.stroke === '#fde047' && setelahKustom.info.includes('21 garis'),
       JSON.stringify(setelahKustom))
-    cek('0d: mengaktifkan subgrid menampilkan garis subgrid di pratinjau',
-      setelahKustom.jmlSub > 0, String(setelahKustom.jmlSub))
+    cek('0d: garis bantu tiap langkah tampil di pratinjau & disebut di info',
+      setelahKustom.jmlSub > 100 && setelahKustom.info.includes('bantu tiap langkah'), JSON.stringify({ jmlSub: setelahKustom.jmlSub, info: setelahKustom.info }))
+    await p.select('[data-testid="pilih-garis-langkah"]', '0')
+    await wait(250)
 
     // Uji preset Indoor / GOR (patok aktif) lalu klik opsi cepat "Tanpa patok (indoor kecil)" & preset "Indoor tanpa patok"
     await p.evaluate(() => {
@@ -172,6 +171,31 @@ try {
       () => document.querySelectorAll('[data-pratinjau-lap="patok"]').length > 0,
     )
     cek('0e: preset Indoor / GOR menyalakan patok di pratinjau', adaPatokIndoor)
+
+    // v2.9 — Lembar Meteran: ringkasan di editor & HTML cetak A4 (dimuat malas)
+    const meteran = await p.evaluate(() => ({
+      huruf: document.querySelector('[data-testid="meteran-huruf"]')?.textContent ?? '',
+      t: document.querySelector('[data-testid="meteran-t"]')?.textContent ?? '',
+    }))
+    cek('0e: v2.9 Lembar Meteran menampilkan A 0,00 · A# 2,29 · B 4,57 (8-to-5)',
+      /A 0,00 · A# 2,29 · B 4,57/.test(meteran.huruf), meteran.huruf)
+    cek('0e: v2.9 Lembar Meteran sumbu T mulai T0 0,00 · T1 4,57', /T0 0,00 · T1 4,57/.test(meteran.t), meteran.t)
+    await p.evaluate(() => {
+      window.__htmlCetak = ''
+      window.open = () => ({
+        document: { write: (h) => { window.__htmlCetak += h }, close() {}, open() {} },
+        focus() {},
+        setTimeout() {},
+        print() {},
+      })
+    })
+    await p.click('[data-testid="cetak-meteran"]')
+    await p.waitForFunction(() => window.__htmlCetak.length > 0, { timeout: 8000 }).catch(() => {})
+    const htmlMeteran = await p.evaluate(() => window.__htmlCetak)
+    cek('0e: v2.9 Cetak A4 membuat lembar meteran (A4, hex murni, T0 & tanda pita)',
+      htmlMeteran.includes('data-lembar-meteran="1"') && htmlMeteran.includes('size: A4') &&
+      htmlMeteran.includes('T0') && htmlMeteran.includes('Tanda pita meteran') && !/oklch|color-mix/.test(htmlMeteran),
+      htmlMeteran.slice(0, 120))
 
     await p.click('[data-testid="opsi-tanpa-patok"]')
     await wait(350)
@@ -192,13 +216,12 @@ try {
     const indoorPolos = await p.evaluate(() => ({
       panjang: document.querySelector('[data-testid="kolom-panjang"]')?.value,
       lebar: document.querySelector('[data-testid="kolom-lebar"]')?.value,
-      grid: document.querySelector('[data-testid="kolom-grid-jarak"]')?.value,
       garisDom: document.querySelectorAll('[data-pratinjau-lap="garis"]').length,
       patokDom: document.querySelectorAll('[data-pratinjau-lap="patok"]').length,
     }))
-    cek('0e: preset "Indoor tanpa patok" mengatur 40 × 20 m, grid 2 m (21 garis), tanpa patok',
-      indoorPolos.panjang === '40' && indoorPolos.lebar === '20' && indoorPolos.grid === '2' &&
-      indoorPolos.garisDom === 21 && indoorPolos.patokDom === 0,
+    cek('0e: preset "Indoor tanpa patok" mengatur 40 × 20 m, garis tiap 5 yard dari tengah (9 garis), tanpa patok',
+      indoorPolos.panjang === '40' && indoorPolos.lebar === '20' &&
+      indoorPolos.garisDom === 9 && indoorPolos.patokDom === 0,
       JSON.stringify(indoorPolos))
 
     // Kembalikan ke DCI standar sebelum lanjut ke uji batas N16 di bawah

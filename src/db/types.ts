@@ -419,7 +419,7 @@ export type HashPreset = 'nfhs' | 'ncaa' | 'nfl' | 'none'
 /** Satuan tampilan & input ukuran/grid lapangan di editor (internal tetap yard). */
 export type SatuanTampilLapangan = 'yd' | 'm' | 'langkah'
 
-/** Satuan jarak antarpatok (langkah mengikuti `step`, yard/meter ukuran fisik). */
+/** @deprecated v2.9 — hanya untuk membaca data lama; jarak patok selalu langkah. */
 export type SatuanJarakPatok = 'langkah' | 'yard' | 'meter'
 
 /** Arah gerak defile barisan kirab di layar (`kiri-ke-kanan` = menuju kanan layar, `kanan-ke-kiri` = menuju kiri layar). */
@@ -464,13 +464,17 @@ export interface FieldConfig {
   endZoneYd: number
   /** jarak antar hash mark */
   hash: HashPreset
-  /** jarak antar garis yard untuk grid utama, default 5 yard */
-  gridYd: number
-  /** jarak subgrid (yard) — 0/undefined = tanpa subgrid */
+  /**
+   * @deprecated v2.9 — tidak dipakai lagi. Garis lapangan kini satu grid:
+   * garis patok (langkah) atau garis yard tiap 5 yard (lihat `garisLapangan`).
+   * Tetap dibaca dari data lama tanpa efek.
+   */
+  gridYd?: number
+  /** @deprecated v2.9 — diganti garis bantu tiap 1 langkah (`subgridTampil`). */
   subgridYd?: number
-  /** 1 = tampilkan grid utama, 0 = sembunyikan (default 1) */
+  /** 1 = tampilkan garis lapangan (patok / garis yard), 0 = sembunyikan (default 1) */
   gridTampil?: number
-  /** 1 = tampilkan subgrid, 0 = sembunyikan */
+  /** v2.9 — 1 = tampilkan garis bantu tipis tiap 1 langkah (dari titik nol grid yang sama) */
   subgridTampil?: number
   /** 1 = tampilkan hash mark, 0 = sembunyikan (jika undefined, ikut `hash !== 'none'`) */
   hashTampil?: number
@@ -478,7 +482,7 @@ export interface FieldConfig {
   step: StepPreset
   /** jika step === 'custom', panjang 1 langkah dalam yard */
   customStepYd: number
-  /** tampilkan label yard line (football) */
+  /** tampilkan label garis lapangan: `A B C` / `T0 T1` (patok) atau `50 45 40` (football) */
   showLabels: number
   /**
    * Satuan yang dipakai saat mengisi panjang/lebar/grid di editor (`yd` / `m` / `langkah`).
@@ -516,7 +520,7 @@ export interface FieldConfig {
  *
  * Dua sumbu patok yang saling tegak lurus:
  * - **Patok huruf**: `A → # → B → # → C …` — huruf dan tanda # berselang-seling.
- * - **Patok angka**: `T1 → T2 → T3 …`
+ * - **Patok angka**: `T0 → T1 → T2 …` (T0 = tepi depan, sejajar deretan patok huruf)
  *
  * Posisi pemain dibaca sebagai gabungan keduanya, misalnya **A6** (patok A,
  * patok T6) atau **B#8** (patok B#, patok T8).
@@ -540,7 +544,7 @@ export interface PatokConfig {
    * `0` = A di tepi, lalu lurus ke seberang: `A # B # C # …`.
    */
   dariTengah: number
-  /** 1 = patok angka ditulis `T1`, `T2`; 0 = cukup `1`, `2` */
+  /** 1 = patok angka ditulis `T0`, `T1`; 0 = cukup `0`, `1` */
   awalanT: number
   /**
    * 1 = sisi yang berlawanan diberi tanda koma atas (`B'`), supaya patok kiri
@@ -551,25 +555,24 @@ export interface PatokConfig {
   jarakHuruf: number
   /** jarak patok huruf ke tanda # sesudahnya (A→#), dalam langkah */
   jarakHash: number
-  /** jarak antar patok angka (T1→T2), dalam langkah */
+  /** jarak antar patok angka (T0→T1), dalam langkah */
   jarakT: number
-  /** 1 = gambar patok & labelnya di lapangan (legacy, gabungan) */
+  /** @deprecated v2.9 — garis patok = garis lapangan (`gridTampil`), label ikut `showLabels`. */
   tampil: number
   /**
    * Batas huruf maksimum (0=A, 1=B, …, 4=E). Undefined = otomatis sampai tepi
    * lapangan. Jika A di tengah, batas berlaku simetris ke dua sisi.
    */
   maksHuruf?: number
-  /** Batas T maksimum (1-based, mis. 26 = T1..T26). Undefined = otomatis. */
+  /** Nomor T terakhir (mis. 26 = T0..T26). Undefined = otomatis sampai tepi. */
   maksT?: number
-  /** 1 = tampilkan garis patok; 0 = sembunyikan (jika undefined, ikut `tampil`) */
+  /** @deprecated v2.9 — garis patok = garis lapangan (`FieldConfig.gridTampil`). */
   tampilGaris?: number
-  /** 1 = tampilkan label patok; 0 = sembunyikan (jika undefined, ikut `tampil`) */
+  /** @deprecated v2.9 — label patok ikut `FieldConfig.showLabels`. */
   tampilLabel?: number
   /**
-   * Satuan jarak patok: 'langkah' (bawaan) = jarak dalam langkah (ikut
-   * ukuran langkah 8-to-5); 'yard' = jarak fisik yard; 'meter' = jarak fisik
-   * meter (mengikuti ukuran pita meteran lapangan, tidak ikut langkah).
+   * @deprecated v2.9 — jarak patok selalu dalam langkah. Data lama bernilai
+   * `'yard' | 'meter'` dikonversi ke langkah oleh `patokOf` (posisi tetap).
    */
   satuanJarak?: SatuanJarakPatok
 }

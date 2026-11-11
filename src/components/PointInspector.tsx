@@ -22,6 +22,7 @@ import {
 } from './ui'
 import {
   coordText as coorTextSafe,
+  teksMeterAcuan,
   stepYd,
 } from '../lib/field'
 import { normalisasiMidsetsPemain } from '../lib/gerak'
@@ -78,12 +79,17 @@ export function PointInspector({
       </div>
       {/* data-live-* dipakai untuk memperbarui angka saat menggeser titik,
           tanpa harus me-render ulang seluruh peta. */}
-      <p
-        data-live-coord
-        className="mb-3 rounded-lg bg-slate-950/60 px-3 py-2 font-mono text-xs text-emerald-300"
-      >
-        {coorTextSafe(point.x, point.y, field)}
-      </p>
+      <div className="mb-3 rounded-lg bg-slate-950/60 px-3 py-2 font-mono text-xs text-emerald-300">
+        <span data-live-coord className="block">
+          {coorTextSafe(point.x, point.y, field)}
+        </span>
+        {/* v2.9 — jarak pita meteran dari A & T0 (atau garis 50 & sideline depan) */}
+        {teksMeterAcuan(point.x, point.y, field) && (
+          <span data-live-meter data-testid="meter-titik" className="mt-0.5 block text-[10px] text-slate-400">
+            {teksMeterAcuan(point.x, point.y, field)}
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="mb-1 block text-[11px] text-slate-500">X (langkah dari 50)</label>

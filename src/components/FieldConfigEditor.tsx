@@ -1,6 +1,7 @@
 /**
- * Editor konfigurasi lapangan (satuan yard/meter/langkah, grid & subgrid kustom,
- * warna/ketebalan garis hex, pratinjau langsung, serta sistem patok Indonesia).
+ * Editor konfigurasi lapangan (satuan yard/meter/langkah, satu grid lapangan,
+ * warna/ketebalan garis hex, pratinjau langsung, sistem patok Indonesia, dan
+ * Lembar Meteran untuk memasang patok).
  *
  * Dipakai bersama oleh Pengaturan tim (`src/pages/Settings.tsx`) dan modal
  * Pengaturan drill (`src/components/DrillSettingsModal.tsx`).
@@ -12,12 +13,13 @@ import type {
   HashPreset,
   ParadeConfig,
   PatokConfig,
-  SatuanJarakPatok,
   SatuanTampilLapangan,
   SisiPanggungKehormatan,
   StepPreset,
 } from '../db/types'
+import { useState } from 'react'
 import { FieldSurface } from './FieldSurface'
+import { downloadHtmlFile, printHtml } from '../lib/print'
 import {
   Field,
   Input,
@@ -37,9 +39,9 @@ import {
   daftarPatok,
   dariSatuanTampil,
   fieldBox,
-  garisGridUtama,
-  garisSubgrid,
+  garisLapangan,
   hurufPatok,
+  labelT,
   keSatuanTampil,
   namaSatuanLapangan,
   paradeOf,
@@ -47,6 +49,7 @@ import {
   satuanLapanganOf,
   singkatanSatuanLapangan,
   stepYd,
+  tabelMeteran,
   tebalGarisGrid,
   ukurTitik,
   warnaGarisGrid,
@@ -124,15 +127,13 @@ export function FieldConfigEditor({
     urut.length > 9 ? [...urut.slice(0, 4), '…', ...urut.slice(-4)].join(' ') : urut.join(' ')
 
   const gridUtamaOn = (f.gridTampil ?? 1) === 1
-  const subgridOn = (f.subgridTampil ?? (f.subgridYd ? 1 : 0)) === 1
+  const garisLangkahOn = f.subgridTampil === 1
   const hashOn = (f.hashTampil ?? (f.hash !== 'none' ? 1 : 0)) === 1
-  const patokGarisOn = (p.tampilGaris ?? p.tampil) === 1
-  const patokLabelOn = (p.tampilLabel ?? p.tampil) === 1
 
-  // Hitungan otomatis garis dari fieldBox (#9).
-  const daftarGarisUtama = gridUtamaOn && (f.garis ?? 1) !== 0 ? garisGridUtama(f) : []
-  const daftarGarisSub = subgridOn && (f.garis ?? 1) !== 0 ? garisSubgrid(f) : []
-  const presetGridCepat = satuan === 'langkah' ? [2, 4, 8, 16] : [1, 2, 5, 10]
+  // v2.9 — satu grid: hitung garis utama (patok / garis yard) dan garis bantu langkah.
+  const gridSemua = garisLapangan({ ...f, subgridTampil: 0 })
+  const jmlGarisUtama = gridSemua.x.length + gridSemua.y.length
+  const meteran = tabelMeteran(f)
 
   // Geometri SVG pratinjau langsung (identik dengan konvensi DrillEditor).
   const VW = Math.max(2, f.lengthYd + f.endZoneYd * 2)
@@ -155,13 +156,24 @@ export function FieldConfigEditor({
   const warnaG = warnaGarisGrid(f)
   const langkahYd = stepYd(f)
   const langkahCm = Math.round(langkahYd * YD_TO_M * 1000) / 10
-  const satuanJarakPatok: SatuanJarakPatok = p.satuanJarak ?? 'langkah'
-  const ketJarakPatok =
-    satuanJarakPatok === 'yard'
-      ? 'dalam yard fisik'
-      : satuanJarakPatok === 'meter'
-        ? 'dalam meter fisik'
-        : 'dalam langkah'
+  const ketJarakPatok = `dalam langkah (1 lk = ${langkahCm} cm)`
+  const meterDari = (langkah: number) => (Math.round(langkah * langkahYd * YD_TO_M * 100) / 100).toFixed(2).replace('.', ',')
+  /** Ringkasan jarak garis untuk keterangan editor. */
+  const ketGaris =
+    p.aktif === 1
+      ? `Garis = patok: huruf tiap ${p.jarakHuruf} lk (${meterDari(p.jarakHuruf)} m), # tiap ${p.jarakHash} lk (${meterDari(p.jarakHash)} m), ${labelT(p, 0)}, ${labelT(p, 1)}… tiap ${p.jarakT} lk (${meterDari(p.jarakT)} m)`
+      : modeParade
+        ? 'Garis tiap 5 m dari titik tengah koridor'
+        : `Garis yard tiap 5 yard dari garis 50 (${Math.round((5 / langkahYd) * 100) / 100} lk)`
+
+  const [pesanCetak, setPesanCetak] = useState('')
+  async function cetakMeteran(unduh: boolean) {
+    if (!meteran) return
+    const { buatLembarMeteranHtml } = await import('../lib/meteranCetak')
+    const html = buatLembarMeteranHtml({ tabel: meteran, pola: contohPola, langkah: STEP_LABEL[f.step] })
+    if (unduh) downloadHtmlFile(html, 'lembar-meteran-patok.html')
+    else setPesanCetak(printHtml(html) ? '' : 'Jendela cetak diblokir — pakai Unduh')
+  }
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -181,8 +193,8 @@ export function FieldConfigEditor({
             data-testid="info-jumlah-garis-grid"
             className="rounded bg-slate-900 px-2 py-0.5 font-mono text-[10px] text-slate-300"
           >
-            {daftarGarisUtama.length} garis grid
-            {subgridOn ? ` · ${daftarGarisSub.length} subgrid` : ''} ·{' '}
+            {jmlGarisUtama} garis
+            {garisLangkahOn ? ' + bantu tiap langkah' : ''} ·{' '}
             {modeParade ? `Parade VIP ${prd.panjangPanggungM} m` : p.aktif === 1 ? `Patok ${jmlHuruf}×${jmlT}` : 'Tanpa patok'}
           </span>
         </div>
@@ -295,124 +307,27 @@ export function FieldConfigEditor({
         />
       </Field>
 
-      {/* Grid utama & subgrid kustom — dihitung otomatis dari fieldBox, terpisah dari patok */}
-      <Field
-        label={`Grid utama (${nSatuan})`}
-        hint={`Dihitung otomatis dari fieldBox (${daftarGarisUtama.length} garis)`}
-      >
-        <div className="space-y-1.5">
-          <div className="flex gap-2">
-            <Select
-              data-testid="pilih-grid-tampil"
-              value={gridUtamaOn ? 1 : 0}
-              onChange={(e) => patch({ gridTampil: Number(e.target.value) })}
-            >
-              <option value={1}>Tampilkan</option>
-              <option value={0}>Sembunyikan</option>
-            </Select>
-            <Input
-              data-testid="kolom-grid-jarak"
-              type="number"
-              step="0.25"
-              min={0.25}
-              disabled={!gridUtamaOn}
-              value={keTampil(f.gridYd)}
-              onChange={(e) => {
-                const jarakYd = Math.max(
-                  0.25,
-                  dariTampil(angkaAman(e.target.value, keTampil(f.gridYd), 0.25)),
-                )
-                patch({ gridYd: jarakYd })
-              }}
-            />
-          </div>
-          {gridUtamaOn && (
-            <div className="flex flex-wrap gap-1">
-              {presetGridCepat.map((n) => {
-                const targetYd = dariTampil(n)
-                const aktif = Math.abs(f.gridYd - targetYd) < 0.02
-                return (
-                  <button
-                    key={n}
-                    type="button"
-                    data-testid={`preset-grid-${n}`}
-                    onClick={() => patch({ gridYd: targetYd })}
-                    className={`rounded border px-1.5 py-0.5 text-[10px] transition ${
-                      aktif
-                        ? 'border-sky-500 bg-sky-500/20 text-sky-200'
-                        : 'border-slate-700/80 bg-slate-900/60 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    Tiap {n} {singkatan}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
+      {/* v2.9 — satu grid lapangan: garisnya = patok (atau garis yard), tidak ada jarak grid terpisah */}
+      <Field label="Garis lapangan" hint={ketGaris}>
+        <Select
+          data-testid="pilih-grid-tampil"
+          value={gridUtamaOn ? 1 : 0}
+          onChange={(e) => patch({ gridTampil: Number(e.target.value) })}
+        >
+          <option value={1}>Tampilkan</option>
+          <option value={0}>Sembunyikan</option>
+        </Select>
       </Field>
 
-      <Field
-        label={`Subgrid (${nSatuan})`}
-        hint="Garis bantu tipis di antara garis grid utama"
-      >
-        <div className="space-y-1.5">
-          <div className="flex gap-2">
-            <Select
-              data-testid="pilih-subgrid-tampil"
-              value={subgridOn ? 1 : 0}
-              onChange={(e) => {
-                const nyala = Number(e.target.value)
-                const bawaanSub = Math.max(0.25, f.gridYd / 2)
-                patch({
-                  subgridTampil: nyala,
-                  subgridYd: nyala ? (f.subgridYd && f.subgridYd < f.gridYd ? f.subgridYd : bawaanSub) : f.subgridYd,
-                })
-              }}
-            >
-              <option value={0}>Tanpa subgrid</option>
-              <option value={1}>Tampilkan</option>
-            </Select>
-            <Input
-              data-testid="kolom-subgrid-jarak"
-              type="number"
-              step="0.25"
-              min={0.1}
-              disabled={!subgridOn}
-              value={keTampil(f.subgridYd ?? Math.max(0.25, f.gridYd / 2))}
-              onChange={(e) => {
-                const nilaiAsal = keTampil(f.subgridYd ?? Math.max(0.25, f.gridYd / 2))
-                const mentahYd = dariTampil(angkaAman(e.target.value, nilaiAsal, 0.1))
-                const amanYd = Math.min(Math.max(0.1, mentahYd), Math.max(0.15, f.gridYd - 0.05))
-                patch({ subgridYd: amanYd, subgridTampil: 1 })
-              }}
-            />
-          </div>
-          {subgridOn && (
-            <div className="flex flex-wrap gap-1">
-              {[
-                { label: '½ grid utama', nilaiYd: Math.max(0.1, f.gridYd / 2) },
-                { label: '¼ grid utama', nilaiYd: Math.max(0.1, f.gridYd / 4) },
-              ].map((opsi) => {
-                const aktif = Math.abs((f.subgridYd ?? 0) - opsi.nilaiYd) < 0.02
-                return (
-                  <button
-                    key={opsi.label}
-                    type="button"
-                    onClick={() => patch({ subgridYd: opsi.nilaiYd, subgridTampil: 1 })}
-                    className={`rounded border px-1.5 py-0.5 text-[10px] transition ${
-                      aktif
-                        ? 'border-sky-500 bg-sky-500/20 text-sky-200'
-                        : 'border-slate-700/80 bg-slate-900/60 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {opsi.label} ({keTampil(opsi.nilaiYd)} {singkatan})
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
+      <Field label="Garis bantu tiap langkah" hint="Garis tipis tiap 1 langkah, dihitung dari titik nol yang sama dengan patok">
+        <Select
+          data-testid="pilih-garis-langkah"
+          value={garisLangkahOn ? 1 : 0}
+          onChange={(e) => patch({ subgridTampil: Number(e.target.value) })}
+        >
+          <option value={0}>Tanpa garis bantu</option>
+          <option value={1}>Tampilkan</option>
+        </Select>
       </Field>
 
       <Field label="Warna garis grid" hint="Hex murni — aman cetak & berkas portabel">
@@ -498,10 +413,10 @@ export function FieldConfigEditor({
         </Field>
       )}
       <div className="sm:col-span-2 rounded-md border border-amber-700/30 bg-amber-950/20 p-2 text-[11px] leading-relaxed text-amber-200/80">
-        <b>Catatan yard ↔ meter ↔ langkah:</b> 8-to-5 standar = <b>8 langkah per 5 yard</b> (22,5″ ≈ 0,5715 m per langkah, total 4,572 m). Grid <b>5 meter</b> = <b>5,468 yard</b> — jarak fisik berbeda. Mengganti satuan tampilan <b>tidak</b> mengubah panjang langkah atau memaksa snap; grid & patok dihitung terpisah dari garis tengah (<code className="font-mono">fieldBox</code>).
+        <b>Satu grid:</b> garis lapangan selalu jatuh di patok (atau garis yard tiap 5 yard bila tanpa patok), dihitung dalam <b>langkah</b> dari A dan T0. Pada 8-to-5: 4 langkah = <b>2,29 m</b>, 8 langkah = 5 yard = <b>4,57 m</b>. Satuan yard/meter/langkah hanya mengubah angka ukuran lapangan — <b>tidak</b> menggeser garis.
       </div>
 
-      <Field label="Label koordinat">
+      <Field label="Label garis" hint="A B C · T0 T1 (patok) atau 50 45 40 (football)">
         <Select value={f.showLabels} onChange={(e) => patch({ showLabels: Number(e.target.value) })}>
           <option value={1}>Tampilkan</option>
           <option value={0}>Sembunyikan</option>
@@ -560,12 +475,12 @@ export function FieldConfigEditor({
         <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
           {p.aktif === 1 ? (
             <>
-              Patok huruf <b>A → # → B → # → C …</b> dan patok angka <b>T1 → T2 → T3 …</b>. Posisi pemain
-              dibaca gabungan keduanya, misalnya <b>A6</b> (patok A, patok T6) atau <b>B#8</b>. Grid <b>tidak</b> dipotong oleh batas patok.
+              Patok huruf <b>A → # → B → # → C …</b> dan patok angka <b>{labelT(p, 0)} → {labelT(p, 1)} → {labelT(p, 2)} …</b> ({labelT(p, 0)} = tepi depan, sejajar deretan patok huruf). Posisi pemain
+              dibaca gabungan keduanya, misalnya <b>A6</b> (patok A, patok T6) atau <b>B#8</b>. Garis lapangan <b>adalah</b> garis patok.
             </>
           ) : (
             <>
-              Mode <b>Tanpa patok</b> aktif — cocok untuk lapangan indoor/GOR kecil atau lapangan standar tanpa penanda huruf. Hanya garis grid &amp; tepi yang digambar; contoh titik tengah: <b className="text-slate-300">{contohTengah}</b>.
+              Mode <b>Tanpa patok</b> aktif — cocok untuk lapangan indoor/GOR kecil atau lapangan football. Garis yard tiap 5 yard dari garis 50 &amp; tepi yang digambar; contoh titik tengah: <b className="text-slate-300">{contohTengah}</b>.
             </>
           )}
         </p>
@@ -580,50 +495,6 @@ export function FieldConfigEditor({
                 <option value="x">Membujur (kiri ↔ kanan)</option>
               </Select>
             </Field>
-            <Field
-              label="Satuan jarak patok"
-              hint="langkah = ikut ukuran langkah; yard/meter = ukuran pita fisik"
-            >
-              <Select
-                data-testid="pilih-satuan-jarak-patok"
-                value={satuanJarakPatok}
-                onChange={(e) =>
-                  gantiPatok({ satuanJarak: e.target.value as SatuanJarakPatok })
-                }
-              >
-                <option value="langkah">Langkah (8 per 5 yard pada 8-to-5)</option>
-                <option value="yard">Yard fisik (ikuti grid yard)</option>
-                <option value="meter">Meter fisik (ikuti pita meteran)</option>
-              </Select>
-            </Field>
-            <Field label="Garis patok">
-              <Select
-                value={patokGarisOn ? 1 : 0}
-                onChange={(e) =>
-                  gantiPatok({
-                    tampilGaris: Number(e.target.value),
-                    tampil: Number(e.target.value) || (p.tampilLabel ?? p.tampil) ? 1 : 0,
-                  })
-                }
-              >
-                <option value={1}>Tampilkan garis</option>
-                <option value={0}>Sembunyikan garis</option>
-              </Select>
-            </Field>
-            <Field label="Label patok">
-              <Select
-                value={patokLabelOn ? 1 : 0}
-                onChange={(e) =>
-                  gantiPatok({
-                    tampilLabel: Number(e.target.value),
-                    tampil: Number(e.target.value) || (p.tampilGaris ?? p.tampil) ? 1 : 0,
-                  })
-                }
-              >
-                <option value={1}>Tampilkan label</option>
-                <option value={0}>Sembunyikan label</option>
-              </Select>
-            </Field>
             <Field label="Pola patok huruf">
               <Select
                 value={p.dariTengah}
@@ -633,10 +504,10 @@ export function FieldConfigEditor({
                 <option value={0}>A di tepi, lurus ke seberang</option>
               </Select>
             </Field>
-            <Field label="Tulisan patok angka">
+            <Field label="Tulisan patok angka" hint="Dimulai dari 0 di tepi depan">
               <Select value={p.awalanT} onChange={(e) => gantiPatok({ awalanT: Number(e.target.value) })}>
-                <option value={1}>T1, T2, T3, …</option>
-                <option value={0}>1, 2, 3, …</option>
+                <option value={1}>T0, T1, T2, …</option>
+                <option value={0}>0, 1, 2, …</option>
               </Select>
             </Field>
             <Field label="Patok di dua sisi" hint="A di tengah, jadi B ada kiri & kanan">
@@ -672,7 +543,7 @@ export function FieldConfigEditor({
                 }
               />
             </Field>
-            <Field label="Jarak antar patok T" hint={`${ketJarakPatok} — mis. T1 ke T2`}>
+            <Field label="Jarak antar patok T" hint={`${ketJarakPatok} — mis. ${labelT(p, 0)} ke ${labelT(p, 1)}`}>
               <Input
                 data-testid="kolom-patok-t"
                 type="number"
@@ -704,12 +575,12 @@ export function FieldConfigEditor({
                 </Select>
               </div>
             </Field>
-            <Field label="Batas T" hint="26 = T1..T26; kosong = otomatis">
+            <Field label="Batas T" hint={`26 = ${labelT(p, 0)}..${labelT(p, 26)}; kosong = otomatis`}>
               <Input
                 data-testid="kolom-batas-t"
                 type="number"
                 step="1"
-                min="1"
+                min="0"
                 placeholder="otomatis"
                 value={p.maksT ?? ''}
                 onChange={(e) => {
@@ -720,7 +591,7 @@ export function FieldConfigEditor({
                   }
                   const n = Number(teks)
                   if (Number.isFinite(n)) {
-                    gantiPatok({ maksT: Math.max(1, Math.floor(n)) })
+                    gantiPatok({ maksT: Math.max(0, Math.floor(n)) })
                   }
                 }}
               />
@@ -741,6 +612,49 @@ export function FieldConfigEditor({
                 </span>
               </p>
             </div>
+            {meteran && (
+              <div
+                data-testid="lembar-meteran"
+                className="rounded-md border border-emerald-700/40 bg-emerald-950/20 p-2.5 sm:col-span-2"
+              >
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-emerald-200">Lembar meteran — tanda di pita meteran</span>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      data-testid="cetak-meteran"
+                      onClick={() => void cetakMeteran(false)}
+                      className="rounded border border-emerald-600/60 bg-emerald-600/20 px-2 py-0.5 text-[11px] font-medium text-emerald-100 hover:bg-emerald-600/30"
+                    >
+                      Cetak A4
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="unduh-meteran"
+                      onClick={() => void cetakMeteran(true)}
+                      className="rounded border border-slate-600 bg-slate-900/70 px-2 py-0.5 text-[11px] font-medium text-slate-200 hover:bg-slate-800"
+                    >
+                      Unduh
+                    </button>
+                  </div>
+                </div>
+                {pesanCetak && <p className="mb-1 text-[11px] text-amber-300">{pesanCetak}</p>}
+                <p data-testid="meteran-huruf" className="font-mono text-[11px] leading-relaxed text-slate-300">
+                  {meteran.huruf
+                    .slice(0, 9)
+                    .map((b) => `${b.label} ${b.meter.toFixed(2).replace('.', ',')}`)
+                    .join(' · ')}
+                  {meteran.huruf.length > 9 ? ' · …' : ''} m dari A{meteran.duaSisi ? ' (sama ke dua sisi)' : ''}
+                </p>
+                <p data-testid="meteran-t" className="font-mono text-[11px] leading-relaxed text-slate-300">
+                  {meteran.t
+                    .slice(0, 7)
+                    .map((b) => `${b.label} ${b.meter.toFixed(2).replace('.', ',')}`)
+                    .join(' · ')}
+                  {meteran.t.length > 7 ? ' · …' : ''} m dari tepi depan
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -781,7 +695,6 @@ export function FieldConfigEditor({
                     widthYd: lebarM * M_TO_YD,
                     lengthYd: (lebarM === 6 ? 50 : lebarM === 8 ? 60 : 75) * M_TO_YD,
                     endZoneYd: 0,
-                    gridYd: 5 * M_TO_YD,
                     hash: 'none',
                     showLabels: 0,
                     satuan: 'm',

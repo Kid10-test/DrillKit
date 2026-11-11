@@ -9,7 +9,7 @@
  *      koordinat memakai garis yard (mis. "S2 · YL40 · FH +2.75");
  *   2. saklar "Pakai sistem patok" di ⚙ benar-benar tersimpan (basis data);
  *   3. patok menyala: keterangan A/−/+ dan C′ tercetak; contoh dari
- *      IDE-PENGEMBANGAN tepat: Gita `C' · T5 +2.75` → `B' +2.25 · T6 +0.75`, `↖`;
+ *      IDE-PENGEMBANGAN (v2.9: T mulai T0, jadi T5→T4): Gita `C' · T4 +2.75` → `B' +2.25 · T5 +0.75`, `↖`;
  *   4. koma atas (′) menandai sisi S2 — DICOCOKKAN SILANG dengan sisi S1/S2
  *      pada koordinat garis yard untuk pemain & set yang sama. Dua sistem
  *      koordinat yang dihitung terpisah harus sepakat di sisi mana pemain berdiri;
@@ -81,11 +81,11 @@ await jalankan('DD10 — kompas, panah & koordinat buku saku', async (t) => {
 
   const gita = kartuMilik(patok, 'Gita Permata')
   const gp = gerakPertama(gita)
-  sama("3: Gita Set 1 — \"C' · T5 +2.75\" (contoh IDE-PENGEMBANGAN)", gp.koordinat, "C' · T5 +2.75")
+  sama("3: Gita Set 1 — \"C' · T4 +2.75\" (contoh IDE-PENGEMBANGAN)", gp.koordinat, "C' · T4 +2.75")
   sama(
-    "3: Gita Set 2 — \"B' +2.25 · T6 +0.75\"",
+    "3: Gita Set 2 — \"B' +2.25 · T5 +0.75\"",
     gita?.baris[1]?.[gita.kepala.indexOf('Koordinat')]?.teks,
-    "B' +2.25 · T6 +0.75",
+    "B' +2.25 · T5 +0.75",
   )
   sama('3: Gita — satu panah, ↖', gp.panah, ['↖'])
   await t.simpanGambar('dd9-patok.png')
@@ -137,7 +137,7 @@ await jalankan('DD10 — kompas, panah & koordinat buku saku', async (t) => {
     polos[0].kepala.includes('→ langkah') && polos[0].kepala.length === patok[0].kepala.length,
     polos[0].kepala.join(' | '),
   )
-  sama('6: koordinat tidak terpengaruh', koordinat(polos, 0).get('Gita Permata'), "C' · T5 +2.75")
+  sama('6: koordinat tidak terpengaruh', koordinat(polos, 0).get('Gita Permata'), "C' · T4 +2.75")
   await t.tutupPratinjau()
   sama(`6: centang "${ARAH}" dinyalakan kembali`, await t.centang(ARAH, true), true)
   await t.tutupSemua()

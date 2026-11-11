@@ -341,6 +341,14 @@ try {
   await wait(300)
   await klik('[data-testid="absen-mB-hadir"]')
   await wait(300)
+  // v2.9 — tunggu kondisi nyata di basis data (bukan jeda tetap): kedua catatan s_w11 sudah terhapus
+  for (let i = 0; i < 40; i++) {
+    const sisa = (await semua('attendance')).filter(
+      (r) => r.sessionId === 's_w11' && (r.memberId === 'mA' || r.memberId === 'mB') && r.status,
+    )
+    if (sisa.length === 0) break
+    await wait(200)
+  }
 
   /* ============================== 4. Syarat pelantikan ============================== */
   console.log('\n— Syarat pelantikan —')

@@ -231,7 +231,6 @@ export const DEFAULT_FIELD = {
   lengthYd: 100,
   endZoneYd: 10,
   hash: 'ncaa' as const,
-  gridYd: 5,
   step: '8to5' as const,
   customStepYd: 0.625,
   showLabels: 1,
