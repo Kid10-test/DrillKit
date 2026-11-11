@@ -244,9 +244,15 @@ try {
   // Latsar bukan kelompok roster di tim ini → keluarkan; tambah Alumni.
   const iLatsar = kel.indexOf('#Latsar')
   await klik(`[data-testid="kelompok-hapus-${iLatsar}"]`)
+  // Tunggu kondisi nyata, bukan jeda tetap (runner CI lambat): Latsar hilang dari chip,
+  // tombol tambah aktif setelah input terisi, lalu Alumni tersimpan.
+  const chipKelompok = () => [...document.querySelectorAll('[data-testid="kelompok-roster"] > span')].map((x) => (x.textContent ?? '').replace(/[‹›×]/g, '').trim())
+  await p.waitForFunction(`!(${chipKelompok})().includes('#Latsar')`, { timeout: 10000 })
   await isi('[data-testid="kelompok-baru"]', 'Alumni')
+  await p.waitForFunction(() => !document.querySelector('[data-testid="kelompok-tambah"]')?.disabled, { timeout: 10000 })
   await klik('[data-testid="kelompok-tambah"]')
-  await wait(500)
+  await p.waitForFunction(`(${chipKelompok})().includes('#Alumni')`, { timeout: 10000 }).catch(() => {})
+  await wait(200)
   cek('kelompok tersimpan di pengaturan tim', JSON.stringify((await tim()).kelompokRoster) === '["CAB 42","Returner 2027","Alumni"]', JSON.stringify((await tim()).kelompokRoster))
   const total = await p.$$eval('[data-testid="rekap-total"] td', (xs) => xs.map((x) => x.textContent?.trim()))
   // Kolom: Total | CAB 42 | Returner 2027 | Alumni | Lainnya | Total aktif
