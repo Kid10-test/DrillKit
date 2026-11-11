@@ -24,16 +24,12 @@ import {
   HASH_OFFSET_YD,
   M_TO_YD,
   apakahModeParade,
-  daftarPatok,
   facingDeg,
-  garisGridUtama,
-  garisSubgrid,
+  garisLapangan,
   gridUtamaTampil,
   hashGarisTampil,
   paradeOf,
-  patokGarisTampil,
   patokOf,
-  subgridTampil,
   warnaGarisGrid,
   warnaLapangan,
 } from './field'
@@ -1076,44 +1072,35 @@ function gambarPermukaanLapanganPerspektif(
   ctx.save()
   ctx.strokeStyle = garisHex
 
-  // Subgrid halus
-  if (
-    subgridTampil(field) &&
-    field.subgridYd &&
-    field.subgridYd > 0 &&
-    field.subgridYd < field.gridYd
-  ) {
-    ctx.globalAlpha = 0.14
-    ctx.lineWidth = 0.8
-    for (const gx of garisSubgrid(field)) {
-      // `garisGridUtama`/`garisSubgrid` sudah mengembalikan koordinat internal (bukan SVG).
-      const xInt = gx
-      garis3D(ctx, kamera, xInt, -halfW, 0, xInt, halfW, 0)
+  // v2.9 — satu grid lapangan (patok atau garis yard) + garis bantu tiap langkah.
+  const grid = garisLapangan(field)
+  const tampilUtama = gridUtamaTampil(field)
+  for (const g of grid.x) {
+    if (g.jenis === 'langkah') {
+      ctx.globalAlpha = 0.14
+      ctx.lineWidth = 0.8
+    } else if (!tampilUtama) {
+      continue
+    } else if (g.jenis === 'tengah') {
+      ctx.globalAlpha = 0.24
+      ctx.lineWidth = 0.9
+    } else {
+      ctx.globalAlpha = g.tengah ? 0.65 : 0.34
+      ctx.lineWidth = g.tengah ? 1.8 : 1.05
     }
+    garis3D(ctx, kamera, g.pos, -halfW, 0, g.pos, halfW, 0)
   }
-
-  // Garis yard / grid utama
-  if (gridUtamaTampil(field)) {
-    for (const gx of garisGridUtama(field)) {
-      // `garisGridUtama`/`garisSubgrid` sudah mengembalikan koordinat internal (bukan SVG).
-      const xInt = gx
-      const diTengah50 = Math.abs(xInt) < 0.05
-      ctx.globalAlpha = diTengah50 ? 0.65 : 0.34
-      ctx.lineWidth = diTengah50 ? 1.8 : 1.05
-      garis3D(ctx, kamera, xInt, -halfW, 0, xInt, halfW, 0)
+  for (const g of grid.y) {
+    if (g.jenis === 'langkah') {
+      ctx.globalAlpha = 0.14
+      ctx.lineWidth = 0.8
+    } else if (!tampilUtama) {
+      continue
+    } else {
+      ctx.globalAlpha = g.jenis === 'tengah' ? 0.24 : 0.34
+      ctx.lineWidth = g.jenis === 'tengah' ? 0.9 : 1.05
     }
-  }
-
-  // Garis patok Indonesia bila diaktifkan pada lapangan ini
-  if (patokAktif && patokGarisTampil(pCfg)) {
-    ctx.globalAlpha = 0.28
-    ctx.lineWidth = 0.9
-    for (const px of daftarPatok(field, 'x')) {
-      garis3D(ctx, kamera, px.pos, -halfW, 0, px.pos, halfW, 0)
-    }
-    for (const py of daftarPatok(field, 'y')) {
-      garis3D(ctx, kamera, -mainHalfL, py.pos, 0, mainHalfL, py.pos, 0)
-    }
+    garis3D(ctx, kamera, -mainHalfL, g.pos, 0, mainHalfL, g.pos, 0)
   }
 
   // Hash marks depan & belakang

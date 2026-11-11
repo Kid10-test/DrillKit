@@ -199,9 +199,29 @@ export function skalaGarisLapangan(f: FieldConfig): number {
   return proporsi * tebalGarisGrid(f)
 }
 
-/** Pengaturan patok lapangan ini — aman untuk `FieldConfig` lama yang belum punya. */
+/**
+ * Pengaturan patok lapangan ini — aman untuk `FieldConfig` lama yang belum punya.
+ *
+ * v2.9 — jarak patok **selalu dalam langkah** (satu grid: garis lapangan =
+ * garis patok). Drill lama yang menyimpan `satuanJarak: 'yard' | 'meter'`
+ * dikonversi ke langkah di sini, sehingga patoknya tetap di tempat yang sama
+ * persis (boleh pecahan langkah) — tidak ada titik atau patok yang bergeser.
+ */
 export function patokOf(f: FieldConfig): PatokConfig {
-  return f.patok ? { ...PATOK_DEFAULT, ...f.patok } : PATOK_DEFAULT
+  if (!f.patok) return PATOK_DEFAULT
+  const p: PatokConfig = { ...PATOK_DEFAULT, ...f.patok }
+  if (p.satuanJarak === 'yard' || p.satuanJarak === 'meter') {
+    const faktor = (p.satuanJarak === 'meter' ? M_TO_YD : 1) / stepYd(f)
+    const bulat = (v: number) => Math.round(v * faktor * 1000) / 1000
+    return {
+      ...p,
+      jarakHuruf: bulat(p.jarakHuruf),
+      jarakHash: bulat(p.jarakHash),
+      jarakT: bulat(p.jarakT),
+      satuanJarak: 'langkah',
+    }
+  }
+  return p
 }
 
 /**
@@ -250,7 +270,6 @@ export const FIELD_PRESETS: {
       widthYd: 53.33,
       lengthYd: 100,
       endZoneYd: 10,
-      gridYd: 5,
       hash: 'ncaa',
       satuan: 'yd',
       patok: { ...PATOK_DEFAULT },
@@ -264,7 +283,6 @@ export const FIELD_PRESETS: {
       widthYd: 53.33,
       lengthYd: 100,
       endZoneYd: 10,
-      gridYd: 5,
       hash: 'nfhs',
       satuan: 'yd',
       patok: { ...PATOK_DEFAULT },
@@ -278,7 +296,6 @@ export const FIELD_PRESETS: {
       widthYd: 53.33,
       lengthYd: 100,
       endZoneYd: 10,
-      gridYd: 5,
       hash: 'nfl',
       satuan: 'yd',
       patok: { ...PATOK_DEFAULT },
@@ -292,7 +309,6 @@ export const FIELD_PRESETS: {
       widthYd: 53.33,
       lengthYd: 100,
       endZoneYd: 10,
-      gridYd: 5,
       hash: 'none',
       satuan: 'yd',
       patok: { ...PATOK_DEFAULT },
@@ -306,7 +322,6 @@ export const FIELD_PRESETS: {
       widthYd: 68 * M_TO_YD,
       lengthYd: 105 * M_TO_YD,
       endZoneYd: 0,
-      gridYd: 5 * M_TO_YD,
       hash: 'none',
       satuan: 'm',
       patok: { ...PATOK_DEFAULT, aktif: 1 },
@@ -320,7 +335,6 @@ export const FIELD_PRESETS: {
       widthYd: 20 * M_TO_YD,
       lengthYd: 40 * M_TO_YD,
       endZoneYd: 0,
-      gridYd: 5 * M_TO_YD,
       hash: 'none',
       satuan: 'm',
       patok: { ...PATOK_DEFAULT, aktif: 1 },
@@ -329,12 +343,11 @@ export const FIELD_PRESETS: {
   {
     id: 'indoor-polos',
     label: 'Indoor tanpa patok',
-    hint: '40 × 20 m · grid tiap 2 m tanpa sistem patok — untuk aula/GOR kecil',
+    hint: '40 × 20 m · garis tiap 8 langkah tanpa sistem patok — untuk aula/GOR kecil',
     config: {
       widthYd: 20 * M_TO_YD,
       lengthYd: 40 * M_TO_YD,
       endZoneYd: 0,
-      gridYd: 2 * M_TO_YD,
       hash: 'none',
       showLabels: 0,
       satuan: 'm',
@@ -349,7 +362,6 @@ export const FIELD_PRESETS: {
       widthYd: 6 * M_TO_YD,
       lengthYd: 50 * M_TO_YD,
       endZoneYd: 0,
-      gridYd: 5 * M_TO_YD,
       hash: 'none',
       showLabels: 0,
       satuan: 'm',
@@ -371,7 +383,6 @@ export const FIELD_PRESETS: {
       widthYd: 8 * M_TO_YD,
       lengthYd: 60 * M_TO_YD,
       endZoneYd: 0,
-      gridYd: 5 * M_TO_YD,
       hash: 'none',
       showLabels: 0,
       satuan: 'm',
@@ -393,7 +404,6 @@ export const FIELD_PRESETS: {
       widthYd: 12 * M_TO_YD,
       lengthYd: 75 * M_TO_YD,
       endZoneYd: 0,
-      gridYd: 5 * M_TO_YD,
       hash: 'none',
       showLabels: 0,
       satuan: 'm',
@@ -432,7 +442,6 @@ function kanonPreset(c: Record<string, unknown>): Record<string, unknown> {
     warna: c.warna ?? 'hijau',
     ukuranTitik: c.ukuranTitik ?? 1,
     gridTampil: (c.gridTampil as number | undefined) ?? 1,
-    subgridYd: (c.subgridYd as number | undefined) ?? undefined,
     subgridTampil: (c.subgridTampil as number | undefined) ?? 0,
     hashTampil: !hashVal || hashVal === 'none' ? 0 : ((c.hashTampil as number | undefined) ?? 1),
   }
@@ -628,7 +637,7 @@ export function coordText(x: number, y: number, f: FieldConfig): string {
 /* ========================================================================== */
 /*  DD1 — Sistem patok cara Indonesia                                         */
 /*                                                                            */
-/*  Dua sumbu patok: huruf (A → # → B → # → C …) dan angka (T1 → T2 → T3 …).   */
+/*  Dua sumbu patok: huruf (A → # → B → # → C …) dan angka (T0 → T1 → T2 …).   */
 /*  Posisi dibaca gabungan keduanya, mis. "A6" = patok A, patok T6.            */
 /* ========================================================================== */
 
@@ -648,7 +657,7 @@ export interface PatokRef {
   huruf: string
   /** jarak dari patok itu, dalam langkah (positif = menjauh dari A) */
   hurufOffset: number
-  /** nomor patok T terdekat, mulai dari 1 */
+  /** nomor patok T terdekat, mulai dari 0 (T0 = tepi depan) */
   nomor: number
   /** jarak dari patok T itu, dalam langkah */
   nomorOffset: number
@@ -715,9 +724,9 @@ export function patokRef(x: number, y: number, f: FieldConfig): PatokRef {
   }
   const acuan = pas ?? huruf
 
-  // Sumbu angka — T1, T2, T3, … diambil langsung dari `daftarPatok` seperti
-  // sumbu huruf, supaya mode `satuanJarak` ('langkah' | 'yard' | 'meter') dan
-  // `maksT` selalu selaras antara patok yang digambar dan buku saku.
+  // Sumbu angka — T0, T1, T2, … diambil langsung dari `daftarPatok` seperti
+  // sumbu huruf, supaya jarak dan `maksT` selalu selaras antara patok yang
+  // digambar dan buku saku. T0 = tepi depan.
   const sumbuT: 'x' | 'y' = hurufIsY ? 'x' : 'y'
   const daftarT = daftarPatok(fHitung, sumbuT)
   const uSteps = ((hurufIsY ? x : y) - aMin) / s
@@ -731,9 +740,9 @@ export function patokRef(x: number, y: number, f: FieldConfig): PatokRef {
       idxT = i
     }
   }
-  const nomor = daftarT.length > 0 ? idxT + 1 : Math.max(1, Math.round(uSteps / jt) + 1)
+  const nomor = daftarT.length > 0 ? idxT : Math.max(0, Math.round(uSteps / jt))
   const nomorOffset =
-    daftarT.length > 0 ? uSteps - posStepsT(daftarT[idxT]) : uSteps - (nomor - 1) * jt
+    daftarT.length > 0 ? uSteps - posStepsT(daftarT[idxT]) : uSteps - nomor * jt
 
   /**
    * Tanda jarak diukur **dari A**, bukan dari tepi lapangan:
@@ -818,6 +827,86 @@ export function coordPatok(x: number, y: number, f: FieldConfig): string {
   return `${h} · ${t}`
 }
 
+/** Angka meter gaya Indonesia: `4,57`. */
+function fmtMeter(m: number): string {
+  return (Math.round(m * 100) / 100).toFixed(2).replace('.', ',')
+}
+
+/**
+ * v2.9 — jarak pita meteran dari titik nol grid (`asalGrid`), untuk
+ * inspektor titik: mis. **"5,72 m dari A · 13,72 m dari T0"**.
+ * Patok: dari A (sumbu huruf) dan T0 (tepi depan). Football: dari garis 50 dan
+ * sideline depan. Mode Kirab sudah bermeter di koordinatnya → string kosong.
+ */
+export function teksMeterAcuan(x: number, y: number, f: FieldConfig): string {
+  if (apakahModeParade(f)) return ''
+  const asal = asalGrid(f)
+  const p = patokOf(f)
+  const dx = Math.abs(x - asal.x) * YD_TO_M
+  const dy = Math.abs(y - asal.y) * YD_TO_M
+  if (p.aktif === 1) {
+    const t0 = labelT(p, 0)
+    const [mHuruf, mT] = p.sumbuHuruf === 'y' ? [dy, dx] : [dx, dy]
+    return `${fmtMeter(mHuruf)} m dari A · ${fmtMeter(mT)} m dari ${t0}`
+  }
+  return `${fmtMeter(dx)} m dari garis 50 · ${fmtMeter(dy)} m dari sideline depan`
+}
+
+export interface BarisMeteran {
+  label: string
+  /** jarak dari acuan (A atau T0), dalam langkah */
+  langkah: number
+  /** jarak yang sama dalam meter — angka yang ditandai di pita meteran */
+  meter: number
+}
+
+export interface TabelMeteran {
+  /** patok huruf dari A keluar (satu sisi bila A di tengah — sisi lain sama, diberi koma atas) */
+  huruf: BarisMeteran[]
+  /** T0, T1, … dari tepi depan */
+  t: BarisMeteran[]
+  /** A di tengah → berlaku ke dua sisi */
+  duaSisi: boolean
+  /** panjang 1 langkah (cm) */
+  langkahCm: number
+  /** tanda kecil pita meteran tiap `jarakHash` langkah (mis. tiap 4 langkah) */
+  jarakTandaLangkah: number
+}
+
+/**
+ * v2.9 — tabel tanda pita meteran untuk memasang patok di lapangan:
+ * jarak tiap patok dari A dan dari T0, dalam langkah dan meter.
+ * `null` bila patok tidak aktif.
+ */
+export function tabelMeteran(f: FieldConfig): TabelMeteran | null {
+  const p = patokOf(f)
+  if (p.aktif !== 1) return null
+  const s = stepYd(f)
+  const asal = asalGrid(f)
+  const sumbuT: 'x' | 'y' = p.sumbuHuruf === 'y' ? 'x' : 'y'
+  const asalHuruf = p.sumbuHuruf === 'y' ? asal.y : asal.x
+  const asalT = sumbuT === 'y' ? asal.y : asal.x
+  const baris = (pos: number, a: number, label: string): BarisMeteran => {
+    const yd = Math.abs(pos - a)
+    return { label, langkah: Math.round((yd / s) * 1000) / 1000, meter: Math.round(yd * YD_TO_M * 1000) / 1000 }
+  }
+  const duaSisi = p.dariTengah === 1
+  const huruf = daftarPatok(f, p.sumbuHuruf)
+    .filter((g) => !duaSisi || (g.arah ?? 1) >= 0)
+    .map((g) => baris(g.pos, asalHuruf, g.label))
+    .sort((a, b) => a.langkah - b.langkah)
+  const t = daftarPatok(f, sumbuT)
+    .map((g) => baris(g.pos, asalT, g.label))
+    .sort((a, b) => a.langkah - b.langkah)
+  return {
+    huruf,
+    t,
+    duaSisi,
+    langkahCm: Math.round(s * YD_TO_M * 1000) / 10,
+    jarakTandaLangkah: jarakPatok(p).jhash,
+  }
+}
+
 /**
  * Posisi patok terdekat pada satu sumbu (yard).
  * Dipakai supaya titik pemain bisa **menempel ke patok** saat digeser —
@@ -833,7 +922,7 @@ export function patokTerdekat(f: FieldConfig, sumbu: 'x' | 'y', nilai: number): 
   return dekat
 }
 
-/** Label patok angka: `T1` kalau memakai awalan T, atau cukup `1`. */
+/** Label patok angka: `T0`/`T1`… kalau memakai awalan T, atau cukup `0`/`1`…. */
 export function labelT(p: PatokConfig, nomor: number): string {
   return p.awalanT === 1 ? `T${nomor}` : `${nomor}`
 }
@@ -853,20 +942,16 @@ export interface GarisPatok {
   arah?: 1 | -1 | 0
 }
 
-export function patokGarisTampil(p: PatokConfig): boolean {
-  if (p.tampilGaris !== undefined) return p.tampilGaris === 1
-  return p.tampil === 1
-}
-export function patokLabelTampil(p: PatokConfig): boolean {
-  if (p.tampilLabel !== undefined) return p.tampilLabel === 1
-  return p.tampil === 1
-}
 export function gridUtamaTampil(f: FieldConfig): boolean {
   return (f.gridTampil ?? 1) === 1
 }
-export function subgridTampil(f: FieldConfig): boolean {
-  if (f.subgridTampil !== undefined) return f.subgridTampil === 1
-  return !!f.subgridYd && f.subgridYd > 0
+/**
+ * v2.9 — garis bantu tipis **tiap 1 langkah**, dihitung dari titik nol grid
+ * yang sama dengan patok/garis yard (lihat `asalGrid`). Menggantikan subgrid
+ * lama yang jaraknya bebas dan dihitung dari tepi lapangan.
+ */
+export function garisLangkahTampil(f: FieldConfig): boolean {
+  return f.subgridTampil === 1
 }
 export function hashGarisTampil(f: FieldConfig): boolean {
   if (f.hashTampil !== undefined) return f.hashTampil === 1
@@ -921,46 +1006,137 @@ export function singkatanSatuanLapangan(s?: SatuanTampilLapangan): string {
   return 'yd'
 }
 
+/* ========================================================================== */
+/*  v2.9 — Satu grid lapangan                                                 */
+/*                                                                            */
+/*  Dulu ada dua grid yang tidak saling kenal: "grid utama/subgrid" (jarak    */
+/*  bebas, dihitung dari TEPI lapangan) dan patok (langkah, dari TENGAH).     */
+/*  Di lapangan bola keduanya tidak pernah bertemu (5 m vs 8 langkah =        */
+/*  4,57 m). Sekarang hanya ada satu set garis; label (A B C / 50 45 40)      */
+/*  hanyalah cara menamainya.                                                 */
+/* ========================================================================== */
+
+/** `utama` = huruf / garis yard / T, `tengah` = tanda #, `langkah` = garis bantu 1 langkah. */
+export type JenisGarisLapangan = 'utama' | 'tengah' | 'langkah'
+
+export interface GarisLapangan {
+  /** posisi garis (yard, koordinat internal) */
+  pos: number
+  jenis: JenisGarisLapangan
+  /** label yang ditulis di lapangan, mis. `B'`, `A#`, `T3`, atau `45` */
+  label?: string
+  /** garis tengah lapangan (patok A di tengah / garis 50) — digambar lebih tebal */
+  tengah?: boolean
+}
+
+/** Jarak garis yard football (yard fisik) dan garis meter Mode Kirab. */
+const JARAK_YARD_LINE = 5
+const JARAK_GARIS_PARADE_YD = 5 * M_TO_YD
+
 /**
- * Daftar posisi garis grid utama membujur (yard, sumbu X internal), dihitung
- * otomatis sepanjang area main (`fieldBox` dikurangi end zone).
+ * Titik nol grid pada tiap sumbu (yard internal) — acuan garis, snap
+ * langkah, dan konversi meter. Semua garis jatuh tepat di kelipatan
+ * langkah dari titik ini, jadi snap 1 langkah selalu bertemu patok.
+ *
+ * - Patok: sumbu huruf dari **A** (tengah, atau tepi bila pola "A di tepi");
+ *   sumbu T dari **T0** = tepi depan (sisi penonton).
+ * - Football / tanpa patok: X dari garis 50, Y dari sideline depan.
  */
-export function garisGridUtama(f: FieldConfig): number[] {
-  const step = Number.isFinite(f.gridYd) && f.gridYd > 0 ? f.gridYd : 5
-  const ez = Math.max(0, Number.isFinite(f.endZoneYd) ? f.endZoneYd : 0)
+export function asalGrid(f: FieldConfig): { x: number; y: number } {
   const box = fieldBox(f)
-  const minMain = box.minX + ez
-  const maxMain = box.maxX - ez
+  const p = patokOf(f)
+  if (p.aktif === 1) {
+    const hurufIsY = p.sumbuHuruf === 'y'
+    const hMin = hurufIsY ? box.minY : box.minX
+    const hMax = hurufIsY ? box.maxY : box.maxX
+    const asalHuruf = p.dariTengah === 1 ? hMin + (hMax - hMin) / 2 : hMin
+    const asalT = hurufIsY ? box.minX : box.minY
+    return hurufIsY ? { x: asalT, y: asalHuruf } : { x: asalHuruf, y: asalT }
+  }
+  return { x: 0, y: box.minY }
+}
+
+/** Kelipatan `jarak` dari `asal` di dalam rentang [min, max]. */
+function kelipatan(asal: number, jarak: number, min: number, max: number, maks = 1500): number[] {
+  if (!(jarak > 0)) return []
   const out: number[] = []
-  const maks = 500
-  for (let x = minMain; x <= maxMain + 0.001 && out.length < maks; x += step) {
-    out.push(Math.abs(x) < 1e-9 ? 0 : x)
+  const kMin = Math.ceil((min - asal) / jarak - 1e-9)
+  const kMax = Math.floor((max - asal) / jarak + 1e-9)
+  for (let k = kMin; k <= kMax && out.length < maks; k++) {
+    const v = asal + k * jarak
+    out.push(Math.abs(v) < 1e-9 ? 0 : v)
   }
   return out
 }
 
+function tanpaKomaAtas(label: string): string {
+  return label.endsWith("'") ? label.slice(0, -1) : label
+}
+
 /**
- * Daftar posisi garis subgrid membujur (yard) sepanjang area main yang tidak
- * berimpit dengan garis grid utama.
+ * Semua garis lapangan pada kedua sumbu: `x` = garis membujur (digambar
+ * vertikal), `y` = garis melintang (digambar horizontal).
+ *
+ * - **Patok aktif**: garis = patok itu sendiri (huruf → `utama`, # → `tengah`,
+ *   T → `utama`). Tidak ada grid lain yang bisa meleset darinya.
+ * - **Football**: garis yard tiap 5 yard dari garis 50 (sama dengan 8 langkah
+ *   pada 8-to-5), di antara dua garis gol.
+ * - **Kirab**: garis tiap 5 m dari titik tengah koridor.
+ * - Garis bantu tiap langkah (`garisLangkahTampil`) ditambahkan dari titik nol
+ *   yang sama, tanpa menumpuk garis yang sudah ada.
  */
-export function garisSubgrid(f: FieldConfig): number[] {
-  if (!subgridTampil(f)) return []
-  const utama = Number.isFinite(f.gridYd) && f.gridYd > 0 ? f.gridYd : 5
-  const step = f.subgridYd
-  if (!step || !Number.isFinite(step) || step <= 0 || step >= utama) return []
-  const ez = Math.max(0, Number.isFinite(f.endZoneYd) ? f.endZoneYd : 0)
+export function garisLapangan(f: FieldConfig): { x: GarisLapangan[]; y: GarisLapangan[] } {
   const box = fieldBox(f)
-  const minMain = box.minX + ez
-  const maxMain = box.maxX - ez
-  const out: number[] = []
-  const maks = 1000
-  for (let x = minMain; x <= maxMain + 0.001 && out.length < maks; x += step) {
-    const rasio = x / utama
-    if (Math.abs(rasio - Math.round(rasio)) >= 1e-6) {
-      out.push(Math.abs(x) < 1e-9 ? 0 : x)
+  const p = patokOf(f)
+  let gx: GarisLapangan[] = []
+  let gy: GarisLapangan[] = []
+  if (p.aktif === 1) {
+    const sumbuT: 'x' | 'y' = p.sumbuHuruf === 'y' ? 'x' : 'y'
+    const huruf = daftarPatok(f, p.sumbuHuruf).map(
+      (g): GarisLapangan => ({
+        pos: g.pos,
+        jenis: tanpaKomaAtas(g.label).endsWith('#') ? 'tengah' : 'utama',
+        label: g.label,
+        tengah: g.arah === 0,
+      }),
+    )
+    const t = daftarPatok(f, sumbuT).map((g): GarisLapangan => ({ pos: g.pos, jenis: 'utama', label: g.label }))
+    if (p.sumbuHuruf === 'y') {
+      gy = huruf
+      gx = t
+    } else {
+      gx = huruf
+      gy = t
     }
+  } else {
+    const ez = Math.max(0, Number.isFinite(f.endZoneYd) ? f.endZoneYd : 0)
+    const minMain = box.minX + ez
+    const maxMain = box.maxX - ez
+    const parade = apakahModeParade(f)
+    gx = kelipatan(0, parade ? JARAK_GARIS_PARADE_YD : JARAK_YARD_LINE, minMain, maxMain).map((x) => {
+      const nilai = Math.round(50 - Math.abs(x))
+      return {
+        pos: x,
+        jenis: 'utama' as const,
+        label: !parade && nilai >= 0 ? String(nilai) : undefined,
+        tengah: Math.abs(x) < 1e-6,
+      }
+    })
   }
-  return out
+  if (garisLangkahTampil(f)) {
+    const s = stepYd(f)
+    const asal = asalGrid(f)
+    const tambah = (daftar: GarisLapangan[], a: number, min: number, max: number) => {
+      const ada = daftar.map((g) => g.pos)
+      const bantu = kelipatan(a, s, min, max)
+        .filter((v) => !ada.some((q) => Math.abs(q - v) < 1e-6))
+        .map((v): GarisLapangan => ({ pos: v, jenis: 'langkah' }))
+      return [...daftar, ...bantu]
+    }
+    gx = tambah(gx, asal.x, box.minX, box.maxX)
+    gy = tambah(gy, asal.y, box.minY, box.maxY)
+  }
+  return { x: gx, y: gy }
 }
 
 /**
@@ -973,10 +1149,11 @@ function batasHurufNorm(v?: number): number | undefined {
   if (!Number.isFinite(n) || n < 0) return undefined
   return n
 }
+/** Nomor T terakhir yang dipasang (T0..Tn); undefined = otomatis sampai tepi. */
 function batasTNorm(v?: number): number | undefined {
   if (v === undefined || v === null) return undefined
   const n = Math.floor(Number(v))
-  if (!Number.isFinite(n) || n < 1) return undefined
+  if (!Number.isFinite(n) || n < 0) return undefined
   return n
 }
 
@@ -985,9 +1162,10 @@ function batasTNorm(v?: number): number | undefined {
  * Dipakai untuk menggambar patok di lapangan dan untuk koordinat buku saku.
  *
  * Perubahan fondasi grid/patok:
- * - `maksHuruf` & `maksT` membatasi label tanpa memotong grid.
- * - `satuanJarak='yard'` mengartikan jarak sebagai yard fisik, bukan langkah.
- * - Garis/label patok dapat diatur terpisah via `tampilGaris`/`tampilLabel`.
+ * - `maksHuruf` & `maksT` membatasi jumlah patok.
+ * - v2.9: jarak **selalu dalam langkah** (`patokOf` mengonversi data lama),
+ *   dan patok angka dimulai dari **T0 = tepi depan** (deretan patok huruf),
+ *   lalu T1, T2, … ke belakang.
  */
 export function daftarPatok(f: FieldConfig, sumbu: 'x' | 'y'): GarisPatok[] {
   const p = patokOf(f)
@@ -1000,13 +1178,11 @@ export function daftarPatok(f: FieldConfig, sumbu: 'x' | 'y'): GarisPatok[] {
   const box = fieldBox(f)
   const min = sumbu === 'y' ? box.minY : box.minX
   const max = sumbu === 'y' ? box.maxY : box.maxX
-  // Jarak dalam yard: 'langkah' ikut stepYd(f), 'yard' ukuran yard fisik, 'meter' ukuran meter fisik.
-  const modeJarak = p.satuanJarak ?? 'langkah'
+  // Jarak patok dalam langkah → yard (ikut ukuran langkah tim).
   const { jh: jhMentah, jhash: jhashMentah, jt: jtMentah } = jarakPatok(p)
-  const faktorJarakYd = modeJarak === 'yard' ? 1 : modeJarak === 'meter' ? M_TO_YD : s
-  const jhYd = jhMentah * faktorJarakYd
-  const jhashYd = jhashMentah * faktorJarakYd
-  const jtYd = jtMentah * faktorJarakYd
+  const jhYd = jhMentah * s
+  const jhashYd = jhashMentah * s
+  const jtYd = jtMentah * s
   // untuk batas tepi, hitung dalam satuan yard juga
   const lenYd = max - min
   const batasHuruf = batasHurufNorm(p.maksHuruf)
@@ -1077,12 +1253,11 @@ export function daftarPatok(f: FieldConfig, sumbu: 'x' | 'y'): GarisPatok[] {
       }
     }
   } else {
-    const nMax = Math.floor(lenYd / jtYd)
-    const n =
-      batasT !== undefined ? Math.min(nMax + 1, batasT) : nMax + 1
-    // n adalah jumlah T yang akan digambar (1-based)
-    for (let k = 0; k < n; k++) {
-      out.push({ pos: min + k * jtYd, label: labelT(p, k + 1), sumbu })
+    // T0 di tepi depan (sejajar deretan patok huruf), lalu T1, T2, … ke belakang.
+    const nMax = Math.floor(lenYd / jtYd + 1e-9)
+    const terakhir = batasT !== undefined ? Math.min(nMax, batasT) : nMax
+    for (let k = 0; k <= terakhir; k++) {
+      out.push({ pos: min + k * jtYd, label: labelT(p, k), sumbu })
     }
   }
   return out

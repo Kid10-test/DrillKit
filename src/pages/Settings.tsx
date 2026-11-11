@@ -315,7 +315,6 @@ export default function Settings() {
                       showLabels: 1,
                       gridTampil: 1,
                       subgridTampil: 0,
-                      subgridYd: undefined,
                       warna: 'hijau',
                       parade: undefined,
                       hashTampil: p.config.hash && p.config.hash !== 'none' ? 1 : 0,

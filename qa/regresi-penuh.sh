@@ -232,6 +232,11 @@ bash bangun-logika.sh || exit 1
 # impor CSV jawaban Google Form) sehingga total regresi penuh menjadi 166
 # rangkaian.
 
+# v2.9.0 — menambahkan `satu-grid-patok-e2e` ("Satu Grid Patok": garis
+# lapangan = garis patok, T dimulai T0 di tepi depan, inspektor jarak meteran,
+# snap dari A & T0 + Tempel ke patok, garis bantu tiap langkah) sehingga total
+# regresi penuh menjadi 167 rangkaian.
+
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika grid-patok-logika uji-situs uji-rilis uji-lapangan \
   buka-berkas-logika evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
@@ -242,7 +247,7 @@ bash regresi.sh "$BASE" \
   kunci-otomatis mode-terkunci berbagi-anggota \
   kunci-layar-presenter penanda-sesi evaluasi-anggota \
   backup-lengkap buka-berkas latihan-jadwal pacu-latihan mode-lomba runsheet-lomba \
-  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet inventaris-logistik mode-kirab penilaian-juri administrasi-unit kanvas-parametrik midsets-tags-pointer-palet tabrakan-spasi-silang perspektif-tribun-video buku-saku-generasi-baru perkusi-e2e studio-intonasi-e2e estafet-qr-e2e podium-e2e ranah-sesi-e2e program-latsar-e2e musim-papan-e2e roster-anggota-e2e kehadiran-rasio-e2e \
+  kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet inventaris-logistik mode-kirab penilaian-juri administrasi-unit kanvas-parametrik midsets-tags-pointer-palet tabrakan-spasi-silang perspektif-tribun-video buku-saku-generasi-baru perkusi-e2e studio-intonasi-e2e estafet-qr-e2e podium-e2e ranah-sesi-e2e program-latsar-e2e musim-papan-e2e roster-anggota-e2e kehadiran-rasio-e2e satu-grid-patok-e2e \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \

@@ -7,6 +7,11 @@
  * 3. batas huruf/T (E / T26 simetris, tidak auto-fill melewati batas)
  * 4. jangan samakan yard & meter diam-diam (8-to-5 = 8 langkah per 5 yard, bukan 5 meter)
  *
+ * v2.9 "Satu Grid Patok": garis lapangan = garis patok (tidak ada grid utama /
+ * subgrid berjarak sendiri), patok T dimulai dari T0 di tepi depan, jarak
+ * patok selalu dalam langkah (data lama yard/meter dikonversi), snap & garis
+ * bantu langkah dihitung dari A/T0 (asalGrid), plus tabel Lembar Meteran.
+ *
  * Pakai: node grid-patok-logika.mjs
  */
 import {
@@ -21,8 +26,12 @@ import {
   dariSatuanTampil,
   faktorTampilLapangan,
   fieldBox,
-  garisGridUtama,
-  garisSubgrid,
+  garisLapangan,
+  garisLangkahTampil,
+  asalGrid,
+  labelT,
+  tabelMeteran,
+  teksMeterAcuan,
   keSatuanTampil,
   namaSatuanLapangan,
   patokOf,
@@ -34,9 +43,9 @@ import {
   tebalGarisGrid,
   warnaGarisGrid,
   gridUtamaTampil,
-  subgridTampil,
   hashGarisTampil,
 } from '/tmp/lapangan.mjs'
+import { bulatkanKoordinatSumbu } from '/tmp/bentukFormasi.mjs'
 
 let lulus = 0
 const gagal = []
@@ -55,8 +64,6 @@ const LAP_FOOTBALL = {
   widthYd: 53.33,
   lengthYd: 100,
   endZoneYd: 10,
-  gridYd: 5,
-  subgridYd: undefined,
   gridTampil: 1,
   hash: 'ncaa',
   hashTampil: 1,
@@ -115,11 +122,12 @@ const LAP_FOOTBALL = {
   // T-T jarak
   const daftarY = daftarPatok(f, 'y')
   // T along y when huruf on x
+  const t0 = daftarY.find((g) => g.label === 'T0')
   const t1 = daftarY.find((g) => g.label === 'T1')
-  const t2 = daftarY.find((g) => g.label === 'T2')
+  cek('1c: T0 ada (v2.9 — patok angka mulai dari 0)', !!t0)
+  cek('1c: T0 tepat di tepi depan (sejajar deretan patok huruf)', !!t0 && dekat(t0.pos, -f.widthYd / 2, 1e-9), String(t0?.pos))
   cek('1c: T1 ada', !!t1)
-  cek('1c: T2 ada', !!t2)
-  if (t1 && t2) cek('1c: T2 5 yard dari T1 (8 langkah)', dekat(t2.pos - t1.pos, 5, 1e-6), `${t2.pos - t1.pos}`)
+  if (t0 && t1) cek('1c: T1 5 yard dari T0 (8 langkah)', dekat(t1.pos - t0.pos, 5, 1e-6), `${t1.pos - t0.pos}`)
 }
 
 /* ------------ 2. Ganti tampilan yard ↔ meter tidak geser geometri ------------ */
@@ -139,25 +147,20 @@ const LAP_FOOTBALL = {
   }
   cek('2a: posisi & label patok identik yard↔meter (hanya konversi tampil)', posSama, contoh)
 
-  // yardline grid juga tidak bergeser: gridYd tetap 5 yard internal, bukan 5 meter
-  // bila field satuan m tapi gridYd tetap 5 (yard), grid tetap 5 yard, bukan 5m
-  // Untuk lapangan football, gridYd=5 yard; jika satuan diganti m, grid tetap 5 yard internal
-  // (konversi tampil: 5 yard = 4.572 m, bukan 5 m)
-  const gridYd = fYd.gridYd
-  cek('2b: gridYd internal tetap 5 yard walau satuan m', dekat(fM.gridYd, 5), String(fM.gridYd))
-  // hitung yardLines yang akan digambar FieldSurface: -50..50 step 5 yard
-  const yardLinesYd = []
-  for (let y = -fYd.lengthYd / 2; y <= fYd.lengthYd / 2 + 0.001; y += fYd.gridYd) yardLinesYd.push(y)
-  const yardLinesM = []
-  for (let y = -fM.lengthYd / 2; y <= fM.lengthYd / 2 + 0.001; y += fM.gridYd) yardLinesM.push(y)
-  cek('2b: yardLines grid sama yard vs meter', yardLinesYd.length === yardLinesM.length && yardLinesYd.every((v,i)=>dekat(v, yardLinesM[i])), `${yardLinesYd.length} vs ${yardLinesM.length}`)
+  // v2.9 — garis lapangan juga tidak bergeser saat satuan tampil diganti
+  const gYd = garisLapangan(fYd)
+  const gM = garisLapangan(fM)
+  cek('2b: garisLapangan identik yard vs meter (posisi & label)',
+    gYd.x.length === gM.x.length && gYd.y.length === gM.y.length &&
+    gYd.x.every((l, i) => dekat(l.pos, gM.x[i].pos) && l.label === gM.x[i].label),
+    `${gYd.x.length} vs ${gM.x.length}`)
 
   // Pastikan bukan diam-diam jadi 5 meter: 5 meter = 5.468 yard, berbeda dari 5 yard
   const grid5mYd = 5 * M_TO_YD
   cek('2b: 5 meter fisik = 5.468 yard, berbeda dari 5 yard', !dekat(grid5mYd, 5, 1e-3), `${grid5mYd} vs 5`)
 }
 
-/* -------- 3. Batas E / T26 menghentikan patok/label tapi grid tetap utuh -------- */
+/* -------- 3. Batas E / T26 menghentikan patok — garis lapangan ikut patok -------- */
 {
   const fBatas = {
     ...LAP_FOOTBALL,
@@ -195,18 +198,16 @@ const LAP_FOOTBALL = {
   const adaT27 = daftarT26.some((g) => g.label === 'T27' || g.label === '27')
   cek('3b: T26 ada bila lapangan cukup panjang (batas 26)', adaT26, `T labels: ${daftarT26.slice(0,3).map(g=>g.label).join(',')} ... ${daftarT26.slice(-3).map(g=>g.label).join(',')}`)
   cek('3b: T27 tidak ada (batas 26)', !adaT27)
-  cek('3b: jumlah T = 26 (dibatasi bukan 30)', daftarT26.length === 26, String(daftarT26.length))
-  // pada lapangan football sempit, batas 26 tetap 11 (tidak memaksa di luar tepi)
-  cek('3b: pada football sempit, T tetap 11 walau batas 26 (tidak keluar tepi)', daftarY.length === 11, `${daftarY.length}`)
+  cek('3b: jumlah T = 27 (T0..T26, dibatasi bukan 31)', daftarT26.length === 27 && daftarT26[0].label === 'T0', String(daftarT26.length))
+  // pada lapangan football sempit, batas 26 tetap T0..T10 (tidak memaksa di luar tepi)
+  cek('3b: pada football sempit, T tetap 11 (T0..T10) walau batas 26 (tidak keluar tepi)', daftarY.length === 11 && daftarY.at(-1).label === 'T10', `${daftarY.length}`)
 
-  // Grid tetap utuh: yardLines tidak terpengaruh batas patok
-  const yardLines = []
-  for (let y = -LAP_FOOTBALL.lengthYd / 2; y <= LAP_FOOTBALL.lengthYd / 2 + 0.001; y += LAP_FOOTBALL.gridYd) yardLines.push(y)
-  // 100 yard length /5 = 21 garis (-50..50): -50,-45,...,0,...,45,50 => 21
-  cek('3c: grid tetap 21 garis walau patok dibatasi E/T26', yardLines.length === 21, String(yardLines.length))
-  // juga cek grid utama tetap tampil walau patok dibatasi
-  const fGridOn = gridUtamaTampil(fBatas)
-  cek('3c: grid utama tetap tampil', fGridOn === true)
+  // v2.9 — satu grid: garis lapangan = patok, jadi batas E juga batas garis huruf
+  const gBatas = garisLapangan(fBatas)
+  cek('3c: garis lapangan sumbu huruf = daftar patok (17 garis A..E′ termasuk #)',
+    gBatas.x.length === daftarX.length && gBatas.x.every((l) => daftarX.some((d) => dekat(d.pos, l.pos) && d.label === l.label)),
+    `${gBatas.x.length} vs ${daftarX.length}`)
+  cek('3c: garis lapangan tetap tampil walau patok dibatasi', gridUtamaTampil(fBatas) === true)
   // patok garis/label terpisah: batasi tidak menyembunyikan grid
   const fNoPatokGaris = { ...LAP_FOOTBALL, patok: { ...LAP_FOOTBALL.patok, maksHuruf: 4, maksT: 26, tampilGaris: 0, tampilLabel: 1 } }
   // daftarPatok masih mengembalikan data (karena label masih on)
@@ -241,7 +242,6 @@ const LAP_FOOTBALL = {
     widthYd: 68 * M_TO_YD,
     lengthYd: 105 * M_TO_YD,
     endZoneYd: 0,
-    gridYd: 5 * M_TO_YD, // 5 meter dalam yard
     hash: 'none',
     step: '8to5',
     customStepYd: 0.625,
@@ -252,9 +252,6 @@ const LAP_FOOTBALL = {
   }
   const s = stepYd(fMetric) // 0.625 yard
   cek('4a: step 8-to-5 tetap 0.625 yard di lapangan metrik', dekat(s, 0.625))
-  const gridYd = fMetric.gridYd
-  cek('4a: grid 5 meter = 5.468 yard', dekat(gridYd, 5 * M_TO_YD, 1e-9), String(gridYd))
-  cek('4a: grid 5m (5.468 yd) != 8 langkah (5 yd)', !dekat(gridYd, 8 * s, 1e-6), `${gridYd} vs ${8*s}`)
   // 8 langkah = 5 yard = 4.572 m, bukan 5 m
   const eightStepsMeter = 5 * YD_TO_M
   cek('4a: 8 langkah = 5 yard = 4.572 m (bukan 5 m)', dekat(eightStepsMeter, 4.572, 0.01), String(eightStepsMeter))
@@ -270,7 +267,7 @@ const LAP_FOOTBALL = {
     cek('4b: B/A ada di metrik', false, `${aM?.pos} ${bM?.pos}`)
   }
 
-  // Jika satuanJarak='yard', patok jarak dihitung yard fisik
+  // Data lama satuanJarak='yard' dikonversi ke langkah tanpa menggeser patok
   const fYardMode = {
     ...fMetric,
     patok: { ...fMetric.patok, satuanJarak: 'yard', jarakHuruf: 5, jarakHash: 2.5, jarakT: 5 },
@@ -279,18 +276,20 @@ const LAP_FOOTBALL = {
   const aY = dYard.find((g) => g.label === 'A')
   const bY = dYard.find((g) => g.label === 'B' && g.arah === 1)
   if (aY && bY) {
-    cek('4c: mode yard: B 5 yard dari A (jarak yard, bukan langkah)', dekat(bY.pos - aY.pos, 5, 1e-6), `${bY.pos - aY.pos}`)
+    cek('4c: data lama mode yard: B tetap 5 yard dari A', dekat(bY.pos - aY.pos, 5, 1e-6), `${bY.pos - aY.pos}`)
   }
+  const pYard = patokOf(fYardMode)
+  cek('4c: patokOf mengonversi jarak yard lama ke langkah (5 yd = 8 lk, 2,5 yd = 4 lk)',
+    dekat(pYard.jarakHuruf, 8, 1e-9) && dekat(pYard.jarakHash, 4, 1e-9) && dekat(pYard.jarakT, 8, 1e-9) && (pYard.satuanJarak ?? 'langkah') === 'langkah',
+    JSON.stringify(pYard))
 
-  // Grid & patok terpisah: matikan patok garis tidak hilangkan grid
-  const fTanpaPatokGaris = { ...fMetric, patok: { ...fMetric.patok, tampilGaris: 0, tampilLabel: 1 } }
-  const gridOn = gridUtamaTampil(fTanpaPatokGaris)
-  cek('4d: grid tetap tampil walau garis patok dimatikan', gridOn === true)
-  // subgrid terpisah
-  const fSub = { ...fMetric, subgridYd: 2.5 * M_TO_YD, subgridTampil: 1 }
-  cek('4d: subgrid dapat ditampilkan terpisah dari grid utama', subgridTampil(fSub) === true, String(subgridTampil(fSub)))
-  const fNoSub = { ...fMetric, subgridYd: undefined, subgridTampil: 0 }
-  cek('4d: subgrid mati tidak memengaruhi grid utama', gridUtamaTampil(fNoSub) === true && subgridTampil(fNoSub) === false)
+  // v2.9 — garis bantu tiap langkah: satu tombol, terpisah dari garis lapangan
+  cek('4d: garis lapangan tampil bawaan', gridUtamaTampil(fMetric) === true)
+  cek('4d: garis bantu langkah mati bawaan, nyala bila subgridTampil=1',
+    garisLangkahTampil(fMetric) === false && garisLangkahTampil({ ...fMetric, subgridTampil: 1 }) === true)
+  cek('4d: garis bantu langkah tidak memengaruhi garis lapangan',
+    gridUtamaTampil({ ...fMetric, subgridTampil: 1 }) === true &&
+    garisLapangan({ ...fMetric, subgridTampil: 1 }).x.filter((l) => l.jenis !== 'langkah').length === garisLapangan(fMetric).x.length)
 }
 
 /* ---------------- 5. #9 — Toggle satuan tampil yard / meter / langkah ---------------- */
@@ -333,10 +332,10 @@ const LAP_FOOTBALL = {
   cek('5d: fieldBox identik antara yard dan langkah',
     dekat(bYd.minX, bLk.minX) && dekat(bYd.maxX, bLk.maxX) &&
     dekat(bYd.minY, bLk.minY) && dekat(bYd.maxY, bLk.maxY))
-  const gYd = garisGridUtama(fYd)
-  const gLk = garisGridUtama(fLk)
-  cek('5d: posisi garisGridUtama identik antara yard dan langkah',
-    gYd.length === gLk.length && gYd.every((v, i) => dekat(v, gLk[i])))
+  const gYd = garisLapangan(fYd).x
+  const gLk = garisLapangan(fLk).x
+  cek('5d: posisi garisLapangan identik antara yard dan langkah',
+    gYd.length === gLk.length && gYd.every((v, i) => dekat(v.pos, gLk[i].pos)))
   const pYd = daftarPatok(fYd, 'x')
   const pLk = daftarPatok(fLk, 'x')
   cek('5d: daftarPatok identik antara yard dan langkah',
@@ -345,30 +344,36 @@ const LAP_FOOTBALL = {
 
 /* ---------------- 6. #9 — Garis grid/subgrid otomatis dari fieldBox & palet hex ---------------- */
 {
-  const gFootball = garisGridUtama(LAP_FOOTBALL)
-  cek('6a: garisGridUtama 100 yd tiap 5 yd = 21 garis tepat dari fieldBox',
-    gFootball.length === 21 && gFootball.includes(0) && dekat(gFootball[0], -50) && dekat(gFootball[20], 50),
+  // Tanpa patok: garis yard tiap 5 yard dari garis 50 (−50..50 = 21 garis), label 0..50..0
+  const fTanpaPatok = { ...LAP_FOOTBALL, patok: { ...LAP_FOOTBALL.patok, aktif: 0 } }
+  const gFootball = garisLapangan(fTanpaPatok).x
+  cek('6a: tanpa patok, garis yard 100 yd tiap 5 yd = 21 garis dengan 50 di tengah',
+    gFootball.length === 21 && gFootball.some((l) => dekat(l.pos, 0) && l.label === '50' && l.tengah) && dekat(gFootball[0].pos, -50) && dekat(gFootball[20].pos, 50),
     `len=${gFootball.length}`)
+  cek('6a: dengan patok 8-to-5, garis huruf jatuh tepat di garis yard (A=50, B=45, C=40)',
+    ['A', 'B', 'C'].every((h, i) => garisLapangan(LAP_FOOTBALL).x.some((l) => l.label === h && dekat(l.pos, i * 5))))
 
-  // Lapangan indoor 40x20 m dengan grid kustom 2 m -> 21 garis (-20 m .. 0 .. +20 m), tengah tepat 0
   const fIndoor2m = {
     ...LAP_FOOTBALL,
     widthYd: 20 * M_TO_YD,
     lengthYd: 40 * M_TO_YD,
     endZoneYd: 0,
-    gridYd: 2 * M_TO_YD,
     satuan: 'm',
   }
-  const gIndoor = garisGridUtama(fIndoor2m)
-  cek('6a: lapangan 40 m dengan grid kustom 2 m menghasilkan 21 garis dengan tengah tepat 0',
-    gIndoor.length === 21 && gIndoor.includes(0), `len=${gIndoor.length}, mid=${gIndoor[10]}`)
 
-  // Subgrid 2,5 yd di dalam grid utama 5 yd menghasilkan tepat 20 garis dan tidak menumpuk garis utama
-  const fDenganSub = { ...LAP_FOOTBALL, gridYd: 5, subgridYd: 2.5, subgridTampil: 1 }
-  const gSub = garisSubgrid(fDenganSub)
-  cek('6b: subgrid 2,5 yd di dalam grid 5 yd (100 yd) menghasilkan 20 garis non-duplikat',
-    gSub.length === 20 && gSub.every((s) => !gFootball.some((u) => dekat(u, s, 1e-6))),
-    `len=${gSub.length}`)
+  // Garis bantu tiap 1 langkah dari A/T0, tidak menumpuk garis patok
+  const fDenganBantu = { ...LAP_FOOTBALL, subgridTampil: 1 }
+  const gBantu = garisLapangan(fDenganBantu)
+  const bantuX = gBantu.x.filter((l) => l.jenis === 'langkah')
+  const utamaX = gBantu.x.filter((l) => l.jenis !== 'langkah')
+  const s = stepYd(LAP_FOOTBALL)
+  cek('6b: garis bantu tiap 1 langkah dari A, tidak menumpuk garis patok',
+    bantuX.length > 100 && bantuX.every((b) => dekat(Math.round(b.pos / s) * s, b.pos, 1e-6) && !utamaX.some((u) => dekat(u.pos, b.pos, 1e-6))),
+    `len=${bantuX.length}`)
+  const bantuY = gBantu.y.filter((l) => l.jenis === 'langkah')
+  const t0y = -LAP_FOOTBALL.widthYd / 2
+  cek('6b: garis bantu sumbu T dihitung dari T0 (tepi depan)',
+    bantuY.length > 0 && bantuY.every((b) => dekat(Math.round((b.pos - t0y) / s) * s, b.pos - t0y, 1e-6)))
 
   // Semua warna garis grid wajib hex #rrggbb murni (aman cetak/portabel, nol oklch/rgba)
   const semuaHex = WARNA_GARIS_GRID.length >= 4 && WARNA_GARIS_GRID.every((w) => /^#[0-9a-fA-F]{6}$/.test(w.hex))
@@ -384,7 +389,7 @@ const LAP_FOOTBALL = {
 
 /* ---------------- 7. #9 — Patok meter fisik, keselarasan sumbu T, & Indoor tanpa patok ---------------- */
 {
-  // Mode satuanJarak = 'meter': jarak patok mengikuti meter fisik dan patokRef selaras dengan daftarPatok
+  // Data lama satuanJarak = 'meter' dikonversi ke langkah (dibulatkan 0,001 lk → selisih < 1 mm); patokRef selaras
   const fPatokMeter = {
     ...LAP_FOOTBALL,
     widthYd: 20 * M_TO_YD,
@@ -404,20 +409,24 @@ const LAP_FOOTBALL = {
   const dyM = daftarPatok(fPatokMeter, 'y')
   const aM = dxM.find((g) => g.label === 'A')
   const bM = dxM.find((g) => g.label === 'B' && g.arah === 1)
-  cek('7a: satuanJarak="meter" menempatkan B tepat 4 meter fisik dari A',
-    !!(aM && bM && dekat(bM.pos - aM.pos, 4 * M_TO_YD, 1e-9)), `${bM && aM ? bM.pos - aM.pos : 'null'}`)
-  cek('7a: satuanJarak="meter" menempatkan T2 tepat 5 meter fisik dari T1',
-    dyM.length >= 2 && dekat(dyM[1].pos - dyM[0].pos, 5 * M_TO_YD, 1e-9))
+  cek('7a: data lama satuanJarak="meter" tetap menempatkan B 4 meter fisik dari A',
+    !!(aM && bM && dekat(bM.pos - aM.pos, 4 * M_TO_YD, 0.002)), `${bM && aM ? bM.pos - aM.pos : 'null'}`)
+  cek('7a: data lama satuanJarak="meter" tetap menempatkan T1 5 meter fisik dari T0',
+    dyM.length >= 2 && dyM[0].label === 'T0' && dekat(dyM[1].pos - dyM[0].pos, 5 * M_TO_YD, 0.002))
+  cek('7a: patokOf menyimpan jarak meter lama sebagai langkah',
+    patokOf(fPatokMeter).satuanJarak !== 'meter' && dekat(patokOf(fPatokMeter).jarakHuruf * stepYd(fPatokMeter), 4 * M_TO_YD, 0.002))
 
-  // Keselarasan patokRef & coordPatok di sumbu T pada satuanJarak 'meter' dan 'yard'
-  const refT2Meter = patokRef(bM.pos, dyM[1].pos, fPatokMeter)
-  cek('7b: patokRef tepat di (B, T2) pada mode meter memberi huruf B & nomor 2 offset 0',
-    refT2Meter.huruf === 'B' && refT2Meter.nomor === 2 && dekat(refT2Meter.nomorOffset, 0, 1e-9),
-    JSON.stringify(refT2Meter))
-  cek('7b: coordPatok tepat di (B, T2) pada mode meter menulis singkatan "B2", dan 1 langkah di belakang menulis "B · T2 +1"',
-    coordPatok(bM.pos, dyM[1].pos, fPatokMeter) === 'B2' &&
-    coordPatok(bM.pos, dyM[1].pos + stepYd(fPatokMeter), fPatokMeter) === 'B · T2 +1',
-    coordPatok(bM.pos, dyM[1].pos, fPatokMeter))
+  // Keselarasan patokRef & coordPatok di sumbu T
+  const refT1 = patokRef(bM.pos, dyM[1].pos, fPatokMeter)
+  cek('7b: patokRef tepat di (B, T1) memberi huruf B & nomor 1 offset 0',
+    refT1.huruf === 'B' && refT1.nomor === 1 && dekat(refT1.nomorOffset, 0, 1e-9),
+    JSON.stringify(refT1))
+  cek('7b: patokRef di tepi depan memberi nomor 0 (T0)',
+    patokRef(bM.pos, dyM[0].pos, fPatokMeter).nomor === 0)
+  cek('7b: coordPatok tepat di (B, T1) menulis singkatan "B1", dan 1 langkah di belakang menulis "B · T1 +1"',
+    coordPatok(bM.pos, dyM[1].pos, fPatokMeter) === 'B1' &&
+    coordPatok(bM.pos, dyM[1].pos + stepYd(fPatokMeter), fPatokMeter) === 'B · T1 +1',
+    coordPatok(bM.pos, dyM[1].pos, fPatokMeter) + ' | ' + coordPatok(bM.pos, dyM[1].pos + stepYd(fPatokMeter), fPatokMeter))
 
   // Batas maksT dihormati pula oleh patokRef (tidak pernah menyebut T di luar maksT)
   const fBatasT4 = { ...fPatokMeter, patok: { ...fPatokMeter.patok, maksT: 3 } }
@@ -432,10 +441,50 @@ const LAP_FOOTBALL = {
     const fPolos = { ...LAP_FOOTBALL, showLabels: 0, ...presetPolos.config }
     cek('7d: preset indoor-polos mematikan patok (aktif=0 & daftarPatok kosong)',
       patokOf(fPolos).aktif === 0 && daftarPatok(fPolos, 'x').length === 0 && daftarPatok(fPolos, 'y').length === 0)
-    cek('7d: preset indoor-polos tetap menggambar 21 garis grid tiap 2 m dan dikenali activePreset',
-      garisGridUtama(fPolos).length === 21 && activePreset(fPolos) === 'indoor-polos',
-      `garis=${garisGridUtama(fPolos).length}, preset=${activePreset(fPolos)}`)
+    const gPolos = garisLapangan(fPolos).x
+    cek('7d: preset indoor-polos memakai grid yang sama (garis tiap 5 yard dari tengah) dan dikenali activePreset',
+      gPolos.length === 9 && gPolos.some((l) => dekat(l.pos, 0)) && activePreset(fPolos) === 'indoor-polos',
+      `garis=${gPolos.length}, preset=${activePreset(fPolos)}`)
   }
+}
+
+/* ---------------- 8. v2.9 — asal grid, snap, meteran, label T ---------------- */
+{
+  const f = LAP_FOOTBALL
+  const s = stepYd(f)
+  const a = asalGrid(f)
+  cek('8a: asalGrid dengan patok = (A, T0)', dekat(a.x, 0) && dekat(a.y, -f.widthYd / 2), JSON.stringify(a))
+  // Snap ½ langkah (bawaan) dari titik acak selalu jatuh tepat di patok bila dekat patok
+  const sn = bulatkanKoordinatSumbu(a.x + 8 * s + 0.12, a.y + 16 * s - 0.1, f)
+  cek('8b: snap dari A/T0 — titik dekat B·T2 jatuh tepat "B2"', coordPatok(sn.x, sn.y, f) === 'B2', coordPatok(sn.x, sn.y, f))
+  const sn1 = bulatkanKoordinatSumbu(a.x + 10 * s + 0.1, a.y + 24 * s - 0.05, f, { snapAktif: true, langkahX: 1, langkahY: 1 })
+  cek('8b: snap 1 langkah memberi "B +2 · T3"', coordPatok(sn1.x, sn1.y, f) === 'B +2 · T3', coordPatok(sn1.x, sn1.y, f))
+  const snT = bulatkanKoordinatSumbu(a.x + 10 * s + 0.1, a.y + 24 * s - 0.05, f, { snapAktif: true, langkahX: 1, langkahY: 1, tempelPatok: true })
+  cek('8c: tempelPatok menempel ke patok terdekat (B#, T3)', coordPatok(snT.x, snT.y, f) === 'B#3', coordPatok(snT.x, snT.y, f))
+  // Lapangan yang lebarnya bukan kelipatan langkah: snap tetap dari T0, bukan dari tengah
+  const fGanjil = { ...f, widthYd: 50.3 }
+  const aG = asalGrid(fGanjil)
+  const snG = bulatkanKoordinatSumbu(0.2, aG.y + 7 * s + 0.1, fGanjil, { snapAktif: true, langkahX: 1, langkahY: 1 })
+  cek('8d: lebar ganjil — snap Y tetap kelipatan langkah dari T0',
+    dekat((snG.y - aG.y) / s, 7, 1e-9), String((snG.y - aG.y) / s))
+
+  cek('8e: teksMeterAcuan menulis jarak meter dari A & T0',
+    teksMeterAcuan(a.x + 10 * s, a.y + 24 * s, f) === '5,72 m dari A · 13,72 m dari T0',
+    teksMeterAcuan(a.x + 10 * s, a.y + 24 * s, f))
+  cek('8e: teksMeterAcuan tanpa patok memakai garis 50 & sideline depan',
+    teksMeterAcuan(5, -f.widthYd / 2 + 5, { ...f, patok: { ...f.patok, aktif: 0 } }).includes('dari garis 50'))
+
+  const tm = tabelMeteran(f)
+  cek('8f: tabelMeteran huruf A 0 · A# 2,29 · B 4,57 · C 9,14',
+    !!tm && tm.huruf[0].label === 'A' && dekat(tm.huruf[0].meter, 0) &&
+    dekat(tm.huruf[1].meter, 2.286, 0.001) && tm.huruf[2].label === 'B' && dekat(tm.huruf[2].meter, 4.572, 0.001) &&
+    dekat(tm.huruf.find((b) => b.label === 'C').meter, 9.144, 0.001),
+    tm ? tm.huruf.slice(0, 5).map((b) => `${b.label} ${b.meter}`).join(' · ') : 'null')
+  cek('8f: tabelMeteran T mulai T0 = 0, T1 = 4,57 m; dua sisi saat A di tengah',
+    !!tm && tm.t[0].label === 'T0' && dekat(tm.t[0].meter, 0) && dekat(tm.t[1].meter, 4.572, 0.001) && tm.duaSisi === true)
+  cek('8f: tabelMeteran null bila tanpa patok', tabelMeteran({ ...f, patok: { ...f.patok, aktif: 0 } }) === null)
+  cek('8g: labelT 0-based ("T0", atau "3" bila tanpa awalan)',
+    labelT(patokOf(f), 0) === 'T0' && labelT({ ...patokOf(f), awalanT: 0 }, 3) === '3')
 }
 
 console.log(`\n${lulus} lulus, ${gagal.length} gagal`)

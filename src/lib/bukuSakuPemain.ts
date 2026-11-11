@@ -2,7 +2,7 @@
  * #26 (`v2.2.4`) — Buku Saku Generasi Baru (logika murni, tanpa React/DOM).
  *
  * 1. **`xCounts`** — hitungan tepat saat lintasan pemain melintasi garis yard,
- *    hash, atau patok Indonesia (`A, B#, T1..Tn`), untuk jalur lurus, lengkung,
+ *    hash, atau patok Indonesia (`A, B#, T0..Tn`), untuk jalur lurus, lengkung,
  *    busur, titik singgah `#23`, maupun FTL `#16` (via `jejakJalur.ts`).
  * 2. **Titik tengah** — posisi tepat pada separuh hitungan set.
  * 3. **Dress / guiding** — siapa pemandu pelurusan bagi seorang pemain.

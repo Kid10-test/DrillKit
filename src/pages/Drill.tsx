@@ -106,7 +106,6 @@ export default function DrillPage() {
       widthYd: 8 * M_TO_YD,
       lengthYd: 60 * M_TO_YD,
       endZoneYd: 0,
-      gridYd: 5 * M_TO_YD,
       hash: 'none' as const,
       showLabels: 0,
       satuan: 'm' as const,

@@ -17,6 +17,7 @@ import type {
 import {
   facingDeg as hitungFacingDeg,
   fieldBox,
+  asalGrid,
   patokOf,
   patokTerdekat,
   stepYd,
@@ -35,15 +36,20 @@ export interface OpsiPembulatanSumbu {
   snapAktif: boolean
   langkahX: LangkahBulat
   langkahY: LangkahBulat
-  /** Jika true (bawaan), saat patok aktif & langkah=1 maka menempel ke garis patok. */
-  hormatiPatok?: boolean
+  /**
+   * v2.9 — **Tempel ke patok**: bila patok aktif, titik menempel ke garis patok
+   * terdekat (huruf/#/T) pada sumbu yang dibulatkan. Bawaan `false`: titik
+   * dibulatkan per langkah dari titik nol grid (A & T0), sehingga tetap bisa
+   * diletakkan di antara patok dan otomatis jatuh tepat di patok bila pas.
+   */
+  tempelPatok?: boolean
 }
 
 export const OPSI_PEMBULATAN_BAWAAN: OpsiPembulatanSumbu = {
   snapAktif: true,
   langkahX: 1,
   langkahY: 1,
-  hormatiPatok: true,
+  tempelPatok: false,
 }
 
 /**
@@ -72,26 +78,27 @@ export function bulatkanKoordinatSumbu(
 ): TitikKendaliYd {
   if (!opsi.snapAktif) return { x, y }
   const s = stepYd(field)
-  const pakaiPatok = (opsi.hormatiPatok ?? true) && patokOf(field).aktif === 1
+  const tempel = opsi.tempelPatok === true && patokOf(field).aktif === 1
+  // v2.9 — satu titik nol untuk garis, patok, dan snap (A/garis 50 & T0/sideline depan).
+  const asal = asalGrid(field)
 
   let gx = x
   if (opsi.langkahX > 0) {
-    if (pakaiPatok && opsi.langkahX === 1) {
+    if (tempel) {
       gx = patokTerdekat(field, 'x', x)
     } else {
       const unitX = s * opsi.langkahX
-      gx = Math.round(x / unitX) * unitX
+      gx = asal.x + Math.round((x - asal.x) / unitX) * unitX
     }
   }
 
   let gy = y
   if (opsi.langkahY > 0) {
-    if (pakaiPatok && opsi.langkahY === 1) {
+    if (tempel) {
       gy = patokTerdekat(field, 'y', y)
     } else {
       const unitY = s * opsi.langkahY
-      const setengah = field.widthYd / 2
-      gy = Math.round((y + setengah) / unitY) * unitY - setengah
+      gy = asal.y + Math.round((y - asal.y) / unitY) * unitY
     }
   }
 
@@ -101,11 +108,13 @@ export function bulatkanKoordinatSumbu(
   }
 }
 
+/** ¼ langkah dari titik nol grid (v2.9: sama dengan garis & patok, bukan dari tengah lebar lapangan). */
 function snapToQuarterStep(x: number, y: number, f: FieldConfig): TitikKendaliYd {
   const s = stepYd(f)
+  const asal = asalGrid(f)
   return {
-    x: (Math.round((x / s) * 4) / 4) * s,
-    y: (Math.round((y / s) * 4) / 4) * s,
+    x: asal.x + (Math.round(((x - asal.x) / s) * 4) / 4) * s,
+    y: asal.y + (Math.round(((y - asal.y) / s) * 4) / 4) * s,
   }
 }
 

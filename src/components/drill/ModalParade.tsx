@@ -132,7 +132,6 @@ export default function ModalParade({
       widthYd: lebarM * M_TO_YD,
       lengthYd: panjangSegmenM * M_TO_YD,
       endZoneYd: 0,
-      gridYd: 5 * M_TO_YD,
       hash: 'none',
       showLabels: 0,
       satuan: 'm',
