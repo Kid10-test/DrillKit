@@ -185,6 +185,8 @@ rakit src/lib/ranahSesi.ts               ranahSesi
 rakit src/lib/jadwalCetak.ts             jadwalCetak
 # #36 — Program Latsar (generator berfase) & Pemantau Syarat Pelantikan.
 rakit src/lib/programLatsar.ts           programLatsar
+# v2.8 — kehadiran berbasis rasio + impor CSV jawaban Google Form.
+rakit src/lib/imporGForm.ts             imporGForm
 # #34a — musim TC: H-Minus, gerbang kesiapan mundur, & titik hitung mundur terpadu.
 rakit src/lib/manajemenMusim.ts          manajemenMusim
 # v2.7.1 — roster pergantian musim: impor CSV cocok-nama, aksi massal, rekap roster.

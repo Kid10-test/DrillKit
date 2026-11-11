@@ -13,14 +13,15 @@
  * - rencana: buat / tautkan sesi yang sudah ada / tetap; rencana pelatih & realisasi
  *   tidak ditimpa; mode ganti; tonggak jadi sesi "lainnya"; sesi yang lepas
  * - wajib bawaan = latihan sebelum pelantikan (12), Hakrab tidak
- * - keabsahan izin (sebelum jam mulai), sakit (≤ 24 jam), tanpa jam lapor, putusan pelatih
- * - syarat: ⌈70% × (wajib − izin/sakit sah)⌉ dan minimal 7 hadir fisik,
+ * - keabsahan izin (sebelum jam mulai + bukti), sakit (≤ 24 jam), tanpa jam lapor, putusan pelatih
+ * - syarat v2.8 (rasio): hadir ≥ ⌈7/12·N⌉, alpa ≤ bulat(1/4·N), jatah telat bulat(1/6·N);
  *   status lulus / berjalan / kritis / susulan, batas bergabung, bergabung belakangan
+ *   (rincian rasio, jam datang, Form & impor: qa/kehadiran-rasio-logika.mjs)
  * - CSV rekap
  */
 import {
   tanggalLatihan, usulFase, cariPolaLatsar, programBaru, periksaProgram, rencanakanProgram, terapkanRencana,
-  ringkasRencana, keabsahanIzin, kodeKehadiran, butuhHadir, nilaiPeserta, rekapPelantikan, urutkanRekap,
+  ringkasRencana, keabsahanIzin, kodeKehadiran, batasRasio, lengkapiAturan, nilaiPeserta, rekapPelantikan, urutkanRekap,
   tambahPeserta, barisCsvPelantikan, sesiWajib, faseUntuk, mulaiSesiMs, tonggakCamp, ATURAN_BAKU,
 } from '/tmp/programLatsar.mjs'
 import { polaContohLatsar } from '/tmp/ranahSesi.mjs'
@@ -69,7 +70,7 @@ Object.assign(p, {
   ],
   aturan: { ...ATURAN_BAKU, batasGabung: '2026-11-24' },
 })
-cek('aturan baku 70% · min 7 · sakit 24 jam', ATURAN_BAKU.persenMin === 70 && ATURAN_BAKU.hadirMin === 7 && ATURAN_BAKU.sakitMaksJam === 24)
+cek('aturan baku rasio 7/12 · 1/4 · 1/6 · sakit 24 jam', ATURAN_BAKU.rasioHadir.join('/') === '7/12' && ATURAN_BAKU.rasioAlpa.join('/') === '1/4' && ATURAN_BAKU.rasioTelat.join('/') === '1/6' && ATURAN_BAKU.sakitMaksJam === 24)
 const tgl = tanggalLatihan(p)
 const HARAP = ['2026-11-12', '2026-11-13', '2026-11-17', '2026-11-19', '2026-11-20', '2026-11-24', '2026-11-26', '2026-11-27', '2026-11-29', '2026-12-01', '2026-12-03', '2026-12-04', '2026-12-08', '2026-12-10', '2026-12-11', '2026-12-15', '2026-12-17', '2026-12-18']
 cek('18 tanggal latihan persis kalender CAB 42', JSON.stringify(tgl) === JSON.stringify(HARAP), tgl.join(','))
@@ -158,26 +159,26 @@ cek('mode ganti: sesi berjalan tetap aman', !r3.item.find((x) => x.tanggal === '
 console.log('\n— Keabsahan izin & sakit —')
 const S = { date: '2026-11-19', startTime: '18:00' }
 const jam = (h, m = 0, d = 19) => new Date(2026, 10, d, h, m).getTime()
-const A = { sakitMaksJam: 24 }
-cek('izin 17:59 → sah', keabsahanIzin({ status: 'izin', dilaporAt: jam(17, 59) }, S, A) === 'sah')
-cek('izin 18:00 tepat → terlambat', keabsahanIzin({ status: 'izin', dilaporAt: jam(18) }, S, A) === 'telat')
+const A = lengkapiAturan({ sakitMaksJam: 24 })
+const B = { bukti: 'ada' }
+cek('izin 17:59 + bukti → sah', keabsahanIzin({ status: 'izin', dilaporAt: jam(17, 59), ...B }, S, A) === 'sah')
+cek('izin 18:00 tepat → terlambat', keabsahanIzin({ status: 'izin', dilaporAt: jam(18), ...B }, S, A) === 'telat')
 cek('izin tanpa jam lapor → tanpa-cap', keabsahanIzin({ status: 'izin' }, S, A) === 'tanpa-cap')
-cek('sakit dilapor 20 jam kemudian → sah', keabsahanIzin({ status: 'sakit', dilaporAt: jam(14, 0, 20) }, S, A) === 'sah')
-cek('sakit 24 jam tepat → sah', keabsahanIzin({ status: 'sakit', dilaporAt: jam(18, 0, 20) }, S, A) === 'sah')
-cek('sakit 25 jam → terlambat', keabsahanIzin({ status: 'sakit', dilaporAt: jam(19, 0, 20) }, S, A) === 'telat')
-cek('putusan pelatih "sah" mengalahkan jam', keabsahanIzin({ status: 'izin', dilaporAt: jam(19), putusanIzin: 'sah' }, S, A) === 'sah')
-cek('putusan "tidak sah" mengalahkan jam', keabsahanIzin({ status: 'izin', dilaporAt: jam(9), putusanIzin: 'tidak-sah' }, S, A) === 'telat')
+cek('izin tepat waktu tanpa bukti → tanpa-bukti', keabsahanIzin({ status: 'izin', dilaporAt: jam(10) }, S, A) === 'tanpa-bukti')
+cek('sakit dilapor 20 jam kemudian → sah', keabsahanIzin({ status: 'sakit', dilaporAt: jam(14, 0, 20), ...B }, S, A) === 'sah')
+cek('sakit 24 jam tepat → sah', keabsahanIzin({ status: 'sakit', dilaporAt: jam(18, 0, 20), ...B }, S, A) === 'sah')
+cek('sakit 25 jam → terlambat', keabsahanIzin({ status: 'sakit', dilaporAt: jam(19, 0, 20), ...B }, S, A) === 'telat')
+cek('putusan pelatih "sah" mengalahkan jam & bukti', keabsahanIzin({ status: 'izin', dilaporAt: jam(19), putusanIzin: 'sah' }, S, A) === 'sah')
+cek('putusan "tidak sah" → ditolak', keabsahanIzin({ status: 'izin', dilaporAt: jam(9), putusanIzin: 'tidak-sah', ...B }, S, A) === 'ditolak')
 cek('hadir/alpha bukan urusan keabsahan', keabsahanIzin({ status: 'hadir' }, S, A) === null && keabsahanIzin({ status: 'alpha' }, S, A) === null)
-const atr = { ...ATURAN_BAKU }
+const atr = lengkapiAturan(ATURAN_BAKU)
 cek('kode: belum diisi (lewat) vs mendatang', kodeKehadiran(undefined, { ...S, id: 'x' }, atr, '2026-11-20') === 'kosong' && kodeKehadiran(undefined, { ...S, id: 'x' }, atr, '2026-11-19') === 'mendatang')
-cek('kode izin sah / sakit terlambat', kodeKehadiran({ status: 'izin', dilaporAt: jam(10) }, S, atr, '2026-11-20') === 'izin-sah' && kodeKehadiran({ status: 'sakit', dilaporAt: jam(20, 0, 21) }, S, atr, '2026-11-22') === 'sakit-telat')
+cek('kode izin sah / sakit terlambat', kodeKehadiran({ status: 'izin', dilaporAt: jam(10), ...B }, S, atr, '2026-11-20') === 'izin-sah' && kodeKehadiran({ status: 'sakit', dilaporAt: jam(20, 0, 21), ...B }, S, atr, '2026-11-22') === 'sakit-telat')
 
 /* --------------------------------- syarat --------------------------------- */
-console.log('\n— Syarat pelantikan —')
-cek('butuh: 12 sesi → 9 (⌈8,4⌉)', butuhHadir(12, atr) === 9)
-cek('butuh: 10 (2 izin sah) → 7', butuhHadir(10, atr) === 7)
-cek('butuh: 8 → minimal 7 hadir fisik (bukan ⌈5,6⌉)', butuhHadir(8, atr) === 7)
-cek('butuh: 70% × 10 = 7 tepat (tanpa galat pecahan)', butuhHadir(10, { persenMin: 70, hadirMin: 0 }) === 7)
+console.log('\n— Syarat pelantikan (rasio) —')
+cek('N=12 → hadir 7 · alpa 3 · telat 2', JSON.stringify(batasRasio(12, atr)) === JSON.stringify({ hadir: 7, alpa: 3, telat: 2 }))
+cek('N=7 (oprec susulan) → 5 · 2 · 1', JSON.stringify(batasRasio(7, atr)) === JSON.stringify({ hadir: 5, alpa: 2, telat: 1 }))
 
 const prog = { ...terap.program, wajibIds: terap.program.sesiIds.filter((id) => r.item.find((x) => x.sesi.id === id)?.wajib) }
 const sesiSemua = r.item.map((x) => x.sesi)
@@ -185,22 +186,34 @@ const wajib = sesiWajib(prog, sesiSemua)
 cek('sesi wajib urut: 12, mulai 12 Nov, akhir 4 Des', wajib.length === 12 && wajib[0].date === '2026-11-12' && wajib[11].date === '2026-12-04')
 const W = wajib.map((s) => s.id)
 const rec = (memberId, i, status, extra = {}) => ({ id: `${memberId}${i}`, sessionId: W[i], memberId, status, ...extra })
-const lapor = (i, h) => new Date(...wajib[i].date.split('-').map((x, k) => (k === 1 ? Number(x) - 1 : Number(x))), h).getTime()
+const lapor = (i, h, m = 0) => new Date(...wajib[i].date.split('-').map((x, k) => (k === 1 ? Number(x) - 1 : Number(x))), h, m).getTime()
 const catatan = []
-// Andi: hadir 9 sesi pertama → sudah pasti lulus.
-for (let i = 0; i < 9; i++) catatan.push(rec('andi', i, 'hadir'))
-// Budi: hadir 5, alpha 3 di 8 sesi pertama → sisa 4, butuh 9 → maks 9 → kritis.
+// Andi: hadir 8 sesi pertama → sudah memenuhi 7.
+for (let i = 0; i < 8; i++) catatan.push(rec('andi', i, 'hadir'))
+// Budi: hadir 5, alpha 3 → alpa 3 = batas → jatah alpa habis → kritis.
 for (let i = 0; i < 8; i++) catatan.push(rec('budi', i, i < 5 ? 'hadir' : 'alpha'))
-// Citra: 2 izin sah (lapor siang) + 6 hadir dari 8 → pembagi 10, butuh 7, sisa 4 → boleh absen 3.
-for (let i = 0; i < 8; i++) catatan.push(i < 2 ? rec('citra', i, 'izin', { dilaporAt: lapor(i, 12) }) : rec('citra', i, 'hadir'))
-// Dodi: 4 alpha dari 8 → maks 8 < 9 → susulan.
+// Citra: 2 izin sah (lapor siang + bukti) + 6 hadir → izin tidak memakai jatah alpa.
+for (let i = 0; i < 8; i++) catatan.push(i < 2 ? rec('citra', i, 'izin', { dilaporAt: lapor(i, 12), bukti: 'ada', kategoriIzin: 'kuliah' }) : rec('citra', i, 'hadir'))
+// Dodi: 4 alpha → melebihi batas 3 → susulan walau hadirnya masih bisa cukup.
 for (let i = 0; i < 8; i++) catatan.push(rec('dodi', i, i < 4 ? 'alpha' : 'hadir'))
-// Euis: 2 izin telat (lapor 19:00) + 1 izin tanpa jam → tetap dihitung absen.
+// Euis: 2 izin telat (lapor 19:00) + 1 izin tanpa jam → 3 alpa → kritis.
 for (let i = 0; i < 8; i++)
-  catatan.push(i < 2 ? rec('euis', i, 'izin', { dilaporAt: lapor(i, 19) }) : i === 2 ? rec('euis', i, 'izin') : rec('euis', i, 'hadir'))
-// Fajar: izin sah di 6 sesi → pembagi 6, minimal 7 hadir fisik mustahil → susulan.
-for (let i = 0; i < 8; i++) catatan.push(i < 6 ? rec('fajar', i, 'izin', { dilaporAt: lapor(i, 8) }) : rec('fajar', i, 'hadir'))
-// Gita: tidak ada catatan untuk 8 sesi yang lewat → belum diisi dihitung absen.
+  catatan.push(i < 2 ? rec('euis', i, 'izin', { dilaporAt: lapor(i, 19), bukti: 'ada' }) : i === 2 ? rec('euis', i, 'izin') : rec('euis', i, 'hadir'))
+// Fajar: izin sah di 6 sesi → paling banyak hadir 6 < 7 → susulan.
+for (let i = 0; i < 8; i++) catatan.push(i < 6 ? rec('fajar', i, 'izin', { dilaporAt: lapor(i, 8), bukti: 'ada' }) : rec('fajar', i, 'hadir'))
+// Gita: tidak ada catatan untuk 8 sesi yang lewat → belum diisi (bukan alpa), maks 4 < 7.
+// Joko: telat — 2 berjatah, jatah habis, lewat 19.00, tanpa alasan.
+const telat = (i, h, m, alasan) => rec('joko', i, 'hadir', { datangAt: lapor(i, h, m), ...(alasan ? { alasanTelat: alasan, bukti: 'ada' } : {}) })
+catatan.push(
+  telat(0, 18, 45, 'praktikum'),
+  telat(1, 18, 50, 'praktikum'),
+  telat(2, 18, 40, 'asistensi'),
+  telat(3, 19, 15, 'praktikum'),
+  telat(4, 18, 20),
+  telat(5, 18, 45),
+  rec('joko', 6, 'hadir'),
+  rec('joko', 7, 'hadir'),
+)
 const peserta = [
   { memberId: 'andi', bergabung: '2026-11-12' },
   { memberId: 'budi', bergabung: '2026-11-12' },
@@ -211,45 +224,54 @@ const peserta = [
   { memberId: 'gita', bergabung: '2026-11-12' },
   { memberId: 'hana', bergabung: '2026-11-24' },
   { memberId: 'iwan', bergabung: '2026-11-26' },
+  { memberId: 'joko', bergabung: '2026-11-12' },
 ]
 const progP = { ...prog, peserta }
 const HARI = '2026-11-28' // 8 sesi wajib sudah lewat (12–27 Nov), sisa 4 (29 Nov, 1, 3, 4 Des)
 const anggota = peserta.map((x) => ({ id: x.memberId, name: x.memberId[0].toUpperCase() + x.memberId.slice(1), code: x.memberId.slice(0, 2).toUpperCase(), section: 'brass' }))
 const rek = rekapPelantikan(progP, anggota, sesiSemua, catatan, HARI)
 const n = (id) => rek.baris.find((b) => b.memberId === id)
-cek('Andi: hadir 9 → Memenuhi (pasti lulus walau 3 sisa absen)', n('andi').status === 'lulus' && n('andi').butuh === 9)
-cek('Budi: 5 hadir + sisa 4 = maks 9 = butuh → Kritis', n('budi').status === 'kritis' && n('budi').jatah === 0 && n('budi').alasan.includes('Wajib hadir di 4'), n('budi').alasan)
-cek('Citra: 2 izin sah → pembagi 10, butuh 7, boleh absen 3', n('citra').status === 'berjalan' && n('citra').pembagi === 10 && n('citra').butuh === 7 && n('citra').jatah === 3, JSON.stringify(n('citra')))
-cek('Dodi: maks 8 < 9 → Susulan', n('dodi').status === 'susulan' && n('dodi').maksHadir === 8)
-cek('Euis: izin terlambat & tanpa jam = tidak sah', n('euis').tidakSah === 3 && n('euis').izinSah === 0 && n('euis').pembagi === 12)
-cek('Euis: 5 hadir + 4 sisa = 9 → Kritis', n('euis').status === 'kritis')
-cek('Fajar: 6 izin sah → minimal 7 hadir fisik tak tercapai → Susulan', n('fajar').status === 'susulan' && n('fajar').butuh === 7 && n('fajar').maksHadir === 6 && n('fajar').alasan.includes('minimal 7'), n('fajar').alasan)
-cek('Gita: 8 belum diisi dihitung absen → Susulan', n('gita').kosong === 8 && n('gita').status === 'susulan')
-cek('Hana: bergabung 24 Nov (batas) → dihitung dari 24 Nov', !n('hana').terlambatGabung && n('hana').wajib === 7 && n('hana').rincian.slice(0, 5).every((k) => k === null))
-cek('Hana: 7 sesi wajib → butuh minimal 7 hadir', n('hana').butuh === 7)
+cek('Andi: hadir 8 ≥ 7 → Memenuhi, jaga alpa', n('andi').status === 'lulus' && n('andi').butuh === 7 && n('andi').alasan.includes('sisa 3×'), n('andi').alasan)
+cek('Budi: alpa 3 = batas → Kritis (jatah alpa habis)', n('budi').status === 'kritis' && n('budi').alpa === 3 && n('budi').sisaAlpa === 0 && n('budi').alasan.includes('Jatah alpa habis'), n('budi').alasan)
+cek('Citra: 2 izin sah tidak memakai jatah alpa → Berjalan, boleh tidak hadir 3×', n('citra').status === 'berjalan' && n('citra').izinSah === 2 && n('citra').alpa === 0 && n('citra').butuh === 7 && n('citra').jatah === 3, JSON.stringify(n('citra')))
+cek('Dodi: alpa 4 > 3 → Susulan', n('dodi').status === 'susulan' && n('dodi').alasan.startsWith('Alpa 4×'), n('dodi').alasan)
+cek('Euis: izin terlambat & tanpa jam = alpa 3', n('euis').tidakSah === 3 && n('euis').izinSah === 0 && n('euis').alpa === 3)
+cek('Euis: jatah alpa habis → Kritis', n('euis').status === 'kritis')
+cek('Fajar: 6 izin sah → paling banyak hadir 6 < 7 → Susulan', n('fajar').status === 'susulan' && n('fajar').maksHadir === 6 && n('fajar').alpa === 0, n('fajar').alasan)
+cek('Gita: 8 belum diisi → bukan alpa, tapi maks 4 < 7 → Susulan', n('gita').kosong === 8 && n('gita').alpa === 0 && n('gita').status === 'susulan')
+cek('Hana: bergabung 24 Nov (batas) → N = 7 sejak 24 Nov', !n('hana').terlambatGabung && n('hana').wajib === 7 && n('hana').rincian.slice(0, 5).every((k) => k === null))
+cek('Hana: N=7 → butuh 5, alpa maks 2, jatah telat 1', n('hana').butuh === 5 && n('hana').maksAlpa === 2 && n('hana').maksTelat === 1)
 cek('Iwan: bergabung 26 Nov > batas 24 Nov → Susulan', n('iwan').terlambatGabung && n('iwan').status === 'susulan' && n('iwan').alasan.includes('24 Nov'), n('iwan').alasan)
-cek('Hana: 3 sesi sejak bergabung belum diisi → maks 4 < 7 → Susulan', n('hana').kosong === 3 && n('hana').status === 'susulan')
-cek('rekap: jumlah per status', rek.jumlah.lulus === 1 && rek.jumlah.berjalan === 1 && rek.jumlah.kritis === 2 && rek.jumlah.susulan === 5, JSON.stringify(rek.jumlah))
-cek('rekap: hitung izin tanpa jam lapor', rek.tanpaCap === 1)
+cek('Hana: 3 sesi sejak bergabung belum diisi → maks 4 < 5 → Susulan', n('hana').kosong === 3 && n('hana').status === 'susulan')
+cek(
+  'Joko: rincian telat — 2 berjatah, jatah habis, lewat batas, tepat, tanpa alasan',
+  n('joko').rincian.slice(0, 8).join() === 'telat-jatah,telat-jatah,telat,telat,hadir,telat,hadir,hadir',
+  n('joko').rincian.join(),
+)
+cek('Joko: hadir 5 (2 berjatah), alpa 3 → Kritis', n('joko').hadir === 5 && n('joko').telatJatah === 2 && n('joko').telat === 3 && n('joko').status === 'kritis')
+cek('rekap: jumlah per status', rek.jumlah.lulus === 1 && rek.jumlah.berjalan === 1 && rek.jumlah.kritis === 3 && rek.jumlah.susulan === 5, JSON.stringify(rek.jumlah))
+cek('rekap: hitung izin tanpa jam lapor & sel kosong (Gita 8 + Hana 3 + Iwan 2)', rek.tanpaCap === 1 && rek.kosong === 13, String(rek.kosong))
 cek('rincian: kode per sesi wajib', n('citra').rincian.slice(0, 3).join() === 'izin-sah,izin-sah,hadir' && n('citra').rincian[8] === 'mendatang')
-cek('persen hadir dari sesi yang sudah lewat (di luar sah)', n('citra').persenHadir === 100 && n('dodi').persenHadir === 50)
+cek('persen hadir dari sesi yang sudah lewat', n('andi').persenHadir === 100 && n('dodi').persenHadir === 50)
 const urut = urutkanRekap(rek.baris)
 cek('urutan: susulan dulu, lulus terakhir', urut[0].status === 'susulan' && urut.at(-1).status === 'lulus')
-// Sesudah semua sesi wajib lewat: Citra yang berjalan dengan 4 hadir lagi → lulus.
+// Sesudah semua sesi wajib lewat: Citra hadir 4 lagi → lulus; Budi 4 sisa kosong → susulan.
 const catatan2 = [...catatan, ...[8, 9, 10, 11].map((i) => rec('citra', i, 'hadir'))]
 const rekAkhir = rekapPelantikan(progP, anggota, sesiSemua, catatan2, '2026-12-05')
 cek('akhir: Citra lulus, Budi (4 sisa kosong) susulan', rekAkhir.baris.find((b) => b.memberId === 'citra').status === 'lulus' && rekAkhir.baris.find((b) => b.memberId === 'budi').status === 'susulan')
 cek('anggota terhapus tetap terhitung (anggota null)', rekapPelantikan({ ...progP, peserta: [{ memberId: 'zzz', bergabung: '2026-11-12' }] }, anggota, sesiSemua, [], HARI).baris[0].anggota === null)
-cek('peserta bergabung sesudah semua sesi wajib (tanpa batas) → belum mulai', nilaiPeserta({ ...progP, aturan: { ...atr } }, { memberId: 'x', bergabung: '2026-12-10' }, wajib, new Map(), HARI).status === 'belum-mulai')
+cek('peserta bergabung sesudah semua sesi wajib (tanpa batas) → belum mulai', nilaiPeserta({ ...progP, aturan: { ...atr, batasGabung: undefined } }, { memberId: 'x', bergabung: '2026-12-10' }, wajib, new Map(), HARI).status === 'belum-mulai')
+cek('aturan lama #36 (persenMin/hadirMin) dibaca sebagai rasio bawaan', nilaiPeserta({ ...progP, aturan: { persenMin: 70, hadirMin: 7, sakitMaksJam: 24 } }, peserta[0], wajib, new Map(), HARI).butuh === 7)
 
 console.log('\n— Peserta & CSV —')
 const tp = tambahPeserta(progP, ['andi', 'baru1', 'baru2'])
-cek('tambah peserta: unik, bergabung = mulai program', tp.length === 11 && tp.at(-1).bergabung === '2026-11-12' && tp.filter((x) => x.memberId === 'andi').length === 1)
+cek('tambah peserta: unik, bergabung = mulai program', tp.length === 12 && tp.at(-1).bergabung === '2026-11-12' && tp.filter((x) => x.memberId === 'andi').length === 1)
 cek('tambah peserta dengan tanggal bergabung', tambahPeserta(progP, ['baru3'], '2026-11-20').at(-1).bergabung === '2026-11-20')
 const csv = barisCsvPelantikan(rek, (s) => (s === 'brass' ? 'Brass' : s))
-cek('CSV: kepala + 9 baris', csv.length === 10 && csv[0][1] === 'Nama' && csv[0].length === 15 + 12)
-cek('CSV: kolom tanggal sesi wajib', csv[0][15] === '2026-11-12' && csv[0].at(-1) === '2026-12-04')
-cek('CSV: kode sel & tanda sebelum bergabung', csv.find((x) => x[1] === 'Hana')[15] === '—' && csv.find((x) => x[1] === 'Citra')[15] === 'I')
+cek('CSV: kepala + 10 baris', csv.length === 11 && csv[0][1] === 'Nama' && csv[0].length === 21 + 12)
+cek('CSV: kolom tanggal sesi wajib', csv[0][21] === '2026-11-12' && csv[0].at(-1) === '2026-12-04')
+cek('CSV: kode sel & tanda sebelum bergabung', csv.find((x) => x[1] === 'Hana')[21] === '—' && csv.find((x) => x[1] === 'Citra')[21] === 'I')
+cek('CSV: kolom alpa & batasnya', csv[0][10] === 'Alpa' && csv.find((x) => x[1] === 'Dodi')[10] === 4 && csv.find((x) => x[1] === 'Dodi')[11] === 3)
 
 console.log(`\n${lulus} lulus, ${gagal.length} gagal`)
 if (gagal.length) process.exit(1)

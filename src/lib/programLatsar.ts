@@ -8,22 +8,29 @@
  *    daftar sesi jadwal. Sesi yang sudah ada di tanggal yang sama
  *    **ditautkan**, bukan diduplikat; rencana yang sudah diisi pelatih dan
  *    sesi yang sudah berjalan tidak pernah ditimpa diam-diam.
- * 2. **Keabsahan izin/sakit** — izin sah bila tertulis sebelum jam mulai
- *    sesi; sakit sah bila dilaporkan paling lambat N jam sesudah mulai;
- *    selain itu dihitung tanpa keterangan. Putusan pelatih mengalahkan jam.
- * 3. **Syarat pelantikan** — hadir ≥ ⌈persen × (wajib − izin/sakit sah)⌉ dan
- *    minimal `hadirMin` hadir fisik; bergabung setelah batas → susulan.
- *    Status dihitung **ke depan**: kapan seseorang sudah pasti lulus, masih
- *    bisa (dengan sisa jatah absen), atau sudah pasti harus susulan.
+ * 2. **Keabsahan izin/sakit** — izin sah bila tertulis sebelum batas lapor
+ *    (bawaan: jam mulai sesi), kategorinya termasuk daftar musim ini, dan
+ *    buktinya sudah diterima; sakit sah bila dilaporkan paling lambat N jam
+ *    sesudah mulai. Putusan pelatih mengalahkan semuanya.
+ * 3. **Syarat pelantikan (v2.8, berbasis rasio)** — jumlah sesi Latsar
+ *    berubah tiap musim, jadi batasnya pecahan dari N sesi wajib sejak
+ *    bergabung: hadir ≥ ⌈7/12·N⌉, alpa ≤ bulat(1/4·N), telat berjatah ≤
+ *    bulat(1/6·N). Datang ≤ 30 menit sesudah mulai = hadir; sampai separuh
+ *    durasi sesi dengan alasan + bukti = hadir memakai jatah telat (urut
+ *    tanggal); selebihnya tidak dihitung hadir (= alpa). Izin/sakit sah
+ *    tidak mengurangi jatah alpa. Status dihitung **ke depan**: sudah
+ *    memenuhi, masih bisa, kritis, atau pasti susulan.
  */
 import type {
   AttendanceRecord,
   AturanPelantikan,
   FaseProgram,
+  KategoriIzin,
   Member,
   PesertaProgram,
   PolaSesi,
   ProgramLatihan,
+  RasioSesi,
   Session,
   SessionType,
   TargetNeraca,
@@ -89,7 +96,92 @@ export function mulaiSesiMs(s: Pick<Session, 'date' | 'startTime'>): number {
 
 /* ================================ template ================================ */
 
-export const ATURAN_BAKU: AturanPelantikan = { persenMin: 70, hadirMin: 7, sakitMaksJam: 24 }
+/**
+ * v2.8 — 7 kategori izin bawaan (Lembar Info Musim CAB 42). Semuanya wajib
+ * berbukti. Rapat organisasi, kerabat selain orang tua/om/tante/kakek/nenek,
+ * dan alasan tanpa bukti bukan izin.
+ */
+export const KATEGORI_IZIN_BAKU: readonly KategoriIzin[] = [
+  { id: 'sakit', nama: 'Sakit parah', bukti: 'Surat dokter' },
+  { id: 'ortu', nama: 'Orang tua berkunjung', bukti: 'Orang tua/wali menghubungi kepelatihan langsung' },
+  { id: 'kuliah', nama: 'Praktikum / asistensi', bukti: 'Foto kegiatan' },
+  { id: 'agama', nama: 'Acara keagamaan', bukti: 'Foto kegiatan' },
+  { id: 'duka', nama: 'Berduka', bukti: 'Foto / kabar duka' },
+  { id: 'lomba', nama: 'Lomba mewakili kampus/daerah', bukti: 'Surat tugas / keikutsertaan' },
+  { id: 'organisasi', nama: 'Acara besar organisasi kampus (hari-H)', bukti: 'Foto kegiatan' },
+]
+
+/** Aturan yang semua field-nya sudah terisi — hasil `lengkapiAturan()`. */
+export type AturanLengkap = Required<
+  Pick<AturanPelantikan, 'rasioHadir' | 'rasioAlpa' | 'rasioTelat' | 'toleransiMenit' | 'wajibForm' | 'wajibBukti' | 'kategoriIzin' | 'sakitMaksJam'>
+> &
+  Pick<AturanPelantikan, 'batasJatahMenit' | 'batasIzin' | 'batasGabung'>
+
+export const ATURAN_BAKU: AturanLengkap = {
+  rasioHadir: [7, 12],
+  rasioAlpa: [1, 4],
+  rasioTelat: [1, 6],
+  toleransiMenit: 30,
+  wajibForm: true,
+  wajibBukti: true,
+  kategoriIzin: KATEGORI_IZIN_BAKU.map((k) => ({ ...k })),
+  sakitMaksJam: 24,
+}
+
+function rasioSah(r: unknown, cadangan: RasioSesi): RasioSesi {
+  if (!Array.isArray(r) || r.length !== 2) return [...cadangan] as RasioSesi
+  const a = Math.round(Number(r[0]))
+  const b = Math.round(Number(r[1]))
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 1 || a > b) return [...cadangan] as RasioSesi
+  return [a, b]
+}
+
+const JAM_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/**
+ * Lengkapi aturan tersimpan dengan nilai bawaan. Data #36 (`persenMin`,
+ * `hadirMin`) dibuang: model rasio menggantikannya seluruhnya — tidak ada
+ * dua aturan yang berlaku bersamaan.
+ */
+export function lengkapiAturan(a?: Partial<AturanPelantikan> | null): AturanLengkap {
+  const x = (a ?? {}) as Partial<AturanPelantikan> & Record<string, unknown>
+  const angka = (v: unknown, cadangan: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : cadangan)
+  const kategori = Array.isArray(x.kategoriIzin)
+    ? x.kategoriIzin
+        .filter((k) => k && typeof k.id === 'string' && k.id && k.id !== 'lain' && typeof k.nama === 'string')
+        .map((k) => ({ id: k.id, nama: k.nama, bukti: typeof k.bukti === 'string' ? k.bukti : '' }))
+    : null
+  const out: AturanLengkap = {
+    rasioHadir: rasioSah(x.rasioHadir, ATURAN_BAKU.rasioHadir),
+    rasioAlpa: rasioSah(x.rasioAlpa, ATURAN_BAKU.rasioAlpa),
+    rasioTelat: rasioSah(x.rasioTelat, ATURAN_BAKU.rasioTelat),
+    toleransiMenit: Math.round(angka(x.toleransiMenit, ATURAN_BAKU.toleransiMenit)),
+    wajibForm: typeof x.wajibForm === 'boolean' ? x.wajibForm : ATURAN_BAKU.wajibForm,
+    wajibBukti: typeof x.wajibBukti === 'boolean' ? x.wajibBukti : ATURAN_BAKU.wajibBukti,
+    kategoriIzin: kategori ?? KATEGORI_IZIN_BAKU.map((k) => ({ ...k })),
+    sakitMaksJam: angka(x.sakitMaksJam, ATURAN_BAKU.sakitMaksJam),
+  }
+  if (typeof x.batasJatahMenit === 'number' && Number.isFinite(x.batasJatahMenit) && x.batasJatahMenit >= 0)
+    out.batasJatahMenit = Math.round(x.batasJatahMenit)
+  if (typeof x.batasIzin === 'string' && JAM_RE.test(x.batasIzin)) out.batasIzin = x.batasIzin
+  if (typeof x.batasGabung === 'string' && x.batasGabung) out.batasGabung = x.batasGabung
+  return out
+}
+
+/**
+ * Batas dari N sesi wajib. Bilangan bulat murni (tanpa galat pecahan):
+ * hadir = ⌈a·N/b⌉; alpa & telat dibulatkan biasa (,5 ke atas).
+ * N=12 → 7/3/2 · N=7 → 5/2/1 · N=10 → 6/3/2.
+ */
+export function batasRasio(n: number, a: Pick<AturanLengkap, 'rasioHadir' | 'rasioAlpa' | 'rasioTelat'>): { hadir: number; alpa: number; telat: number } {
+  const N = Math.max(0, Math.round(n))
+  const atas = ([p, q]: RasioSesi) => Math.floor((p * N + q - 1) / q)
+  const bulat = ([p, q]: RasioSesi) => Math.floor((2 * p * N + q) / (2 * q))
+  return { hadir: atas(a.rasioHadir), alpa: bulat(a.rasioAlpa), telat: bulat(a.rasioTelat) }
+}
+
+/** "7/12" */
+export const teksRasio = (r: RasioSesi) => `${r[0]}/${r[1]}`
 
 export const LABEL_TONGGAK: Record<TonggakProgram['jenis'], string> = {
   acara: 'Acara',
@@ -184,7 +276,7 @@ export function programBaru(buatId: (awalan: string) => string, mulai: string, s
     sesiIds: [],
     wajibIds: [],
     peserta: [],
-    aturan: { ...ATURAN_BAKU },
+    aturan: lengkapiAturan(ATURAN_BAKU),
     dibuat: sekarang,
     diubah: sekarang,
   }
@@ -423,22 +515,32 @@ export function ringkasRencana(r: RencanaProgram, wajib: Record<string, boolean>
 
 export type KodeKehadiran =
   | 'hadir'
+  | 'telat-jatah'
+  | 'telat'
+  | 'tanpa-form'
   | 'izin-sah'
   | 'sakit-sah'
   | 'izin-telat'
   | 'sakit-telat'
   | 'tanpa-cap'
+  | 'tanpa-bukti'
+  | 'izin-ditolak'
   | 'alpha'
   | 'kosong'
   | 'mendatang'
 
 export const LABEL_KODE: Record<KodeKehadiran, string> = {
   hadir: 'Hadir',
+  'telat-jatah': 'Telat berjatah (dihitung hadir)',
+  telat: 'Telat — tidak dihitung hadir',
+  'tanpa-form': 'Hadir tanpa Google Form',
   'izin-sah': 'Izin sah',
   'sakit-sah': 'Sakit sah',
   'izin-telat': 'Izin terlambat',
   'sakit-telat': 'Sakit terlambat',
   'tanpa-cap': 'Izin/sakit tanpa jam lapor',
+  'tanpa-bukti': 'Izin/sakit tanpa bukti',
+  'izin-ditolak': 'Izin tidak diterima',
   alpha: 'Tanpa keterangan',
   kosong: 'Belum diisi',
   mendatang: 'Belum berlangsung',
@@ -446,11 +548,16 @@ export const LABEL_KODE: Record<KodeKehadiran, string> = {
 
 export const SINGKAT_KODE: Record<KodeKehadiran, string> = {
   hadir: 'H',
+  'telat-jatah': 'T',
+  telat: 'T!',
+  'tanpa-form': 'F!',
   'izin-sah': 'I',
   'sakit-sah': 'S',
   'izin-telat': 'I!',
   'sakit-telat': 'S!',
   'tanpa-cap': 'I?',
+  'tanpa-bukti': 'B?',
+  'izin-ditolak': 'I×',
   alpha: 'A',
   kosong: '·',
   mendatang: '',
@@ -459,56 +566,182 @@ export const SINGKAT_KODE: Record<KodeKehadiran, string> = {
 /** Hex untuk sel rekap (layar & cetak). */
 export const WARNA_KODE: Record<KodeKehadiran, string> = {
   hadir: '#10b981',
+  'telat-jatah': '#0d9488',
+  telat: '#ea580c',
+  'tanpa-form': '#f97316',
   'izin-sah': '#0ea5e9',
   'sakit-sah': '#f59e0b',
   'izin-telat': '#f43f5e',
   'sakit-telat': '#f43f5e',
   'tanpa-cap': '#fb7185',
+  'tanpa-bukti': '#db2777',
+  'izin-ditolak': '#be123c',
   alpha: '#e11d48',
   kosong: '#94a3b8',
   mendatang: '#cbd5e1',
 }
 
-/** Kode yang mengurangi pembagi (tidak mengurangi jatah). */
-export const KODE_SAH: KodeKehadiran[] = ['izin-sah', 'sakit-sah']
-/** Kode yang dihitung sebagai tidak hadir tanpa keterangan sah. */
-export const KODE_ALPHA: KodeKehadiran[] = ['izin-telat', 'sakit-telat', 'tanpa-cap', 'alpha', 'kosong']
+/** Kode yang dihitung hadir. */
+export const KODE_HADIR: readonly KodeKehadiran[] = ['hadir', 'telat-jatah']
+/** Kode tidak hadir yang sah — tidak memakai jatah alpa. */
+export const KODE_SAH: readonly KodeKehadiran[] = ['izin-sah', 'sakit-sah']
+/**
+ * Kode yang dihitung **alpa** (memakai jatah alpa). `kosong` sengaja tidak
+ * termasuk: itu tunggakan pengisian absen, bukan perilaku anak — ditampilkan
+ * sebagai peringatan sampai diisi.
+ */
+export const KODE_ALPA: readonly KodeKehadiran[] = [
+  'telat',
+  'tanpa-form',
+  'izin-telat',
+  'sakit-telat',
+  'tanpa-cap',
+  'tanpa-bukti',
+  'izin-ditolak',
+  'alpha',
+]
+/** Urutan legenda (layar & cetak). */
+export const LEGENDA_KODE: readonly KodeKehadiran[] = [
+  'hadir',
+  'telat-jatah',
+  'telat',
+  'tanpa-form',
+  'izin-sah',
+  'sakit-sah',
+  'izin-telat',
+  'sakit-telat',
+  'tanpa-cap',
+  'tanpa-bukti',
+  'izin-ditolak',
+  'alpha',
+  'kosong',
+]
 
-export type KeabsahanIzin = 'sah' | 'telat' | 'tanpa-cap'
+export type KeabsahanIzin = 'sah' | 'telat' | 'tanpa-cap' | 'tanpa-bukti' | 'ditolak'
 
-/** Keabsahan satu catatan izin/sakit; `null` untuk hadir/alpha. */
-export function keabsahanIzin(
-  r: Pick<AttendanceRecord, 'status' | 'dilaporAt' | 'putusanIzin'>,
+type AturanIzin = Pick<AturanLengkap, 'sakitMaksJam' | 'wajibBukti' | 'kategoriIzin' | 'batasIzin'>
+
+const adaBukti = (r: Pick<AttendanceRecord, 'bukti'>) => !!r.bukti?.trim()
+
+/** Kategori izin menurut id (`null` bila tidak ada / di luar daftar). */
+export function kategoriIzin(a: Pick<AturanLengkap, 'kategoriIzin'>, id: string | undefined): KategoriIzin | null {
+  if (!id) return null
+  return a.kategoriIzin.find((k) => k.id === id) ?? null
+}
+
+/**
+ * Batas lapor (epoch ms): izin — sebelum `batasIzin` pada hari-H (bawaan jam
+ * mulai sesi, dan tidak pernah lebih lambat dari itu); sakit — paling lambat
+ * `sakitMaksJam` jam sesudah sesi mulai.
+ */
+export function batasLapor(
+  status: 'izin' | 'sakit',
   s: Pick<Session, 'date' | 'startTime'>,
-  aturan: Pick<AturanPelantikan, 'sakitMaksJam'>,
+  aturan: Pick<AturanLengkap, 'sakitMaksJam' | 'batasIzin'>,
+): number {
+  const mulai = mulaiSesiMs(s)
+  if (status === 'sakit') return mulai + aturan.sakitMaksJam * 3_600_000
+  if (aturan.batasIzin) return Math.min(mulai, mulaiSesiMs({ date: s.date, startTime: aturan.batasIzin }))
+  return mulai
+}
+
+/**
+ * Keabsahan satu catatan izin/sakit; `null` untuk hadir/alpha. Urutan:
+ * putusan pelatih → jam lapor → kategori → bukti.
+ */
+export function keabsahanIzin(
+  r: Pick<AttendanceRecord, 'status' | 'dilaporAt' | 'putusanIzin' | 'kategoriIzin' | 'bukti'>,
+  s: Pick<Session, 'date' | 'startTime'>,
+  aturan: AturanIzin,
 ): KeabsahanIzin | null {
   if (r.status !== 'izin' && r.status !== 'sakit') return null
   if (r.putusanIzin === 'sah') return 'sah'
-  if (r.putusanIzin === 'tidak-sah') return 'telat'
+  if (r.putusanIzin === 'tidak-sah') return 'ditolak'
   if (r.dilaporAt == null) return 'tanpa-cap'
-  const mulai = mulaiSesiMs(s)
-  if (r.status === 'izin') return r.dilaporAt < mulai ? 'sah' : 'telat'
-  return r.dilaporAt <= mulai + aturan.sakitMaksJam * 3_600_000 ? 'sah' : 'telat'
+  const batas = batasLapor(r.status, s, aturan)
+  if (r.status === 'izin' ? r.dilaporAt >= batas : r.dilaporAt > batas) return 'telat'
+  if (r.kategoriIzin && !kategoriIzin(aturan, r.kategoriIzin)) return 'ditolak'
+  if (aturan.wajibBukti && !adaBukti(r)) return 'tanpa-bukti'
+  return 'sah'
 }
 
-/** Kalimat pendek tentang batas lapor sebuah catatan — dipakai di Absensi. */
-export function batasLapor(status: 'izin' | 'sakit', s: Pick<Session, 'date' | 'startTime'>, aturan: Pick<AturanPelantikan, 'sakitMaksJam'>): number {
+/** Jendela datang sebuah sesi (epoch ms). */
+export function jendelaDatang(
+  s: Pick<Session, 'date' | 'startTime' | 'endTime'>,
+  a: Pick<AturanLengkap, 'toleransiMenit' | 'batasJatahMenit'>,
+): { mulai: number; tepat: number; batasJatah: number } {
   const mulai = mulaiSesiMs(s)
-  return status === 'izin' ? mulai : mulai + aturan.sakitMaksJam * 3_600_000
+  const selesai = s.endTime ? mulaiSesiMs({ date: s.date, startTime: s.endTime }) : 0
+  const durasiMenit = selesai > mulai ? Math.round((selesai - mulai) / 60_000) : 120
+  const tepat = mulai + a.toleransiMenit * 60_000
+  const menitJatah = a.batasJatahMenit ?? Math.floor(durasiMenit / 2)
+  return { mulai, tepat, batasJatah: Math.max(tepat, mulai + menitJatah * 60_000) }
 }
 
+export type StatusDatang = 'tepat' | 'jatah' | 'lewat-batas' | 'tanpa-alasan' | 'tanpa-bukti' | 'putusan-sah' | 'putusan-tidak-sah'
+
+/**
+ * Penilaian jam datang satu catatan hadir. `null` = jam datang tidak dicatat
+ * (dianggap tepat waktu). `jatah` = boleh memakai jatah telat bila masih ada.
+ */
+export function statusDatang(
+  r: Pick<AttendanceRecord, 'status' | 'datangAt' | 'alasanTelat' | 'bukti' | 'putusanIzin'>,
+  s: Pick<Session, 'date' | 'startTime' | 'endTime'>,
+  a: Pick<AturanLengkap, 'toleransiMenit' | 'batasJatahMenit' | 'wajibBukti'>,
+): StatusDatang | null {
+  if (r.status !== 'hadir' || r.datangAt == null) return null
+  const j = jendelaDatang(s, a)
+  if (r.datangAt <= j.tepat) return 'tepat'
+  if (r.putusanIzin === 'sah') return 'putusan-sah'
+  if (r.putusanIzin === 'tidak-sah') return 'putusan-tidak-sah'
+  if (r.datangAt > j.batasJatah) return 'lewat-batas'
+  if (!r.alasanTelat?.trim()) return 'tanpa-alasan'
+  if (a.wajibBukti && !adaBukti(r)) return 'tanpa-bukti'
+  return 'jatah'
+}
+
+export const LABEL_DATANG: Record<StatusDatang, string> = {
+  tepat: 'tepat waktu',
+  jatah: 'telat berjatah',
+  'lewat-batas': 'lewat batas jatah',
+  'tanpa-alasan': 'telat tanpa alasan',
+  'tanpa-bukti': 'telat tanpa bukti',
+  'putusan-sah': 'telat · putusan: dihitung hadir',
+  'putusan-tidak-sah': 'telat · putusan: tidak dihitung',
+}
+
+/** Sesi ini memakai Google Form presensi? (ada isian yang sudah diimpor) */
+export function sesiBerForm(s: Pick<Session, 'formPresensi'>): boolean {
+  return !!s.formPresensi && Object.keys(s.formPresensi).length > 0
+}
+
+/**
+ * Kode satu sesi untuk satu anak — **tanpa** memperhitungkan sisa jatah telat
+ * (`telat-jatah` = berhak memakai jatah; `nilaiPeserta` menurunkannya ke
+ * `telat` bila jatahnya sudah habis).
+ *
+ * Wajib Form hanya berlaku di sesi yang isian Form-nya sudah diimpor —
+ * sesi tanpa impor tidak menghukum siapa pun.
+ */
 export function kodeKehadiran(
   r: AttendanceRecord | undefined,
   s: Session,
-  aturan: AturanPelantikan,
+  aturan: AturanLengkap,
   hariIni: string,
 ): KodeKehadiran {
   if (!r) return s.date < hariIni ? 'kosong' : 'mendatang'
-  if (r.status === 'hadir') return 'hadir'
   if (r.status === 'alpha') return 'alpha'
+  if (r.status === 'hadir') {
+    if (aturan.wajibForm && r.putusanIzin !== 'sah' && sesiBerForm(s) && !s.formPresensi![r.memberId]) return 'tanpa-form'
+    const d = statusDatang(r, s, aturan)
+    if (d == null || d === 'tepat' || d === 'putusan-sah') return 'hadir'
+    return d === 'jatah' ? 'telat-jatah' : 'telat'
+  }
   const k = keabsahanIzin(r, s, aturan)
   if (k === 'sah') return r.status === 'izin' ? 'izin-sah' : 'sakit-sah'
   if (k === 'tanpa-cap') return 'tanpa-cap'
+  if (k === 'tanpa-bukti') return 'tanpa-bukti'
+  if (k === 'ditolak') return 'izin-ditolak'
   return r.status === 'izin' ? 'izin-telat' : 'sakit-telat'
 }
 
@@ -536,31 +769,39 @@ export interface NilaiPeserta {
   memberId: string
   bergabung: string
   terlambatGabung: boolean
-  /** Sesi wajib yang berlaku (sesudah tanggal bergabung). */
+  /** N — sesi wajib yang berlaku (sejak tanggal bergabung). */
   wajib: number
+  /** Hadir yang dihitung (tepat waktu + telat berjatah). */
   hadir: number
+  /** Telat yang memakai jatah (sudah termasuk `hadir`). */
+  telatJatah: number
+  /** Telat yang tidak dihitung hadir (tanpa alasan/bukti, lewat batas, atau jatah habis). */
+  telat: number
+  /** Datang tapi tidak mengisi Google Form presensi. */
+  tanpaForm: number
   izinSah: number
   sakitSah: number
-  /** Izin/sakit tidak sah + tanpa jam lapor. */
+  /** Izin/sakit tidak sah: terlambat lapor, tanpa jam lapor, tanpa bukti, ditolak. */
   tidakSah: number
   alpha: number
+  /** Total alpa = telat + tanpaForm + tidakSah + alpha. */
+  alpa: number
   kosong: number
   sisa: number
-  pembagi: number
+  /** Batas dari N: hadir minimal, alpa maksimal, jatah telat. */
   butuh: number
+  maksAlpa: number
+  maksTelat: number
+  sisaAlpa: number
+  sisaTelat: number
   maksHadir: number
-  /** Sisa jatah absen (tanpa keterangan sah) sebelum gagal. */
+  /** Berapa kali lagi boleh alpa tanpa gagal (min. sisa jatah alpa & kelonggaran hadir). */
   jatah: number
   persenHadir: number
   status: StatusPelantikan
   alasan: string
   /** Kode per sesi wajib program (urut tanggal); `null` = sebelum bergabung. */
   rincian: (KodeKehadiran | null)[]
-}
-
-export function butuhHadir(pembagi: number, aturan: Pick<AturanPelantikan, 'persenMin' | 'hadirMin'>): number {
-  const persen = Math.ceil((aturan.persenMin / 100) * pembagi - 1e-9)
-  return Math.max(persen, aturan.hadirMin)
 }
 
 const tglPendek = (iso: string) => {
@@ -582,9 +823,11 @@ export function nilaiPeserta(
   catatan: Map<string, AttendanceRecord>,
   hariIni: string,
 ): NilaiPeserta {
-  const a = p.aturan
+  const a = lengkapiAturan(p.aturan)
   const terlambat = !!a.batasGabung && peserta.bergabung > a.batasGabung
-  const n = { hadir: 0, izinSah: 0, sakitSah: 0, tidakSah: 0, alpha: 0, kosong: 0, sisa: 0, wajib: 0 }
+  const berlaku = wajibUrut.filter((s) => s.date >= peserta.bergabung)
+  const batas = batasRasio(berlaku.length, a)
+  const n = { hadir: 0, telatJatah: 0, telat: 0, tanpaForm: 0, izinSah: 0, sakitSah: 0, tidakSah: 0, alpha: 0, kosong: 0, sisa: 0, wajib: 0 }
   const rincian: (KodeKehadiran | null)[] = []
   for (const s of wajibUrut) {
     if (s.date < peserta.bergabung) {
@@ -592,22 +835,32 @@ export function nilaiPeserta(
       continue
     }
     n.wajib++
-    const k = kodeKehadiran(catatan.get(`${s.id}|${peserta.memberId}`), s, a, hariIni)
+    let k = kodeKehadiran(catatan.get(`${s.id}|${peserta.memberId}`), s, a, hariIni)
+    // Jatah telat dipakai urut tanggal; sesudah habis, telat beralasan pun tidak dihitung.
+    if (k === 'telat-jatah') {
+      if (n.telatJatah < batas.telat) n.telatJatah++
+      else k = 'telat'
+    }
     rincian.push(k)
-    if (k === 'hadir') n.hadir++
+    if (k === 'hadir' || k === 'telat-jatah') n.hadir++
+    else if (k === 'telat') n.telat++
+    else if (k === 'tanpa-form') n.tanpaForm++
     else if (k === 'izin-sah') n.izinSah++
     else if (k === 'sakit-sah') n.sakitSah++
-    else if (k === 'izin-telat' || k === 'sakit-telat' || k === 'tanpa-cap') n.tidakSah++
     else if (k === 'alpha') n.alpha++
     else if (k === 'kosong') n.kosong++
-    else n.sisa++
+    else if (k === 'mendatang') n.sisa++
+    else n.tidakSah++
   }
-  const pembagi = n.wajib - n.izinSah - n.sakitSah
-  const butuh = butuhHadir(pembagi, a)
+  const alpa = n.telat + n.tanpaForm + n.tidakSah + n.alpha
+  const butuh = batas.hadir
   const maksHadir = n.hadir + n.sisa
-  const jatah = Math.max(0, maksHadir - butuh)
+  const longgar = Math.max(0, maksHadir - butuh)
+  const sisaAlpa = Math.max(0, batas.alpa - alpa)
+  const sisaTelat = Math.max(0, batas.telat - n.telatJatah)
+  const jatah = Math.min(longgar, sisaAlpa)
   const sudah = n.wajib - n.sisa
-  const persenHadir = sudah - n.izinSah - n.sakitSah > 0 ? Math.round((n.hadir / (sudah - n.izinSah - n.sakitSah)) * 100) : 0
+  const persenHadir = sudah > 0 ? Math.round((n.hadir / sudah) * 100) : 0
   let status: StatusPelantikan
   let alasan: string
   if (terlambat) {
@@ -616,29 +869,36 @@ export function nilaiPeserta(
   } else if (n.wajib === 0) {
     status = 'belum-mulai'
     alasan = 'Belum ada sesi wajib sejak bergabung'
-  } else if (n.hadir >= butuh) {
-    status = 'lulus'
-    alasan = `Hadir ${n.hadir} dari ${butuh} yang dibutuhkan`
+  } else if (alpa > batas.alpa) {
+    status = 'susulan'
+    alasan = `Alpa ${alpa}×, melebihi batas ${batas.alpa}× (${teksRasio(a.rasioAlpa)} dari ${n.wajib} sesi)`
   } else if (maksHadir < butuh) {
     status = 'susulan'
-    alasan =
-      pembagi < a.hadirMin && n.hadir + n.sisa < a.hadirMin
-        ? `Paling banyak hadir ${maksHadir}×, minimal ${a.hadirMin}× hadir fisik`
-        : `Paling banyak hadir ${maksHadir} dari ${butuh} yang dibutuhkan`
+    alasan = `Paling banyak hadir ${maksHadir} dari ${butuh} yang dibutuhkan`
+  } else if (n.hadir >= butuh) {
+    status = 'lulus'
+    alasan = `Hadir ${n.hadir} dari ${butuh} yang dibutuhkan${n.sisa > 0 ? ` · jaga alpa: sisa ${sisaAlpa}×` : ''}`
+  } else if (longgar === 0) {
+    status = 'kritis'
+    alasan = `Wajib hadir di ${n.sisa} sesi tersisa (perlu ${butuh - n.hadir} lagi)`
+  } else if (sisaAlpa === 0) {
+    status = 'kritis'
+    alasan = `Jatah alpa habis — perlu ${butuh - n.hadir} hadir lagi; tidak hadir hanya boleh dengan izin sah (${longgar}×)`
   } else {
-    status = jatah === 0 ? 'kritis' : 'berjalan'
-    alasan =
-      jatah === 0
-        ? `Wajib hadir di ${n.sisa} sesi tersisa (perlu ${butuh - n.hadir} lagi)`
-        : `Perlu ${butuh - n.hadir} hadir lagi dari ${n.sisa} sesi · boleh absen ${jatah}×`
+    status = 'berjalan'
+    alasan = `Perlu ${butuh - n.hadir} hadir lagi dari ${n.sisa} sesi · boleh tidak hadir ${longgar}× (alpa maks. ${sisaAlpa}×)`
   }
   return {
     memberId: peserta.memberId,
     bergabung: peserta.bergabung,
     terlambatGabung: terlambat,
     ...n,
-    pembagi,
+    alpa,
     butuh,
+    maksAlpa: batas.alpa,
+    maksTelat: batas.telat,
+    sisaAlpa,
+    sisaTelat,
     maksHadir,
     jatah,
     persenHadir,
@@ -654,6 +914,12 @@ export interface RekapPelantikan {
   jumlah: Record<StatusPelantikan, number>
   /** Catatan izin/sakit wajib yang belum punya jam lapor. */
   tanpaCap: number
+  /** Catatan izin/sakit wajib yang buktinya belum diterima. */
+  tanpaBukti: number
+  /** Sel sesi wajib yang sudah lewat tapi belum diisi. */
+  kosong: number
+  /** Sesi wajib yang isian Google Form presensinya sudah diimpor. */
+  sesiBerForm: number
 }
 
 export function rekapPelantikan(
@@ -671,11 +937,17 @@ export function rekapPelantikan(
   const baris = p.peserta.map((x) => ({ ...nilaiPeserta(p, x, wajib, peta, hariIni), anggota: perId.get(x.memberId) ?? null }))
   const jumlah: Record<StatusPelantikan, number> = { lulus: 0, berjalan: 0, kritis: 0, susulan: 0, 'belum-mulai': 0 }
   let tanpaCap = 0
+  let tanpaBukti = 0
+  let kosong = 0
   for (const b of baris) {
     jumlah[b.status]++
-    tanpaCap += b.rincian.filter((k) => k === 'tanpa-cap').length
+    for (const k of b.rincian) {
+      if (k === 'tanpa-cap') tanpaCap++
+      else if (k === 'tanpa-bukti') tanpaBukti++
+      else if (k === 'kosong') kosong++
+    }
   }
-  return { wajib, baris, jumlah, tanpaCap }
+  return { wajib, baris, jumlah, tanpaCap, tanpaBukti, kosong, sesiBerForm: wajib.filter(sesiBerForm).length }
 }
 
 const URUT_STATUS: StatusPelantikan[] = ['susulan', 'kritis', 'berjalan', 'belum-mulai', 'lulus']
@@ -688,6 +960,12 @@ export function urutkanRekap<T extends NilaiPeserta & { anggota: Member | null }
       a.jatah - b.jatah ||
       (a.anggota?.name ?? '').localeCompare(b.anggota?.name ?? '', 'id'),
   )
+}
+
+/** Kalimat aturan untuk layar & cetak: "hadir ≥ 7/12 · alpa ≤ 1/4 · telat ≤ 1/6 → N=12: 7 · 3 · 2". */
+export function ringkasAturan(a: AturanLengkap, n: number): string {
+  const b = batasRasio(n, a)
+  return `hadir ≥ ${teksRasio(a.rasioHadir)}, alpa ≤ ${teksRasio(a.rasioAlpa)}, telat berjatah ≤ ${teksRasio(a.rasioTelat)} dari N sesi wajib · N = ${n} → hadir min. ${b.hadir}, alpa maks. ${b.alpa}, jatah telat ${b.telat}`
 }
 
 /* ================================ peserta ================================ */
@@ -714,15 +992,21 @@ export function barisCsvPelantikan(
     'Section',
     'Bergabung',
     'Status',
+    'Sesi wajib (N)',
     'Hadir',
+    'Dibutuhkan',
+    'Telat berjatah',
+    'Jatah telat',
+    'Alpa',
+    'Alpa maks.',
     'Izin sah',
     'Sakit sah',
-    'Tidak sah',
+    'Telat tak dihitung',
+    'Tanpa Form',
+    'Izin/sakit tidak sah',
     'Tanpa keterangan',
     'Belum diisi',
     'Sisa sesi',
-    'Dibutuhkan',
-    'Sisa jatah absen',
     'Keterangan',
     ...r.wajib.map((s) => s.date),
   ]
@@ -734,15 +1018,21 @@ export function barisCsvPelantikan(
       b.anggota ? label(b.anggota.section) : '',
       b.bergabung,
       LABEL_STATUS[b.status],
+      b.wajib,
       b.hadir,
+      b.butuh,
+      b.telatJatah,
+      b.maksTelat,
+      b.alpa,
+      b.maksAlpa,
       b.izinSah,
       b.sakitSah,
+      b.telat,
+      b.tanpaForm,
       b.tidakSah,
       b.alpha,
       b.kosong,
       b.sisa,
-      b.butuh,
-      b.jatah,
       b.alasan,
       ...b.rincian.map((k) => (k == null ? '—' : SINGKAT_KODE[k])),
     ]),
@@ -782,6 +1072,6 @@ export function infoSesiProgram(
 }
 
 /** Aturan pelantikan yang berlaku untuk sebuah sesi (program pemiliknya atau baku). */
-export function aturanUntukSesi(program: ProgramLatihan[] | undefined, sessionId: string): AturanPelantikan {
-  return (program ?? []).find((p) => p.sesiIds.includes(sessionId))?.aturan ?? ATURAN_BAKU
+export function aturanUntukSesi(program: ProgramLatihan[] | undefined, sessionId: string): AturanLengkap {
+  return lengkapiAturan((program ?? []).find((p) => p.sesiIds.includes(sessionId))?.aturan)
 }
