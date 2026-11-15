@@ -1058,3 +1058,9 @@ Rincian peta jalan dan catatan rilis lengkap tercatat di [`PETA-JALAN-v2.md`](PE
 * Konversi koordinat terpusat di `src/lib/field.ts`; kalau mengubah tampilan papan,
   pastikan sumbu x = memanjang dan y = melintang (lihat bagian “Konvensi data”).
 * Jaga bundel JS awal tetap di bawah **`< 420 kB`** (`qa/polesan-v101.mjs`) dengan memisahkan modul cetak A4/A5 dan panel sekunder ke *lazy chunk* (`React.lazy` / dynamic `import()`), jaga kedua panduan ringkas di `src/lib/panduan.ts` tetap pas **1 halaman A4** (`halamanA4 === 1`), pastikan seluruh keluaran cetak/SVG murni heksadesimal/rgb (tanpa `oklch()`/`color-mix()`/`rgba()`), serta daftarkan skrip uji setiap fitur baru di `qa/regresi-penuh.sh`.
+
+---
+
+## Lisensi
+
+DrillKit adalah **perangkat lunak hak milik** (*proprietary*), bukan sumber terbuka. Seluruh hak dilindungi; lihat [`LICENSE`](LICENSE). Pemakaian oleh unit atau band mana pun hanya lewat perjanjian lisensi tertulis dengan pemilik. Data yang dimasukkan unit tetap milik unit tersebut. Pustaka pihak ketiga di `package.json` tetap tunduk pada lisensinya masing-masing.

@@ -1,25 +1,35 @@
-# CI DrillKit — typecheck + build + regresi penuh (116 rangkaian).
+# CI DrillKit — typecheck + build + regresi penuh (167 rangkaian).
 #
-# Setiap **commit** menjalankan seluruh rangkaian uji ke versinya yang sudah
+# Setiap **PR** menjalankan seluruh rangkaian uji ke versinya yang sudah
 # di-build (`vite preview`), sama persis dengan yang dijalankan lokal via
 # `bash qa/regresi-penuh.sh`. Tidak ada server, tidak ada rahasia: yang
 # dibutuhkan hanya Node, Chrome (diambil puppeteer), dan pustaka sistem
 # Chrome dari apt.
 name: CI
 
-# Satu commit = satu run.
+# Satu PR = satu regresi penuh.
 #
-# Dulu `push:` tanpa saringan digabung `pull_request:`, sehingga setiap commit
-# di branch yang sudah punya PR menyalakan DUA run ±60 menit — satu untuk
-# event push, satu untuk pull_request. Terukur 1–7 Okt 2026: **39 run untuk 24
-# commit, 1.990 menit**, padahal repo private paket Free hanya diberi 2.000
-# menit per bulan; job sesudahnya ditolak sebelum mulai ("job was not started
-# … spending limit"). Kini `push` hanya untuk `main`, dan commit di branch
-# diuji lewat PR-nya.
+# Riwayat pemborosan menit:
+#   • 1–7 Okt 2026: `push:` tanpa saringan + `pull_request:` membuat setiap
+#     commit di branch ber-PR menyalakan DUA run. 39 run untuk 24 commit,
+#     1.990 menit, padahal repo private paket Free hanya diberi 2.000 menit
+#     per bulan. Sejak itu `push` hanya untuk `main`.
+#   • Nov 2026: masih ada dobel. Setiap PR diuji penuh (±82 menit), lalu
+#     setelah di-merge `main` diuji penuh LAGI (±82 menit). Padahal run
+#     `pull_request` sudah menguji commit gabungan PR dengan `main`
+#     (refs/pull/N/merge), yaitu isi yang sama yang mendarat di `main`.
+#     Satu PR jadi makan ±165 menit; dalam repo private itu hanya cukup
+#     untuk ±12 PR per bulan.
+#
+# Sekarang:
+#   • `pull_request` → job `bangun` + job `uji` (regresi penuh).
+#   • `push` ke `main` → job `bangun` saja (typecheck + build, ±1 menit),
+#     supaya `main` tetap dicek bisa di-build dan lencana CI tetap bermakna.
+#   • `workflow_dispatch` → regresi penuh manual, misalnya sebelum rilis,
+#     atau bila dua PR di-merge berurutan tanpa saling menunggu.
 #
 # Konsekuensinya: commit di branch yang BELUM punya PR tidak diuji sampai
-# PR-nya dibuka. Di proyek ini PR selalu dibuka segera setelah push, jadi
-# jendelanya sempit — dan jauh lebih murah daripada membakar 60 menit dua kali.
+# PR-nya dibuka. Di proyek ini PR selalu dibuka segera setelah push.
 on:
   push:
     branches: [main]
@@ -28,6 +38,7 @@ on:
   pull_request:
     paths-ignore:
       - '**.md'
+  workflow_dispatch:
 
 # Commit baru di ref yang sama membatalkan run yang masih berjalan.
 #
@@ -41,13 +52,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  bangun:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dependensi aplikasi
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
   uji:
+    # Regresi penuh hanya untuk PR dan pemicu manual (lihat catatan `on:`).
+    if: github.event_name != 'push'
     # Ubuntu 24.04 (noble): nama paketnya sudah generasi `t64`, dan daftar
     # apt di bawah ditulis untuknya. Jangan ganti versi tanpa menyesuaikan.
     runs-on: ubuntu-24.04
-    # Regresi penuh ±40 menit (ada jeda 10 detik antar-rangkaian, lihat
-    # qa/regresi.sh) + instalasi. Batas 90 menit memberi ruang lega tanpa
-    # menggantung selamanya bila ada yang macet.
+    # Regresi penuh sempat ±82 menit dengan jeda 10 detik antar-rangkaian,
+    # nyaris menyentuh batas 90 menit. Dengan `JEDA=4` dan tanpa jeda sesudah
+    # rangkaian `*-logika` (lihat qa/regresi.sh), perkiraannya ±60 menit.
+    # Batas 90 menit tetap, supaya run yang macet tidak menggantung.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
@@ -104,4 +138,8 @@ jobs:
           curl -sf http://localhost:4173/ >/dev/null
 
       - name: Regresi penuh
+        env:
+          # Runner GitHub bermemori 7–16 GB, jadi jeda 4 detik sudah cukup
+          # bagi Chrome melepas memorinya. Naikkan bila muncul gagal acak.
+          JEDA: '4'
         run: bash qa/regresi-penuh.sh http://localhost:4173

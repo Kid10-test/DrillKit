@@ -63,10 +63,23 @@ for f in "${DAFTAR[@]}"; do
   # cacat. Jeda yang terlalu pendek membuat regresi berbohong sesekali,
   # dan regresi yang berbohong sesekali lambat laun tidak dipercaya.
   #
-  # `JEDA` hanya untuk menguji skrip ini sendiri (mis. `JEDA=0 bash
-  # regresi.sh … ` saat memeriksa kode keluarnya). Regresi sungguhan —
-  # termasuk di CI — memakai 10 detik.
-  sleep "${JEDA:-10}"
+  # `JEDA` mengatur lamanya. Bawaannya 10 detik untuk kotak pasir 2 GB.
+  # `JEDA=0 bash regresi.sh …` dipakai saat memeriksa kode keluarnya.
+  #
+  # Penghematan menit CI (Nov 2026) — dua hal:
+  #   1. Jeda hanya perlu sesudah rangkaian yang mungkin menyalakan Chrome.
+  #      Rangkaian `*-logika` murni Node (modul dirakit ke /tmp,
+  #      fake-indexeddb), jadi rangkaian sesudahnya tidak perlu menunggu.
+  #      Dari 167 rangkaian, 55 jeda hilang (±9 menit) tanpa mengubah satu
+  #      asersi pun.
+  #   2. Runner GitHub punya memori 7–16 GB, bukan 2 GB, jadi ci.yml
+  #      memasang `JEDA=4`. Lokal di kotak pasir tetap 10 detik.
+  # Bila kegagalan acak seperti catatan N15 muncul lagi di CI, naikkan
+  # `JEDA` di ci.yml dulu sebelum mencurigai kodenya.
+  if [ -n "${sebelum:-}" ] && [ "${sebelum%-logika}" = "$sebelum" ]; then
+    sleep "${JEDA:-10}"
+  fi
+  sebelum="$f"
   # BASE dikirim lewat lingkungan, bukan argumen: skrip uji membacanya dari
   # `process.env.BASE`. Pernah dikirim sebagai argumen — diabaikan begitu
   # saja, dan seluruh rangkaian diam-diam berlari ke bawaan :5173.
