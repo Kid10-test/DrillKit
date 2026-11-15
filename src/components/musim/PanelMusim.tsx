@@ -74,6 +74,10 @@ export default function PanelMusim() {
           drill terpasang, H-30 full-run & seragam, H-14 simulasi juri Box 4+, H-3 pak truk — dan memeriksanya dari data yang sudah
           ada.
         </p>
+        <p className="text-[11px] text-slate-500" data-testid="musim-bukan-pindah">
+          Ini hanya hitung mundur; jadwal dan anggota tidak berubah. Untuk merekap musim lalu dan mulai dari nol, pakai Pengaturan → Arsip
+          Lintas-Musim.
+        </p>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-[11px] text-slate-400">
             Tanggal kejuaraan (H-0)
@@ -82,7 +86,7 @@ export default function PanelMusim() {
             </div>
           </label>
           <Button variant="primary" data-testid="musim-buat" onClick={buat} disabled={!h0Baru}>
-            Buat musim
+            Buat hitung mundur
           </Button>
         </div>
       </Card>
@@ -114,9 +118,9 @@ export default function PanelMusim() {
               setPilih(m.id)
             }}
           >
-            + Musim
+            + Hitung mundur kejuaraan
           </Button>
-          <ConfirmButton testId="musim-hapus" label="Hapus" message="Hapus musim ini?" onConfirm={hapus} />
+          <ConfirmButton testId="musim-hapus" label="Hapus" message="Hapus hitung mundur ini?" onConfirm={hapus} />
         </div>
       </div>
 

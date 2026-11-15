@@ -1,7 +1,7 @@
 import { db, getSettings } from '../db/db'
 import { downloadBlob, downloadFile } from './utils'
 import { bikinZip, type EntriZip } from './zip'
-import { namaBackup, namaBackupZip } from './namaBerkas'
+import { namaBackup, namaBackupAkhirMusim, namaBackupZip } from './namaBerkas'
 
 /**
  * Backup otomatis — pengingat & riwayat backup.
@@ -225,7 +225,7 @@ export async function downloadBackup(): Promise<BackupNote> {
  * #6/#11a — Unduh backup lengkap bersama audio dan partitur (ZIP).
  * Mengemas JSON teks, biner audio, dan MusicXML/PDF dari IndexedDB.
  */
-export async function downloadBackupZip(): Promise<BackupNote> {
+export async function downloadBackupZip(opsi: { akhirMusim?: string } = {}): Promise<BackupNote> {
   const payload = await buildBackupPayload()
   const text = JSON.stringify(payload, null, 2)
   const tanggal = new Date(payload.exportedAt)
@@ -313,7 +313,10 @@ export async function downloadBackupZip(): Promise<BackupNote> {
   }
 
   const zipData = bikinZip(entries)
-  downloadBlob(namaBackupZip(tanggal), zipData)
+  downloadBlob(
+    opsi.akhirMusim !== undefined ? namaBackupAkhirMusim(opsi.akhirMusim, tanggal) : namaBackupZip(tanggal),
+    zipData,
+  )
 
   const note: BackupNote = {
     at: payload.exportedAt,

@@ -54,6 +54,23 @@ async function tungguBerkasUnduhan(filterFn, batasMs = 10000) {
   return null
 }
 
+async function bacaIdb(page, fn) {
+  return page.evaluate(async (badan) => {
+    const req = indexedDB.open('drillkit')
+    const db = await new Promise((res) => {
+      req.onsuccess = () => res(req.result)
+    })
+    const semua = (nama) =>
+      new Promise((res) => {
+        const q = db.transaction([nama], 'readonly').objectStore(nama).getAll()
+        q.onsuccess = () => res(q.result)
+      })
+    const hasil = await new Function('semua', `return (async () => { ${badan} })()`)(semua)
+    db.close()
+    return hasil
+  }, fn)
+}
+
 try {
   await page.goto(BASE, { waitUntil: 'networkidle2' })
   await lewatSambutan(page)
@@ -299,6 +316,30 @@ try {
     'PAGAR PRIVASI E2E: Paket grup sama sekali tidak membocorkan kartu medis, NIS/sekolah, kas, maupun audisi',
   )
 
+  // v2.10 — satu berkas partitur untuk lagu musim ini: harus selamat melewati pindah musim.
+  const laguBerkas = await page.evaluate(async () => {
+    const req = indexedDB.open('drillkit')
+    const db = await new Promise((res) => {
+      req.onsuccess = () => res(req.result)
+    })
+    const lagu = await new Promise((res) => {
+      const q = db.transaction(['songs'], 'readonly').objectStore('songs').getAll()
+      q.onsuccess = () => res(q.result[0])
+    })
+    if (!lagu) return null
+    await new Promise((res) => {
+      const tx = db.transaction(['partiturBerkas'], 'readwrite')
+      tx.objectStore('partiturBerkas').put({
+        id: lagu.id, songId: lagu.id, blob: new Blob(['<score-partwise/>'], { type: 'application/xml' }),
+        namaFile: 'uji.musicxml', tipe: 'musicxml', ukuran: 17, hash: 'uji', updatedAt: Date.now(),
+      })
+      tx.oncomplete = () => res()
+    })
+    db.close()
+    return lagu.id
+  })
+  cek(!!laguBerkas, 'Berkas partitur uji tertanam pada lagu musim berjalan')
+
   // Season Rollover di Pengaturan
   await page.goto(`${BASE}/#/pengaturan`, { waitUntil: 'networkidle2' })
   await page.waitForSelector('[data-testid="panel-arsip-musim"]', { timeout: 12000 })
@@ -310,6 +351,23 @@ try {
   await page.type('[data-testid="input-catatan-musim"]', 'Juara Umum 2 Divisi Open')
   await page.click('[data-testid="buka-konfirmasi-rollover"]')
   await page.waitForSelector('[data-testid="konfirmasi-bekukan-musim"]', { timeout: 6000 })
+  // v2.10 — tombol bekukan terkunci sampai backup akhir musim diunduh.
+  cek(
+    await page.$eval('[data-testid="konfirmasi-bekukan-musim"]', (el) => el.disabled),
+    'Bekukan musim terkunci sebelum backup akhir musim diunduh',
+  )
+  for (const f of fs.readdirSync(UNDUH)) fs.rmSync(path.join(UNDUH, f), { force: true })
+  await page.click('[data-testid="unduh-backup-akhir-musim"]')
+  const berkasAkhir = await tungguBerkasUnduhan((f) => f.includes('BACKUP AKHIR MUSIM') && f.endsWith('.zip'), 20000)
+  cek(
+    !!berkasAkhir && path.basename(berkasAkhir).includes('Musim Kejuaraan GPMB 2026') && fs.statSync(berkasAkhir).size > 1000,
+    'Backup ZIP akhir musim terunduh dengan nama musimnya',
+    berkasAkhir ? path.basename(berkasAkhir) : 'tidak ada berkas',
+  )
+  await page.waitForFunction(
+    () => !document.querySelector('[data-testid="konfirmasi-bekukan-musim"]')?.disabled,
+    { timeout: 8000 },
+  )
   await page.click('[data-testid="konfirmasi-bekukan-musim"]')
   await tunggu(1200)
 
@@ -331,18 +389,101 @@ try {
       sessions: await hitung('sessions'),
       kasIuran: await hitung('kasIuran'),
       audisi: await hitung('audisi'),
+      partiturBerkas: await hitung('partiturBerkas'),
     }
   })
   cek(
     pascaRollover.arsipMusim === 1 &&
       pascaRollover.drills === 0 &&
       pascaRollover.sessions === 0 &&
-      pascaRollover.kasIuran === 0 &&
+      pascaRollover.kasIuran <= 1 &&
       pascaRollover.audisi === 0 &&
       pascaRollover.members === jmlAnggotaAwal + 1 &&
       pascaRollover.medisAnggota === 1,
-    'Season Rollover membekukan musim ke arsip & membersihkan tabel musiman sambil menjaga anggota aktif & medis tetap utuh',
+    'Season Rollover membekukan musim ke arsip & membersihkan tabel musiman sambil menjaga data anggota & medis tetap utuh',
     JSON.stringify(pascaRollover),
+  )
+  cek(pascaRollover.partiturBerkas >= 1, 'v2.10 — berkas partitur tidak ikut terhapus saat pindah musim', JSON.stringify(pascaRollover))
+
+  const pascaDetail = await bacaIdb(
+    page,
+    `const m = await semua('members'); const k = await semua('kasIuran'); const a = (await semua('arsipMusim'))[0]
+     return { aktif: m.filter((x) => x.active === 1).length, kas: k, saldoArsip: a.ringkasan.saldoAkhirKas }`,
+  )
+  cek(pascaDetail.aktif === 0, 'v2.10 — semua anggota nonaktif sesudah pindah musim', `aktif=${pascaDetail.aktif}`)
+  const saldoBaru = pascaDetail.kas[0]
+  cek(
+    pascaDetail.saldoArsip === 0
+      ? pascaDetail.kas.length === 0
+      : pascaDetail.kas.length === 1 &&
+          saldoBaru.nominal === Math.abs(pascaDetail.saldoArsip) &&
+          saldoBaru.nomorKwitansi === 'SALDO-AWAL',
+    'v2.10 — saldo akhir kas terbawa sebagai satu transaksi saldo awal',
+    JSON.stringify(pascaDetail),
+  )
+
+  // v2.10 — banner di Anggota & aktifkan kembali secara massal.
+  await page.goto(`${BASE}/#/anggota`, { waitUntil: 'networkidle2' })
+  await page.waitForSelector('[data-testid="banner-musim-baru"]', { timeout: 8000 })
+  cek(true, 'v2.10 — Anggota menampilkan petunjuk mengaktifkan lagi anggota yang lanjut')
+  await page.click('[data-testid="mulai-aktifkan-lagi"]')
+  await tunggu(500)
+  const opsiAngkatan = await page.$$eval('[data-testid="filter-tag-anggota"] option', (os) =>
+    os.map((o) => o.value).filter((v) => v.startsWith('angkatan:')),
+  )
+  cek(opsiAngkatan.length > 0, 'v2.10 — saringan Anggota memuat pilihan per angkatan', JSON.stringify(opsiAngkatan))
+  if (opsiAngkatan.length) {
+    await page.select('[data-testid="filter-tag-anggota"]', opsiAngkatan[0])
+    await tunggu(300)
+    await page.click('[data-testid="pilih-semua-tampil"]')
+    await tunggu(200)
+    await page.click('[data-testid="massal-aktifkan"]')
+    await tunggu(800)
+    const th = Number(opsiAngkatan[0].slice(9))
+    const aktifLagi = await bacaIdb(
+      page,
+      `const m = await semua('members'); return { aktif: m.filter((x) => x.active === 1).map((x) => x.joinYear), seangkatan: m.filter((x) => x.joinYear === ${th}).length }`,
+    )
+    cek(
+      aktifLagi.aktif.length === aktifLagi.seangkatan && aktifLagi.aktif.every((y) => y === th),
+      'v2.10 — aktifkan kembali massal per angkatan hanya menyentuh angkatan itu',
+      JSON.stringify(aktifLagi),
+    )
+  }
+
+  // v2.10 — halaman Jadwal kosong menunjuk ke arsip.
+  await page.goto(`${BASE}/#/jadwal`, { waitUntil: 'networkidle2' })
+  await page.waitForSelector('[data-testid="petunjuk-ambil-jadwal"]', { timeout: 8000 })
+  cek(true, 'v2.10 — Jadwal kosong menunjuk ke Ambil dari arsip')
+
+  // v2.10 — Ambil dari arsip: satu drill + satu sesi jadwal, ditambahkan tanpa menimpa.
+  await page.goto(`${BASE}/#/pengaturan`, { waitUntil: 'networkidle2' })
+  await page.waitForSelector('[data-testid^="ambil-arsip-"]', { timeout: 12000 })
+  await page.click('[data-testid^="ambil-arsip-"]')
+  await page.waitForSelector('[data-testid="modal-ambil-arsip"]', { timeout: 6000 })
+  await page.click('[data-testid="ambil-drill"] input[type="checkbox"]')
+  await page.click('[data-testid="ambil-jadwal"] input[type="checkbox"]')
+  await tunggu(300)
+  const ringkasAmbil = await page.$eval('[data-testid="ringkasan-ambil"]', (el) => el.textContent || '')
+  cek(/1 drill/.test(ringkasAmbil) && /1 sesi jadwal/.test(ringkasAmbil), 'Ringkasan Ambil dari arsip menyebut 1 drill & 1 sesi', ringkasAmbil)
+  await page.click('[data-testid="tambahkan-dari-arsip"]')
+  await tunggu(1000)
+  const pascaAmbil = await bacaIdb(
+    page,
+    `const d = await semua('drills'); const s = await semua('sessions'); const st = await semua('sets')
+     return { drills: d.length, sesi: s, sets: st.length, drillSet: d[0] ? st.filter((x) => x.drillId === d[0].id).length : 0 }`,
+  )
+  cek(
+    pascaAmbil.drills === 1 && pascaAmbil.sesi.length === 1 && pascaAmbil.drillSet === pascaAmbil.sets,
+    'v2.10 — Ambil dari arsip menambahkan drill (dengan set-nya) & satu sesi jadwal',
+    JSON.stringify({ ...pascaAmbil, sesi: pascaAmbil.sesi.length }),
+  )
+  const sesiAmbil = pascaAmbil.sesi[0]
+  cek(
+    sesiAmbil && sesiAmbil.date >= new Date(Date.now() - 4 * 864e5).toISOString().slice(0, 10) &&
+      (sesiAmbil.checklist ?? []).every((c) => c.done === 0),
+    'v2.10 — sesi hasil ambil digeser ke musim ini & centang checklist dikosongkan',
+    JSON.stringify(sesiAmbil && { date: sesiAmbil.date }),
   )
 
   // Uji pratinjau Piagam A4 & Muat Ulang arsip musim (anti-jalan-buntu)
@@ -361,10 +502,15 @@ try {
   await page.keyboard.press('Escape')
   await tunggu(400)
 
+  for (const f of fs.readdirSync(UNDUH)) fs.rmSync(path.join(UNDUH, f), { force: true })
   await page.evaluate(() => {
     document.querySelector('[data-testid^="muat-ulang-musim-"]')?.click()
   })
-  await tunggu(1200)
+  await page.waitForSelector('[data-testid="konfirmasi-muat-ulang-musim"]', { timeout: 6000 })
+  await page.click('[data-testid="konfirmasi-muat-ulang-musim"]')
+  const backupMuat = await tungguBerkasUnduhan((f) => f.endsWith('.zip'), 20000)
+  cek(!!backupMuat, 'v2.10 — Muat Ulang mengunduh backup isi musim berjalan sebelum menimpa')
+  await tunggu(1500)
   const drillsPulih = await page.evaluate(async () => {
     const req = indexedDB.open('drillkit')
     const db = await new Promise((res) => {
@@ -376,6 +522,21 @@ try {
     })
   })
   cek(drillsPulih > 0, 'Tombol Muat Ulang di Arsip Musim memulihkan kembali drill & data musim tanpa jalan buntu')
+
+  // v2.10 — hapus arsip: berkas partitur yang masih dipakai musim berjalan tetap ada.
+  await page.click('[data-testid^="hapus-arsip-"]')
+  await page.waitForSelector('[data-testid="konfirmasi-hapus-arsip"]', { timeout: 6000 })
+  await page.click('[data-testid="konfirmasi-hapus-arsip"]')
+  await tunggu(1000)
+  const pascaHapus = await bacaIdb(
+    page,
+    `return { arsip: (await semua('arsipMusim')).length, partitur: (await semua('partiturBerkas')).map((p) => p.id) }`,
+  )
+  cek(
+    pascaHapus.arsip === 0 && pascaHapus.partitur.includes(laguBerkas),
+    'v2.10 — hapus arsip tidak menghapus berkas yang masih dirujuk musim berjalan',
+    JSON.stringify(pascaHapus),
+  )
 
   cek(galatKonsol.length === 0, 'Tidak ada pageerror maupun console.error sepanjang alur #21', galatKonsol.join(' | '))
 } finally {

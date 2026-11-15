@@ -8,11 +8,18 @@ import {
   susunArsipMusim,
 } from '../../lib/administrasiUnit'
 import { bangunHtmlPiagamArsipMusim } from '../../lib/administrasiUnitCetak'
-import { buildBackupPayload } from '../../lib/backup'
+import { buildBackupPayload, downloadBackupZip } from '../../lib/backup'
+import {
+  berkasYatim,
+  kumpulkanRujukanBerkas,
+  nonaktifkanSemua,
+  transaksiSaldoAwal,
+} from '../../lib/pindahMusim'
+import { AmbilDariArsip } from './AmbilDariArsip'
 import { downloadHtmlFile, printHtml } from '../../lib/print'
 import { downloadFile, slugify, todayISO, uid } from '../../lib/utils'
 import { IconDownload, IconPrinter, IconTrash } from '../Icons'
-import { Button, Card, Field, Input, Modal, useToast } from '../ui'
+import { Button, Card, Field, Input, Modal, Toggle, useToast } from '../ui'
 
 export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
   const toast = useToast()
@@ -29,10 +36,45 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
   const [konfirmasiOpen, setKonfirmasiOpen] = useState(false)
   const [sedangProses, setSedangProses] = useState(false)
   const [pratinjauArsip, setPratinjauArsip] = useState<ArsipMusim | null>(null)
+  // v2.10 — backup wajib, pilihan rollover, dan konfirmasi untuk aksi yang mengubah data.
+  const [backupAkhir, setBackupAkhir] = useState(false)
+  const [sedangBackup, setSedangBackup] = useState(false)
+  const [nonaktifkanAnggota, setNonaktifkanAnggota] = useState(true)
+  const [bawaSaldo, setBawaSaldo] = useState(true)
+  const [ambilDari, setAmbilDari] = useState<ArsipMusim | null>(null)
+  const [muatUlang, setMuatUlang] = useState<ArsipMusim | null>(null)
+  const [hapusArsip, setHapusArsip] = useState<ArsipMusim | null>(null)
+
+  function bukaKonfirmasi() {
+    setBackupAkhir(false)
+    setKonfirmasiOpen(true)
+  }
+
+  /**
+   * v2.10 — backup ZIP lengkap (termasuk partitur & rekaman) sebelum musim
+   * dibekukan. Arsip musim tinggal di penyimpanan browser yang sama; kalau
+   * HP hilang, arsip ikut hilang. Berkas ini satu-satunya salinan di luar HP.
+   */
+  async function unduhBackupAkhirMusim() {
+    setSedangBackup(true)
+    try {
+      await downloadBackupZip({ akhirMusim: namaMusim.trim() || `Musim ${tahunMusim}` })
+      setBackupAkhir(true)
+      toast.push('Backup akhir musim diunduh. Simpan di Drive sebelum lanjut.')
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : 'Gagal membuat backup', 'err')
+    } finally {
+      setSedangBackup(false)
+    }
+  }
 
   async function jalankanRolloverMusim() {
     if (!namaMusim.trim()) {
       toast.push('Nama musim wajib diisi terlebih dahulu', 'err')
+      return
+    }
+    if (!backupAkhir) {
+      toast.push('Unduh backup akhir musim dulu', 'err')
       return
     }
     setSedangProses(true)
@@ -66,13 +108,29 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
         anotasiPartitur: payload.anotasiPartitur,
       })
 
+      // v2.10 — tabel berkas biner (partitur, rekaman, judge tape) TIDAK
+      // termasuk di sini lagi; lihat TABEL_BERKAS_DIPERTAHANKAN.
       const tabelBersih = TABEL_MUSIMAN_DIARSIPKAN.map((nama: string) => db.table(nama))
+      const saldo = transaksiSaldoAwal(
+        arsip.ringkasan.saldoAkhirKas,
+        arsip.namaMusim,
+        todayISO(),
+        uid('kas_'),
+        Date.now(),
+      )
+      let jmlNonaktif = 0
 
-      await db.transaction('rw', [db.arsipMusim, ...tabelBersih], async () => {
+      await db.transaction('rw', [db.arsipMusim, db.members, ...tabelBersih], async () => {
         await db.arsipMusim.put(arsip)
         for (const t of tabelBersih) {
           await t.clear()
         }
+        if (nonaktifkanAnggota) {
+          const ubah = nonaktifkanSemua(await db.members.toArray())
+          jmlNonaktif = ubah.length
+          if (ubah.length) await db.members.bulkPut(ubah)
+        }
+        if (bawaSaldo && saldo) await db.kasIuran.put(saldo)
       })
 
       setKonfirmasiOpen(false)
@@ -80,8 +138,10 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
       const thnLanjut = (Number(tahunMusim) || thnSkrg) + 1
       setNamaMusim(`Musim Kompetisi ${thnLanjut}`)
       setTahunMusim(String(thnLanjut))
+      setBackupAkhir(false)
       toast.push(
-        `${arsip.namaMusim} berhasil dibekukan ke Arsip Lintas-Musim! Roster aktif, inventaris alat, & kartu medis tetap utuh untuk musim baru.`,
+        `${arsip.namaMusim} dibekukan ke arsip. Musim baru mulai bersih` +
+          (nonaktifkanAnggota ? `; ${jmlNonaktif} anggota dinonaktifkan, aktifkan lagi yang lanjut di menu Anggota.` : '.'),
       )
     } catch (err) {
       toast.push(
@@ -95,6 +155,9 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
 
   async function pulihkanArsipKeRuangKerja(arsip: ArsipMusim) {
     try {
+      // v2.10 — Muat Ulang MENGGANTI seluruh isi musim berjalan, jadi isi yang
+      // sekarang diselamatkan dulu ke berkas.
+      await downloadBackupZip()
       const m = arsip.muatanMusim
       const tabelTulis = [
         db.sessions,
@@ -139,9 +202,45 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
         if (m.tindakLanjut?.length) await db.tindakLanjut.bulkPut(m.tindakLanjut)
         if (m.anotasiPartitur?.length) await db.anotasiPartitur.bulkPut(m.anotasiPartitur)
       })
-      toast.push(`Data musim "${arsip.namaMusim}" berhasil dimuat kembali ke ruang kerja aktif`)
+      setMuatUlang(null)
+      toast.push(`Data musim "${arsip.namaMusim}" dimuat kembali. Isi sebelumnya tersimpan di backup yang baru diunduh.`)
     } catch (err) {
       toast.push(err instanceof Error ? err.message : 'Gagal memuat arsip musim', 'err')
+    }
+  }
+
+  /**
+   * v2.10 — hapus arsip beserta berkas partitur/rekaman yang HANYA dirujuk
+   * arsip itu. Berkas yang masih dipakai musim berjalan atau arsip lain tetap.
+   */
+  async function jalankanHapusArsip(arsip: ArsipMusim) {
+    try {
+      let jml = 0
+      await db.transaction(
+        'rw',
+        [db.arsipMusim, db.songs, db.penilaianLomba, db.partiturBerkas, db.rekamanAudio, db.judgeTapeAudio],
+        async () => {
+          const lain = (await db.arsipMusim.toArray()).filter((a) => a.id !== arsip.id)
+          const rujukan = kumpulkanRujukanBerkas(
+            { songs: await db.songs.toArray(), penilaianLomba: await db.penilaianLomba.toArray() },
+            lain,
+          )
+          const yatim = berkasYatim(arsip, rujukan, {
+            partitur: await db.partiturBerkas.toArray(),
+            audio: await db.rekamanAudio.toArray(),
+            judgeTape: await db.judgeTapeAudio.toArray(),
+          })
+          await db.partiturBerkas.bulkDelete(yatim.partitur)
+          await db.rekamanAudio.bulkDelete(yatim.audio)
+          await db.judgeTapeAudio.bulkDelete(yatim.judgeTape)
+          jml = yatim.partitur.length + yatim.audio.length + yatim.judgeTape.length
+          await db.arsipMusim.delete(arsip.id)
+        },
+      )
+      setHapusArsip(null)
+      toast.push(`Arsip "${arsip.namaMusim}" dihapus${jml ? `, beserta ${jml} berkas partitur/rekaman miliknya` : ''}.`, 'info')
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : 'Gagal menghapus arsip', 'err')
     }
   }
 
@@ -152,7 +251,8 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
           Arsip Lintas-Musim &amp; Pergantian Tahun Kepengurusan (Season Rollover)
         </h2>
         <p className="mt-1 text-xs text-slate-400">
-          Bekukan repertoar lagu, koreografi drill/kirab, presensi latihan, buku kas, dan rekap nilai lomba musim ini ke arsip permanen baca-saja, lalu mulai musim baru <strong>tanpa menghapus</strong> daftar anggota aktif, inventaris alat/seragam, kartu medis, maupun identitas tim.
+          Rekap seluruh musim ini (jadwal &amp; absensi, lagu, drill, evaluasi, buku kas, nilai lomba) ke arsip, lalu mulai musim baru dari nol.
+          Anggota tidak dihapus, hanya dinonaktifkan; yang lanjut tinggal diaktifkan lagi. Lagu, drill, dan jadwal lama bisa diambil kembali satu per satu dari arsip.
         </p>
       </div>
 
@@ -182,13 +282,13 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
         </Field>
         <div className="sm:col-span-3 flex flex-wrap items-center justify-between gap-2 pt-1">
           <span className="text-[11px] text-slate-400">
-            Tetap dipertahankan di musim baru: <strong>Anggota Aktif</strong>, <strong>Inventaris &amp; Pinjaman Alat</strong>, <strong>Kartu Medis</strong>, dan <strong>Pengaturan Unit</strong>.
+            Tetap ada di musim baru: <strong>data anggota</strong> (nonaktif), <strong>inventaris &amp; pinjaman alat</strong>, <strong>kartu medis</strong>, <strong>pengaturan unit</strong>, serta berkas partitur &amp; rekaman.
           </span>
           <Button
             size="sm"
             variant="primary"
             data-testid="buka-konfirmasi-rollover"
-            onClick={() => setKonfirmasiOpen(true)}
+            onClick={bukaKonfirmasi}
           >
             Bekukan Musim &amp; Mulai Musim Baru
           </Button>
@@ -257,9 +357,19 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
                   {a.muatanMusim && (
                     <Button
                       size="sm"
+                      variant="primary"
+                      data-testid={`ambil-arsip-${a.id}`}
+                      onClick={() => setAmbilDari(a)}
+                    >
+                      Ambil lagu/drill/jadwal
+                    </Button>
+                  )}
+                  {a.muatanMusim && (
+                    <Button
+                      size="sm"
                       variant="ghost"
                       data-testid={`muat-ulang-musim-${a.id}`}
-                      onClick={() => void pulihkanArsipKeRuangKerja(a)}
+                      onClick={() => setMuatUlang(a)}
                     >
                       Muat Ulang
                     </Button>
@@ -267,7 +377,8 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
                   <button
                     type="button"
                     title="Hapus arsip musim"
-                    onClick={() => void db.arsipMusim.delete(a.id)}
+                    data-testid={`hapus-arsip-${a.id}`}
+                    onClick={() => setHapusArsip(a)}
                     className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-rose-400"
                   >
                     <IconTrash size={14} />
@@ -292,7 +403,7 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
             </Button>
             <Button
               variant="primary"
-              disabled={sedangProses}
+              disabled={sedangProses || !backupAkhir}
               data-testid="konfirmasi-bekukan-musim"
               onClick={() => void jalankanRolloverMusim()}
             >
@@ -301,19 +412,111 @@ export function PanelArsipMusim({ namaTim }: { namaTim: string }) {
           </div>
         }
       >
+        <div className="space-y-3 text-xs text-slate-300">
+          <div
+            className={`rounded-lg border p-3 ${backupAkhir ? 'border-emerald-700/50 bg-emerald-950/20' : 'border-amber-700/50 bg-amber-950/20'}`}
+          >
+            <div className="font-semibold text-slate-100">Langkah 1 · Unduh backup akhir musim</div>
+            <p className="mt-1 text-slate-400">
+              Satu berkas ZIP berisi semua data, partitur, dan rekaman. Arsip di bawah tersimpan di HP ini saja; kalau HP hilang, hanya berkas
+              ini yang tersisa. Simpan ke Drive.
+            </p>
+            <Button
+              size="sm"
+              variant={backupAkhir ? 'soft' : 'primary'}
+              className="mt-2"
+              data-testid="unduh-backup-akhir-musim"
+              disabled={sedangBackup}
+              onClick={() => void unduhBackupAkhirMusim()}
+            >
+              <IconDownload size={13} /> {sedangBackup ? 'Menyiapkan…' : backupAkhir ? 'Sudah diunduh · unduh lagi' : 'Unduh backup (ZIP)'}
+            </Button>
+          </div>
+          <div className="space-y-2 rounded-lg border border-slate-800 p-3">
+            <div className="font-semibold text-slate-100">Langkah 2 · Bekukan &amp; mulai musim baru</div>
+            <ul className="list-disc space-y-1 pl-5 text-slate-400">
+              <li>
+                <strong>Disalin ke arsip lalu dikosongkan:</strong> jadwal &amp; absensi, lagu &amp; set list, drill, setoran hafalan, evaluasi,
+                kesiapan &amp; nilai lomba, buku kas, audisi.
+              </li>
+              <li>
+                <strong>Tetap:</strong> data anggota, inventaris &amp; pinjaman, kartu medis, pengaturan unit, serta berkas partitur &amp; rekaman
+                (tersambung lagi begitu lagunya diambil dari arsip).
+              </li>
+            </ul>
+            <Toggle
+              checked={nonaktifkanAnggota}
+              onChange={setNonaktifkanAnggota}
+              label="Nonaktifkan semua anggota (yang lanjut diaktifkan lagi di menu Anggota)"
+              testId="opsi-nonaktifkan-anggota"
+            />
+            <Toggle
+              checked={bawaSaldo}
+              onChange={setBawaSaldo}
+              label="Bawa saldo akhir kas sebagai saldo awal musim baru"
+              testId="opsi-bawa-saldo"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {ambilDari && <AmbilDariArsip arsip={ambilDari} onClose={() => setAmbilDari(null)} />}
+
+      <Modal
+        open={!!muatUlang}
+        onClose={() => setMuatUlang(null)}
+        title={muatUlang ? `Muat ulang "${muatUlang.namaMusim}"?` : 'Muat ulang arsip'}
+        testId="modal-muat-ulang-musim"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setMuatUlang(null)}>
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              data-testid="konfirmasi-muat-ulang-musim"
+              onClick={() => muatUlang && void pulihkanArsipKeRuangKerja(muatUlang)}
+            >
+              Ganti isi musim berjalan
+            </Button>
+          </div>
+        }
+      >
         <div className="space-y-2 text-xs text-slate-300">
           <p>
-            Seluruh data musim <strong>{namaMusim}</strong> akan disimpan utuh ke dalam Arsip Lintas-Musim lokal (dan sewaktu-waktu dapat diunduh atau dimuat ulang).
+            Jadwal, absensi, lagu, drill, evaluasi, dan buku kas yang ada sekarang akan <strong>diganti seluruhnya</strong> dengan isi arsip ini.
+            Sebelum itu DrillKit mengunduh backup ZIP isi sekarang.
           </p>
-          <ul className="list-disc space-y-1 pl-5 text-slate-400">
-            <li>
-              <strong>Dibersihkan untuk musim baru:</strong> Jadwal &amp; presensi latihan, lagu &amp; setoran hafalan, koreografi drill/kirab, kesiapan lomba, simulasi nilai juri, buku kas/iuran musim berjalan, serta daftar audisi lama.
-            </li>
-            <li>
-              <strong>Tetap utuh dan siap dipakai:</strong> Daftar anggota aktif, inventaris seragam/alat &amp; peminjaman aktif, kartu medis darurat, serta pengaturan unit.
-            </li>
-          </ul>
+          <p className="text-slate-400">
+            Hanya perlu sebagian? Pakai <strong>Ambil lagu/drill/jadwal</strong>, yang menambahkan tanpa menimpa.
+          </p>
         </div>
+      </Modal>
+
+      <Modal
+        open={!!hapusArsip}
+        onClose={() => setHapusArsip(null)}
+        title={hapusArsip ? `Hapus arsip "${hapusArsip.namaMusim}"?` : 'Hapus arsip'}
+        testId="modal-hapus-arsip"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setHapusArsip(null)}>
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              data-testid="konfirmasi-hapus-arsip"
+              onClick={() => hapusArsip && void jalankanHapusArsip(hapusArsip)}
+            >
+              Hapus permanen
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-xs text-slate-300">
+          Rekap musim ini beserta berkas partitur &amp; rekaman yang hanya dipakai musim itu akan dihapus dari HP ini. Pastikan backup akhir
+          musimnya sudah tersimpan di Drive.
+        </p>
       </Modal>
 
       {/* Modal Pratinjau Piagam Arsip Musim */}

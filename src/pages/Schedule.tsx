@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Link } from 'react-router-dom'
 import { db } from '../db/db'
 import type { AttendanceRecord, ChecklistItem, Session, SessionType } from '../db/types'
 import {
@@ -112,6 +113,8 @@ export default function Schedule() {
   const ambang = rapikanPredikat(settings?.ambangPredikat)
   const sessions = useLiveQuery(() => db.sessions.orderBy('date').toArray(), [], [])
   const absensi = useLiveQuery(() => db.attendance.toArray(), [], [] as AttendanceRecord[])
+  // v2.10 — musim baru kosong tetapi ada arsip: tunjukkan jalan mengambil jadwal lama.
+  const jmlArsip = useLiveQuery(() => db.arsipMusim.count(), [], 0)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Session | null>(null)
   /** D3 — saring daftar jadwal menurut jenis kegiatan. */
@@ -388,6 +391,16 @@ export default function Schedule() {
           </>
         }
       />
+
+      {sessions.length === 0 && jmlArsip > 0 && (
+        <div className="mb-4 rounded-2xl border border-amber-700/40 bg-amber-950/20 p-3 text-xs text-amber-100" data-testid="petunjuk-ambil-jadwal">
+          Musim baru masih kosong. Jadwal musim lalu bisa diambil kembali (tanggalnya digeser ke musim ini) dari{' '}
+          <Link to="/pengaturan" className="font-semibold text-amber-300 underline">
+            Pengaturan → Arsip Lintas-Musim → Ambil lagu/drill/jadwal
+          </Link>
+          .
+        </div>
+      )}
 
       <Card className="mb-4">
         <div className="flex flex-wrap items-end gap-3">

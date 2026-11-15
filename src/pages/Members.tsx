@@ -122,6 +122,13 @@ export default function Members() {
   const [rekapOpen, setRekapOpen] = useState(false)
 
   const daftarTagAnggota = useMemo(() => kumpulkanTagRoster(members), [members])
+  // v2.10 — saring per angkatan (tahun masuk), dipakai mengaktifkan lagi anggota yang lanjut sesudah pindah musim.
+  const daftarAngkatan = useMemo(() => {
+    const peta = new Map<number, number>()
+    for (const m of members) if (m.joinYear) peta.set(m.joinYear, (peta.get(m.joinYear) ?? 0) + 1)
+    return [...peta.entries()].sort((a, b) => b[0] - a[0])
+  }, [members])
+  const semuaNonaktif = members.length > 0 && members.every((m) => m.active !== 1)
 
   const list = useMemo(() => {
     return members
@@ -131,7 +138,9 @@ export default function Members() {
           ? true
           : filter.startsWith('tag:')
             ? punyaTag(m, filter.slice(4))
-            : m.section === filter,
+            : filter.startsWith('angkatan:')
+              ? String(m.joinYear) === filter.slice(9)
+              : m.section === filter,
       )
       .filter((m) => cocokCari(m, q, true))
   }, [members, q, filter, showInactive])
@@ -485,6 +494,15 @@ export default function Members() {
                   {s.label}
                 </option>
               ))}
+              {daftarAngkatan.length > 0 && (
+                <optgroup label="Angkatan (tahun masuk)">
+                  {daftarAngkatan.map(([th, n]) => (
+                    <option key={`angkatan:${th}`} value={`angkatan:${th}`}>
+                      Angkatan {th} ({n})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
               {daftarTagAnggota.length > 0 && (
                 <optgroup label="Tag / kelompok roster">
                   {daftarTagAnggota.map(({ tag, memberIds }) => (
@@ -497,6 +515,29 @@ export default function Members() {
             </Select>
           </div>
         </div>
+        {semuaNonaktif && !showInactive && (
+          <div
+            className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-700/40 bg-amber-950/20 p-2.5 text-xs text-amber-100"
+            data-testid="banner-musim-baru"
+          >
+            <span>
+              Semua {members.length} anggota sedang nonaktif (biasanya sesudah pindah musim). Saring per section atau angkatan, pilih yang lanjut,
+              lalu aktifkan lagi.
+            </span>
+            <Button
+              size="sm"
+              variant="primary"
+              data-testid="mulai-aktifkan-lagi"
+              onClick={() => {
+                setShowInactive(true)
+                setModePilih(true)
+                setTerpilih(new Set())
+              }}
+            >
+              Aktifkan yang lanjut
+            </Button>
+          </div>
+        )}
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <Toggle checked={showInactive} onChange={setShowInactive} label="Tampilkan anggota nonaktif" testId="toggle-anggota-nonaktif" />
           <PilihModeNama />
