@@ -2,6 +2,7 @@
   "name": "drillkit",
   "private": true,
   "version": "2.9.0",
+  "license": "UNLICENSED",
   "type": "module",
   "description": "DrillKit - Aplikasi all-in-one untuk pelatih marching band (formasi/drill, anggota, absensi, jadwal, metronom). Offline-first PWA.",
   "scripts": {

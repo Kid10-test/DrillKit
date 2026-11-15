@@ -1,0 +1,57 @@
+DrillKit — Lisensi Hak Milik (Proprietary License)
+
+Hak Cipta (c) 2026 pemilik akun GitHub Kid10-test ("Pemilik").
+Seluruh hak dilindungi.
+
+DrillKit, termasuk kode sumber, kode hasil build, tampilan, nama,
+dokumentasi, panduan, dan berkas pendukungnya ("Perangkat Lunak"), adalah
+ciptaan Pemilik yang dilindungi Undang-Undang Republik Indonesia Nomor 28
+Tahun 2014 tentang Hak Cipta.
+
+1. Tidak ada izin. Berkas ini tidak memberikan izin apa pun. Tanpa izin
+   tertulis dari Pemilik, siapa pun dilarang menyalin, mengubah,
+   menggabungkan, menerbitkan, mendistribusikan, men-deploy, menjalankan
+   untuk pihak lain, mensublisensikan, menyewakan, atau menjual Perangkat
+   Lunak, seluruhnya maupun sebagian.
+
+2. Melihat bukan berarti boleh memakai. Bila repositori ini sedang dapat
+   dilihat publik, hak yang ada hanya sebatas yang diwajibkan Ketentuan
+   Layanan GitHub, yaitu melihat dan mem-fork di dalam GitHub. Hak itu
+   tidak mencakup memakai, menjalankan, atau men-deploy Perangkat Lunak.
+
+3. Izin pakai hanya lewat perjanjian. Pemakaian oleh unit, band, atau
+   organisasi mana pun hanya sah berdasarkan perjanjian lisensi tertulis
+   yang ditandatangani Pemilik. Perjanjian itu menentukan pemakai, jumlah
+   perangkat, dan masa berlakunya. Perjanjian lisensi bukan pengalihan hak
+   cipta, dan Perangkat Lunak bukan aset atau inventaris pemegang lisensi.
+
+4. Data tetap milik pemakai. Data yang dimasukkan pemegang lisensi ke
+   Perangkat Lunak (anggota, absensi, jadwal, evaluasi, dan sebagainya)
+   tetap milik pemegang lisensi.
+
+5. Pustaka pihak ketiga. Pustaka sumber terbuka yang dipakai DrillKit
+   (tercantum di package.json) tetap tunduk pada lisensinya masing-masing.
+   Lisensi ini tidak berlaku atas pustaka tersebut.
+
+6. Tanpa jaminan. Kecuali diatur lain dalam perjanjian lisensi tertulis,
+   Perangkat Lunak disediakan "sebagaimana adanya", dan sejauh diizinkan
+   hukum, Pemilik tidak bertanggung jawab atas kerugian yang timbul dari
+   pemakaiannya.
+
+Permohonan izin: hubungi Pemilik melalui akun GitHub Kid10-test.
+
+---
+
+English summary
+
+Copyright (c) 2026 the owner of the GitHub account Kid10-test. All rights
+reserved. DrillKit is proprietary software protected under Indonesian
+Copyright Law No. 28 of 2014. No licence is granted by this file. You may
+not copy, modify, distribute, deploy, sublicense, rent, or sell it, in whole
+or in part, without the owner's written permission. Any public visibility of
+this repository grants only the rights required by the GitHub Terms of
+Service (viewing and forking within GitHub), not the right to use, run, or
+deploy the software. Use by any organisation requires a signed written
+licence agreement. Data entered by a licensee remains the licensee's.
+Third-party open-source libraries listed in package.json remain under their
+own licences.
