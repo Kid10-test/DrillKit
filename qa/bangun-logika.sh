@@ -192,6 +192,9 @@ rakit src/lib/manajemenMusim.ts          manajemenMusim
 # v2.7.1 — roster pergantian musim: impor CSV cocok-nama, aksi massal, rekap roster.
 rakit src/lib/rosterAnggota.ts           rosterAnggota
 rakit src/lib/rosterCetak.ts            rosterCetak
+# v2.10 — pindah musim: nonaktifkan anggota, saldo awal kas, berkas yatim, ambil dari arsip.
+rakit src/lib/pindahMusim.ts             pindahMusim
+rakit src/lib/namaBerkas.ts              namaBerkas
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'

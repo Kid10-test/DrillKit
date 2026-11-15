@@ -588,6 +588,12 @@ export interface MasukanSeasonRollover {
  * Daftar tabel musiman yang dibersihkan saat *Season Rollover*.
  *
  * **DIJAMIN TIDAK DIHAPUS:** `members`, `inventaris`, `medisAnggota`, `settings`, dan `arsipMusim`!
+ *
+ * v2.10 — `judgeTapeAudio`, `rekamanAudio`, dan `partiturBerkas` DIKELUARKAN
+ * dari daftar ini. Isinya (berkas biner) tidak pernah ikut disalin ke
+ * `ArsipMusim`, jadi menghapusnya berarti partitur, rekaman lagu, dan rekaman
+ * juri musim lalu hilang permanen. Lihat `TABEL_BERKAS_DIPERTAHANKAN` di
+ * `pindahMusim.ts`. Anggota tidak dihapus, tetapi dinonaktifkan oleh panel.
  */
 export const TABEL_MUSIMAN_DIARSIPKAN = [
   'sessions',
@@ -605,9 +611,6 @@ export const TABEL_MUSIMAN_DIARSIPKAN = [
   'countSheets',
   'logistikLomba',
   'penilaianLomba',
-  'judgeTapeAudio',
-  'rekamanAudio',
-  'partiturBerkas',
   'kasIuran',
   'audisi',
   'tindakLanjut',

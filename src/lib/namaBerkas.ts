@@ -41,6 +41,12 @@ export function namaBackupZip(t?: Date): string {
   return `DrillKit - BACKUP LENGKAP + REKAMAN - ${capTanggal(t)}.zip`
 }
 
+/** v2.10 — backup wajib sebelum pindah musim; nama musimnya ikut tertulis. */
+export function namaBackupAkhirMusim(namaMusim: string, t?: Date): string {
+  const nama = bersihNama(tanpaAksen(namaMusim).replace(/[\\/]/g, '-'), 50) || 'Musim'
+  return `DrillKit - BACKUP AKHIR MUSIM - ${nama} - ${capTanggal(t)}.zip`
+}
+
 export function namaData(t?: Date): string {
   return `DrillKit - DATA PILIHAN - ${capTanggal(t)}.json`
 }
