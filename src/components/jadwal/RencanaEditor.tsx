@@ -7,10 +7,10 @@
  * paralel memakai durasi blok induknya, sehingga jam sesi tetap satu garis.
  */
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import type { BlokLatihan, CabangBlok, JenisBlok, Session } from '../../db/types'
+import type { BlokLatihan, CabangBlok, JenisBlok, PrioritasBlok, Session } from '../../db/types'
 import { saveSettings } from '../../db/db'
 import { Button, Input, Select, useToast } from '../ui'
-import { LABEL_BLOK, URUTAN_BLOK, WARNA_BLOK, formatMenit, lebihRencana, totalRencana } from '../../lib/latihan'
+import { LABEL_BLOK, LABEL_PRIORITAS, URUTAN_BLOK, WARNA_BLOK, formatMenit, lebihRencana, prioritasBlok, totalRencana } from '../../lib/latihan'
 import { lamaSlot, menitDariJam } from '../../lib/runsheet'
 import {
   buatPola,
@@ -107,6 +107,7 @@ export function PenyuntingBlok({
         if (b.id !== id) return b
         const baru: BlokLatihan = { ...b, ...patch }
         for (const k of ['pelatih', 'tempat', 'catatan'] as const) if (baru[k] === '') delete baru[k]
+        if (!baru.prioritas) delete baru.prioritas
         if (baru.cabang && baru.cabang.length === 0) delete baru.cabang
         return baru
       }),
@@ -148,6 +149,17 @@ export function PenyuntingBlok({
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-slate-600">{i + 1}.</span>
                   <span className="min-w-0 flex-1 truncate text-sm text-slate-200">{b.judul}</span>
+                  {prioritasBlok(b) !== 'biasa' && (
+                    <span
+                      data-testid={`tanda-prioritas-${b.id}`}
+                      className={`hidden shrink-0 rounded border px-1 py-0.5 text-[10px] sm:inline ${
+                        prioritasBlok(b) === 'kunci' ? 'border-amber-500/40 text-amber-300' : 'border-slate-600 text-slate-400'
+                      }`}
+                      title={b.prioritas ? 'Prioritas diatur' : 'Otomatis dari ranah'}
+                    >
+                      {prioritasBlok(b) === 'kunci' ? 'kunci' : 'potong dulu'}
+                    </span>
+                  )}
                   <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${WARNA_BLOK[b.jenis] ?? WARNA_BLOK.lainnya}`}>
                     {LABEL_BLOK[b.jenis] ?? b.jenis}
                   </span>
@@ -206,7 +218,7 @@ export function PenyuntingBlok({
 
                 {terbuka && (
                   <div data-testid={`panel-blok-${b.id}`} className="mt-2 space-y-2 border-t border-slate-700/60 pt-2">
-                    <div className="grid gap-2 sm:grid-cols-[1fr_9rem_5rem]">
+                    <div className="grid gap-2 sm:grid-cols-[1fr_9rem_9rem_5rem]">
                       <Input
                         data-testid={`judul-${b.id}`}
                         value={b.judul}
@@ -223,6 +235,17 @@ export function PenyuntingBlok({
                             {LABEL_BLOK[t]}
                           </option>
                         ))}
+                      </Select>
+                      <Select
+                        data-testid={`prioritas-${b.id}`}
+                        value={b.prioritas ?? ''}
+                        onChange={(e) => ubah(b.id, { prioritas: (e.target.value || undefined) as PrioritasBlok | undefined })}
+                        title="Prioritas saat waktu tidak cukup"
+                      >
+                        <option value="">Otomatis ({LABEL_PRIORITAS[prioritasBlok({ jenis: b.jenis })].toLowerCase()})</option>
+                        <option value="kunci">Kunci — jangan dipotong</option>
+                        <option value="biasa">Biasa</option>
+                        <option value="potong">Potong dulu</option>
                       </Select>
                       <Input
                         data-testid={`menit-${b.id}`}

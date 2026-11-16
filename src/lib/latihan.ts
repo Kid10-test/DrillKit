@@ -18,7 +18,7 @@
  * Sengaja **murni** (tidak menyentuh Dexie, React, atau DOM) supaya bisa
  * diuji langsung dari node, seperti `runsheet.ts` dan `lomba.ts`.
  */
-import type { BlokLatihan, JenisBlok, LogRepSet, RealisasiBlok, Session } from '../db/types'
+import type { BlokLatihan, JenisBlok, LogRepSet, PrioritasBlok, RealisasiBlok, Session } from '../db/types'
 
 /** Satu blok rencana, sudah dihitung waktu absolutnya. */
 export interface BarisRencana {
@@ -28,6 +28,8 @@ export interface BarisRencana {
   /** Durasi yang direncanakan, dalam menit. */
   menit: number
   catatan?: string
+  /** v2.11 — prioritas efektif (lihat `prioritasBlok`). */
+  prioritas: PrioritasBlok
   /** Menit sejak tengah malam. `null` kalau jam mulai sesi tidak sah. */
   mulai: number | null
   selesai: number | null
@@ -88,6 +90,22 @@ export const WARNA_BLOK: Record<JenisBlok, string> = {
   lainnya: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
 }
 
+/**
+ * v2.11 — prioritas blok saat waktu tidak cukup. Bila tidak diisi: apel,
+ * tes, dan pendingin dianggap `kunci` (tidak pernah diusulkan dipotong),
+ * selebihnya `biasa`.
+ */
+export function prioritasBlok(b: Pick<BlokLatihan, 'jenis' | 'prioritas'>): PrioritasBlok {
+  if (b.prioritas === 'kunci' || b.prioritas === 'biasa' || b.prioritas === 'potong') return b.prioritas
+  return b.jenis === 'apel' || b.jenis === 'tes' || b.jenis === 'pendingin' ? 'kunci' : 'biasa'
+}
+
+export const LABEL_PRIORITAS: Record<PrioritasBlok, string> = {
+  kunci: 'Kunci',
+  biasa: 'Biasa',
+  potong: 'Potong dulu',
+}
+
 /** Total menit yang direncanakan. Blok dengan durasi tidak sah diabaikan. */
 export function totalRencana(blok: BlokLatihan[] | undefined): number {
   if (!blok) return 0
@@ -116,6 +134,7 @@ export function susunRencana(mulai: number | null, blok: BlokLatihan[] | undefin
       jenis: b.jenis,
       menit,
       catatan: b.catatan,
+      prioritas: prioritasBlok(b),
       mulai: awal,
       selesai: akhir,
       urutan,
@@ -136,132 +155,287 @@ export function lebihRencana(lamaSlot: number | null, blok: BlokLatihan[] | unde
 
 export type FaseLatihan = 'belumMulai' | 'berjalan' | 'rampung'
 
+/**
+ * Keadaan satu blok di Pacu.
+ *
+ * - `belum` — belum dikerjakan dan masih di depan; ikut dihitung ke proyeksi.
+ * - `takTercatat` — tidak punya catatan padahal blok sesudahnya sudah
+ *   dimulai. Dianggap sudah lewat, **tidak** menahan hitungan (dulu satu
+ *   blok tanpa catatan membuat selisih berhenti dihitung).
+ */
+export type StatusBlok = 'belum' | 'berjalan' | 'selesai' | 'dilewati' | 'dibawa' | 'takTercatat'
+
+/** Satu baris Pacu: rencana + kenyataan + perkiraan. Semua jam dalam menit sejak tengah malam hari sesi. */
+export interface BarisPacu extends BarisRencana {
+  status: StatusBlok
+  nyataMulai: number | null
+  nyataSelesai: number | null
+  /** Durasi nyata blok selesai, atau yang sudah berjalan. */
+  nyataMenit: number | null
+  /** Perkiraan jam mulai & selesai untuk blok `belum` dan `berjalan`. */
+  kiraMulai: number | null
+  kiraSelesai: number | null
+  /** Sesi tujuan bila blok dibawa ke sesi lain. */
+  dibawaKe?: string
+}
+
 export interface PosisiLatihan {
   /** Menit sejak tengah malam, sesuai jam yang diberikan. */
   menit: number
   fase: FaseLatihan
-  /** Blok yang sedang berjalan. `null` kalau di luar rentang rencana. */
+  /**
+   * Blok yang sedang berjalan. Bila belum ada catatan sama sekali: blok yang
+   * menurut rencana seharusnya sedang berlangsung. `null` saat jeda
+   * antarblok atau di luar rentang rencana.
+   */
   blok: BarisRencana | null
   /**
    * Menit tersisa pada blok yang berjalan. **Boleh negatif** — negatif
    * berarti blok ini sudah lewat dari jatahnya dan belum dituntaskan.
    */
   sisaBlok: number | null
-  /** Blok yang sudah dilewati, dalam urutan rencana. */
+  /** Blok yang sudah lewat (selesai, dilewati, dibawa, tak tercatat). */
   sudahLewat: BarisRencana[]
   /** Blok yang belum dikerjakan. */
   tersisa: BarisRencana[]
   /**
-   * **Inti modul ini.** Geser kumulatif dalam menit: positif = terlambat,
-   * negatif = lebih cepat dari rencana. Dihitung dari realisasi, bukan
-   * dari rencana — karena rencana tidak pernah melenceng, kenyataannya yang
-   * melenceng.
+   * **Inti modul ini.** Selisih proyeksi selesai terhadap jam selesai acuan,
+   * dalam menit: positif = terlambat, negatif = lebih cepat.
    */
   geser: number
-  /** Total menit yang direncanakan. */
+  /** Total menit rencana yang sekarang. */
   totalRencana: number
-  /**
-   * Proyeksi jam selesainya semua blok, dalam menit sejak tengah malam.
-   * Inilah jawaban untuk "apakah bagian akhir kehabisan waktu".
-   * `null` kalau rencananya tidak berjam.
-   */
+  /** Perkiraan jam selesai blok terakhir. `null` kalau rencananya tidak berjam. */
   proyeksiSelesai: number | null
-  /** Berapa blok yang sudah dicatat realisasinya. */
+  /** Berapa blok yang sudah punya catatan (termasuk yang dilewati). */
   tercatat: number
+
+  /* --------------------------- v2.11 --------------------------- */
+  /** Seluruh blok dengan keadaan, jam nyata, dan perkiraannya. */
+  baris: BarisPacu[]
+  berjalan: BarisPacu | null
+  /** Blok berikutnya yang belum dikerjakan. */
+  berikut: BarisPacu | null
+  /** Menit sejak blok terakhir selesai, saat tidak ada blok berjalan. */
+  jeda: number | null
+  /** Blok yang menurut rencana sekarang seharusnya berlangsung. */
+  seharusnya: BarisRencana | null
+  /** Jam selesai acuan (rencana awal). */
+  target: number | null
+  /** Jam mulai acuan. */
+  mulaiAcuan: number | null
+  /** Blok pertama mulai berapa menit dari jam rencana. `null` = belum mulai. */
+  telatMulai: number | null
+  /** Jumlah jeda di antara blok yang sudah tercatat, dalam menit. */
+  totalJeda: number
 }
 
 /**
- * Posisi latihan saat ini.
+ * Rapikan catatan realisasi sebelum dihitung:
  *
- * Dua jangkar yang berbeda, dipakai bergantung pada apa yang tersedia:
+ * - satu catatan per blok (yang terakhir menang);
+ * - blok yang dilewati selalu punya `selesai`;
+ * - **paling banyak satu blok berjalan.** Data lama bisa berisi dua blok
+ *   berjalan sekaligus (dulu tombol Mulai tidak menutup blok sebelumnya);
+ *   yang lebih awal dianggap selesai saat blok berikutnya dimulai.
+ */
+export function rapikanRealisasi(realisasi: readonly RealisasiBlok[] | undefined): RealisasiBlok[] {
+  const peta = new Map<string, RealisasiBlok>()
+  for (const r of realisasi ?? []) {
+    if (!r || !r.id || !Number.isFinite(r.mulai)) continue
+    const salin: RealisasiBlok = { ...r }
+    if (salin.dibawaKe) salin.dilewati = true
+    if (salin.dilewati && salin.selesai == null) salin.selesai = salin.mulai
+    if (salin.selesai != null && salin.selesai < salin.mulai) salin.selesai = salin.mulai
+    peta.delete(r.id)
+    peta.set(r.id, salin)
+  }
+  const hasil = [...peta.values()]
+  const jalan = hasil.filter((r) => r.selesai == null).sort((a, b) => a.mulai - b.mulai)
+  for (let i = 0; i < jalan.length - 1; i++) {
+    const r = jalan[i]
+    const sesudah = hasil
+      .filter((x) => x !== r && !x.dilewati && x.mulai > r.mulai)
+      .reduce((min, x) => Math.min(min, x.mulai), jalan[jalan.length - 1].mulai)
+    r.selesai = Math.max(r.mulai, sesudah)
+  }
+  return hasil
+}
+
+/**
+ * Posisi latihan saat ini — v2.11, **berpatokan pada jam nyata**.
  *
- * - **Jangkar realisasi** (utama). Kalau ada blok yang benar-benar sudah
- *   dimulai, posisi dan gesernya dihitung dari **kenyataan**.
- * - **Jangkar rencana** (cadangan). Kalau belum ada yang dimulai, posisi
- *   ditentukan dengan mencari blok yang slotnya mencakup jam sekarang —
- *   memakai **rentang setengah terbuka** `mulai ≤ now < selesai`, sama
- *   seperti `posisiHari` di G2, supaya menit pertama sesi sudah menjadi
- *   milik blok pertama.
+ * Pertanyaan yang dijawab: *kalau sisa blok dikerjakan sesuai menitnya mulai
+ * sekarang, jam berapa latihan selesai, dan berapa selisihnya dari rencana
+ * awal?* Karena dihitung dari jam dinding, semua yang dulu luput ikut
+ * terhitung dengan sendirinya:
  *
- * Geser hanya dihitung setelah blok pertama benar-benar dimulai. Sebelum
- * itu nilainya 0, bukan karena tepat waktu, melainkan karena **belum ada
- * yang bisa diketahui** — membedakan "tidak tahu" dari "tepat waktu"
- * adalah pelajaran yang sama dengan status `takPasti` di G1.
+ * - **apel yang mulai terlambat** — blok pertama mulai 17.40 padahal rencana
+ *   17.30 berarti sisa latihan bergeser 10 menit;
+ * - **jeda di antara blok** — blok selesai 18.10, berikutnya baru mulai
+ *   18.15: lima menit itu hilang dan ikut dihitung;
+ * - **blok yang dilewati** tidak menghentikan hitungan; menitnya justru
+ *   menjadi waktu yang didapat kembali;
+ * - blok yang berjalan hanya menyumbang **kelebihannya yang sudah terjadi** —
+ *   baru 5 menit dari blok 20 menit tidak dibaca \"lebih cepat 15 menit\".
+ *
+ * Sebelum jam mulai rencana dan tanpa catatan apa pun, selisihnya 0: belum
+ * ada yang bisa diketahui. Sesi yang sudah lewat tanpa pernah dicatat juga
+ * dinilai 0, bukan terlambat berjam-jam.
+ *
+ * Acuan selisih adalah **rencana awal** (`mulaiAcuan` + `totalAcuan`), bukan
+ * rencana yang sedang dipakai. Dengan begitu mengurangi menit atau melewati
+ * blok benar-benar terlihat sebagai waktu yang dikejar, dan menambah blok
+ * darurat terlihat sebagai tambahan.
  */
 export function posisiLatihan(bahan: {
   rencana: BarisRencana[]
-  realisasi: RealisasiBlok[]
-  /** Menit sejak tengah malam, jam saat ini. */
+  realisasi: readonly RealisasiBlok[]
+  /** Menit sejak tengah malam (hari sesi), jam saat ini. */
   menit: number
-  /** Epoch ms saat ini — diperlukan untuk menghitung durasi blok berjalan. */
+  /** Epoch ms saat ini. */
   kini: number
+  /** Epoch ms pukul 00.00 hari sesi. Bawaan: diturunkan dari `kini` & `menit`. */
+  nol?: number
+  /** Jam mulai acuan (rencana awal). Bawaan: jam blok pertama rencana. */
+  mulaiAcuan?: number | null
+  /** Total menit rencana awal. Bawaan: total rencana sekarang. */
+  totalAcuan?: number
+  /** Epoch ms sesi ditandai selesai, bila ada. */
+  selesaiSesi?: number | null
 }): PosisiLatihan {
-  const { rencana, realisasi, menit, kini } = bahan
+  const { rencana, menit, kini } = bahan
+  const nol = bahan.nol ?? kini - menit * 60000
+  const keMenit = (e: number) => (e - nol) / 60000
+  const sekarang = keMenit(kini)
+  const realisasi = rapikanRealisasi(bahan.realisasi)
   const peta = new Map(realisasi.map((r) => [r.id, r]))
   const total = rencana.reduce((t, b) => t + b.menit, 0)
 
-  // --- Jangkar realisasi: ada blok yang sedang berjalan?
-  const berjalan = rencana.find((b) => {
+  // --- Keadaan tiap blok.
+  let terakhirNyata = -1
+  rencana.forEach((b, i) => {
     const r = peta.get(b.id)
-    return r != null && r.mulai != null && r.selesai == null
+    if (r && !r.dilewati) terakhirNyata = i
+  })
+  const baris: BarisPacu[] = rencana.map((b, i) => {
+    const r = peta.get(b.id)
+    let status: StatusBlok
+    if (!r) status = i < terakhirNyata ? 'takTercatat' : 'belum'
+    else if (r.dibawaKe) status = 'dibawa'
+    else if (r.dilewati) status = 'dilewati'
+    else status = r.selesai == null ? 'berjalan' : 'selesai'
+    const nyata = r && !r.dilewati
+    const nyataMulai = nyata ? keMenit(r.mulai) : null
+    const nyataSelesai = nyata && r.selesai != null ? keMenit(r.selesai) : null
+    return {
+      ...b,
+      status,
+      nyataMulai,
+      nyataSelesai,
+      nyataMenit: nyataMulai == null ? null : (nyataSelesai ?? sekarang) - nyataMulai,
+      kiraMulai: null,
+      kiraSelesai: null,
+      ...(r?.dibawaKe ? { dibawaKe: r.dibawaKe } : {}),
+    }
   })
 
-  // --- Geser kumulatif dari realisasi.
-  //
-  // Blok yang **sudah selesai** menyumbang seluruh selisihnya, entah lebih
-  // atau kurang dari rencana.
-  //
-  // Blok yang **sedang berjalan** hanya menyumbang kelebihannya yang sudah
-  // terjadi — `max(0, berjalan − rencana)`. Ini penting: kalau ia ikut
-  // menyumbang selisih utuhnya, maka baru 5 menit masuk blok 20 menit akan
-  // terbaca "lebih cepat 15 menit", padahal yang benar kita tidak tahu apa
-  // pun selain "belum melenceng".
-  let geser = 0
-  for (const b of rencana) {
-    const r = peta.get(b.id)
-    if (!r || r.mulai == null) break // belum ada catatan → setelahnya tak dinilai
-    if (r.selesai != null) {
-      geser += (r.selesai - r.mulai) / 60000 - b.menit
-    } else {
-      geser += Math.max(0, (kini - r.mulai) / 60000 - b.menit)
-      break
-    }
-  }
+  const nyataSemua = baris.filter((b) => b.nyataMulai != null)
+  const idRencana = new Set(rencana.map((b) => b.id))
+  const adaCatatan = realisasi.some((r) => idRencana.has(r.id))
+  const berjalan = baris.find((b) => b.status === 'berjalan') ?? null
+  const mulaiPertama = nyataSemua.length ? Math.min(...nyataSemua.map((b) => b.nyataMulai!)) : null
+  const selesaiTerakhir = nyataSemua.some((b) => b.nyataSelesai != null)
+    ? Math.max(...nyataSemua.filter((b) => b.nyataSelesai != null).map((b) => b.nyataSelesai!))
+    : null
 
-  let blok: BarisRencana | null = berjalan ?? null
-  let sisaBlok: number | null = null
+  // --- Acuan.
+  const mulaiRencana = rencana.length ? rencana[0].mulai : null
+  const acuanTetap = bahan.mulaiAcuan !== undefined ? bahan.mulaiAcuan : mulaiRencana
+  const mulaiAcuan = acuanTetap ?? mulaiPertama
+  const totalAcuan = bahan.totalAcuan ?? total
+  const target = mulaiAcuan == null ? null : mulaiAcuan + totalAcuan
+  const ujungRencanaKini = mulaiRencana == null ? null : mulaiRencana + total
 
+  // --- Blok yang menurut rencana seharusnya sedang berlangsung.
+  const seharusnya =
+    rencana.find((b) => b.mulai != null && b.selesai != null && b.mulai <= menit && menit < b.selesai) ?? null
+
+  // --- Proyeksi: sisa blok disusun mulai dari jam nyata.
+  const sesiDitutup = bahan.selesaiSesi != null
+  let kursor: number | null
   if (berjalan) {
-    const r = peta.get(berjalan.id)!
-    sisaBlok = berjalan.menit - (kini - r.mulai) / 60000
+    kursor = Math.max(sekarang, berjalan.nyataMulai! + berjalan.menit)
+    berjalan.kiraMulai = berjalan.nyataMulai
+    berjalan.kiraSelesai = kursor
+  } else if (adaCatatan) {
+    const basi = target != null && sekarang > target + 360
+    const dasar = Math.max(selesaiTerakhir ?? -Infinity, mulaiAcuan ?? -Infinity)
+    kursor = basi || sesiDitutup ? (Number.isFinite(dasar) ? dasar : null) : Math.max(sekarang, dasar)
+  } else if (mulaiAcuan == null) {
+    kursor = null
   } else {
-    // --- Jangkar rencana: blok yang slotnya mencakup jam sekarang.
-    const berwaktu = rencana.filter((b) => b.mulai != null && b.selesai != null)
-    const isi = berwaktu.find((b) => b.mulai! <= menit && menit < b.selesai!)
-    if (isi) {
-      blok = isi
-      sisaBlok = isi.selesai! - menit
+    // Belum ada catatan. Sesi yang rencananya sudah habis dianggap tidak
+    // dicatat, bukan terlambat; di dalam rentangnya, jam dinding berlaku.
+    const sudahHabis = ujungRencanaKini != null && menit >= ujungRencanaKini
+    kursor = sudahHabis || sesiDitutup ? mulaiAcuan : Math.max(sekarang, mulaiAcuan)
+  }
+  const belum = baris.filter((b) => b.status === 'belum')
+  if (kursor != null) {
+    for (const b of belum) {
+      b.kiraMulai = kursor
+      kursor += b.menit
+      b.kiraSelesai = kursor
     }
   }
+  const adaSisa = belum.length > 0 || berjalan != null
+  const proyeksiSelesai = !adaSisa && selesaiTerakhir != null ? selesaiTerakhir : kursor
+  const geser = proyeksiSelesai != null && target != null ? proyeksiSelesai - target : 0
 
-  const idx = blok ? blok.urutan : -1
-  const sudahLewat = idx >= 0 ? rencana.slice(0, idx) : []
-  const tersisa = idx >= 0 ? rencana.slice(idx + 1) : rencana
+  // --- Jeda.
+  const urutNyata = [...nyataSemua].sort((a, b) => a.nyataMulai! - b.nyataMulai!)
+  let totalJeda = 0
+  for (let i = 1; i < urutNyata.length; i++) {
+    const s = urutNyata[i - 1].nyataSelesai
+    if (s != null) totalJeda += Math.max(0, urutNyata[i].nyataMulai! - s)
+  }
+  const jeda =
+    !berjalan && adaCatatan && belum.length > 0 && selesaiTerakhir != null && !sesiDitutup
+      ? Math.max(0, sekarang - selesaiTerakhir)
+      : null
+
+  // --- Blok yang ditampilkan & sisa waktunya.
+  let blok: BarisRencana | null = null
+  let sisaBlok: number | null = null
+  if (berjalan) {
+    blok = berjalan
+    sisaBlok = berjalan.menit - (sekarang - berjalan.nyataMulai!)
+  } else if (!adaCatatan && seharusnya) {
+    blok = seharusnya
+    sisaBlok = seharusnya.selesai! - menit
+  }
+
+  let sudahLewat: BarisRencana[]
+  let tersisa: BarisRencana[]
+  if (adaCatatan) {
+    sudahLewat = baris.filter((b) => b.status !== 'belum' && b.status !== 'berjalan')
+    tersisa = belum
+  } else {
+    const idx = blok ? blok.urutan : -1
+    sudahLewat = idx >= 0 ? baris.slice(0, idx) : []
+    tersisa = idx >= 0 ? baris.slice(idx + 1) : baris
+  }
 
   let fase: FaseLatihan
-  if (blok) fase = 'berjalan'
+  if (berjalan) fase = 'berjalan'
+  else if (adaCatatan) fase = belum.length > 0 && !sesiDitutup ? 'berjalan' : 'rampung'
+  else if (blok) fase = 'berjalan'
   else if (rencana.length === 0) fase = 'rampung'
   else {
     const berwaktu = rencana.filter((b) => b.mulai != null && b.selesai != null)
     const adaYangBelum = berwaktu.some((b) => b.selesai! > menit)
     fase = adaYangBelum || berwaktu.length === 0 ? 'belumMulai' : 'rampung'
   }
-
-  // Proyeksi selesai: ujung rencana digeser sebesar keterlambatan yang
-  // sudah terakumulasi. Di sinilah "bagian akhir kehabisan waktu" kelihatan
-  // sebelum benar-benar terjadi.
-  const ujung = rencana.length ? rencana[rencana.length - 1].selesai : null
-  const proyeksiSelesai = ujung == null ? null : ujung + geser
 
   return {
     menit,
@@ -273,7 +447,16 @@ export function posisiLatihan(bahan: {
     geser,
     totalRencana: total,
     proyeksiSelesai,
-    tercatat: realisasi.filter((r) => r.mulai != null).length,
+    tercatat: realisasi.filter((r) => idRencana.has(r.id)).length,
+    baris,
+    berjalan,
+    berikut: belum[0] ?? null,
+    jeda,
+    seharusnya,
+    target,
+    mulaiAcuan,
+    telatMulai: mulaiPertama != null && acuanTetap != null ? mulaiPertama - acuanTetap : null,
+    totalJeda,
   }
 }
 

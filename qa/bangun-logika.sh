@@ -200,6 +200,8 @@ rakit src/lib/rundown.ts                 rundown
 rakit src/lib/gabungSesi.ts              gabungSesi
 rakit src/lib/googleDrive.ts             googleDrive
 rakit src/lib/backupDrive.ts             backupDrive
+# v2.11 — Pacu v2: lewati, ubah menit, tambah, pindah, bawa, koreksi, usul potong, laporan.
+rakit src/lib/pacu.ts                    pacu
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'

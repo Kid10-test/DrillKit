@@ -313,6 +313,8 @@ export function rencanaAmbilArsip(
     .map((s) => {
       const {
         realisasiLatihan: _realisasi,
+        rencanaAwal: _awal,
+        jejakPacu: _jejak,
         mulaiNyata: _mulai,
         selesaiNyata: _selesai,
         logRep: _log,
