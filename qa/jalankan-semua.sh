@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Beberapa blok supaya satu blok tidak melewati batas waktu satu perintah.
 # Catatan v2.11.2: daftar di sini TIDAK lagi sama dengan regresi-penuh.sh —
-# isinya 142 rangkaian unik (beberapa tercantum dua kali), sedangkan
-# regresi-penuh.sh berisi 177. Acuan CI dan rilis adalah regresi-penuh.sh;
+# isinya 144 rangkaian unik (beberapa tercantum dua kali), sedangkan
+# regresi-penuh.sh berisi 179. Acuan CI dan rilis adalah regresi-penuh.sh;
 # skrip ini hanya untuk menjalankan regresi per blok di kotak pasir.
 # Hasilnya ditulis ke berkas supaya bisa dipantau selagi berjalan.
 set -u
@@ -19,7 +19,7 @@ bash regresi.sh "$BASE" \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika pacu-logika tempatkan-massal-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika pacu-logika tempatkan-massal-logika penyusun-display-logika \
   >> "$LOG" 2>&1
 
 echo "== BLOK 2: mode anggota, kios, & situs ==" >> "$LOG"
@@ -35,7 +35,7 @@ bash regresi.sh "$BASE" \
 
 echo "== BLOK 3: berkas, jadwal, lomba, Pyware, partitur, & portabel ==" >> "$LOG"
 bash regresi.sh "$BASE" \
-  backup-lengkap buka-berkas latihan-jadwal pacu-latihan pacu-v2-e2e tempatkan-pemain-e2e mode-lomba runsheet-lomba \
+  backup-lengkap buka-berkas latihan-jadwal pacu-latihan pacu-v2-e2e tempatkan-pemain-e2e display-latihan-e2e mode-lomba runsheet-lomba \
   kemajuan-presenter tukar-repertoar dasar-jarak csv-gabung pusat-data \
   pyware-impor partitur-impor partitur-render partitur-cetak partitur-frasa portabel-rilis polesan-v101 partitur-paket-bunyi setoran-hafalan kolaborasi-perubahan koreografi-lanjut count-sheet inventaris-logistik mode-kirab penilaian-juri administrasi-unit \
   >> "$LOG" 2>&1
