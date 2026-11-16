@@ -344,7 +344,7 @@ async function api(url: string, init: RequestInit = {}): Promise<Response> {
       const j = (await r.json()) as { error?: { message?: string; status?: string } }
       pesan = j.error?.message || pesan
       if (j.error?.status === 'PERMISSION_DENIED' && /has not been used|is disabled/i.test(pesan)) {
-        pesan = 'API Google ini belum diaktifkan di proyek Google Cloud-mu (Drive API / Sheets API). Pengaturan → Google Drive → Atur → langkah 2.'
+        pesan = 'API Google ini belum diaktifkan di proyek Google Cloud-mu (Drive API / Sheets API). Lihat panduan di Pengaturan → Google Drive → Atur, langkah 2.'
       }
     } catch {
       /* bukan JSON */
