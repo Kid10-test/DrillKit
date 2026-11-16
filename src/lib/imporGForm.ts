@@ -194,21 +194,36 @@ export function bacaCapWaktu(teks: string, urutan: UrutanTanggal = 'dmy'): numbe
 
 /* ------------------------------ kategori izin ------------------------------ */
 
-/** Kata kunci per kategori bawaan — kategori tambahan pelatih dicocokkan lewat namanya. */
+/**
+ * Kata kunci per kategori bawaan — kategori tambahan pelatih dicocokkan lewat
+ * namanya. Dicocokkan per KATA UTUH (teks sudah dinormalisasi: huruf kecil,
+ * tanda baca jadi spasi). v2.11.1: sebelumnya potongan kata ikut cocok —
+ * "kel·om·pok", "k·om·unitas", "welc·om", "kerk·om" terbaca "om" sehingga izin
+ * LDPKM, acara komunitas, dan kerja kelompok jatuh ke "Orang tua berkunjung".
+ */
 const KATA_KATEGORI: Record<string, RegExp> = {
-  sakit: /(sakit|dokter|demam|opname|rawat inap|klinik|rumah sakit|\brs\b)/,
-  ortu: /(orang ?tua|ortu|ayah|ibu|bapak|mama|papa|om|tante|kakek|nenek|keluarga datang|dikunjungi)/,
-  kuliah: /(praktikum|asistensi|asisten|responsi|kuliah|kelas pengganti|ujian|kuis|quiz)/,
-  agama: /(ibadah|gereja|misa|keagamaan|retret|retreat|pengajian|sembahyang|pura|vihara|jumatan|doa)/,
-  duka: /(duka|meninggal|wafat|melayat|layat|pemakaman)/,
-  lomba: /(lomba|pomda|porda|kejuaraan|pertandingan|olimpiade|mewakili)/,
-  organisasi: /(bem|hima|ukm|organisasi|kepanitiaan|panitia|event)/,
+  sakit:
+    /\b(sakit|dokter|demam|opname|rawat inap|klinik|rumah sakit|rs|puskesmas|enak badan|kurang fit|meriang|pusing|flu|tipes|tifus|maag|diare|muntah)\b/,
+  ortu: /\b(orang ?tua|ortu|ayah|ibu|bapak|mama|papa|om|tante|kakek|nenek|wali|keluarga datang|dikunjungi|berkunjung)\b/,
+  kuliah: /\b(praktikum|asistensi|asisten|responsi|kuliah|kelas pengganti|ujian|kuis|quiz|uts|uas)\b/,
+  agama: /\b(ibadah|gereja|misa|keagamaan|retret|retreat|pengajian|sembahyang|pura|vihara|jumatan|doa)\b/,
+  duka: /\b(duka|berduka|meninggal|wafat|melayat|layat|pemakaman)\b/,
+  lomba: /\b(lomba|pomda|porda|kejuaraan|pertandingan|olimpiade|mewakili)\b/,
+  organisasi: /\b(bem|hima|ukm|organisasi|kepanitiaan|panitia|event)\b/,
 }
+
+/**
+ * Urutan pemeriksaan kata kunci: yang paling khas dulu. "Orang tua" paling
+ * akhir karena kata-katanya paling umum ("ibu dosen", "bapak asisten").
+ */
+const URUTAN_KATA = ['sakit', 'duka', 'lomba', 'kuliah', 'agama', 'organisasi', 'ortu']
 
 /**
  * Tebak kategori dari jawaban. Nama kategori yang persis/terkandung menang;
  * lalu kata kunci. `lain` = ada jawaban tapi tidak cocok; `undefined` = kosong.
- * "Rapat" organisasi bukan izin — sengaja jatuh ke `lain`.
+ * "Rapat" organisasi bukan izin — sengaja jatuh ke `lain`. Kegiatan wajib
+ * mahasiswa baru (LDPKM, Pra LDK, PKKMB…) juga `lain`: belum ada kategorinya,
+ * jadi danlat yang memutus per orang.
  */
 export function tebakKategoriIzin(teks: string, daftar: readonly KategoriIzin[]): string | undefined {
   const t = norm(teks)
@@ -218,7 +233,11 @@ export function tebakKategoriIzin(teks: string, daftar: readonly KategoriIzin[])
     if (n && (t === n || t.startsWith(n) || (n.length >= 6 && t.includes(n)))) return k.id
   }
   if (/\brapat\b/.test(t) && !KATA_KATEGORI.sakit.test(t)) return 'lain'
-  for (const k of daftar) {
+  const peringkat = (id: string) => {
+    const i = URUTAN_KATA.indexOf(id)
+    return i < 0 ? URUTAN_KATA.length : i
+  }
+  for (const k of [...daftar].sort((a, b) => peringkat(a.id) - peringkat(b.id))) {
     const pola = KATA_KATEGORI[k.id]
     if (pola?.test(t)) return k.id
   }
