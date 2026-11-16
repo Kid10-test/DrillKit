@@ -142,6 +142,27 @@ cek('kategori dari nama persis (pilihan Form)', tebakKategoriIzin('Sakit parah',
 cek('kategori dari kata kunci', tebakKategoriIzin('praktikum kimia dasar', K) === 'kuliah' && tebakKategoriIzin('Kakek datang dari Medan', K) === 'ortu' && tebakKategoriIzin('misa arwah', K) === 'agama' && tebakKategoriIzin('ikut PORDA renang', K) === 'lomba')
 cek('rapat organisasi bukan izin → lain', tebakKategoriIzin('Rapat BEM', K) === 'lain')
 cek('alasan tak dikenal → lain; kosong → undefined', tebakKategoriIzin('nonton konser', K) === 'lain' && tebakKategoriIzin('  ', K) === undefined)
+// v2.11.1 — cocok per kata utuh: potongan "om" di kelompok/komunitas/welcome tidak lagi = orang tua.
+cek(
+  'LDPKM / kegiatan maba → lain, bukan orang tua',
+  [
+    'mengikuti ldpkm kelompok 44 di Syantikara',
+    'Ikut LDPKM tanggal 13-14',
+    'kegiatan wajib MABA yaitu LDPKM',
+    'program Diesti HMTI wajib mahasiswa baru',
+  ].every((x) => tebakKategoriIzin(x, K) === 'lain'),
+)
+cek(
+  'komunitas / kerja kelompok → lain',
+  tebakKategoriIzin('Acara komunitas mahasiswa.', K) === 'lain' && tebakKategoriIzin('ada kerkom kkn', K) === 'lain',
+)
+cek('welcome party BEM → organisasi', tebakKategoriIzin('welcom party BEM', K) === 'organisasi')
+cek('kurang enak badan → sakit', tebakKategoriIzin('maaf kak lagi kurang enak badan', K) === 'sakit')
+cek(
+  'orang tua tetap terbaca',
+  tebakKategoriIzin('ibu saya berkunjung', K) === 'ortu' && tebakKategoriIzin('om dan tante datang', K) === 'ortu',
+)
+cek('kata orang tua kalah dari kata yang lebih khas', tebakKategoriIzin('asistensi dengan bapak dosen', K) === 'kuliah')
 const AG = [
   { id: 'm1', name: 'Budi Santoso', panggilan: 'Budi', code: 'B01' },
   { id: 'm2', name: 'Rina Putri', panggilan: 'Ina', code: 'B02' },
