@@ -28,6 +28,8 @@ import { RencanaEditor } from '../components/jadwal/RencanaEditor'
 import { BilahKomposisi } from '../components/jadwal/BilahKomposisi'
 import { PolaSesiModal } from '../components/jadwal/PolaSesiModal'
 import { ProgramModal } from '../components/jadwal/ProgramModal'
+import SesiGandaModal, { gabungkanSesi, pesanGabung } from '../components/jadwal/SesiGandaModal'
+import { bertumpuk, cariSesiGanda } from '../lib/gabungSesi'
 import { WARNA_FASE, infoSesiProgram, targetMinggu } from '../lib/programLatsar'
 import type { ProgramLatihan } from '../db/types'
 import { TampilanNeraca } from '../components/jadwal/TampilanNeraca'
@@ -148,6 +150,11 @@ export default function Schedule() {
   /** Menunggu pilihan "hanya sesi ini / semua berikutnya". */
   const [tanyaSeri, setTanyaSeri] = useState<{ lama: Session; baru: Session } | null>(null)
   const [hapusSeri, setHapusSeri] = useState<Session | null>(null)
+  /** v2.10.1 — hapus satu sesi yang sudah berisi absensi: tanya dulu. */
+  const [hapusSatu, setHapusSatu] = useState<Session | null>(null)
+  const [gandaBuka, setGandaBuka] = useState(false)
+  const milikProgram = useMemo(() => new Set((settings?.programLatihan ?? []).flatMap((p) => p.sesiIds)), [settings?.programLatihan])
+  const kelompokGanda = useMemo(() => cariSesiGanda(sessions ?? [], absensi ?? [], milikProgram), [sessions, absensi, milikProgram])
   /** Seret-pindah terakhir, untuk tombol Batalkan. */
   const [undo, setUndo] = useState<{ id: string; date: string; judul: string } | null>(null)
   useEffect(() => {
@@ -356,7 +363,10 @@ export default function Schedule() {
       setEditing(s)
       setOpen(true)
     },
-    onDelete: remove,
+    onDelete: (s) => {
+      if ((absensi ?? []).some((r) => r.sessionId === s.id)) setHapusSatu(s)
+      else void remove(s)
+    },
     onDeleteSeri: (s) => setHapusSeri(s),
     onPacu: (s) => setPacuId(s.id),
     onDuplikat: (s) => setDuplikat(s),
@@ -458,6 +468,17 @@ export default function Schedule() {
           </span>
           <Button size="sm" data-testid="batal-pindah" onClick={batalkanPindah}>
             Batalkan
+          </Button>
+        </div>
+      )}
+
+      {kelompokGanda.length > 0 && (
+        <div data-testid="bilah-sesi-ganda" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-700/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-100">
+          <span>
+            <b>{kelompokGanda.length}</b> tanggal punya sesi latihan ganda (jam bertumpuk) — absensi bisa terpecah ke dua sesi.
+          </span>
+          <Button size="sm" data-testid="buka-sesi-ganda" onClick={() => setGandaBuka(true)}>
+            Tinjau sesi ganda
           </Button>
         </div>
       )}
@@ -574,6 +595,68 @@ export default function Schedule() {
             )
           })()}
       </Modal>
+
+      {hapusSatu &&
+        (() => {
+          const n = (absensi ?? []).filter((r) => r.sessionId === hapusSatu.id).length
+          const kembar = (sessions ?? []).filter(
+            (x) => x.id !== hapusSatu.id && x.date === hapusSatu.date && x.type === hapusSatu.type && bertumpuk(x, hapusSatu),
+          )
+          return (
+            <Modal
+              open
+              onClose={() => setHapusSatu(null)}
+              title="Hapus jadwal yang berisi absensi"
+              testId="modal-hapus-berabsen"
+              footer={
+                <>
+                  <Button variant="ghost" onClick={() => setHapusSatu(null)}>
+                    Batal
+                  </Button>
+                  <Button
+                    variant="danger"
+                    data-testid="hapus-berabsen-ya"
+                    onClick={() => {
+                      void remove(hapusSatu)
+                      setHapusSatu(null)
+                    }}
+                  >
+                    Hapus beserta {n} catatan
+                  </Button>
+                </>
+              }
+            >
+              <p className="text-sm text-slate-300">
+                “{hapusSatu.title}” ({formatDateLong(hapusSatu.date)}, {hapusSatu.startTime}–{hapusSatu.endTime}) sudah berisi{' '}
+                <b data-testid="hapus-berabsen-jumlah">{n}</b> catatan absensi. Menghapus jadwal ini ikut menghapus semua catatan itu, dan rekap
+                kehadiran anak-anak berubah.
+              </p>
+              {kembar.length > 0 ? (
+                <div className="space-y-1.5">
+                  <p className="text-[12px] text-slate-400">Ada sesi lain di tanggal & jam yang sama. Gabungkan saja — absensinya pindah, tidak hilang:</p>
+                  {kembar.map((k) => (
+                    <Button
+                      key={k.id}
+                      variant="primary"
+                      data-testid={`gabung-ke-${k.id}`}
+                      onClick={async () => {
+                        const r = await gabungkanSesi(k, [hapusSatu])
+                        setHapusSatu(null)
+                        toast.push(pesanGabung(r))
+                      }}
+                    >
+                      Pindahkan absensi ke {k.startTime}–{k.endTime} “{k.title}”, lalu hapus
+                    </Button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[12px] text-slate-400">Bila ragu, ekspor backup dulu (Pengaturan › Kelola data).</p>
+              )}
+            </Modal>
+          )
+        })()}
+
+      <SesiGandaModal open={gandaBuka} onClose={() => setGandaBuka(false)} sesi={sessions ?? []} absensi={absensi ?? []} milikProgram={milikProgram} />
 
       <DuplikatModal sesi={duplikat} onClose={() => setDuplikat(null)} onSimpan={simpanDuplikat} />
 
@@ -1007,7 +1090,14 @@ function SesiKartu({
           <Button size="sm" variant="ghost" data-testid={`duplikat-${s.id}`} onClick={() => onDuplikat(s)}>
             Duplikat
           </Button>
-          <ConfirmButton onConfirm={() => onDelete(s)} message="Hapus jadwal?" />
+          {absensi.some((x) => x.sessionId === s.id) ? (
+            // v2.10.1 — sesi berabsensi: tombol membuka penjelasan, bukan konfirmasi singkat.
+            <Button size="sm" variant="ghost" data-testid={`hapus-${s.id}`} onClick={() => onDelete(s)}>
+              Hapus
+            </Button>
+          ) : (
+            <ConfirmButton onConfirm={() => onDelete(s)} message="Hapus jadwal?" testId={`hapus-${s.id}`} />
+          )}
           {s.seriId && (
             <Button size="sm" variant="ghost" data-testid={`hapus-seri-${s.id}`} onClick={() => onDeleteSeri(s)}>
               Hapus seri…

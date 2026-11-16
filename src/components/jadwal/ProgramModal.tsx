@@ -9,6 +9,7 @@
  * Peserta & pemantauannya ada di Absensi → Syarat pelantikan.
  */
 import { useEffect, useMemo, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
 import type { FaseProgram, PolaSesi, ProgramLatihan, Session, TonggakProgram } from '../../db/types'
 import { db, saveSettings } from '../../db/db'
 import { Button, ConfirmButton, Input, Modal, Select, useToast } from '../ui'
@@ -61,11 +62,18 @@ export function ProgramModal({ open, onClose, sesi }: { open: boolean; onClose: 
 
   const tersimpan = draf ? daftar.some((x) => x.id === draf.id) : false
   const masalah = draf ? periksaProgram(draf) : []
-  const rencana = useMemo(
-    () => (draf && masalah.length === 0 ? rencanakanProgram(draf, sesi, pustaka, { buatId, mode }) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draf, sesi, pustaka, mode, masalah.length],
+  // v2.10.1 — sesi yang sudah berisi absensi diutamakan saat menautkan tanggal ganda.
+  const adaAbsensi = useLiveQuery(
+    async () => new Set((await db.attendance.orderBy('sessionId').uniqueKeys()).map(String)),
+    [],
+    new Set<string>(),
   )
+  const rencana = useMemo(
+    () => (draf && masalah.length === 0 ? rencanakanProgram(draf, sesi, pustaka, { buatId, mode, adaAbsensi }) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draf, sesi, pustaka, mode, masalah.length, adaAbsensi],
+  )
+  const jumlahGanda = (rencana?.item ?? []).filter((x) => x.ganda?.length).length
   const wajibPeta = useMemo(() => {
     const m: Record<string, boolean> = {}
     for (const x of rencana?.item ?? []) m[x.sesi.id] = wajibUbah[kunciItem(x)] ?? x.wajib
@@ -389,6 +397,12 @@ export function ProgramModal({ open, onClose, sesi }: { open: boolean; onClose: 
                     sudah ada · <b>{ringkas.isi}</b> diisi rencana · <b data-testid="program-jumlah-wajib">{ringkas.wajib}</b> sesi wajib
                     {ringkas.lepas > 0 && <> · {ringkas.lepas} sesi lama dilepas dari program (tidak dihapus)</>}
                   </p>
+                  {jumlahGanda > 0 && (
+                    <p data-testid="program-peringatan-ganda" className="rounded-md border border-amber-700/50 bg-amber-950/30 px-2 py-1.5 text-[11px] text-amber-200">
+                      ⚠ {jumlahGanda} tanggal punya lebih dari satu sesi latihan. Program menautkan sesi yang sudah berisi absensi; kembarannya
+                      tetap ada di Jadwal. Gabungkan lewat Jadwal › <b>Sesi ganda</b> supaya absensi tidak terpecah.
+                    </p>
+                  )}
                   <div className="max-h-80 overflow-y-auto rounded-lg border border-slate-800">
                     <ul className="divide-y divide-slate-800/70" data-testid="daftar-rencana-program">
                       {rencana.item.map((x) => {
@@ -430,7 +444,11 @@ export function ProgramModal({ open, onClose, sesi }: { open: boolean; onClose: 
                               />
                               wajib
                             </label>
-                            {x.catatan && <span className="w-full pl-16 text-[10px] text-slate-500">{x.catatan}</span>}
+                            {x.catatan && (
+                              <span data-testid={x.ganda?.length ? `program-ganda-${x.tanggal}` : undefined} className={`w-full pl-16 text-[10px] ${x.ganda?.length ? 'text-amber-300' : 'text-slate-500'}`}>
+                                {x.catatan}
+                              </span>
+                            )}
                           </li>
                         )
                       })}

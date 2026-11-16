@@ -6,7 +6,7 @@
  * sesi otomatis menggeser seluruh blok tanpa perlu disusun ulang. Blok
  * paralel memakai durasi blok induknya, sehingga jam sesi tetap satu garis.
  */
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import type { BlokLatihan, CabangBlok, JenisBlok, Session } from '../../db/types'
 import { saveSettings } from '../../db/db'
 import { Button, Input, Select, useToast } from '../ui'
@@ -25,8 +25,36 @@ import { uid } from '../../lib/utils'
 import { useSettings } from '../../hooks/useSettings'
 import { useSeksiAktif, type SeksiAktif } from '../../hooks/useSeksiAktif'
 import { BilahKomposisi } from './BilahKomposisi'
+import { adaIzinGoogle } from '../google/izinGoogle'
+import type { HasilImporRundown } from './ImporRundownModal'
 
 const buatId = (awalan: string) => uid(awalan)
+
+/** v2.10.1 — modal impor rundown (tempel / Drive / berkas), dimuat saat dibuka. */
+const ImporRundownModal = lazy(() => import('./ImporRundownModal'))
+
+/** "17 Nov 14.05" */
+function capPendek(ms: number): string {
+  const d = new Date(ms)
+  const bln = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][d.getMonth()]
+  return `${d.getDate()} ${bln} ${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** Terapkan hasil impor rundown ke draf sesi (belum disimpan sampai tombol Simpan). */
+export function sesiDariRundown(s: Session, h: HasilImporRundown): Session {
+  const lama = s.rencanaLatihan ?? []
+  const baru: Session = {
+    ...s,
+    rencanaLatihan: h.mode === 'tambah' ? [...lama, ...h.blok] : h.blok,
+  }
+  if (h.sesuaikanJam && h.mulai && h.selesai) {
+    baru.startTime = h.mulai
+    baru.endTime = h.selesai
+  }
+  if (h.tautan) baru.rundownDrive = h.tautan
+  else if (h.mode === 'ganti') delete baru.rundownDrive
+  return baru
+}
 
 /** Penyunting daftar blok — dipakai modal jadwal dan penyunting pola. */
 export function PenyuntingBlok({
@@ -415,9 +443,30 @@ export function RencanaEditor({ s, setS }: { s: Session; setS: (x: Session) => v
   const seksi = useSeksiAktif()
   const toast = useToast()
   const [namaPola, setNamaPola] = useState<string | null>(null)
+  const [imporBuka, setImporBuka] = useState(false)
+  /** ISO `modifiedTime` terbaru di Drive bila berbeda dari yang diambil. */
+  const [driveBaru, setDriveBaru] = useState<string | null>(null)
   const pola = settings.polaSesi ?? []
   const blok = s.rencanaLatihan ?? []
   const lama = lamaSlot(menitDariJam(s.startTime), menitDariJam(s.endTime))
+  const tautan = s.rundownDrive
+
+  // v2.10.1 — rundown dari Drive: bila izin Google masih berlaku di tab ini,
+  // periksa diam-diam apakah berkasnya sudah diubah sejak diambil.
+  useEffect(() => {
+    setDriveBaru(null)
+    if (!tautan || !adaIzinGoogle()) return
+    let hidup = true
+    void import('../../lib/googleDrive')
+      .then((g) => g.infoBerkas(tautan.id))
+      .then((info) => {
+        if (hidup && info.modifiedTime && info.modifiedTime !== tautan.diubah) setDriveBaru(info.modifiedTime)
+      })
+      .catch(() => undefined)
+    return () => {
+      hidup = false
+    }
+  }, [tautan?.id, tautan?.diubah])
 
   async function simpan() {
     const nama = (namaPola ?? '').trim()
@@ -458,6 +507,9 @@ export function RencanaEditor({ s, setS }: { s: Session; setS: (x: Session) => v
             </Select>
             </div>
           )}
+          <Button size="sm" variant="ghost" data-testid="buka-impor-rundown" onClick={() => setImporBuka(true)}>
+            Impor rundown
+          </Button>
           {blok.length > 0 && namaPola == null && (
             <Button size="sm" variant="ghost" data-testid="simpan-pola" onClick={() => setNamaPola(s.title || '')}>
               Simpan sebagai pola
@@ -465,6 +517,41 @@ export function RencanaEditor({ s, setS }: { s: Session; setS: (x: Session) => v
           )}
         </div>
       </div>
+      {tautan && (
+        <div
+          data-testid="tautan-rundown"
+          className={`mb-2 flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5 text-[11px] ${driveBaru ? 'border-amber-600/60 bg-amber-950/30 text-amber-200' : 'border-slate-800 bg-slate-950/40 text-slate-400'}`}
+        >
+          <span className="min-w-0 flex-1 truncate">
+            Rundown dari Drive: <b className="text-slate-200">{tautan.nama}</b>
+            {tautan.tab ? ` › ${tautan.tab}` : ''} · diambil {capPendek(tautan.diambil)}
+            {driveBaru && <span data-testid="rundown-drive-berubah"> · berkasnya sudah diubah sesudah itu</span>}
+          </span>
+          <Button size="sm" variant={driveBaru ? 'primary' : 'ghost'} data-testid="rundown-ambil-ulang-sesi" onClick={() => setImporBuka(true)}>
+            Ambil ulang
+          </Button>
+        </div>
+      )}
+      {imporBuka && (
+        <Suspense fallback={null}>
+          <ImporRundownModal
+            open={imporBuka}
+            onClose={() => setImporBuka(false)}
+            seksi={seksi}
+            sesi={s}
+            adaRencana={blok.length > 0}
+            tautan={tautan}
+            konteks="sesi"
+            onTerapkan={(h) => {
+              setS(sesiDariRundown(s, h))
+              setDriveBaru(null)
+              toast.push(
+                `${h.blok.length} blok dari rundown${h.sesuaikanJam && h.mulai ? ` · jam sesi ${h.mulai}–${h.selesai}` : ''} — tekan Simpan untuk menyimpan`,
+              )
+            }}
+          />
+        </Suspense>
+      )}
       {namaPola != null && (
         <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-slate-700 p-2">
           <Input

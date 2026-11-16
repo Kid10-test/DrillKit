@@ -184,6 +184,29 @@ export interface Session {
    * staf** — dikupas dari berkas yang dibagikan.
    */
   formPresensi?: Record<string, number>
+
+  /**
+   * v2.10.1 — rundown sesi ini diambil dari berkas Google Drive (Docs/Sheets/
+   * .docx). Disimpan supaya DrillKit bisa memeriksa apakah berkasnya sudah
+   * diubah sejak diambil (`diubah` = `modifiedTime` Drive saat itu) dan
+   * menawarkan ambil ulang. **Catatan staf** — dikupas dari berkas yang dibagikan.
+   */
+  rundownDrive?: TautanRundownDrive
+}
+
+/** v2.10.1 — tautan rundown sesi ke satu berkas Google Drive. */
+export interface TautanRundownDrive {
+  id: string
+  nama: string
+  mimeType: string
+  /** `modifiedTime` Drive (ISO) saat rundown terakhir diambil. */
+  diubah: string
+  /** Urutan tabel di berkas yang dipakai (0-based) — Docs bisa memuat beberapa rundown. */
+  tabel?: number
+  /** Nama tab Google Sheets yang dipakai. */
+  tab?: string
+  /** Epoch ms saat terakhir diambil. */
+  diambil: number
 }
 
 /**
@@ -409,6 +432,13 @@ export interface AttendanceRecord {
   kategoriIzin?: string
   /** v2.8 — bukti izin/sakit/telat: tautan berkas Google Form, atau `ada` bila diterima lewat WA. */
   bukti?: string
+  /**
+   * v2.10.1 — jam pulang (epoch ms) bila anak pulang sebelum sesi selesai.
+   * Kosong = ikut sampai selesai. Dinilai bersama jam datang: pulang awal
+   * memakai jatah telat yang sama (alasan + bukti), dan waktu ikut minimal
+   * setengah sesi (lihat `statusDatang` di `lib/programLatsar.ts`).
+   */
+  pulangAt?: number
 }
 
 /* ------------------------------- Drill ---------------------------------- */
@@ -1539,6 +1569,36 @@ export interface TeamSettings {
    * ikut backup, tidak ikut paket bagikan (daftar putih `team`).
    */
   kelompokRoster?: string[]
+  /**
+   * v2.10.1 — sambungan Google Drive milik pelatih (rundown, Sheet jawaban
+   * Form, backup otomatis). Hanya pengenal publik aplikasi Google Cloud —
+   * tidak ada kata sandi atau token di sini. Kosong = memakai nilai bawaan
+   * build (`VITE_GOOGLE_*`). Ikut backup, TIDAK ikut paket bagikan.
+   */
+  google?: KonfigGoogleTim
+  /**
+   * v2.10.1 — Sheet jawaban Google Form yang sudah dipilih per jenis impor,
+   * supaya "Tarik isian terbaru" tidak perlu memilih berkas lagi.
+   */
+  sumberForm?: Partial<Record<'presensi' | 'izin' | 'datang', SumberSheetForm>>
+}
+
+/** v2.10.1 — pengenal aplikasi Google Cloud milik pelatih (bukan rahasia). */
+export interface KonfigGoogleTim {
+  /** OAuth Client ID (…apps.googleusercontent.com). */
+  clientId?: string
+  /** API key — dibatasi ke Picker API & alamat situs. */
+  apiKey?: string
+  /** Nomor proyek Google Cloud (angka), dipakai Picker. */
+  appId?: string
+}
+
+/** v2.10.1 — satu Sheet jawaban Form yang ditarik langsung dari Drive. */
+export interface SumberSheetForm {
+  id: string
+  nama: string
+  /** Nama tab; kosong = tab pertama. */
+  tab?: string
 }
 
 /** #34a — jenis gerbang menentukan bukti otomatis yang dibaca dari data. */
@@ -1635,6 +1695,14 @@ export interface AturanPelantikan {
    * separuh durasi sesi (18.00–20.00 → 19.00; 15.00–19.00 → 17.00).
    */
   batasJatahMenit?: number
+  /**
+   * v2.10.1 — menit awal sesi yang tidak dihitung (apel + ibadah, mis. sesi
+   * 17.30–20.15 dengan latihan inti 18.00 → 30). Jam datang, waktu ikut, dan
+   * pulang awal diukur dari jam inti. Kosong/0 = sejak jam mulai sesi.
+   */
+  praMenit?: number
+  /** v2.10.1 — menit akhir sesi yang tidak dihitung (apel penutup, mis. 15). */
+  penutupMenit?: number
   /** Hadir hanya dihitung bila juga mengisi Google Form presensi sesi itu. */
   wajibForm?: boolean
   /** Izin/sakit/telat beralasan hanya sah bila buktinya sudah diterima. */

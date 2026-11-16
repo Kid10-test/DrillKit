@@ -110,7 +110,7 @@ export function EditorAturanPelantikan({
         </table>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <label className="text-[11px] text-slate-400">
           Toleransi datang (menit)
           <Input type="number" min={0} data-testid="aturan-toleransi" value={a.toleransiMenit} onChange={(e) => ubah({ toleransiMenit: angka(e.target.value) })} />
@@ -124,6 +124,28 @@ export function EditorAturanPelantikan({
             placeholder="½ durasi"
             value={a.batasJatahMenit ?? ''}
             onChange={(e) => ubah({ batasJatahMenit: e.target.value === '' ? undefined : angka(e.target.value) })}
+          />
+        </label>
+        <label className="text-[11px] text-slate-400" title="Menit awal sesi yang tidak dihitung — apel & ibadah sebelum latihan inti">
+          Pra-latihan (menit)
+          <Input
+            type="number"
+            min={0}
+            data-testid="aturan-pra"
+            placeholder="0"
+            value={a.praMenit ?? ''}
+            onChange={(e) => ubah({ praMenit: e.target.value === '' || angka(e.target.value) === 0 ? undefined : angka(e.target.value) })}
+          />
+        </label>
+        <label className="text-[11px] text-slate-400" title="Menit akhir sesi yang tidak dihitung — apel penutup">
+          Penutup (menit)
+          <Input
+            type="number"
+            min={0}
+            data-testid="aturan-penutup"
+            placeholder="0"
+            value={a.penutupMenit ?? ''}
+            onChange={(e) => ubah({ penutupMenit: e.target.value === '' || angka(e.target.value) === 0 ? undefined : angka(e.target.value) })}
           />
         </label>
         <label className="text-[11px] text-slate-400">
@@ -184,7 +206,15 @@ export function EditorAturanPelantikan({
 
       <p className="text-[11px] text-slate-500">
         Hadir ≥ {teksRasio(a.rasioHadir)}·N, alpa ≤ {teksRasio(a.rasioAlpa)}·N, telat berjatah ≤ {teksRasio(a.rasioTelat)}·N — N = sesi wajib
-        sejak bergabung. Datang ≤ {a.toleransiMenit} menit sesudah mulai = hadir; sampai {a.batasJatahMenit != null ? `${a.batasJatahMenit} menit` : 'separuh durasi sesi'}{' '}
+        sejak bergabung.{' '}
+        {a.praMenit || a.penutupMenit ? (
+          <span data-testid="aturan-inti-ringkas">
+            Jam dihitung dari latihan inti: {a.praMenit ? `${a.praMenit} menit awal` : ''}
+            {a.praMenit && a.penutupMenit ? ' dan ' : ''}
+            {a.penutupMenit ? `${a.penutupMenit} menit akhir` : ''} sesi tidak dihitung.{' '}
+          </span>
+        ) : null}
+        Datang ≤ {a.toleransiMenit} menit sesudah mulai inti = hadir; sampai {a.batasJatahMenit != null ? `${a.batasJatahMenit} menit` : 'separuh durasi sesi'}{' '}
         dengan alasan{a.wajibBukti ? ' + bukti' : ''} = hadir memakai jatah telat; selebihnya alpa. Izin/sakit sah tidak memakai jatah alpa. Bergabung
         sesudah batas → pelantikan susulan.
       </p>

@@ -21,7 +21,9 @@ import { NamaTampil } from '../components/NamaTampil'
 import ScanQrModal from '../components/QrScanner'
 import { useSettings } from '../hooks/useSettings'
 import {
-  LABEL_DATANG,
+  labelDatang,
+  menitIkut,
+  pulangAwal,
   aturanUntukSesi,
   batasLapor,
   infoSesiProgram,
@@ -647,9 +649,11 @@ function ChipDatang({
       : dihitung
         ? 'border-teal-500/50 text-teal-300'
         : 'border-orange-500/50 text-orange-300'
+  const pulang = pulangAwal(r, session, aturan)
   const teks = [
-    r.datangAt ? jamPendek(r.datangAt, session.date) : 'jam',
-    telat ? (dihitung ? (d === 'jatah' ? 'jatah telat' : 'putusan') : 'tak dihitung') : '',
+    r.datangAt ? jamPendek(r.datangAt, session.date) : r.pulangAt ? '' : 'jam',
+    r.pulangAt ? `pulang ${jamPendek(r.pulangAt, session.date)}` : '',
+    telat ? (dihitung ? (d === 'jatah' ? (pulang ? 'jatah' : 'jatah telat') : 'putusan') : 'tak dihitung') : '',
     tanpaForm ? 'tanpa Form' : '',
   ]
     .filter(Boolean)
@@ -661,8 +665,9 @@ function ChipDatang({
       data-datang={d ?? ''}
       data-form={tanpaForm ? 'tanpa' : ''}
       onClick={onClick}
-      title={`Jam datang${d ? ` — ${LABEL_DATANG[d]}` : ' belum dicatat (dianggap tepat waktu)'}${tanpaForm ? ' · belum mengisi Google Form presensi' : ''} — ketuk untuk mengubah`}
-      className={cx('max-w-[9rem] shrink-0 truncate rounded-full border py-0.5 text-[10px] font-medium', r.datangAt == null && !tanpaForm ? 'px-1.5' : 'px-2', kelas)}
+      data-pulang={pulang ? 'awal' : r.pulangAt ? 'tepat' : ''}
+      title={`Jam datang/pulang${d ? ` — ${labelDatang(d, r, session, aturan)}` : ' belum dicatat (dianggap tepat waktu)'}${tanpaForm ? ' · belum mengisi Google Form presensi' : ''} — ketuk untuk mengubah`}
+      className={cx('max-w-[11rem] shrink-0 truncate rounded-full border py-0.5 text-[10px] font-medium', r.datangAt == null && r.pulangAt == null && !tanpaForm ? 'px-1.5' : 'px-2', kelas)}
     >
       {teks}
     </button>
@@ -870,6 +875,7 @@ function DatangModal({
   onClose: () => void
 }) {
   const [jam, setJam] = useState('')
+  const [jamPulang, setJamPulang] = useState('')
   const [alasan, setAlasan] = useState('')
   const [buktiAda, setBuktiAda] = useState(false)
   const [tautan, setTautan] = useState('')
@@ -877,6 +883,7 @@ function DatangModal({
   useEffect(() => {
     if (!rec) return
     setJam(rec.datangAt ? jamTitik(rec.datangAt).replace('.', ':') : '')
+    setJamPulang(rec.pulangAt ? jamTitik(rec.pulangAt).replace('.', ':') : '')
     setAlasan(rec.alasanTelat ?? '')
     setBuktiAda(!!rec.bukti)
     setTautan(rec.bukti && rec.bukti !== 'ada' ? rec.bukti : '')
@@ -885,9 +892,11 @@ function DatangModal({
   if (!rec || !session || rec.status !== 'hadir') return null
   const j = jendelaDatang(session, aturan)
   const datangAt = jam ? new Date(`${session.date}T${jam}`).getTime() : undefined
+  const pulangAt = jamPulang ? new Date(`${session.date}T${jamPulang}`).getTime() : undefined
   const uji = {
     ...rec,
     datangAt: Number.isFinite(datangAt) ? datangAt : undefined,
+    pulangAt: Number.isFinite(pulangAt) ? pulangAt : undefined,
     alasanTelat: alasan.trim() || undefined,
     bukti: buktiDari(buktiAda, tautan),
     putusanIzin: putusan || undefined,
@@ -899,6 +908,7 @@ function DatangModal({
     if (!rec) return
     await db.attendance.update(rec.id, {
       datangAt: uji.datangAt,
+      pulangAt: uji.pulangAt,
       alasanTelat: uji.alasanTelat,
       bukti: uji.bukti,
       putusanIzin: uji.putusanIzin,
@@ -906,17 +916,26 @@ function DatangModal({
     onClose()
   }
 
-  const sekarang = () => {
+  const jamKini = () => {
     const n = new Date()
-    setJam(`${dua(n.getHours())}:${dua(n.getMinutes())}`)
+    return `${dua(n.getHours())}:${dua(n.getMinutes())}`
   }
+  const sekarang = () => setJam(jamKini())
+  const awal = pulangAwal(uji, session, aturan)
+  const ikut = menitIkut(uji, session, aturan)
 
   return (
-    <Modal open={!!rec} onClose={onClose} title={`Jam datang — ${nama}`} testId="modal-datang">
+    <Modal open={!!rec} onClose={onClose} title={`Jam datang & pulang — ${nama}`} testId="modal-datang">
       <p className="text-[12px] text-slate-400">
+        {aturan.praMenit || aturan.penutupMenit ? (
+          <span data-testid="datang-inti">
+            Dihitung dari latihan inti <b className="text-slate-200">{jamTitik(j.mulai)}–{jamTitik(j.selesai)}</b>.{' '}
+          </span>
+        ) : null}
         Datang ≤ <b className="text-slate-200">{jamTitik(j.tepat)}</b> = hadir. Sampai <b className="text-slate-200">{jamTitik(j.batasJatah)}</b> dengan
         alasan{aturan.wajibBukti ? ' + bukti' : ''} = hadir memakai jatah telat (selama jatahnya masih ada). Lewat dari itu tetap boleh ikut latihan,
         tetapi tidak dihitung hadir — kalau alasannya termasuk izin sah, catat sebagai <b>Izin</b>. Kosongkan jam bila datang tepat waktu.
+        Pulang sebelum selesai memakai jatah yang sama, dengan waktu ikut minimal seperti batas telat.
       </p>
       <label className="block text-[11px] text-slate-400">
         Jam datang
@@ -937,7 +956,32 @@ function DatangModal({
         </Button>
       </div>
       <label className="block text-[11px] text-slate-400">
-        Alasan telat
+        Jam pulang <span className="text-slate-500">— isi hanya bila pulang sebelum {jamTitik(j.selesai)}</span>
+        <input
+          type="time"
+          data-testid="pulang-jam"
+          value={jamPulang}
+          onChange={(e) => setJamPulang(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+        />
+      </label>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Button size="sm" data-testid="pulang-sekarang" onClick={() => setJamPulang(jamKini())}>
+          Pulang sekarang
+        </Button>
+        {jamPulang && (
+          <Button size="sm" variant="ghost" data-testid="pulang-hapus" onClick={() => setJamPulang('')}>
+            Kosongkan (ikut sampai selesai)
+          </Button>
+        )}
+        {(uji.datangAt != null || uji.pulangAt != null) && (
+          <span data-testid="datang-ikut" className="text-[11px] text-slate-500">
+            Ikut latihan {ikut} menit{awal ? ' · pulang awal' : ''}
+          </span>
+        )}
+      </div>
+      <label className="block text-[11px] text-slate-400">
+        Alasan telat / pulang awal
         <input
           data-testid="datang-alasan"
           value={alasan}
@@ -979,10 +1023,10 @@ function DatangModal({
           : d == null || d === 'tepat'
             ? 'Hadir tepat waktu'
             : d === 'jatah'
-              ? 'Telat berjatah — dihitung hadir bila jatah telat masih ada'
+              ? `${awal ? 'Pulang awal' : 'Telat'} berjatah — dihitung hadir bila jatah telat masih ada`
               : d === 'putusan-sah'
                 ? 'Dihitung hadir — keputusan pelatih'
-                : `Tidak dihitung hadir (${LABEL_DATANG[d]}) — dihitung alpa`}
+                : `Tidak dihitung hadir (${labelDatang(d, uji, session, aturan)}) — dihitung alpa`}
       </p>
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>

@@ -115,7 +115,7 @@ export const KATEGORI_IZIN_BAKU: readonly KategoriIzin[] = [
 export type AturanLengkap = Required<
   Pick<AturanPelantikan, 'rasioHadir' | 'rasioAlpa' | 'rasioTelat' | 'toleransiMenit' | 'wajibForm' | 'wajibBukti' | 'kategoriIzin' | 'sakitMaksJam'>
 > &
-  Pick<AturanPelantikan, 'batasJatahMenit' | 'batasIzin' | 'batasGabung'>
+  Pick<AturanPelantikan, 'batasJatahMenit' | 'batasIzin' | 'batasGabung' | 'praMenit' | 'penutupMenit'>
 
 export const ATURAN_BAKU: AturanLengkap = {
   rasioHadir: [7, 12],
@@ -164,6 +164,10 @@ export function lengkapiAturan(a?: Partial<AturanPelantikan> | null): AturanLeng
   if (typeof x.batasJatahMenit === 'number' && Number.isFinite(x.batasJatahMenit) && x.batasJatahMenit >= 0)
     out.batasJatahMenit = Math.round(x.batasJatahMenit)
   if (typeof x.batasIzin === 'string' && JAM_RE.test(x.batasIzin)) out.batasIzin = x.batasIzin
+  for (const k of ['praMenit', 'penutupMenit'] as const) {
+    const v = x[k]
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[k] = Math.round(v)
+  }
   if (typeof x.batasGabung === 'string' && x.batasGabung) out.batasGabung = x.batasGabung
   return out
 }
@@ -320,6 +324,11 @@ export interface ItemRencana {
   /** Usulan bawaan: dihitung untuk syarat pelantikan. */
   wajib: boolean
   catatan?: string
+  /**
+   * v2.10.1 — sesi lain (jenis latihan) di tanggal yang sama. Tanda jadwal
+   * ganda; gabungkan di Jadwal supaya absensi tidak terpecah.
+   */
+  ganda?: Session[]
 }
 
 export interface RencanaProgram {
@@ -344,7 +353,13 @@ export function rencanakanProgram(
   p: ProgramLatihan,
   semua: Session[],
   pustaka: PolaSesi[],
-  opsi: { buatId: (awalan: string) => string; mode: 'kosong' | 'ganti'; sekarang?: number },
+  opsi: {
+    buatId: (awalan: string) => string
+    mode: 'kosong' | 'ganti'
+    sekarang?: number
+    /** v2.10.1 — id sesi yang sudah punya catatan absensi (diutamakan saat menautkan). */
+    adaAbsensi?: ReadonlySet<string>
+  },
 ): RencanaProgram {
   const sekarang = opsi.sekarang ?? Date.now()
   const milik = new Set(p.sesiIds)
@@ -358,9 +373,18 @@ export function rencanakanProgram(
   const pel = tonggakPelantikan(p)
   const item: ItemRencana[] = []
 
+  const absen = opsi.adaAbsensi ?? new Set<string>()
+  /**
+   * Sesi latihan lama untuk satu tanggal. v2.10.1: sesi yang sudah berisi
+   * absensi menang — kalau tanggal itu punya dua sesi (mis. 17.30 buatan
+   * tangan & 18.00 dari jadwal berulang), program menautkan sesi tempat
+   * absensinya dicatat, bukan kembarannya yang kosong.
+   */
   const cocokLatihan = (t: string): Session | null => {
     const calon = (perTanggal.get(t) ?? []).filter((s) => !terpakai.has(s.id) && JENIS_BERENCANA.includes(s.type))
     return (
+      calon.find((s) => absen.has(s.id) && milik.has(s.id)) ??
+      calon.find((s) => absen.has(s.id)) ??
       calon.find((s) => milik.has(s.id)) ??
       calon.find((s) => s.startTime === p.jamMulai) ??
       calon[0] ??
@@ -386,6 +410,7 @@ export function rencanakanProgram(
     const wajib = !pel?.dari || t < pel.dari
     if (lama) {
       terpakai.add(lama.id)
+      const ganda = (perTanggal.get(t) ?? []).filter((s) => s.id !== lama.id && JENIS_BERENCANA.includes(s.type))
       const kosong = !(lama.rencanaLatihan?.length ?? 0)
       const isi = !!pola && !sudahBerjalan(lama) && (kosong || opsi.mode === 'ganti')
       const sesi: Session = isi ? { ...lama, rencanaLatihan: salinRencana(pola!.rencana, opsi.buatId) } : lama
@@ -399,13 +424,20 @@ export function rencanakanProgram(
         sesi,
         isiRencana: isi,
         wajib: p.wajibIds.length && milik.has(lama.id) ? p.wajibIds.includes(lama.id) : wajib,
-        catatan: !pola
-          ? undefined
-          : sudahBerjalan(lama)
-            ? 'sudah berjalan — rencana tidak diubah'
-            : !kosong && opsi.mode === 'kosong'
-              ? 'sudah punya rencana — dibiarkan'
-              : undefined,
+        catatan:
+          [
+            !pola
+              ? undefined
+              : sudahBerjalan(lama)
+                ? 'sudah berjalan — rencana tidak diubah'
+                : !kosong && opsi.mode === 'kosong'
+                  ? 'sudah punya rencana — dibiarkan'
+                  : undefined,
+            ganda.length ? `tanggal ganda: ${ganda.length + 1} sesi — gabungkan di Jadwal` : undefined,
+          ]
+            .filter(Boolean)
+            .join(' · ') || undefined,
+        ...(ganda.length ? { ganda } : {}),
       })
     } else {
       item.push({
@@ -665,36 +697,100 @@ export function keabsahanIzin(
   return 'sah'
 }
 
-/** Jendela datang sebuah sesi (epoch ms). */
-export function jendelaDatang(
-  s: Pick<Session, 'date' | 'startTime' | 'endTime'>,
-  a: Pick<AturanLengkap, 'toleransiMenit' | 'batasJatahMenit'>,
-): { mulai: number; tepat: number; batasJatah: number } {
+type AturanJam = Pick<AturanLengkap, 'toleransiMenit' | 'batasJatahMenit' | 'praMenit' | 'penutupMenit'>
+type AturanInti = Partial<Pick<AturanLengkap, 'praMenit' | 'penutupMenit'>>
+
+/** Jam selesai sesi (epoch ms); tanpa jam selesai = mulai + 120 menit. */
+function selesaiSesiMs(s: Pick<Session, 'date' | 'startTime' | 'endTime'>): number {
   const mulai = mulaiSesiMs(s)
   const selesai = s.endTime ? mulaiSesiMs({ date: s.date, startTime: s.endTime }) : 0
-  const durasiMenit = selesai > mulai ? Math.round((selesai - mulai) / 60_000) : 120
+  return selesai > mulai ? selesai : mulai + 120 * 60_000
+}
+
+/**
+ * v2.10.1 — jam inti latihan (epoch ms): jam sesi dikurangi menit pra-latihan
+ * di awal dan menit penutup di akhir. Sesi 17.30–20.15 dengan pra 30 &
+ * penutup 15 → 18.00–20.00. Bila potongannya menyisakan < 30 menit (salah
+ * isi), jam sesi utuh yang dipakai — lebih baik longgar daripada menghukum.
+ */
+export function intiSesi(s: Pick<Session, 'date' | 'startTime' | 'endTime'>, a?: AturanInti): { mulai: number; selesai: number } {
+  const mulai = mulaiSesiMs(s)
+  const selesai = selesaiSesiMs(s)
+  const m = mulai + (a?.praMenit ?? 0) * 60_000
+  const z = selesai - (a?.penutupMenit ?? 0) * 60_000
+  return z - m >= 30 * 60_000 ? { mulai: m, selesai: z } : { mulai, selesai }
+}
+
+/** Jendela datang sebuah sesi (epoch ms), diukur dari jam inti. */
+export function jendelaDatang(
+  s: Pick<Session, 'date' | 'startTime' | 'endTime'>,
+  a: AturanJam,
+): { mulai: number; tepat: number; batasJatah: number; selesai: number } {
+  const { mulai, selesai } = intiSesi(s, a)
+  const durasiMenit = Math.round((selesai - mulai) / 60_000)
   const tepat = mulai + a.toleransiMenit * 60_000
   const menitJatah = a.batasJatahMenit ?? Math.floor(durasiMenit / 2)
-  return { mulai, tepat, batasJatah: Math.max(tepat, mulai + menitJatah * 60_000) }
+  return { mulai, tepat, batasJatah: Math.max(tepat, mulai + menitJatah * 60_000), selesai }
 }
 
 export type StatusDatang = 'tepat' | 'jatah' | 'lewat-batas' | 'tanpa-alasan' | 'tanpa-bukti' | 'putusan-sah' | 'putusan-tidak-sah'
 
 /**
- * Penilaian jam datang satu catatan hadir. `null` = jam datang tidak dicatat
- * (dianggap tepat waktu). `jatah` = boleh memakai jatah telat bila masih ada.
+ * v2.10.1 — pulang sebelum latihan inti selesai? Toleransinya sama dengan
+ * toleransi datang (baku 30 menit): pulang 19.40 dari inti s.d. 20.00 belum
+ * dihitung.
+ */
+export function pulangAwal(
+  r: Pick<AttendanceRecord, 'status' | 'pulangAt'>,
+  s: Pick<Session, 'date' | 'startTime' | 'endTime'>,
+  a: Pick<AturanLengkap, 'toleransiMenit'> & AturanInti,
+): boolean {
+  if (r.status !== 'hadir' || r.pulangAt == null) return false
+  return r.pulangAt < intiSesi(s, a).selesai - a.toleransiMenit * 60_000
+}
+
+/** v2.10.1 — menit ikut latihan inti = min(pulang, selesai) − max(datang, mulai). */
+export function menitIkut(
+  r: Pick<AttendanceRecord, 'datangAt' | 'pulangAt'>,
+  s: Pick<Session, 'date' | 'startTime' | 'endTime'>,
+  a?: AturanInti,
+): number {
+  const { mulai, selesai } = intiSesi(s, a)
+  const dari = Math.max(mulai, r.datangAt ?? mulai)
+  const sampai = Math.min(selesai, r.pulangAt ?? selesai)
+  return Math.max(0, Math.round((sampai - dari) / 60_000))
+}
+
+/**
+ * Penilaian jam datang (dan, sejak v2.10.1, jam pulang) satu catatan hadir.
+ * `null` = jam datang & pulang tidak dicatat (dianggap tepat waktu).
+ * `jatah` = boleh memakai jatah telat bila masih ada.
+ *
+ * Pulang awal diperlakukan seperti datang telat — satu jatah yang sama,
+ * syaratnya sama (alasan, bukti bila diwajibkan) — dan waktu ikut tidak boleh
+ * kurang dari yang diizinkan aturan telat (baku: setengah sesi). Datang telat
+ * *dan* pulang awal di sesi yang sama tetap satu kali pemakaian jatah, tetapi
+ * waktu ikutnya dihitung dari keduanya.
  */
 export function statusDatang(
-  r: Pick<AttendanceRecord, 'status' | 'datangAt' | 'alasanTelat' | 'bukti' | 'putusanIzin'>,
+  r: Pick<AttendanceRecord, 'status' | 'datangAt' | 'alasanTelat' | 'bukti' | 'putusanIzin'> & Partial<Pick<AttendanceRecord, 'pulangAt'>>,
   s: Pick<Session, 'date' | 'startTime' | 'endTime'>,
-  a: Pick<AturanLengkap, 'toleransiMenit' | 'batasJatahMenit' | 'wajibBukti'>,
+  a: AturanJam & Pick<AturanLengkap, 'wajibBukti'>,
 ): StatusDatang | null {
-  if (r.status !== 'hadir' || r.datangAt == null) return null
+  if (r.status !== 'hadir' || (r.datangAt == null && r.pulangAt == null)) return null
   const j = jendelaDatang(s, a)
-  if (r.datangAt <= j.tepat) return 'tepat'
+  const telat = r.datangAt != null && r.datangAt > j.tepat
+  const pulang = pulangAwal(r, s, a)
+  if (!telat && !pulang) return 'tepat'
   if (r.putusanIzin === 'sah') return 'putusan-sah'
   if (r.putusanIzin === 'tidak-sah') return 'putusan-tidak-sah'
-  if (r.datangAt > j.batasJatah) return 'lewat-batas'
+  if (telat && r.datangAt! > j.batasJatah) return 'lewat-batas'
+  if (pulang) {
+    // Waktu ikut minimal = durasi − menit jatah (sama dengan batas jam datang).
+    const durasi = Math.round((j.selesai - j.mulai) / 60_000)
+    const minimal = durasi - Math.round((j.batasJatah - j.mulai) / 60_000)
+    if (menitIkut(r, s, a) < minimal) return 'lewat-batas'
+  }
   if (!r.alasanTelat?.trim()) return 'tanpa-alasan'
   if (a.wajibBukti && !adaBukti(r)) return 'tanpa-bukti'
   return 'jatah'
@@ -708,6 +804,20 @@ export const LABEL_DATANG: Record<StatusDatang, string> = {
   'tanpa-bukti': 'telat tanpa bukti',
   'putusan-sah': 'telat · putusan: dihitung hadir',
   'putusan-tidak-sah': 'telat · putusan: tidak dihitung',
+}
+
+/** v2.10.1 — label yang menyebut pulang awal bila memang itu sebabnya. */
+export function labelDatang(
+  d: StatusDatang,
+  r: Pick<AttendanceRecord, 'status' | 'datangAt' | 'pulangAt'>,
+  s: Pick<Session, 'date' | 'startTime' | 'endTime'>,
+  a: AturanJam,
+): string {
+  if (d === 'tepat' || !pulangAwal(r, s, a)) return LABEL_DATANG[d]
+  const telat = r.datangAt != null && r.datangAt > jendelaDatang(s, a).tepat
+  const sebab = telat ? 'telat & pulang awal' : 'pulang awal'
+  if (d === 'lewat-batas') return `${sebab} · waktu ikut kurang dari batas`
+  return LABEL_DATANG[d].replace(/^telat/, sebab)
 }
 
 /** Sesi ini memakai Google Form presensi? (ada isian yang sudah diimpor) */
