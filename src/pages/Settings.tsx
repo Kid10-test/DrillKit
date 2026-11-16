@@ -27,6 +27,7 @@ import {
 import { IconDownload, IconUpload } from '../components/Icons'
 import { backupNotes, daysSince, downloadBackup, downloadBackupZip, formatBytes, lastBackup, noteBackup, siapkanBackup, type BackupNote } from '../lib/backup'
 import { AksiKirimBerkas } from '../components/EstafetBerkas'
+import { KartuGoogleDrive } from '../components/google/KartuGoogleDrive'
 import { KartuSimpanOtomatis } from '../components/SimpanOtomatis'
 import { AMBANG, AMBANG_LANGKAH } from '../lib/analitik'
 import type { AmbangTingkat } from '../db/types'
@@ -529,6 +530,8 @@ export default function Settings() {
           </p>
           {/* 1b — simpan otomatis: sekali pilih berkas, aplikasi menulis sendiri. */}
           <KartuSimpanOtomatis />
+          {/* v2.10.1 — Google Drive: rundown, isian Form, backup otomatis. */}
+          <KartuGoogleDrive onPulihkan={(f) => void importBackup(f)} />
 
           {/* Status & pengingat backup */}
           <div className="mb-4 rounded-xl border border-slate-800 bg-slate-950/40 p-3">

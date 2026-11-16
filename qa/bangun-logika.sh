@@ -195,6 +195,11 @@ rakit src/lib/rosterCetak.ts            rosterCetak
 # v2.10 — pindah musim: nonaktifkan anggota, saldo awal kas, berkas yatim, ambil dari arsip.
 rakit src/lib/pindahMusim.ts             pindahMusim
 rakit src/lib/namaBerkas.ts              namaBerkas
+# v2.10.1 — rundown (tempel/Drive/berkas), sesi ganda, sambungan Google Drive & backup ke Drive.
+rakit src/lib/rundown.ts                 rundown
+rakit src/lib/gabungSesi.ts              gabungSesi
+rakit src/lib/googleDrive.ts             googleDrive
+rakit src/lib/backupDrive.ts             backupDrive
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'

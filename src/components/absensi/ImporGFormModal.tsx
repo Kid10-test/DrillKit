@@ -2,9 +2,11 @@
  * v2.8 — Absensi → Impor Form: CSV jawaban Google Form (presensi, izin,
  * atau rekap absen fisik) → pratinjau per baris → terapkan. Dimuat malas.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { AttendanceRecord, Member, ProgramLatihan, Session } from '../../db/types'
-import { db } from '../../db/db'
+import { db, saveSettings } from '../../db/db'
+import { useSettings } from '../../hooks/useSettings'
+import { useGoogle, sisaIzin } from '../google/useGoogle'
 import { Button, Modal, Select, useToast } from '../ui'
 import { aturanUntukSesi } from '../../lib/programLatsar'
 import {
@@ -26,7 +28,7 @@ import { cx, uid } from '../../lib/utils'
 const JENIS: { id: JenisFormImpor; label: string; ket: string }[] = [
   { id: 'presensi', label: 'Presensi', ket: 'Form yang dibuka ±24 jam sebelum latihan. Disimpan sebagai “sudah isi Form”, bukan hadir.' },
   { id: 'izin', label: 'Izin / sakit', ket: 'Jam lapor = cap waktu Form; kategori ditebak dari jawaban; kolom unggah jadi tautan bukti.' },
-  { id: 'datang', label: 'Absen fisik', ket: 'Rekap admin: nama + jam datang (+ alasan telat). Menandai hadir.' },
+  { id: 'datang', label: 'Absen fisik', ket: 'Rekap admin: nama + jam datang (+ jam pulang, alasan). Menandai hadir.' },
 ]
 
 const LABEL_KOLOM: Record<KolomGForm, string> = {
@@ -34,14 +36,16 @@ const LABEL_KOLOM: Record<KolomGForm, string> = {
   nama: 'Nama',
   tanggal: 'Tanggal latihan',
   jam: 'Jam datang',
+  pulang: 'Jam pulang',
+  status: 'Status',
   alasan: 'Alasan / keterangan',
   kategori: 'Kategori izin',
   bukti: 'Bukti (unggah)',
 }
 const KOLOM_PER_JENIS: Record<JenisFormImpor, KolomGForm[]> = {
-  presensi: ['nama', 'waktu', 'tanggal'],
-  izin: ['nama', 'waktu', 'tanggal', 'kategori', 'alasan', 'bukti'],
-  datang: ['nama', 'tanggal', 'waktu', 'jam', 'alasan', 'bukti'],
+  presensi: ['nama', 'waktu', 'tanggal', 'status'],
+  izin: ['nama', 'waktu', 'tanggal', 'status', 'kategori', 'alasan', 'bukti'],
+  datang: ['nama', 'tanggal', 'waktu', 'jam', 'pulang', 'status', 'alasan', 'bukti'],
 }
 const WARNA_AKSI: Record<AksiImpor, string> = {
   tambah: 'bg-emerald-600 text-white',
@@ -86,6 +90,56 @@ export default function ImporGFormModal({
   const [sesiTetap, setSesiTetap] = useState('')
   const [pilihan, setPilihan] = useState<Record<number, string | null>>({})
   const [sibuk, setSibuk] = useState(false)
+  const settings = useSettings()
+  const g = useGoogle()
+  const sumber = settings.sumberForm?.[jenis]
+  const [tabs, setTabs] = useState<string[]>([])
+  const [tarik, setTarik] = useState('')
+  useEffect(() => setTabs([]), [jenis])
+
+  /** v2.10.1 — tarik isian terbaru langsung dari Sheet jawaban di Drive. */
+  async function tarikDrive(b: { id: string; nama: string; mimeType?: string; tab?: string }, ingat: boolean) {
+    if (!g.mod || !g.konfig) return
+    setTarik('Mengambil isian dari Google Drive…')
+    try {
+      await g.mod.sambung(g.konfig)
+      // Tab "untuk DrillKit" (lihat Form izin MBA) dipilih bila ada dan belum ada pilihan.
+      const awal = b.tab
+      const r = await g.mod.ambilCsvForm({ id: b.id, mimeType: b.mimeType }, awal)
+      let tab = r.tab
+      let teksCsv = r.teks
+      if (!awal && r.tabs.length > 1) {
+        const khusus = r.tabs.find((t) => /drill ?kit/i.test(t))
+        if (khusus && khusus !== r.tab) {
+          const r2 = await g.mod.ambilCsvForm({ id: b.id, mimeType: b.mimeType }, khusus)
+          tab = r2.tab
+          teksCsv = r2.teks
+        }
+      }
+      setTabs(r.tabs)
+      setNamaBerkas(`${b.nama}${tab ? ` › ${tab}` : ''}`)
+      muat(teksCsv)
+      if (ingat || tab !== b.tab) {
+        await saveSettings({ sumberForm: { ...(settings.sumberForm ?? {}), [jenis]: { id: b.id, nama: b.nama, ...(tab ? { tab } : {}) } } })
+      }
+      const n = Math.max(0, bacaCsvForm(teksCsv).length - 1)
+      toast.push(`${n} isian diambil dari “${b.nama}”`)
+    } catch (e) {
+      toast.push(g.mod.pesanGalat(e), 'err')
+    } finally {
+      setTarik('')
+    }
+  }
+
+  async function pilihSheet() {
+    if (!g.mod || !g.konfig) return
+    try {
+      const b = await g.mod.pilihBerkas(g.konfig, 'sheet', 'Pilih Sheet jawaban Google Form')
+      if (b) await tarikDrive({ id: b.id, nama: b.name, mimeType: b.mimeType }, true)
+    } catch (e) {
+      toast.push(g.mod.pesanGalat(e), 'err')
+    }
+  }
 
   const tabel = useMemo(() => (teks.trim() ? bacaCsvForm(teks) : []), [teks])
   const judul = tabel[0] ?? []
@@ -162,6 +216,46 @@ export default function ImporGFormModal({
         ))}
       </div>
       <p className="text-[12px] text-slate-400">{JENIS.find((j) => j.id === jenis)!.ket}</p>
+      {g.konfig && (
+        <div data-testid="gform-drive" className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2 text-[11px]">
+          {!g.online ? (
+            <span data-testid="gform-drive-offline" className="text-slate-500">
+              Tarik dari Google Drive — butuh internet.
+            </span>
+          ) : (
+            <>
+              {sumber && (
+                <Button size="sm" variant="primary" data-testid="gform-tarik" disabled={!!tarik} onClick={() => void tarikDrive(sumber, false)}>
+                  Tarik isian terbaru
+                </Button>
+              )}
+              <Button size="sm" variant={sumber ? 'ghost' : 'soft'} data-testid="gform-pilih-sheet" disabled={!!tarik} onClick={() => void pilihSheet()}>
+                {sumber ? 'Ganti Sheet…' : 'Ambil dari Sheet jawaban di Drive'}
+              </Button>
+              {sumber && tabs.length > 1 && (
+                <Select
+                  data-testid="gform-tab"
+                  value={sumber.tab ?? ''}
+                  onChange={(e) => void tarikDrive({ ...sumber, tab: e.target.value }, true)}
+                  className="w-auto py-1 text-xs"
+                >
+                  {tabs.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+              )}
+              <span className="text-slate-500">
+                {tarik ||
+                  (sumber
+                    ? `${sumber.nama}${sumber.tab ? ` › ${sumber.tab}` : ''}${g.tersambung ? ` · izin ${sisaIzin(g.habis)}` : ''}`
+                    : 'Sekali pilih, sesudahnya tinggal ketuk Tarik.')}
+              </span>
+            </>
+          )}
+        </div>
+      )}
       <p className="text-[11px] text-slate-500">
         Di Google Form: tab <b>Jawaban</b> → ⋮ → <b>Download responses (.csv)</b>, atau dari Google Sheets: File → Download → CSV. Berkas dibaca di
         perangkat ini saja.
@@ -300,6 +394,9 @@ export default function ImporGFormModal({
                           {jenis === 'izin' && b.bukti ? ' · ada bukti' : ''}
                           {jenis === 'datang' && b.jamDatang != null
                             ? ` · ${String(Math.floor(b.jamDatang / 60)).padStart(2, '0')}.${String(b.jamDatang % 60).padStart(2, '0')}`
+                            : ''}
+                          {jenis === 'datang' && b.jamPulang != null
+                            ? ` · pulang ${String(Math.floor(b.jamPulang / 60)).padStart(2, '0')}.${String(b.jamPulang % 60).padStart(2, '0')}`
                             : ''}
                         </span>
                       </td>

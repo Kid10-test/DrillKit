@@ -4,6 +4,7 @@ import { db } from './db/db'
 import Layout from './components/Layout'
 import PenandaRilis from './components/PenandaRilis'
 import { PenjagaSimpanOtomatis } from './components/SimpanOtomatis'
+import { PenjagaBackupDrive } from './components/google/PenjagaBackupDrive'
 import { ErrorBoundary, ToastProvider } from './components/ui'
 import { KioskProvider } from './hooks/useKiosk'
 import { useBootstrap } from './hooks/useSettings'
@@ -88,6 +89,8 @@ export default function App() {
       {/* 1b — penyimpan otomatis ke berkas. Tidak menampilkan apa pun;
           ia hanya menulis bila berkasnya sudah dipasang. */}
       <PenjagaSimpanOtomatis />
+      {/* v2.10.1 — backup ke Google Drive; diam sampai pelatih menyambungkan Drive. */}
+      <PenjagaBackupDrive />
       <Layout>
         <ErrorBoundary>
         <Suspense

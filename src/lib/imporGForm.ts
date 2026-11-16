@@ -21,7 +21,7 @@ import { kemiripanNama, norm } from './namaAnggota'
 import { tebakPemisahCsv } from './rosterAnggota'
 
 export type JenisFormImpor = 'presensi' | 'izin' | 'datang'
-export type KolomGForm = 'waktu' | 'nama' | 'tanggal' | 'jam' | 'alasan' | 'kategori' | 'bukti'
+export type KolomGForm = 'waktu' | 'nama' | 'tanggal' | 'jam' | 'pulang' | 'status' | 'alasan' | 'kategori' | 'bukti'
 /** Indeks kolom CSV per peran; `-1` = tidak ada. */
 export type PetaKolomGForm = Record<KolomGForm, number>
 export type UrutanTanggal = 'dmy' | 'mdy'
@@ -68,8 +68,15 @@ export function bacaCsvForm(teks: string): string[][] {
 
 /* ------------------------------ tebak kolom ------------------------------ */
 
-const POLA_KOLOM: [KolomGForm, RegExp][] = [
+/**
+ * Pola judul kolom per peran, dicoba berurutan. Diekspor supaya diuji dan
+ * dipakai ulang (v2.10.1). "Jam pulang" dicoba sebelum "jam datang", dan
+ * "Status" sebelum "keterangan" — Form izin/presensi MBA memakai keduanya.
+ */
+export const POLA_KOLOM: [KolomGForm, RegExp][] = [
   ['waktu', /^(timestamp|cap waktu|stempel waktu|waktu (isian|pengisian|kirim)|submitted)/],
+  ['pulang', /(jam (pulang|keluar|selesai)|waktu pulang|pulang (jam|pukul)|^pulang$)/],
+  ['status', /^(status( kehadiran)?|kehadiran|hadir atau tidak|keterangan (hadir|kehadiran))$/],
   ['bukti', /(bukti|lampiran|unggah|upload|foto|surat|dokumen)/],
   ['kategori', /(kategori|jenis (izin|alasan)|tipe izin)/],
   ['jam', /(jam (datang|hadir|tiba|masuk)|waktu (datang|tiba|hadir)|^jam$|^datang$)/],
@@ -80,7 +87,7 @@ const POLA_KOLOM: [KolomGForm, RegExp][] = [
 
 /** Tebak peran tiap kolom dari judul. Kolom pertama yang cocok menang. */
 export function tebakKolomGForm(judul: string[]): PetaKolomGForm {
-  const peta: PetaKolomGForm = { waktu: -1, nama: -1, tanggal: -1, jam: -1, alasan: -1, kategori: -1, bukti: -1 }
+  const peta: PetaKolomGForm = { waktu: -1, nama: -1, tanggal: -1, jam: -1, pulang: -1, status: -1, alasan: -1, kategori: -1, bukti: -1 }
   const dipakai = new Set<number>()
   for (const [peran, pola] of POLA_KOLOM) {
     for (let i = 0; i < judul.length; i++) {
@@ -218,6 +225,26 @@ export function tebakKategoriIzin(teks: string, daftar: readonly KategoriIzin[])
   return 'lain'
 }
 
+/* ------------------------------ status isian ------------------------------ */
+
+export type StatusIsianForm = 'hadir' | 'telat' | 'pulang' | 'izin' | 'sakit'
+
+/**
+ * v2.10.1 — baca jawaban kolom Status ("Hadir", "Izin", "Sakit", "Datang
+ * terlambat", "Pulang lebih awal"…). `null` = kosong atau tidak dikenali —
+ * baris seperti itu diperlakukan seperti sebelum ada kolom Status.
+ */
+export function bacaStatusIsian(teks: string): StatusIsianForm | null {
+  const t = norm(teks)
+  if (!t) return null
+  if (/(sakit|\bs\b)/.test(t)) return 'sakit'
+  if (/(izin|ijin|\bi\b|tidak hadir|berhalangan)/.test(t)) return 'izin'
+  if (/(pulang|\btp\b)/.test(t)) return /(telat|terlambat)/.test(t) ? 'telat' : 'pulang'
+  if (/(telat|terlambat)/.test(t)) return 'telat'
+  if (/(hadir|datang|\bh\b|^ya\b)/.test(t)) return 'hadir'
+  return null
+}
+
 /* ------------------------------ cocok nama ------------------------------ */
 
 export interface CocokNamaForm {
@@ -298,6 +325,10 @@ export interface BarisRencanaForm {
   capWaktu: number | null
   /** Menit sejak tengah malam (jenis `datang`). */
   jamDatang: number | null
+  /** v2.10.1 — menit sejak tengah malam (jenis `datang`). */
+  jamPulang: number | null
+  /** v2.10.1 — jawaban kolom Status yang terbaca. */
+  status: StatusIsianForm | null
   kategori?: string
   alasan: string
   bukti: string
@@ -337,14 +368,20 @@ export function rencanakanImporForm(o: OpsiRencanaForm): BarisRencanaForm[] {
     const alasan = sel(b, o.peta.alasan)
     const bukti = sel(b, o.peta.bukti)
     const jamDatang = o.peta.jam >= 0 ? bacaJamForm(sel(b, o.peta.jam)) : null
+    const jamPulang = o.peta.pulang >= 0 ? bacaJamForm(sel(b, o.peta.pulang)) : null
+    const status = o.peta.status >= 0 ? bacaStatusIsian(sel(b, o.peta.status)) : null
     const teksKategori = sel(b, o.peta.kategori) || alasan
-    const kategori = o.jenis === 'izin' ? tebakKategoriIzin(teksKategori, o.kategori) : undefined
+    const kategori = o.jenis === 'izin' ? (status === 'sakit' && !sel(b, o.peta.kategori) ? 'sakit' : tebakKategoriIzin(teksKategori, o.kategori)) : undefined
     const cocok = cocokkanNamaForm(nama, o.anggota)
     const memberId = o.pilihan && no in o.pilihan ? o.pilihan[no] : cocok.memberId
     const sesi = o.sesiTetap ? (perSesi.get(o.sesiTetap) ?? null) : sesiUntukIsian(o.jenis, capWaktu, tanggal, o.sesi)
-    const dasar = { no, nama, cocok, memberId, sesiId: sesi?.id ?? null, capWaktu, jamDatang, kategori, alasan, bukti }
+    const dasar = { no, nama, cocok, memberId, sesiId: sesi?.id ?? null, capWaktu, jamDatang, jamPulang, status, kategori, alasan, bukti }
     const keluar = (aksi: AksiImpor, pesan: string) => hasil.push({ ...dasar, aksi, pesan })
     if (!nama) return keluar('lewati', 'Nama kosong')
+    // v2.10.1 — satu Form untuk hadir & izin: kolom Status memilah barisnya.
+    const isianIzin = status === 'izin' || status === 'sakit'
+    if (o.jenis === 'izin' && status && !isianIzin) return keluar('lewati', 'Bukan isian izin/sakit (Status: hadir/telat/pulang)')
+    if (o.jenis !== 'izin' && isianIzin) return keluar('lewati', `Isian ${status} — impor dengan jenis “Izin / sakit”`)
     if (!memberId) return keluar('lewati', cocok.kandidat.length ? 'Nama tidak pasti — pilih anggotanya' : 'Nama tidak dikenal')
     if (!sesi) return keluar('lewati', o.jenis === 'izin' ? 'Sesi tidak ditemukan — pakai kolom tanggal atau pilih sesi' : 'Tidak ada sesi yang cocok dengan cap waktunya')
     if ((o.jenis === 'presensi' || o.jenis === 'izin') && capWaktu == null) return keluar('lewati', 'Cap waktu tidak terbaca')
@@ -371,8 +408,13 @@ export function rencanakanImporForm(o: OpsiRencanaForm): BarisRencanaForm[] {
     const datangAt = jamDatang != null ? msSesi(sesi, `${Math.floor(jamDatang / 60)}:${jamDatang % 60}`) : undefined
     if (!ada) return keluar('tambah', 'Hadir baru')
     if (ada.status === 'alpha') return keluar('perbarui', 'Tanpa keterangan → hadir')
-    const beda = (datangAt != null && ada.datangAt !== datangAt) || (!!alasan && ada.alasanTelat !== alasan) || (!!bukti && ada.bukti !== bukti)
-    return keluar(beda ? 'perbarui' : 'sama', beda ? 'Perbarui jam datang/alasan' : 'Sudah tercatat')
+    const pulangAt = jamPulang != null ? msSesi(sesi, `${Math.floor(jamPulang / 60)}:${jamPulang % 60}`) : undefined
+    const beda =
+      (datangAt != null && ada.datangAt !== datangAt) ||
+      (pulangAt != null && ada.pulangAt !== pulangAt) ||
+      (!!alasan && ada.alasanTelat !== alasan) ||
+      (!!bukti && ada.bukti !== bukti)
+    return keluar(beda ? 'perbarui' : 'sama', beda ? 'Perbarui jam datang/pulang/alasan' : 'Sudah tercatat')
   })
   return hasil
 }
@@ -420,6 +462,7 @@ export function terapkanImporForm(
       if (b.bukti && !r.bukti) r.bukti = b.bukti
       if (b.alasan && !r.note) r.note = b.alasan
       delete r.datangAt
+      delete r.pulangAt
       delete r.alasanTelat
       keluar.push(r)
       continue
@@ -429,6 +472,7 @@ export function terapkanImporForm(
       status: 'hadir',
     }
     if (b.jamDatang != null) r.datangAt = msSesi(s, `${Math.floor(b.jamDatang / 60)}:${b.jamDatang % 60}`)
+    if (b.jamPulang != null) r.pulangAt = msSesi(s, `${Math.floor(b.jamPulang / 60)}:${b.jamPulang % 60}`)
     if (b.alasan) r.alasanTelat = b.alasan
     if (b.bukti) r.bukti = b.bukti
     delete r.dilaporAt

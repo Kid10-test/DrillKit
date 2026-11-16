@@ -5,7 +5,7 @@
  * Kamis "Pola B — Musik + Section", Jumat "Pola C — Campuran". Anak tahu
  * hari ini latihan apa, dan pelatih tidak menyusun 18 sesi satu per satu.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import type { BlokLatihan, PolaSesi, Session, SessionType } from '../../db/types'
 import { db, saveSettings } from '../../db/db'
 import { Button, ConfirmButton, Input, Modal, Select, useToast } from '../ui'
@@ -26,6 +26,7 @@ import { BilahKomposisi } from './BilahKomposisi'
 import { PenyuntingBlok } from './RencanaEditor'
 
 const buatId = (awalan: string) => uid(awalan)
+const ImporRundownModal = lazy(() => import('./ImporRundownModal'))
 
 export function PolaSesiModal({ open, onClose, sesi }: { open: boolean; onClose: () => void; sesi: Session[] }) {
   const settings = useSettings()
@@ -37,6 +38,7 @@ export function PolaSesiModal({ open, onClose, sesi }: { open: boolean; onClose:
 
   /* ---------------- sunting pola ---------------- */
   const [sunting, setSunting] = useState<PolaSesi | null>(null)
+  const [dariRundown, setDariRundown] = useState(false)
 
   async function simpanDaftar(daftar: PolaSesi[]) {
     await saveSettings({ polaSesi: daftar })
@@ -169,9 +171,23 @@ export function PolaSesiModal({ open, onClose, sesi }: { open: boolean; onClose:
             >
               + Pola baru
             </Button>
+            <Button size="sm" variant="ghost" data-testid="pola-dari-rundown" onClick={() => setDariRundown(true)}>
+              + Pola dari rundown
+            </Button>
             <Button size="sm" variant="ghost" data-testid="contoh-pola" onClick={tambahContoh}>
               Tambah 3 contoh pola Latsar (120 menit)
             </Button>
+            {dariRundown && (
+              <Suspense fallback={null}>
+                <ImporRundownModal
+                  open={dariRundown}
+                  onClose={() => setDariRundown(false)}
+                  seksi={seksi}
+                  konteks="pola"
+                  onTerapkan={(h) => setSunting({ id: uid('pola_'), nama: h.judul, rencana: h.blok, dibuat: Date.now() })}
+                />
+              </Suspense>
+            )}
           </div>
 
           {pola.length > 0 && (
