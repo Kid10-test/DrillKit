@@ -8,8 +8,12 @@
  *    selesai 13 menit padahal direncanakan 10), jadi hasilnya pasti tanpa
  *    perlu membekukan jam.
  * 2. **Blok yang sedang berjalan hanya menyumbang kelebihannya yang sudah
- *    terjadi.** Blok B baru jalan 5 menit dari jatah 20 — gesernya harus
- *    tetap +3 (warisan A), BUKAN "lebih cepat 15 menit".
+ *    terjadi.** Blok B baru jalan 7 menit dari jatah 20 — gesernya harus
+ *    tetap +3 (warisan A), BUKAN "lebih cepat 13 menit".
+ *
+ * v2.11 — selisih berpatokan pada jam nyata, jadi realisasi diseed tepat di
+ * menit jam mulai rencana (bukan "18 menit lalu" yang bisa jatuh di tengah
+ * menit). Alur ubah rundown di lapangan diuji di `pacu-v2-e2e.mjs`.
  */
 import puppeteer from 'puppeteer'
 import { lewatSambutan } from './sambutan.mjs'
@@ -86,20 +90,24 @@ const info = await p.evaluate(async () => {
     { id: 'k_c', judul: 'Gabungan', jenis: 'gabungan', menit: 15 },
   ]
   const tx = r.transaction(['sessions'], 'readwrite')
-  // Sesi 1 — belum ada realisasi sama sekali.
+  // Jam mulai rencana sesi 2, tepat di awal menitnya.
+  const awal = new Date(skrg.getTime() - 20 * M)
+  awal.setSeconds(0, 0)
+  const P = awal.getTime()
+  // Sesi 1 — belum ada realisasi sama sekali, dan jam mulainya 2 menit lagi.
   tx.objectStore('sessions').put({
     id: 's_pacu_murni', title: 'Pacu Tanpa Realisasi', type: 'latihan', date: iso,
-    startTime: jam(-10), endTime: jam(80), place: 'Lapangan A', notes: '', checklist: [],
+    startTime: jam(2), endTime: jam(92), place: 'Lapangan A', notes: '', checklist: [],
     createdAt: kini, rencanaLatihan: rencana, realisasiLatihan: [],
   })
-  // Sesi 2 — A sudah selesai 13 menit (rencana 10), B sedang berjalan 5 menit.
+  // Sesi 2 — A mulai tepat waktu dan selesai 13 menit (rencana 10), B sedang berjalan ±7 menit.
   tx.objectStore('sessions').put({
     id: 's_pacu_jalan', title: 'Pacu Sedang Jalan', type: 'latihan', date: iso,
     startTime: jam(-20), endTime: jam(70), place: 'Lapangan B', notes: '', checklist: [],
     createdAt: kini, rencanaLatihan: rencana,
     realisasiLatihan: [
-      { id: 'k_a', mulai: kini - 18 * M, selesai: kini - 5 * M },
-      { id: 'k_b', mulai: kini - 5 * M, selesai: null },
+      { id: 'k_a', mulai: P, selesai: P + 13 * M },
+      { id: 'k_b', mulai: P + 13 * M, selesai: null },
     ],
   })
   await new Promise((res) => { tx.oncomplete = res })
@@ -116,7 +124,7 @@ await klik('[data-testid="pacu-s_pacu_murni"]')
 await wait(1500)
 cek('layar pacu terbuka', await ada('[data-testid="pacu-latihan"]'))
 cek('judul sesi tampil', (await teks('[data-testid="judul-sesi-pacu"]')).includes('Pacu Tanpa Realisasi'))
-cek('tanpa realisasi → geser 0', (await p.$eval('[data-testid="geser"]', (e) => e.getAttribute('data-geser'))) === '0')
+cek('sebelum jam mulai & tanpa realisasi → geser 0', (await p.$eval('[data-testid="geser"]', (e) => e.getAttribute('data-geser'))) === '0')
 cek('geser 0 tertulis "tepat waktu"', (await teks('[data-testid="geser"]')) === 'tepat waktu')
 cek('tanpa realisasi → tidak ada peringatan geser', !(await ada('[data-testid="peringatan-geser"]')))
 cek('proyeksi = ujung rencana (tanpa geser)', await ada('[data-testid="proyeksi-selesai"]'))
@@ -136,8 +144,10 @@ const sisa1 = await teks('[data-testid="sisa-blok"]')
 await wait(2500)
 const sisa2 = await teks('[data-testid="sisa-blok"]')
 cek('sisa blok terbaca', /\d/.test(sisa1), sisa1)
-cek('blok berjalan tidak memicu geser palsu',
-  (await p.$eval('[data-testid="geser"]', (e) => e.getAttribute('data-geser'))) === '0',
+// Mulai 1–2 menit sebelum jam rencana → lebih cepat 1–2 menit, bukan "lebih cepat 9 menit"
+// (blok yang berjalan tidak menyumbang sisa jatahnya) dan bukan terlambat.
+const geserAwal = Number(await p.$eval('[data-testid="geser"]', (e) => e.getAttribute('data-geser')))
+cek('blok berjalan tidak memicu geser palsu (mulai lebih awal 1–2 mnt)', geserAwal === -1 || geserAwal === -2,
   await teks('[data-testid="geser"]'))
 
 await klik('[data-testid="tutup-pacu"]')
@@ -162,16 +172,17 @@ cek('peringatan menyebut bagian akhir',
 
 const sisaTeks = await teks('[data-testid="sisa-blok"]')
 const sisaAngka = Number(sisaTeks.replace(/[^\d]/g, ''))
-cek('sisa blok B masih 13–15 menit', sisaAngka >= 13 && sisaAngka <= 15, sisaTeks)
+cek('sisa blok B masih 12–13 menit', sisaAngka >= 12 && sisaAngka <= 13, sisaTeks)
 
 const proyeksi = await teks('[data-testid="proyeksi-selesai"]')
 cek('proyeksi selesai terbaca', /^\d{2}:\d{2}$/.test(proyeksi), proyeksi)
 
-// Selesaikan blok B lebih cepat (5 menit dari jatah 20) → geser menjadi −12.
+// Selesaikan blok B lebih cepat (±7 menit dari jatah 20) → C mulai sekarang, selesai ±10 menit lebih cepat.
 await klik('[data-testid="tombol-selesai"]')
 await wait(1500)
 const geser2 = await p.$eval('[data-testid="geser"]', (e) => e.getAttribute('data-geser'))
-cek('B selesai 5 vs 20 → geser −12', geser2 === '-12', String(geser2))
+cek('B selesai ±7 vs 20 → geser −9/−10', geser2 === '-9' || geser2 === '-10', String(geser2))
+cek('saat jeda kartu menunjukkan blok berikutnya', (await teks('[data-testid="kartu-berjalan"]')).includes('Berikutnya: Gabungan'))
 cek('geser negatif tertulis "lebih cepat"',
   (await teks('[data-testid="geser"]')).includes('lebih cepat'), await teks('[data-testid="geser"]'))
 cek('peringatan geser hilang saat tidak terlambat', !(await ada('[data-testid="peringatan-geser"]')))
@@ -182,13 +193,17 @@ await wait(1200)
 cek('blok C mulai dari daftar',
   (await p.$eval('[data-testid="kartu-berjalan"]', (e) => e.getAttribute('data-blok'))) === 'k_c')
 const geser3 = await p.$eval('[data-testid="geser"]', (e) => e.getAttribute('data-geser'))
-cek('geser tetap −12 saat C baru mulai', geser3 === '-12', String(geser3))
+cek('geser tetap saat C baru mulai', geser3 === geser2, `${geser3} vs ${geser2}`)
 
-// Ulangi pencatatan → kembali bersih.
+// Ulangi pencatatan → minta konfirmasi dulu, lalu kembali bersih.
 await klik('[data-testid="reset-realisasi"]')
+await wait(500)
+cek('ulangi pencatatan minta konfirmasi', await ada('[data-testid="reset-realisasi-yakin"]'))
+await klik('[data-testid="reset-realisasi-yakin"]')
 await wait(1200)
-const geser4 = await p.$eval('[data-testid="geser"]', (e) => e.getAttribute('data-geser'))
-cek('reset → geser 0', geser4 === '0', String(geser4))
+const geser4 = Number(await p.$eval('[data-testid="geser"]', (e) => e.getAttribute('data-geser')))
+// Tanpa catatan apa pun, 20 menit sesudah jam mulai: terlambat 20 menit menurut jam dinding.
+cek('reset → selisih dari jam dinding (+20/+21)', geser4 === 20 || geser4 === 21, String(geser4))
 // Setelah direset tidak ada realisasi, jadi layar jatuh ke JANGKAR RENCANA:
 // jam sekarang berada di dalam blok B (sesi mulai 20 menit lalu, A 10 menit,
 // B 20 menit → B mencakup "sekarang"). Yang membuktikannya adalah labelnya.

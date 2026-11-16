@@ -79,6 +79,18 @@ cek('dua bentrokan dilaporkan', g.bentrok === 2, String(g.bentrok))
 cek('rencana kosong di utama diambil dari kembaran', g.utama.rencanaLatihan?.[0]?.judul === 'Pola B')
 cek('jam, judul, seri utama tidak berubah', g.utama.startTime === '17:30' && g.utama.title === 'Latsar P4' && !g.utama.seriId)
 cek('tidak mengubah masukan', sesi[0].rencanaLatihan === undefined && absensi[2].status === 'alpha')
+{
+  // v2.11: catatan Pacu ikut rencana pasangannya, tidak dicampur.
+  const R = [{ id: 'b1', judul: 'Apel', jenis: 'apel', menit: 10 }]
+  const utama = S('u', '2026-11-17', '18:00', '20:00', { rencanaLatihan: R, realisasiLatihan: { b1: { mulai: 1 } } })
+  const k1 = S('k1', '2026-11-17', '18:00', '20:00', { rencanaLatihan: [{ id: 'x1', judul: 'Lain', jenis: 'lain', menit: 5 }], realisasiLatihan: { x1: { mulai: 2 } }, rencanaAwal: { mulai: 0, blok: [], dibekukan: 1 }, jejakPacu: [{ waktu: 1, jenis: 'tambah', teks: 'x' }] })
+  const g1 = rencanaGabung(utama, [utama, k1], [])
+  cek('gabung: rencana utama → catatan Pacu kembaran tidak ikut', g1.utama.realisasiLatihan.b1 && !g1.utama.realisasiLatihan.x1 && g1.utama.rencanaAwal === undefined && g1.utama.jejakPacu === undefined)
+  const kosongU = S('u2', '2026-11-17', '18:00', '20:00')
+  const k2 = S('k2', '2026-11-17', '18:00', '20:00', { realisasiLatihan: { z: { mulai: 3 } }, jejakPacu: [{ waktu: 1, jenis: 'tambah', teks: 'z' }] })
+  const g2 = rencanaGabung(kosongU, [kosongU, k2, k1], [])
+  cek('gabung: rencana dari kembaran → catatan Pacu ikut sumber yang sama', g2.utama.rencanaLatihan[0].id === 'x1' && g2.utama.realisasiLatihan.x1 && !g2.utama.realisasiLatihan.z && g2.utama.jejakPacu[0].teks === 'x')
+}
 const g2 = rencanaGabung(
   S('u', 'd', '18:00', '20:00', { formPresensi: { x1: 50, x2: 10 }, checklist: [{ id: 'c1', text: 'Bawa pad', done: 0 }], notes: 'A' }),
   [S('v', 'd', '18:00', '20:00', { formPresensi: { x1: 20, x3: 30 }, checklist: [{ id: 'c2', text: 'bawa pad', done: 1 }, { id: 'c3', text: 'Metronom', done: 0 }], notes: 'B', rundownDrive: { id: 'f', nama: 'R', mimeType: 'x', diubah: '', diambil: 1 } })],

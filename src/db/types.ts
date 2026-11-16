@@ -192,6 +192,54 @@ export interface Session {
    * menawarkan ambil ulang. **Catatan staf** — dikupas dari berkas yang dibagikan.
    */
   rundownDrive?: TautanRundownDrive
+
+  /**
+   * v2.11 — salinan rencana **saat Pacu pertama kali dipakai** (blok pertama
+   * dimulai atau dilewati). Sesudah itu rencana boleh diubah di lapangan —
+   * menit dikurangi, blok darurat ditambah, urutan ditukar — tetapi acuan
+   * selisih dan laporan tetap rencana yang disepakati sebelum latihan.
+   * Dihapus bersama "Ulangi pencatatan".
+   */
+  rencanaAwal?: RencanaAwal
+
+  /**
+   * v2.11 — jejak perubahan selama sesi berjalan (lewati, ubah menit,
+   * tambah, pindah, bawa, koreksi). Hanya ditambah, tidak pernah disunting.
+   * **Catatan staf** — dikupas dari berkas yang dibagikan.
+   */
+  jejakPacu?: JejakPacu[]
+}
+
+/** v2.11 — rencana yang dibekukan saat Pacu mulai dipakai. */
+export interface RencanaAwal {
+  /** Jam mulai sesi saat dibekukan ("HH:MM"). */
+  mulai: string
+  blok: BlokLatihan[]
+  /** Epoch ms saat dibekukan. */
+  dibekukan: number
+}
+
+export type JenisJejakPacu =
+  | 'mulai-telat'
+  | 'lewati'
+  | 'ubah-menit'
+  | 'tambah'
+  | 'pindah'
+  | 'bawa'
+  | 'koreksi'
+  | 'batal-catat'
+  | 'ulang'
+
+/** v2.11 — satu baris jejak perubahan Pacu. */
+export interface JejakPacu {
+  /** Epoch ms saat perubahan dibuat. */
+  waktu: number
+  jenis: JenisJejakPacu
+  blokId?: string
+  /** Judul blok saat itu — tetap terbaca walau bloknya kemudian diganti nama. */
+  judul?: string
+  /** Kalimat siap baca, mis. "Section 30 → 20 mnt". */
+  teks: string
 }
 
 /** v2.10.1 — tautan rundown sesi ke satu berkas Google Drive. */
@@ -361,7 +409,17 @@ export interface BlokLatihan {
    * Durasinya selalu durasi blok induk, jadi jam sesi tetap satu garis.
    */
   cabang?: CabangBlok[]
+  /**
+   * v2.11 — prioritas saat waktu tidak cukup. Kosong = otomatis: apel, tes,
+   * dan pendingin dianggap `kunci`, selebihnya `biasa`. `potong` = yang
+   * pertama dikurangi atau dilewati bila latihan terlambat.
+   */
+  prioritas?: PrioritasBlok
+  /** v2.11 — blok ini dibawa dari sesi lain (id sesi asal). */
+  dibawaDari?: string
 }
+
+export type PrioritasBlok = 'kunci' | 'biasa' | 'potong'
 
 /** #35 — satu jalur kegiatan di dalam blok paralel. */
 export interface CabangBlok {
@@ -399,6 +457,13 @@ export interface RealisasiBlok {
   mulai: number
   /** Epoch ms saat blok benar-benar selesai. `null` = sedang berjalan. */
   selesai: number | null
+  /**
+   * v2.11 — blok tidak dikerjakan. `mulai` = `selesai` = saat dilewati.
+   * Blok yang dilewati tidak menghentikan hitungan selisih.
+   */
+  dilewati?: boolean
+  /** v2.11 — blok dipindah ke sesi lain (id sesi tujuan); selalu juga `dilewati`. */
+  dibawaKe?: string
 }
 
 export type AttendanceStatus = 'hadir' | 'izin' | 'sakit' | 'alpha'

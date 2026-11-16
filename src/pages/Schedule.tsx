@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { Suspense, createContext, lazy, useContext, useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import { db } from '../db/db'
@@ -19,7 +19,6 @@ import {
 } from '../components/ui'
 import { IconCalendar, IconPlus, IconDownload, IconPlay } from '../components/Icons'
 import { unduhICS } from '../components/PengingatJadwal'
-import { PacuLatihan } from '../components/PacuLatihan'
 import { PenandaSesi, RekapPenanda } from '../components/PenandaSesi'
 import { lamaSlot, menitDariJam } from '../lib/runsheet'
 import { formatMenit, lebihRencana, ringkasLogRep, totalRencana } from '../lib/latihan'
@@ -66,6 +65,9 @@ import {
   type AturanSeri,
   type TampilanJadwal,
 } from '../lib/kalender'
+
+/** v2.11 — Pacu dimuat saat dibuka; layar ini hanya dipakai selama latihan. */
+const PacuLatihan = lazy(() => import('../components/PacuLatihan'))
 
 const TYPES: SessionType[] = [...URUTAN_JENIS] as SessionType[]
 
@@ -660,7 +662,11 @@ export default function Schedule() {
 
       <DuplikatModal sesi={duplikat} onClose={() => setDuplikat(null)} onSimpan={simpanDuplikat} />
 
-      {pacuSesi && <PacuLatihan sesi={pacuSesi} onClose={() => setPacuId(null)} />}
+      {pacuSesi && (
+        <Suspense fallback={null}>
+          <PacuLatihan sesi={pacuSesi} semuaSesi={sessions ?? []} onClose={() => setPacuId(null)} />
+        </Suspense>
+      )}
 
       <PolaSesiModal open={polaBuka} onClose={() => setPolaBuka(false)} sesi={sessions ?? []} />
       <ProgramModal open={programBuka} onClose={() => setProgramBuka(false)} sesi={sessions ?? []} />

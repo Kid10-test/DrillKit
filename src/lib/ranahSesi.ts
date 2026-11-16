@@ -491,6 +491,7 @@ export function salinRencana(blok: BlokLatihan[] | undefined, buatId: (awalan: s
   return (blok ?? []).map((b) => {
     const salin: BlokLatihan = JSON.parse(JSON.stringify(b))
     salin.id = buatId('b_')
+    delete salin.dibawaDari
     if (salin.cabang) salin.cabang = salin.cabang.map((c) => ({ ...c, seksi: [...(c.seksi ?? [])], id: buatId('j_') }))
     return salin
   })

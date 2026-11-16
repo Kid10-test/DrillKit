@@ -107,6 +107,7 @@ export interface RencanaGabung {
 
 /** Kunci yang tidak pernah diambil dari kembaran. */
 const KUNCI_TETAP = new Set(['id', 'date', 'startTime', 'endTime', 'title', 'type', 'seriId', 'createdAt'])
+const KUNCI_PACU = new Set(['realisasiLatihan', 'rencanaAwal', 'jejakPacu'])
 
 const kosong = (v: unknown) =>
   v == null || v === '' || (Array.isArray(v) && v.length === 0) || (typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0)
@@ -142,10 +143,19 @@ export function rencanaGabung(utama: Session, ganda: Session[], catatan: Attenda
   // Isian sesi yang kosong diambil dari kembaran (urutan masukan = prioritas).
   const hasil: Session = { ...utama }
   const rec = hasil as unknown as Record<string, unknown>
+  // Catatan Pacu hanya bermakna bersama rencana pasangannya (id blok sama):
+  // ikut sesi yang menyumbang rencanaLatihan, tidak dicampur dari kembaran lain.
+  const sumberRencana = kosong(utama.rencanaLatihan)
+    ? ganda.find((g) => idGanda.has(g.id) && !kosong(g.rencanaLatihan))
+    : undefined
   for (const g of ganda) {
     if (!idGanda.has(g.id)) continue
     for (const [k, v] of Object.entries(g)) {
       if (KUNCI_TETAP.has(k) || kosong(v)) continue
+      if (KUNCI_PACU.has(k)) {
+        if (g === sumberRencana) rec[k] = v
+        continue
+      }
       if (k === 'formPresensi') {
         const gabung: Record<string, number> = { ...(hasil.formPresensi ?? {}) }
         for (const [m, t] of Object.entries(v as Record<string, number>)) gabung[m] = Math.min(gabung[m] ?? Infinity, t)
