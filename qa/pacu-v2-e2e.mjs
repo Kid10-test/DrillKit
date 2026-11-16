@@ -103,6 +103,9 @@ await p.evaluate(async () => {
   const besok = new Date(skrg.getTime() + 2 * 86400000)
   const tx = r.transaction(['sessions'], 'readwrite')
   const st = tx.objectStore('sessions')
+  // Sesi contoh bawaan bisa jatuh di antara s_v2 dan s_v2_p4 (tergantung jam &
+  // zona waktu runner), jadi "sesi berikutnya" dikosongkan dulu supaya pasti.
+  st.clear()
   st.put({
     id: 's_v2', title: 'Pacu V2', type: 'latihan', date: iso(skrg),
     startTime: jam(awal), endTime: jam(new Date(awal.getTime() + 90 * M)), place: 'Lapangan', notes: '', checklist: [],
@@ -226,7 +229,7 @@ cek('lewati: selisih turun ±20', gSesudahUbah - gSesudahLewati >= 19 && gSesuda
 
 // ======================================================== bawa ke sesi berikutnya
 await klik(`[data-testid="menu-${idTambah}"]`)
-cek('bawa: tombol menyebut sesi tujuan', (await teks(`[data-testid="bawa-${idTambah}"]`)).includes('Pacu V2 Lanjutan'))
+cek('bawa: tombol menyebut sesi tujuan', (await teks(`[data-testid="bawa-${idTambah}"]`)).includes("Pacu V2 Lanjutan"), await teks(`[data-testid="bawa-${idTambah}"]`))
 await klik(`[data-testid="bawa-${idTambah}"]`)
 cek('bawa: status dibawa', (await status(idTambah)) === 'dibawa')
 cek('bawa: info menyebut tujuan', (await teks(`[data-testid="info-blok-${idTambah}"]`)).includes('Pacu V2 Lanjutan'))
