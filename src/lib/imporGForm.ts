@@ -25,8 +25,12 @@ export { lengkapiDariForm }
 
 export type JenisFormImpor = 'presensi' | 'izin' | 'datang'
 export type KolomGForm = 'waktu' | 'nama' | 'tanggal' | 'jam' | 'pulang' | 'status' | 'alasan' | 'kategori' | 'bukti'
-/** Indeks kolom CSV per peran; `-1` = tidak ada. */
-export type PetaKolomGForm = Record<KolomGForm, number>
+/**
+ * Indeks kolom CSV per peran; `-1` = tidak ada. `alasanLain` (v2.13) — kolom
+ * alasan tambahan pada Form lama yang memecah alasan per keadaan ("Alasan
+ * datang terlambat", "Alasan tidak hadir", …); isinya digabung ke alasan.
+ */
+export type PetaKolomGForm = Record<KolomGForm, number> & { alasanLain?: number[] }
 export type UrutanTanggal = 'dmy' | 'mdy'
 
 /* ---------------------------------- CSV ---------------------------------- */
@@ -106,7 +110,34 @@ export function tebakKolomGForm(judul: string[]): PetaKolomGForm {
       }
     }
   }
+  const lain = judul.flatMap((x, i) => (!dipakai.has(i) && /\balasan\b/.test(norm(x)) ? [i] : []))
+  if (lain.length) peta.alasanLain = lain
   return peta
+}
+
+/** Jawaban pengisi kolom yang sebenarnya kosong ("-", "Tdk ada", "Hadir"…). */
+const ISIAN_KOSONG = /^(|tdk ada|tidak ada|gak ada|ga ada|nihil|none|kosong|on time|hadir|tidak bisa hadir)$/
+
+/**
+ * v2.13 — alasan satu baris: kolom Alasan, kolom alasan tambahan, dan teks
+ * alasan di kolom Jam pulang (Form lama: "Pulang duluan (alasan + jam)").
+ * Isian pengisi dibuang, yang sama tidak diulang, sisanya digabung " / ".
+ * Form gabungan (satu kolom Alasan, Jam pulang berisi jam) tidak berubah.
+ */
+export function alasanIsian(b: string[], peta: PetaKolomGForm): string {
+  const ambil = (i: number) => (i >= 0 ? (b[i] ?? '').trim() : '')
+  const calon = [peta.alasan, ...(peta.alasanLain ?? [])].map(ambil)
+  const pulang = ambil(peta.pulang)
+  if (/[a-z]{3,}/i.test(pulang.replace(/\b(jam|pukul|wib)\b/gi, ''))) calon.push(pulang)
+  const terlihat = new Set<string>()
+  const hasil: string[] = []
+  for (const x of calon) {
+    const n = norm(x)
+    if (ISIAN_KOSONG.test(n) || terlihat.has(n)) continue
+    terlihat.add(n)
+    hasil.push(x)
+  }
+  return hasil.join(' / ')
 }
 
 /* ------------------------------ tanggal & jam ------------------------------ */
@@ -414,7 +445,7 @@ export function rencanakanImporForm(o: OpsiRencanaForm): BarisRencanaForm[] {
     const capWaktu = o.peta.waktu >= 0 ? bacaCapWaktu(sel(b, o.peta.waktu), o.urutan) : null
     const tahun = capWaktu != null ? new Date(capWaktu).getFullYear() : undefined
     const tanggal = o.peta.tanggal >= 0 ? bacaTanggalForm(sel(b, o.peta.tanggal), o.urutan, tahun) : null
-    const alasan = sel(b, o.peta.alasan)
+    const alasan = alasanIsian(b, o.peta)
     const bukti = sel(b, o.peta.bukti)
     const jamDatang = o.peta.jam >= 0 ? bacaJamForm(sel(b, o.peta.jam)) : null
     const jamPulang = o.peta.pulang >= 0 ? bacaJamForm(sel(b, o.peta.pulang)) : null
