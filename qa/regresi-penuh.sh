@@ -265,6 +265,9 @@ bash bangun-logika.sh || exit 1
 # A & T0, hitungan ≤ 8 to 5, bebas papasan) sehingga total regresi penuh
 # menjadi 179 rangkaian.
 
+# v2.12.1 — `rundown-logika` kini juga menjaga entitas bernama dari ekspor
+# HTML Google Docs (&times; &prime; dst.); jumlah rangkaian tetap 179.
+
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika grid-patok-logika uji-situs uji-rilis uji-lapangan \
   buka-berkas-logika evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \

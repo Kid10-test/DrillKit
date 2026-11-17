@@ -93,6 +93,65 @@ const ENTITAS: Record<string, string> = {
   ldquo: '“',
   bull: '•',
   middot: '·',
+  // Ekspor HTML Google Docs memakai entitas bernama untuk simbol yang lazim
+  // di rundown ("3 × 9′", "2 × 600 ml", "→"). Tanpa daftar ini sel terbaca
+  // mentah sebagai "3 &times; 9&prime;".
+  times: '×',
+  divide: '÷',
+  prime: '′',
+  Prime: '″',
+  deg: '°',
+  plusmn: '±',
+  minus: '−',
+  frac12: '½',
+  frac14: '¼',
+  frac34: '¾',
+  sup2: '²',
+  sup3: '³',
+  le: '≤',
+  ge: '≥',
+  ne: '≠',
+  asymp: '≈',
+  larr: '←',
+  rarr: '→',
+  uarr: '↑',
+  darr: '↓',
+  harr: '↔',
+  lArr: '⇐',
+  rArr: '⇒',
+  laquo: '«',
+  raquo: '»',
+  lsaquo: '‹',
+  rsaquo: '›',
+  sbquo: '‚',
+  bdquo: '„',
+  copy: '©',
+  reg: '®',
+  trade: '™',
+  sect: '§',
+  para: '¶',
+  euro: '€',
+  ensp: ' ',
+  emsp: ' ',
+  thinsp: ' ',
+  shy: '',
+  zwj: '',
+  zwnj: '',
+  eacute: 'é',
+  egrave: 'è',
+  ecirc: 'ê',
+  euml: 'ë',
+  aacute: 'á',
+  agrave: 'à',
+  auml: 'ä',
+  iacute: 'í',
+  oacute: 'ó',
+  ouml: 'ö',
+  uacute: 'ú',
+  uuml: 'ü',
+  ntilde: 'ñ',
+  ccedil: 'ç',
+  Eacute: 'É',
 }
 
 export function dekodeEntitas(s: string): string {
@@ -101,7 +160,9 @@ export function dekodeEntitas(s: string): string {
       const n = k[1] === 'x' || k[1] === 'X' ? parseInt(k.slice(2), 16) : parseInt(k.slice(1), 10)
       return Number.isFinite(n) && n > 0 ? String.fromCodePoint(n) : m
     }
-    return ENTITAS[k.toLowerCase()] ?? m
+    // Huruf besar-kecil bermakna (&prime; ′ lain dengan &Prime; ″), jadi cocokkan
+    // persis dulu; bentuk huruf kecil hanya cadangan untuk &AMP;, &NBSP;, dst.
+    return ENTITAS[k] ?? ENTITAS[k.toLowerCase()] ?? m
   })
 }
 

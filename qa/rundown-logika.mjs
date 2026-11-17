@@ -239,6 +239,13 @@ cek('values: baris kosong dibuang & lebar disamakan', tNilai.baris.length === 3 
 
 /* ---------------- lain-lain ---------------- */
 cek('entitas angka', dekodeEntitas('&#8211; &#x2014; &amp;') === '– — &')
+cek('entitas simbol ekspor Docs', dekodeEntitas('3 &times; 9&prime; &rarr; 2&Prime; &deg;') === '3 × 9′ → 2″ °')
+cek('entitas huruf besar cadangan', dekodeEntitas('&AMP; &NBSP;x') === '&  x')
+cek('entitas tak dikenal dibiarkan', dekodeEntitas('&zzz; &shy;') === '&zzz; ')
+{
+  const t = tabelDariHtml('<table><tr><td>Jam</td><td>Kegiatan</td></tr><tr><td>18.05&ndash;18.35</td><td>Klinik tiga pos, 3 &times; 9&prime;</td></tr></table>')
+  cek('sel HTML ekspor Docs: × dan ′ terbaca', t[0].baris[1][1] === 'Klinik tiga pos, 3 × 9′')
+}
 cek('teksHtml li', teksHtml('<ul><li>satu</li><li>dua</li></ul>') === '• satu\n• dua')
 cek('sumber kosong', tabelDariSumber({ teks: '   ' }).length === 0)
 cek('sumber HTML tanpa tabel → teks', tabelDariSumber({ html: '<p>17.30 Apel</p><p>17.45 Fisik</p>' })[0].baris.length === 3)
