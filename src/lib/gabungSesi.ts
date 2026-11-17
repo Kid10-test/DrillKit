@@ -162,6 +162,11 @@ export function rencanaGabung(utama: Session, ganda: Session[], catatan: Attenda
         hasil.formPresensi = gabung
         continue
       }
+      if (k === 'formKeterangan') {
+        // v2.13 — keterangan Form per anak: yang sudah ada di sesi utama menang.
+        hasil.formKeterangan = { ...(v as NonNullable<Session['formKeterangan']>), ...(hasil.formKeterangan ?? {}) }
+        continue
+      }
       if (k === 'checklist') {
         const ada = new Set((hasil.checklist ?? []).map((c) => c.text.trim().toLowerCase()))
         const tambah = (v as Session['checklist']).filter((c) => !ada.has(c.text.trim().toLowerCase()))

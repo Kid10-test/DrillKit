@@ -10,7 +10,7 @@
  * Jalankan: bash qa/bangun-logika.sh && node qa/jam-pulang-logika.mjs
  */
 import { ATURAN_BAKU, lengkapiAturan, statusDatang, kodeKehadiran, pulangAwal, menitIkut, labelDatang, jendelaDatang, intiSesi } from '/tmp/programLatsar.mjs'
-import { bacaCsvForm, tebakKolomGForm, rencanakanImporForm, terapkanImporForm, bacaStatusIsian, POLA_KOLOM } from '/tmp/imporGForm.mjs'
+import { bacaCsvForm, tebakKolomGForm, rencanakanImporForm, terapkanImporForm, bacaStatusIsian, POLA_KOLOM, alasanIsian } from '/tmp/imporGForm.mjs'
 
 let lulus = 0
 const gagal = []
@@ -124,6 +124,30 @@ const hiz = terapkanImporForm('izin', rencanakanImporForm({ ...opsi('izin'), cat
 cek('izin menimpa alpa: jam pulang lama dibuang', hiz.catatan.find((r) => r.memberId === 'm2')?.pulangAt === undefined)
 const tanpaStatus = bacaCsvForm('Timestamp,Nama\n18/11/2026 20:00:00,Budi Santoso')
 cek('Form tanpa kolom Status: perilaku lama', rencanakanImporForm({ ...opsi('presensi'), baris: tanpaStatus.slice(1), peta: tebakKolomGForm(tanpaStatus[0]) })[0].aksi === 'tambah')
+cek('Form gabungan: tanpa alasanLain', peta.alasanLain === undefined, JSON.stringify(peta))
+
+console.log('== impor Form lama: alasan dipecah per keadaan ==')
+// Bentuk Form presensi MBA sebelum Form gabungan (dipakai sampai P3): tiga
+// kolom alasan, kolom "Pulang duluan" berisi alasan + jam, isian "-" / "Tdk ada".
+const judulLama = ['Timestamp', 'Nama Lengkap', 'Tanggal Latihan', 'Section', 'Status Kehadiran', 'Alasan Datang Terlambat (+ Jam Menyusul)', 'Alasan Tidak Hadir', 'Pulang Duluan (Alasan + Jam Pulang Duluan) ', 'Unggah Bukti Alasan Izin/Tidak Hadir/Pulang Duluan', 'Score']
+const kl = tebakKolomGForm(judulLama)
+cek('lama: Alasan = 5, alasanLain = [6], Pulang = 7, Bukti = 8', kl.alasan === 5 && JSON.stringify(kl.alasanLain) === '[6]' && kl.pulang === 7 && kl.bukti === 8, JSON.stringify(kl))
+const bLama = (nama, status, a1, a2, a3, bukti = '') => ['19/11/2026 12:00:00', nama, 'Kamis, 19 November 2026', 'Brass', status, a1, a2, a3, bukti, '']
+const barisLama = [
+  bLama('Yohanes Bayu', 'Tidak Hadir', '-', 'sakit (diare), salah makan', '-', 'https://drive.google.com/open?id=c'),
+  bLama('Rina Putri', 'Tidak Hadir', 'Tidak bisa hadir', 'praktikum kimia', 'Tidak bisa hadir'),
+  bLama('Dewi Lestari', 'Datang Terlambat', 'kelas sesi 4 (18.30)', '-', '-'),
+  bLama('Budi Santoso', 'Hadir Tepat Waktu', 'Tdk ada', 'Tdk ada', 'Tdk ada'),
+]
+cek('alasanIsian: "-" dilewati, kolom Tidak hadir terbaca', alasanIsian(barisLama[0], kl) === 'sakit (diare), salah makan')
+cek('alasanIsian: isian pengisi dibuang, tidak diulang', alasanIsian(barisLama[1], kl) === 'praktikum kimia')
+cek('alasanIsian: "Tdk ada" semua → kosong', alasanIsian(barisLama[3], kl) === '')
+cek('alasanIsian: teks alasan di kolom Pulang ikut, jam saja tidak', alasanIsian(['', '', '', '', '', '.', '.', 'asistensi matkul (19.00)'], kl) === 'asistensi matkul (19.00)' && alasanIsian(['', '', '', '', '', 'rapat', '', '19.00'], kl) === 'rapat')
+const ril = rencanakanImporForm({ ...opsi('izin'), baris: barisLama, peta: kl })
+cek('lama izin: Bayu sakit dari alasan Tidak hadir', ril[0].aksi === 'tambah' && ril[0].kategori === 'sakit' && ril[0].alasan.startsWith('sakit'), `${ril[0].kategori} ${ril[0].alasan}`)
+cek('lama izin: Rina kategori kuliah', ril[1].kategori === 'kuliah', `${ril[1].kategori} ${ril[1].alasan}`)
+const rpl = rencanakanImporForm({ ...opsi('presensi'), baris: barisLama, peta: kl })
+cek('lama presensi: keterangan telat Dewi memakai kolom Alasan terlambat', rpl[2].keterangan?.alasan === 'kelas sesi 4 (18.30)', JSON.stringify(rpl[2].keterangan))
 
 console.log('== jam inti: sesi 17.30–20.15, pra 30 + penutup 15 ==')
 const SESI_P = { ...KAMIS, startTime: '17:30', endTime: '20:15' }

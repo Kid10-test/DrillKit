@@ -4,7 +4,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { AttendanceRecord, Member, ProgramLatihan, Session } from '../../db/types'
-import { db, saveSettings } from '../../db/db'
+import { saveSettings } from '../../db/db'
 import { useSettings } from '../../hooks/useSettings'
 import { useGoogle, sisaIzin } from '../google/useGoogle'
 import { Button, Modal, Select, useToast } from '../ui'
@@ -23,6 +23,7 @@ import {
   type UrutanTanggal,
 } from '../../lib/imporGForm'
 import { namaTampil, bacaModeNama } from '../../lib/namaAnggota'
+import { kandidatSesi as sesiKandidat, simpanHasilImpor } from './tarikForm'
 import { cx, uid } from '../../lib/utils'
 
 const JENIS: { id: JenisFormImpor; label: string; ket: string }[] = [
@@ -146,11 +147,7 @@ export default function ImporGFormModal({
   const data = useMemo(() => tabel.slice(1), [tabel])
   const anggota = useMemo(() => members.filter((m) => m.active), [members])
   /** Sesi kandidat: milik program latihan bila ada, selain itu semua sesi. */
-  const kandidatSesi = useMemo(() => {
-    const ids = new Set(program.flatMap((p) => p.sesiIds))
-    const milik = sessions.filter((s) => ids.has(s.id))
-    return milik.length ? milik : sessions
-  }, [program, sessions])
+  const kandidatSesi = useMemo(() => sesiKandidat(program, sessions), [program, sessions])
   const kategori = aturanUntukSesi(program, sesiTetap || sesiAwal).kategoriIzin
 
   function muat(isi: string) {
@@ -179,10 +176,7 @@ export default function ImporGFormModal({
     setSibuk(true)
     try {
       const h = terapkanImporForm(jenis, rencana, records, sessions, () => uid('a_'))
-      await db.transaction('rw', db.attendance, db.sessions, async () => {
-        if (h.catatan.length) await db.attendance.bulkPut(h.catatan)
-        for (const [id, form] of Object.entries(h.form)) await db.sessions.update(id, { formPresensi: form })
-      })
+      await simpanHasilImpor(h)
       toast.push(`${h.jumlah} isian Form diterapkan`)
       onClose()
     } finally {

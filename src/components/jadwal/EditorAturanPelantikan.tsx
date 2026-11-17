@@ -152,10 +152,16 @@ export function EditorAturanPelantikan({
           Batas lapor izin
           <Input type="time" data-testid="aturan-batas-izin" value={a.batasIzin ?? ''} onChange={(e) => ubah({ batasIzin: e.target.value || undefined })} />
         </label>
-        <label className="text-[11px] text-slate-400">
-          Lapor sakit maks. (jam)
-          <Input type="number" min={0} data-testid="aturan-sakit" value={a.sakitMaksJam} onChange={(e) => ubah({ sakitMaksJam: angka(e.target.value) })} />
+        <label className="text-[11px] text-slate-400" title="Mis. 15:30 = dua jam sebelum apel. Sakit sesudah jam ini diputus danlat per orang.">
+          Batas lapor sakit
+          <Input type="time" data-testid="aturan-batas-sakit" value={a.batasSakit ?? ''} onChange={(e) => ubah({ batasSakit: e.target.value || undefined })} />
         </label>
+        {!a.batasSakit && (
+          <label className="text-[11px] text-slate-400" title="Dipakai bila batas lapor sakit kosong">
+            Lapor sakit maks. (jam sesudah mulai)
+            <Input type="number" min={0} data-testid="aturan-sakit" value={a.sakitMaksJam} onChange={(e) => ubah({ sakitMaksJam: angka(e.target.value) })} />
+          </label>
+        )}
         <label className="text-[11px] text-slate-400">
           Batas bergabung
           <Input type="date" data-testid="aturan-batas" value={a.batasGabung ?? ''} onChange={(e) => ubah({ batasGabung: e.target.value || undefined })} />

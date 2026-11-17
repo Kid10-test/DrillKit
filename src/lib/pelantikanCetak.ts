@@ -109,7 +109,7 @@ h2 { font-size: 11pt; margin: 3mm 0 1mm; border-bottom: .4mm solid #e11d48; padd
 <p class="sub">${esc(opsi.namaTim ?? '')}${opsi.namaTim ? ' · ' : ''}${r.wajib.length} sesi wajib · ${p.peserta.length} peserta · per ${esc(tgl(opsi.hariIni))}</p>
 <div class="aturan">Memenuhi bila ${esc(ringkasAturan(a, r.wajib.length))} (N dihitung sejak tanggal bergabung).
 Datang ≤ ${a.toleransiMenit} menit sesudah jam mulai = hadir; sampai ${a.batasJatahMenit != null ? `${a.batasJatahMenit} menit` : 'separuh durasi sesi'} dengan alasan${a.wajibBukti ? ' + bukti' : ''} = hadir memakai jatah telat; selebihnya tidak dihitung hadir (alpa).
-Izin sah bila dilaporkan sebelum ${a.batasIzin ? esc(a.batasIzin.replace(':', '.')) : 'jam mulai sesi'}${a.wajibBukti ? ' dengan bukti' : ''} dan kategorinya diterima; sakit ≤ ${a.sakitMaksJam} jam sesudah mulai. Izin/sakit sah tidak memakai jatah alpa.${
+Izin sah bila dilaporkan sebelum ${a.batasIzin ? esc(a.batasIzin.replace(':', '.')) : 'jam mulai sesi'}${a.wajibBukti ? ' dengan bukti' : ''} dan kategorinya diterima; ${a.batasSakit ? `sakit sebelum ${esc(a.batasSakit.replace(':', '.'))}` : `sakit ≤ ${a.sakitMaksJam} jam sesudah mulai`}. Izin/sakit sah tidak memakai jatah alpa.${
     a.wajibForm ? ' Sesi ber-Google Form: hadir tanpa isian Form = alpa.' : ''
   }${a.batasGabung ? ` Bergabung sesudah <b>${esc(tgl(a.batasGabung))}</b> → pelantikan susulan.` : ''}</div>
 <div class="ring">${URUT.map((s) => `<div style="background:${WARNA_STATUS[s]}"><b>${r.jumlah[s]}</b>${esc(LABEL_STATUS[s])}</div>`).join('')}</div>

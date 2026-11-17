@@ -101,10 +101,11 @@ export function kupasDataKhususStaf(b: ShareBundle): ShareBundle {
   // v2.8 — isian Google Form presensi juga catatan absensi staf.
   // v2.10.1 — tautan rundown Google Drive (id & nama berkas pelatih) juga milik staf.
   // v2.11 — jejak perubahan Pacu (catatan lapangan staf) juga tidak dibagikan.
-  if (Array.isArray(b.sessions) && b.sessions.some((x) => x.logRep || x.formPresensi || x.rundownDrive || x.jejakPacu)) {
+  // v2.13 — keterangan telat/pulang dari Form gabungan juga.
+  if (Array.isArray(b.sessions) && b.sessions.some((x) => x.logRep || x.formPresensi || x.formKeterangan || x.rundownDrive || x.jejakPacu)) {
     salin.sessions = b.sessions.map((x) => {
-      if (!x.logRep && !x.formPresensi && !x.rundownDrive && !x.jejakPacu) return x
-      const { logRep: _logRep, formPresensi: _form, rundownDrive: _rundown, jejakPacu: _jejak, ...sisa } = x
+      if (!x.logRep && !x.formPresensi && !x.formKeterangan && !x.rundownDrive && !x.jejakPacu) return x
+      const { logRep: _logRep, formPresensi: _form, formKeterangan: _ket, rundownDrive: _rundown, jejakPacu: _jejak, ...sisa } = x
       return sisa
     })
   }
