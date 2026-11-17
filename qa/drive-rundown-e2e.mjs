@@ -458,6 +458,16 @@ try {
   await wait(500)
   await klik('[data-testid="datang-k1"]')
   await p.waitForSelector('[data-testid="modal-datang"]')
+  // Aturan program dibaca lewat live query; di runner yang sibuk teks hasil
+  // bisa muncul sesaat setelah modal terbuka. Tunggu, jangan baca seketika.
+  await p
+    .waitForFunction(
+      () =>
+        (document.querySelector('[data-testid="datang-inti"]')?.textContent ?? '').includes('18.00') &&
+        /\S/.test(document.querySelector('[data-testid="datang-hasil"]')?.textContent ?? ''),
+      { timeout: 10000, polling: 200 },
+    )
+    .catch(() => {})
   cek('jam inti disebut: 18.00–20.00', (await teks('[data-testid="datang-inti"]').catch(() => '')).includes('18.00–20.00'))
   cek('isian pulang: "sebelum 20.00" (bukan 20.15)', (await p.$eval('[data-testid="pulang-jam"]', (e) => e.closest('label').textContent)).includes('sebelum 20.00'))
   cek('pulang 19.00 tetap berjatah (ikut 60′ dari 18.00)', (await teks('[data-testid="datang-hasil"]')).startsWith('Pulang awal berjatah'))

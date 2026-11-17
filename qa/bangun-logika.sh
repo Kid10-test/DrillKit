@@ -202,6 +202,10 @@ rakit src/lib/googleDrive.ts             googleDrive
 rakit src/lib/backupDrive.ts             backupDrive
 # v2.11 — Pacu v2: lewati, ubah menit, tambah, pindah, bawa, koreksi, usul potong, laporan.
 rakit src/lib/pacu.ts                    pacu
+# v2.11.2 — editor drill: "Masukkan semua" (ikut set sebelumnya / blok per section) & tempatkan beruntun.
+rakit src/lib/tempatkanMassal.ts         tempatkanMassal
+# v2.12 — Penyusun Display Latihan: 7 konsep, menyesuaikan jumlah hadir & lapangan.
+rakit src/lib/penyusunDisplay.ts         penyusunDisplay
 "$ESBUILD" src/lib/pinPelatih.ts --bundle --format=esm --platform=neutral \
   --outfile=/tmp/pinPelatih.mjs --log-level=warning \
   --define:__PIN_PELATIH_HASH__='""'

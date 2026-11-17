@@ -199,6 +199,11 @@ import { PerformerDetailModal } from './PerformerDetailModal'
 import { DotSheetModal } from './DotSheetModal'
 import { DrillSettingsModal } from './DrillSettingsModal'
 import { PaletPerintah } from './PaletPerintah'
+import {
+  INTERVAL_MASUKKAN_BAWAAN,
+  berikutnyaBelumDitempatkan,
+  rencanaMasukkanSemua,
+} from '../lib/tempatkanMassal'
 
 /* ========================================================================== */
 /*  Editor                                                                     */
@@ -669,6 +674,10 @@ export function Editor({
   const [pointerTerakhir, setPointerTerakhir] = useState<PeranPointer>('tetikus')
   const [lebarSvgPx, setLebarSvgPx] = useState(760)
   const [siapLetakkanId, setSiapLetakkanId] = useState<string | null>(null)
+  /** v2.11.2 — sesudah satu pemain ditempatkan, pemain berikutnya langsung disiapkan. */
+  const [letakBeruntun, setLetakBeruntun] = useState(true)
+  /** v2.11.2 — jarak antarpemain (langkah) untuk tombol "Masukkan semua". */
+  const [intervalMasukkan, setIntervalMasukkan] = useState(INTERVAL_MASUKKAN_BAWAAN)
   const [balonInfo, setBalonInfo] = useState<{ x: number; y: number; teks: string } | null>(null)
   const timerTekanLamaRef = useRef<number>(0)
   const panGeserRef = useRef<{
@@ -1508,6 +1517,46 @@ export function Editor({
     void writePoints(points, set.id, pindahKoord ? (bentukBaru ?? null) : undefined)
   }
 
+  /**
+   * v2.11.2 — masukkan semua pemain yang belum ada di set ini (yang lolos
+   * filter section/tag). Posisi diambil dari set sebelumnya bila ada; sisanya
+   * disusun satu blok per section. Satu langkah undo.
+   */
+  function masukkanSemua() {
+    if (!set) return
+    const daftar = urutanBelumDitempatkan
+    if (!daftar.length) return
+    const r = rencanaMasukkanSemua(
+      daftar.map((m) => ({ id: m.id, section: m.section })),
+      set.points,
+      prevSet?.points,
+      f,
+      {
+        intervalLangkah: intervalMasukkan,
+        urutanSection: (settings?.sections ?? []).map((s) => s.id),
+        snap: view.snap,
+      },
+    )
+    const ids = Object.keys(r.points)
+    if (!ids.length) return
+    snapshot()
+    const points = { ...set.points, ...r.points }
+    set.points = points // optimistik untuk UI
+    void writePoints(points, set.id)
+    siapLetakkanRef.current = null
+    setSiapLetakkanId(null)
+    setSelected(ids)
+    const bagian: string[] = []
+    if (r.dariSetSebelumnya.length && prevSet) {
+      bagian.push(`${r.dariSetSebelumnya.length} di posisi ${prevSet.name}`)
+    }
+    if (r.blok.length) {
+      const nBlok = r.blok.reduce((a, b) => a + b.ids.length, 0)
+      bagian.push(`${nBlok} dalam ${r.blok.length} blok section`)
+    }
+    toast.push(`${ids.length} pemain masuk — ${bagian.join(', ')}. Semuanya terpilih, tinggal digeser.`)
+  }
+
   /* --------------------- DD4 & #22 — Transformasi Terpadu --------------------- */
 
   /** Titik yang kena operasi: yang dipilih, atau semua titik tampil kalau tak ada pilihan. */
@@ -1973,6 +2022,35 @@ export function Editor({
   const siapLetakkanRef = useRef<string | null>(null)
   siapLetakkanRef.current = siapLetakkanId
 
+  /**
+   * v2.11.2 — tempatkan pemain yang sedang disiapkan di titik kanvas (koordinat SVG).
+   *
+   * Dipanggil dari handler `pointerup` yang dipasang SEKALI di `useEffect`.
+   * Dulu handler itu memanggil `updatePoint` langsung, sehingga yang terpakai
+   * adalah `updatePoint` dari render pertama — dengan `set` yang saat itu
+   * masih kosong (set belum termuat dari database). Akibatnya di drill baru
+   * ketuk pemain lalu ketuk lapangan tidak berbuat apa-apa, dan di drill lama
+   * titik bisa ditulis ke salinan set yang usang. Lewat ref ini handler selalu
+   * memakai fungsi dari render terakhir.
+   */
+  const letakkanSiapRef = useRef<(ux: number, uy: number) => void>(() => {})
+  letakkanSiapRef.current = (ux: number, uy: number) => {
+    const targetId = siapLetakkanRef.current
+    if (!targetId || !set) return
+    const { ix: gIx, iy: gIy } = geomRef.current
+    updatePoint(targetId, snapVal(gIx(ux), gIy(uy)))
+    const lanjut = letakBeruntun
+      ? berikutnyaBelumDitempatkan(
+          urutanBelumDitempatkan.map((m) => m.id),
+          (id) => Boolean(set.points[id]),
+          targetId,
+        )
+      : null
+    siapLetakkanRef.current = lanjut
+    setSiapLetakkanId(lanjut)
+    setSelected([targetId])
+  }
+
   useEffect(() => {
     const ukur = () => {
       if (svgRef.current?.clientWidth) setLebarSvgPx(svgRef.current.clientWidth)
@@ -2287,12 +2365,7 @@ export function Editor({
       }
       if (!m.moved) {
         if (siapLetakkanRef.current) {
-          const { ix: gIx, iy: gIy } = geomRef.current
-          const pos = snapVal(gIx(m.x0), gIy(m.y0))
-          const targetId = siapLetakkanRef.current
-          setSiapLetakkanId(null)
-          updatePoint(targetId, pos)
-          setSelected([targetId])
+          letakkanSiapRef.current(m.x0, m.y0)
           return
         }
         // Klik biasa di area kosong → kosongkan pilihan (kecuali menambah).
@@ -2984,12 +3057,7 @@ export function Editor({
       if (!pg.moved) {
         if (siapLetakkanRef.current) {
           const u = clientToUser(ev.clientX, ev.clientY)
-          const { ix: gIx, iy: gIy } = geomRef.current
-          const pos = snapVal(gIx(u.x), gIy(u.y))
-          const targetId = siapLetakkanRef.current
-          setSiapLetakkanId(null)
-          updatePoint(targetId, pos)
-          setSelected([targetId])
+          letakkanSiapRef.current(u.x, u.y)
           return
         }
         if (!pg.additive) setSelected([])
@@ -3802,6 +3870,14 @@ export function Editor({
 
   const placed = Object.keys(set?.points ?? {})
   const unplaced = roster.filter((m) => !set?.points[m.id])
+  /** Pemain belum masuk set ini yang lolos filter section/tag — urutan untuk "beruntun". */
+  const urutanBelumDitempatkan = unplaced.filter((m) =>
+    sectionFilter === 'all'
+      ? true
+      : sectionFilter.startsWith('tag:')
+        ? punyaTag(m, sectionFilter.slice(4))
+        : m.section === sectionFilter,
+  )
   const curCount = Math.min(set?.counts ?? 0, Math.ceil(progress * (set?.counts ?? 0)) || 0)
   const selectedAktif = useMemo(
     () => (set ? selected.filter((id) => Boolean(set.points[id]) && visibleIds.has(id)) : []),
@@ -4483,6 +4559,12 @@ export function Editor({
                 <span>
                   Ketuk di mana saja pada lapangan untuk menempatkan{' '}
                   <b>{rosterById.get(siapLetakkanId)!.code}</b> ({rosterById.get(siapLetakkanId)!.name}).
+                  {letakBeruntun && urutanBelumDitempatkan.length > 1 && (
+                    <span className="text-emerald-300/80" data-testid="sisa-beruntun">
+                      {' '}
+                      Lanjut otomatis · sisa {urutanBelumDitempatkan.length}
+                    </span>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -6298,19 +6380,56 @@ export function Editor({
           )}
 
           {unplaced.length > 0 && (
-            <div className="mb-3">
+            <div className="mb-3" data-testid="panel-belum-masuk">
               <p className="mb-1.5 text-[11px] font-medium text-amber-400">
                 Belum masuk set ini ({unplaced.length})
               </p>
+              {urutanBelumDitempatkan.length > 0 && (
+                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    data-testid="masukkan-semua"
+                    onClick={masukkanSemua}
+                    title={
+                      prevSet
+                        ? `Ambil posisi dari ${prevSet.name}; yang belum ada di sana disusun satu blok per section`
+                        : 'Susun satu blok per section, berjajar dari Side 1 ke Side 2'
+                    }
+                  >
+                    Masukkan semua ({urutanBelumDitempatkan.length})
+                  </Button>
+                  <label className="flex items-center gap-1 text-[11px] text-slate-400" title="Jarak antarpemain di dalam blok">
+                    jarak
+                    <select
+                      data-testid="interval-masukkan"
+                      value={intervalMasukkan}
+                      onChange={(e) => setIntervalMasukkan(Number(e.target.value))}
+                      className="rounded border border-slate-700 bg-slate-900 px-1 py-0.5 text-[11px] text-slate-200"
+                    >
+                      {[2, 3, 4, 6, 8].map((n) => (
+                        <option key={n} value={n}>
+                          {n} langkah
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label
+                    className="ml-auto flex items-center gap-1 text-[11px] text-slate-400"
+                    title="Sesudah satu pemain ditempatkan, pemain berikutnya langsung disiapkan"
+                  >
+                    <input
+                      type="checkbox"
+                      data-testid="letak-beruntun"
+                      checked={letakBeruntun}
+                      onChange={(e) => setLetakBeruntun(e.target.checked)}
+                    />
+                    beruntun
+                  </label>
+                </div>
+              )}
               <div className="flex flex-wrap gap-1">
-                {unplaced
-                  .filter((m) =>
-                    sectionFilter === 'all'
-                      ? true
-                      : sectionFilter.startsWith('tag:')
-                        ? punyaTag(m, sectionFilter.slice(4))
-                        : m.section === sectionFilter,
-                  )
+                {urutanBelumDitempatkan
                   .map((m) => {
                     const disiapkan = siapLetakkanId === m.id
                     return (

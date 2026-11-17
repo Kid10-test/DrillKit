@@ -51,6 +51,14 @@ const cek = (nama, syarat, keterangan = '') => {
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 const teks = (h) => h.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim())
+// Di runner CI yang sibuk, memuat ulang paket anggota bisa lebih lama dari jeda
+// tetap. Tunggu sampai teksnya benar-benar ada (tanpa melempar galat), lalu
+// biarkan cek() yang memutuskan lulus atau gagal.
+const tungguTeks = (h, re, ms = 20000) =>
+  h
+    .waitForFunction((s, f) => new RegExp(s, f).test(document.body.innerText), { timeout: ms, polling: 250 }, re.source, re.flags)
+    .then(() => true)
+    .catch(() => false)
 const ada = (h, id) => h.evaluate((x) => document.querySelector(`[data-testid="${x}"]`) != null, id)
 const isi = (h, id) => h.evaluate((x) => document.querySelector(`[data-testid="${x}"]`)?.textContent ?? '', id)
 
@@ -299,6 +307,10 @@ try {
     await wait(3500)
     await (await B.$('[data-testid="tab-musik"]')).click()
     await wait(2000)
+    if (!(await tungguTeks(B, /Mars Accelerando/))) {
+      await (await B.$('[data-testid="tab-musik"]'))?.click()
+      await tungguTeks(B, /Mars Accelerando/)
+    }
 
     const t = await teks(B)
     cek('13: lagu yang diberi accelerando SAMPAI ke anggota',
@@ -751,6 +763,10 @@ try {
       await wait(3500)
       await (await B.$('[data-testid="tab-musik"]')).click()
       await wait(2200)
+      if (!(await tungguTeks(B, /luncur 172/))) {
+        await (await B.$('[data-testid="tab-musik"]'))?.click()
+        await tungguTeks(B, /luncur 172/)
+      }
       const lencanaB = await B.$$eval('[data-testid^="lencana-berangsur-"]', (els) =>
         els.map((e) => (e.textContent || '').trim()),
       )

@@ -36,6 +36,7 @@ import {
 } from '../lib/utils'
 import { useSettings } from '../hooks/useSettings'
 import { Editor } from '../components/DrillEditor'
+import { ModalDisplayLatihan } from '../components/drill/ModalDisplayLatihan'
 
 export default function DrillPage() {
   const toast = useToast()
@@ -46,6 +47,8 @@ export default function DrillPage() {
   const [drillId, setDrillId] = useState<string>('')
   /** 1a — panel riwayat formasi. */
   const [bukaRiwayat, setBukaRiwayat] = useState(false)
+  /** v2.12 — penyusun Display Latihan. */
+  const [bukaDisplay, setBukaDisplay] = useState(false)
 
   // Pilih drill terakhir yang diedit saat data pertama kali muncul.
   useEffect(() => {
@@ -204,6 +207,16 @@ export default function DrillPage() {
 
   if (!drills) return null
 
+  const modalDisplay = settings && (
+    <ModalDisplayLatihan
+      open={bukaDisplay}
+      onClose={() => setBukaDisplay(false)}
+      members={members ?? []}
+      fieldDasar={settings.defaultField}
+      onDibuat={setDrillId}
+    />
+  )
+
   if (!drill) {
     return (
       <div>
@@ -220,9 +233,13 @@ export default function DrillPage() {
               <Button variant="soft" data-testid="buat-drill-parade" onClick={createParadeDrill}>
                 <IconPlus size={16} /> Buat drill Kirab / Parade
               </Button>
+              <Button variant="soft" data-testid="buka-display-latihan" onClick={() => setBukaDisplay(true)}>
+                <IconPlus size={16} /> Display Latihan
+              </Button>
             </div>
           }
         />
+        {modalDisplay}
       </div>
     )
   }
@@ -246,6 +263,14 @@ export default function DrillPage() {
             </Button>
             <Button variant="soft" data-testid="buat-drill-parade" onClick={createParadeDrill} title="Buat drill Mode Kirab / Street Parade jalan raya">
               <IconPlus size={16} /> Kirab
+            </Button>
+            <Button
+              variant="soft"
+              data-testid="buka-display-latihan"
+              onClick={() => setBukaDisplay(true)}
+              title="Susun drill latihan dari 7 konsep untuk anggota yang hadir hari ini"
+            >
+              <IconPlus size={16} /> Display
             </Button>
             <Button onClick={() => duplicateDrill(drill)}>
               Salin
@@ -274,6 +299,7 @@ export default function DrillPage() {
         open={bukaRiwayat}
         onClose={() => setBukaRiwayat(false)}
       />
+      {modalDisplay}
     </div>
   )
 }
