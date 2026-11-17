@@ -115,7 +115,7 @@ export const KATEGORI_IZIN_BAKU: readonly KategoriIzin[] = [
 export type AturanLengkap = Required<
   Pick<AturanPelantikan, 'rasioHadir' | 'rasioAlpa' | 'rasioTelat' | 'toleransiMenit' | 'wajibForm' | 'wajibBukti' | 'kategoriIzin' | 'sakitMaksJam'>
 > &
-  Pick<AturanPelantikan, 'batasJatahMenit' | 'batasIzin' | 'batasGabung' | 'praMenit' | 'penutupMenit'>
+  Pick<AturanPelantikan, 'batasJatahMenit' | 'batasIzin' | 'batasSakit' | 'batasGabung' | 'praMenit' | 'penutupMenit'>
 
 export const ATURAN_BAKU: AturanLengkap = {
   rasioHadir: [7, 12],
@@ -164,6 +164,7 @@ export function lengkapiAturan(a?: Partial<AturanPelantikan> | null): AturanLeng
   if (typeof x.batasJatahMenit === 'number' && Number.isFinite(x.batasJatahMenit) && x.batasJatahMenit >= 0)
     out.batasJatahMenit = Math.round(x.batasJatahMenit)
   if (typeof x.batasIzin === 'string' && JAM_RE.test(x.batasIzin)) out.batasIzin = x.batasIzin
+  if (typeof x.batasSakit === 'string' && JAM_RE.test(x.batasSakit)) out.batasSakit = x.batasSakit
   for (const k of ['praMenit', 'penutupMenit'] as const) {
     const v = x[k]
     if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[k] = Math.round(v)
@@ -651,7 +652,7 @@ export const LEGENDA_KODE: readonly KodeKehadiran[] = [
 
 export type KeabsahanIzin = 'sah' | 'telat' | 'tanpa-cap' | 'tanpa-bukti' | 'ditolak'
 
-type AturanIzin = Pick<AturanLengkap, 'sakitMaksJam' | 'wajibBukti' | 'kategoriIzin' | 'batasIzin'>
+type AturanIzin = Pick<AturanLengkap, 'sakitMaksJam' | 'wajibBukti' | 'kategoriIzin' | 'batasIzin'> & Partial<Pick<AturanLengkap, 'batasSakit'>>
 
 const adaBukti = (r: Pick<AttendanceRecord, 'bukti'>) => !!r.bukti?.trim()
 
@@ -664,17 +665,26 @@ export function kategoriIzin(a: Pick<AturanLengkap, 'kategoriIzin'>, id: string 
 /**
  * Batas lapor (epoch ms): izin — sebelum `batasIzin` pada hari-H (bawaan jam
  * mulai sesi, dan tidak pernah lebih lambat dari itu); sakit — paling lambat
+ * `batasSakit` pada hari-H bila diisi (v2.13), selain itu paling lambat
  * `sakitMaksJam` jam sesudah sesi mulai.
  */
 export function batasLapor(
   status: 'izin' | 'sakit',
   s: Pick<Session, 'date' | 'startTime'>,
-  aturan: Pick<AturanLengkap, 'sakitMaksJam' | 'batasIzin'>,
+  aturan: Pick<AturanLengkap, 'sakitMaksJam' | 'batasIzin'> & Partial<Pick<AturanLengkap, 'batasSakit'>>,
 ): number {
   const mulai = mulaiSesiMs(s)
-  if (status === 'sakit') return mulai + aturan.sakitMaksJam * 3_600_000
+  if (status === 'sakit') {
+    if (aturan.batasSakit) return mulaiSesiMs({ date: s.date, startTime: aturan.batasSakit })
+    return mulai + aturan.sakitMaksJam * 3_600_000
+  }
   if (aturan.batasIzin) return Math.min(mulai, mulaiSesiMs({ date: s.date, startTime: aturan.batasIzin }))
   return mulai
+}
+
+/** v2.13 — "sakit ≤ 15.30" / "sakit ≤ 24 jam" untuk teks ringkas aturan. */
+export function teksBatasSakit(a: Pick<AturanLengkap, 'sakitMaksJam'> & Partial<Pick<AturanLengkap, 'batasSakit'>>): string {
+  return a.batasSakit ? `sakit ≤ ${a.batasSakit.replace(':', '.')}` : `sakit ≤ ${a.sakitMaksJam} jam`
 }
 
 /**
@@ -784,6 +794,8 @@ export function statusDatang(
   if (!telat && !pulang) return 'tepat'
   if (r.putusanIzin === 'sah') return 'putusan-sah'
   if (r.putusanIzin === 'tidak-sah') return 'putusan-tidak-sah'
+  // v2.13 — alasan diterima danlat: berjatah walau lewat batas/tanpa bukti.
+  if (r.putusanIzin === 'jatah') return 'jatah'
   if (telat && r.datangAt! > j.batasJatah) return 'lewat-batas'
   if (pulang) {
     // Waktu ikut minimal = durasi − menit jatah (sama dengan batas jam datang).
@@ -842,7 +854,7 @@ export function kodeKehadiran(
   if (!r) return s.date < hariIni ? 'kosong' : 'mendatang'
   if (r.status === 'alpha') return 'alpha'
   if (r.status === 'hadir') {
-    if (aturan.wajibForm && r.putusanIzin !== 'sah' && sesiBerForm(s) && !s.formPresensi![r.memberId]) return 'tanpa-form'
+    if (aturan.wajibForm && r.putusanIzin !== 'sah' && r.putusanIzin !== 'jatah' && sesiBerForm(s) && !s.formPresensi![r.memberId]) return 'tanpa-form'
     const d = statusDatang(r, s, aturan)
     if (d == null || d === 'tepat' || d === 'putusan-sah') return 'hadir'
     return d === 'jatah' ? 'telat-jatah' : 'telat'

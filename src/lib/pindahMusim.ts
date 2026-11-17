@@ -319,6 +319,7 @@ export function rencanaAmbilArsip(
         selesaiNyata: _selesai,
         logRep: _log,
         formPresensi: _form,
+        formKeterangan: _ket,
         ...inti
       } = s
       const baru: Session = {

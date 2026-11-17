@@ -250,6 +250,7 @@ export function salinSesi(s: Session, tanggal: string, buatId: () => string, sek
   delete salin.jejakPacu
   delete salin.logRep
   delete salin.formPresensi
+  delete salin.formKeterangan
   delete salin.mulaiNyata
   delete salin.selesaiNyata
   delete salin.seriId

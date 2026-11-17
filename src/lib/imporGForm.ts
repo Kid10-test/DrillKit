@@ -16,9 +16,12 @@
  * Tidak ada yang ditulis tanpa pratinjau; baris yang bentrok (mis. Form izin
  * dari anak yang tercatat hadir) dilewati dan dilaporkan.
  */
-import type { AttendanceRecord, AttendanceStatus, KategoriIzin, Member, Session } from '../db/types'
+import type { AttendanceRecord, AttendanceStatus, KategoriIzin, KeteranganForm, Member, Session } from '../db/types'
 import { kemiripanNama, norm } from './namaAnggota'
 import { tebakPemisahCsv } from './rosterAnggota'
+import { lengkapiDariForm } from './keteranganForm'
+
+export { lengkapiDariForm }
 
 export type JenisFormImpor = 'presensi' | 'izin' | 'datang'
 export type KolomGForm = 'waktu' | 'nama' | 'tanggal' | 'jam' | 'pulang' | 'status' | 'alasan' | 'kategori' | 'bukti'
@@ -264,6 +267,31 @@ export function bacaStatusIsian(teks: string): StatusIsianForm | null {
   return null
 }
 
+/**
+ * v2.13 — keterangan telat/pulang awal dari satu isian Form gabungan
+ * (jenis presensi). `null` bila statusnya bukan telat/pulang atau tidak ada
+ * yang bisa dicatat (alasan, bukti, rencana jam).
+ */
+export function keteranganIsian(
+  teksStatus: string,
+  capWaktu: number,
+  isi: { alasan?: string; bukti?: string; jamDatang?: number | null; jamPulang?: number | null },
+): KeteranganForm | null {
+  const st = bacaStatusIsian(teksStatus)
+  if (st !== 'telat' && st !== 'pulang') return null
+  const t = norm(teksStatus)
+  const status: KeteranganForm['status'] = st === 'pulang' ? 'pulang' : /pulang/.test(t) ? 'telat-pulang' : 'telat'
+  const k: KeteranganForm = { status, capWaktu }
+  if (isi.alasan?.trim()) k.alasan = isi.alasan.trim()
+  if (isi.bukti?.trim()) k.bukti = isi.bukti.trim()
+  if (isi.jamDatang != null && status !== 'pulang') k.jamDatang = isi.jamDatang
+  if (isi.jamPulang != null && status !== 'telat') k.jamPulang = isi.jamPulang
+  return k.alasan || k.bukti || k.jamDatang != null || k.jamPulang != null ? k : null
+}
+
+const samaKeterangan = (a: KeteranganForm | undefined, b: KeteranganForm) =>
+  !!a && a.status === b.status && a.alasan === b.alasan && a.bukti === b.bukti && a.jamDatang === b.jamDatang && a.jamPulang === b.jamPulang
+
 /* ------------------------------ cocok nama ------------------------------ */
 
 export interface CocokNamaForm {
@@ -351,6 +379,8 @@ export interface BarisRencanaForm {
   kategori?: string
   alasan: string
   bukti: string
+  /** v2.13 — keterangan telat/pulang awal (jenis presensi, Form gabungan). */
+  keterangan?: KeteranganForm
   aksi: AksiImpor
   pesan: string
 }
@@ -394,7 +424,9 @@ export function rencanakanImporForm(o: OpsiRencanaForm): BarisRencanaForm[] {
     const cocok = cocokkanNamaForm(nama, o.anggota)
     const memberId = o.pilihan && no in o.pilihan ? o.pilihan[no] : cocok.memberId
     const sesi = o.sesiTetap ? (perSesi.get(o.sesiTetap) ?? null) : sesiUntukIsian(o.jenis, capWaktu, tanggal, o.sesi)
-    const dasar = { no, nama, cocok, memberId, sesiId: sesi?.id ?? null, capWaktu, jamDatang, jamPulang, status, kategori, alasan, bukti }
+    const keterangan =
+      o.jenis === 'presensi' && capWaktu != null ? (keteranganIsian(sel(b, o.peta.status), capWaktu, { alasan, bukti, jamDatang, jamPulang }) ?? undefined) : undefined
+    const dasar = { no, nama, cocok, memberId, sesiId: sesi?.id ?? null, capWaktu, jamDatang, jamPulang, status, kategori, alasan, bukti, ...(keterangan ? { keterangan } : {}) }
     const keluar = (aksi: AksiImpor, pesan: string) => hasil.push({ ...dasar, aksi, pesan })
     if (!nama) return keluar('lewati', 'Nama kosong')
     // v2.10.1 — satu Form untuk hadir & izin: kolom Status memilah barisnya.
@@ -405,13 +437,18 @@ export function rencanakanImporForm(o: OpsiRencanaForm): BarisRencanaForm[] {
     if (!sesi) return keluar('lewati', o.jenis === 'izin' ? 'Sesi tidak ditemukan — pakai kolom tanggal atau pilih sesi' : 'Tidak ada sesi yang cocok dengan cap waktunya')
     if ((o.jenis === 'presensi' || o.jenis === 'izin') && capWaktu == null) return keluar('lewati', 'Cap waktu tidak terbaca')
     const kunci = `${sesi.id}|${memberId}`
-    if (terlihat.has(kunci)) return keluar('ganda', 'Isian ganda — hanya isian pertama yang dipakai')
+    // v2.13 — isian kedua yang membawa keterangan telat/pulang tetap dipakai (keterangannya saja).
+    if (terlihat.has(kunci) && !(o.jenis === 'presensi' && keterangan)) return keluar('ganda', 'Isian ganda — hanya isian pertama yang dipakai')
     terlihat.add(kunci)
     const ada = peta.get(kunci)
     if (o.jenis === 'presensi') {
       const lama = sesi.formPresensi?.[memberId]
-      if (lama != null && lama <= capWaktu!) return keluar('sama', 'Sudah tercatat')
-      return keluar(lama != null ? 'perbarui' : 'tambah', ada ? `Catatan absen: ${ada.status}` : 'Belum ada catatan absen fisik')
+      const ketBaru = !!keterangan && !samaKeterangan(sesi.formKeterangan?.[memberId], keterangan)
+      const lengkapiHadir =
+        !!keterangan && ada?.status === 'hadir' && ((!!keterangan.alasan && !ada.alasanTelat) || (!!keterangan.bukti && !ada.bukti))
+      if (lama != null && lama <= capWaktu! && !ketBaru && !lengkapiHadir) return keluar('sama', 'Sudah tercatat')
+      const ket = keterangan ? ` · keterangan ${keterangan.status === 'pulang' ? 'pulang awal' : keterangan.status === 'telat' ? 'telat' : 'telat & pulang awal'}` : ''
+      return keluar(lama != null ? 'perbarui' : 'tambah', `${ada ? `Catatan absen: ${ada.status}` : 'Belum ada catatan absen fisik'}${ket}`)
     }
     if (o.jenis === 'izin') {
       if (ada?.status === 'hadir') return keluar('bentrok', 'Tercatat hadir di sesi ini — dilewati')
@@ -428,11 +465,14 @@ export function rencanakanImporForm(o: OpsiRencanaForm): BarisRencanaForm[] {
     if (!ada) return keluar('tambah', 'Hadir baru')
     if (ada.status === 'alpha') return keluar('perbarui', 'Tanpa keterangan → hadir')
     const pulangAt = jamPulang != null ? msSesi(sesi, `${Math.floor(jamPulang / 60)}:${jamPulang % 60}`) : undefined
+    const dariForm = lengkapiDariForm(ada, sesi)
     const beda =
       (datangAt != null && ada.datangAt !== datangAt) ||
       (pulangAt != null && ada.pulangAt !== pulangAt) ||
       (!!alasan && ada.alasanTelat !== alasan) ||
-      (!!bukti && ada.bukti !== bukti)
+      (!!bukti && ada.bukti !== bukti) ||
+      (!alasan && !!dariForm.alasanTelat) ||
+      (!bukti && !!dariForm.bukti)
     return keluar(beda ? 'perbarui' : 'sama', beda ? 'Perbarui jam datang/pulang/alasan' : 'Sudah tercatat')
   })
   return hasil
@@ -442,6 +482,8 @@ export interface HasilTerapForm {
   catatan: AttendanceRecord[]
   /** sessionId → formPresensi baru (utuh). */
   form: Record<string, Record<string, number>>
+  /** v2.13 — sessionId → formKeterangan baru (utuh). */
+  keterangan: Record<string, Record<string, KeteranganForm>>
   jumlah: number
 }
 
@@ -457,6 +499,7 @@ export function terapkanImporForm(
   const perSesi = new Map(sesi.map((s) => [s.id, s]))
   const keluar: AttendanceRecord[] = []
   const form: Record<string, Record<string, number>> = {}
+  const keterangan: Record<string, Record<string, KeteranganForm>> = {}
   let jumlah = 0
   for (const b of rencana) {
     if ((b.aksi !== 'tambah' && b.aksi !== 'perbarui') || !b.memberId || !b.sesiId) continue
@@ -466,6 +509,24 @@ export function terapkanImporForm(
     if (jenis === 'presensi') {
       const f = (form[s.id] ??= { ...(s.formPresensi ?? {}) })
       f[b.memberId] = Math.min(f[b.memberId] ?? Infinity, b.capWaktu!)
+      if (b.keterangan) {
+        // Disimpan di sesi (dipakai saat absen fisiknya masuk) dan, bila anak
+        // sudah tercatat hadir, langsung melengkapi alasan & buktinya.
+        const k = (keterangan[s.id] ??= { ...(s.formKeterangan ?? {}) })
+        k[b.memberId] = b.keterangan
+        const kunci = `${s.id}|${b.memberId}`
+        const ada = peta.get(kunci)
+        if (ada?.status === 'hadir') {
+          const tambah = lengkapiDariForm(ada, { formKeterangan: { [b.memberId]: b.keterangan } })
+          if (Object.keys(tambah).length) {
+            const r = { ...ada, ...tambah }
+            peta.set(kunci, r)
+            const i = keluar.findIndex((x) => x.id === r.id)
+            if (i >= 0) keluar[i] = r
+            else keluar.push(r)
+          }
+        }
+      }
       continue
     }
     const ada = peta.get(`${s.id}|${b.memberId}`)
@@ -494,11 +555,12 @@ export function terapkanImporForm(
     if (b.jamPulang != null) r.pulangAt = msSesi(s, `${Math.floor(b.jamPulang / 60)}:${b.jamPulang % 60}`)
     if (b.alasan) r.alasanTelat = b.alasan
     if (b.bukti) r.bukti = b.bukti
+    Object.assign(r, lengkapiDariForm(r, s))
     delete r.dilaporAt
     delete r.kategoriIzin
     keluar.push(r)
   }
-  return { catatan: keluar, form, jumlah }
+  return { catatan: keluar, form, keterangan, jumlah }
 }
 
 /** Ringkasan jumlah per aksi. */

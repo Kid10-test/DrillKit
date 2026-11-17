@@ -28,6 +28,7 @@ import {
   barisCsvPelantikan,
   jendelaDatang,
   lengkapiAturan,
+  teksBatasSakit,
   rekapPelantikan,
   ringkasAturan,
   tambahPeserta,
@@ -129,7 +130,7 @@ export default function PemantauPelantikan() {
             </>
           )}{' '}
           Izin sebelum {aturan.batasIzin ? aturan.batasIzin.replace(':', '.') : 'jam mulai'}
-          {aturan.wajibBukti ? ' + bukti' : ''} · sakit ≤ {aturan.sakitMaksJam} jam
+          {aturan.wajibBukti ? ' + bukti' : ''} · {teksBatasSakit(aturan)}
           {aturan.wajibForm && rekap.sesiBerForm > 0 && <> · Google Form wajib ({rekap.sesiBerForm} sesi diimpor)</>}
           {aturan.batasGabung && <> · bergabung paling lambat {tgl(aturan.batasGabung)}</>} · {lewat}/{rekap.wajib.length} sesi wajib sudah
           lewat

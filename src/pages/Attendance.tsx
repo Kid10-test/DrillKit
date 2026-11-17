@@ -32,6 +32,7 @@ import {
   keabsahanIzin,
   sesiBerForm,
   statusDatang,
+  teksBatasSakit,
   type AturanLengkap,
   type KeabsahanIzin,
 } from '../lib/programLatsar'
@@ -40,6 +41,10 @@ import {
 const PemantauPelantikan = lazy(() => import('../components/absensi/PemantauPelantikan'))
 /** v2.8 — impor CSV jawaban Google Form (presensi / izin / absen fisik). */
 const ImporGFormModal = lazy(() => import('../components/absensi/ImporGFormModal'))
+import PanelPutusan from '../components/absensi/PanelPutusan'
+import TarikOtomatis from '../components/absensi/TarikOtomatis'
+import { lengkapiDariForm } from '../lib/keteranganForm'
+import { daftarPutusan, labelPutusan, ubahanPutusan, type Putusan } from '../lib/putusanDanlat'
 import {
   sectionLabel,
   STATUS_META,
@@ -58,6 +63,7 @@ import {
 } from '../lib/utils'
 
 const ORDER: AttendanceStatus[] = ['hadir', 'izin', 'sakit', 'alpha']
+const PUTUSAN_KOSONG = ubahanPutusan(null, '', 0)
 
 export default function Attendance() {
   const toast = useToast()
@@ -109,6 +115,14 @@ export default function Attendance() {
   const statusOf = (memberId: string) =>
     (records ?? []).find((r) => r.sessionId === sessionId && r.memberId === memberId)
 
+  const catatanSesi = useMemo(() => (records ?? []).filter((r) => r.sessionId === sessionId), [records, sessionId])
+
+  const menungguPutusan = useMemo(() => {
+    if (!session) return 0
+    const aktif = new Set((members ?? []).filter((m) => m.active).map((m) => m.id))
+    return daftarPutusan(catatanSesi, session, aturanUntukSesi(settings.programLatihan, session.id), () => '', aktif).filter((b) => !b.putusan).length
+  }, [catatanSesi, session, members, settings.programLatihan])
+
   const counts = useMemo(() => {
     const c: Record<AttendanceStatus, number> = { hadir: 0, izin: 0, sakit: 0, alpha: 0 }
     for (const r of records ?? []) if (r.sessionId === sessionId) c[r.status]++
@@ -140,17 +154,20 @@ export default function Attendance() {
     // v2.8 — kategori & bukti izin hanya ikut berpindah antar izin↔sakit;
     // jam datang & alasan telat hanya milik catatan hadir.
     const izinSakit = status === 'izin' || status === 'sakit'
+    // v2.13 — alasan telat & bukti dari Form gabungan ikut ke catatan hadir baru.
+    const dariForm = status === 'hadir' && session ? lengkapiDariForm({ memberId }, session) : {}
     if (existing) {
       const tetapCap = izinSakit && (existing.status === 'izin' || existing.status === 'sakit')
       await db.attendance.update(existing.id, {
         status,
         checkInAt: status === 'hadir' ? Date.now() : existing.checkInAt,
         dilaporAt: izinSakit ? (tetapCap ? existing.dilaporAt : Date.now()) : undefined,
-        putusanIzin: tetapCap ? existing.putusanIzin : undefined,
+        ...(tetapCap ? {} : PUTUSAN_KOSONG),
         kategoriIzin: tetapCap ? existing.kategoriIzin : undefined,
         bukti: tetapCap ? existing.bukti : undefined,
         datangAt: undefined,
         alasanTelat: undefined,
+        ...dariForm,
       })
     } else {
       await db.attendance.put({
@@ -160,6 +177,7 @@ export default function Attendance() {
         status,
         checkInAt: status === 'hadir' ? Date.now() : undefined,
         ...(izinSakit ? { dilaporAt: Date.now() } : {}),
+        ...dariForm,
       })
     }
   }
@@ -170,7 +188,14 @@ export default function Attendance() {
     const existing = new Map((records ?? []).filter((r) => r.sessionId === sessionId).map((r) => [r.memberId, r]))
     const puts = active
       .filter((m) => !existing.has(m.id))
-      .map((m) => ({ id: uid('a_'), sessionId, memberId: m.id, status: 'hadir' as AttendanceStatus, checkInAt: now }))
+      .map((m) => ({
+        id: uid('a_'),
+        sessionId,
+        memberId: m.id,
+        status: 'hadir' as AttendanceStatus,
+        checkInAt: now,
+        ...(session ? lengkapiDariForm({ memberId: m.id }, session) : {}),
+      }))
     if (puts.length) await db.attendance.bulkPut(puts)
     toast.push(`${puts.length} anggota ditandai hadir`)
   }
@@ -188,12 +213,13 @@ export default function Attendance() {
         status: 'hadir',
         checkInAt: Date.now(),
         // v2.8 — sisa data izin (jam lapor, kategori, bukti, putusan) tidak ikut ke catatan hadir.
-        ...(dariIzin ? { dilaporAt: undefined, kategoriIzin: undefined, bukti: undefined, putusanIzin: undefined } : {}),
+        ...(dariIzin ? { dilaporAt: undefined, kategoriIzin: undefined, bukti: undefined, ...PUTUSAN_KOSONG } : {}),
+        ...(session ? lengkapiDariForm(dariIzin ? { memberId } : existing, session) : {}),
       })
       return existing.id
     }
     const id = uid('a_')
-    await db.attendance.put({ id, sessionId, memberId, status: 'hadir', checkInAt: Date.now() })
+    await db.attendance.put({ id, sessionId, memberId, status: 'hadir', checkInAt: Date.now(), ...(session ? lengkapiDariForm({ memberId }, session) : {}) })
     return id
   }
 
@@ -346,7 +372,7 @@ export default function Attendance() {
             {programSesi.wajib ? ` · sesi wajib ${programSesi.urutWajib}/${programSesi.program.wajibIds.length}` : ' · tidak dihitung untuk pelantikan'}
             {' — '}datang ≤ {jendela ? jamTitik(jendela.tepat) : ''} hadir, s.d. {jendela ? jamTitik(jendela.batasJatah) : ''} beralasan
             {aturan.wajibBukti ? ' + bukti' : ''} memakai jatah telat · izin sebelum {aturan.batasIzin ? aturan.batasIzin.replace(':', '.') : session?.startTime}
-            {aturan.wajibBukti ? ' + bukti' : ''} · sakit ≤ {aturan.sakitMaksJam} jam
+            {aturan.wajibBukti ? ' + bukti' : ''} · {teksBatasSakit(aturan)}
             {adaForm ? ` · Google Form: ${Object.keys(session?.formPresensi ?? {}).length} isian` : ''}.
           </p>
         )}
@@ -356,9 +382,26 @@ export default function Attendance() {
           </Button>
           <span className="text-xs text-slate-500 self-center">
             {filled}/{active.length} terisi · kehadiran {rate}%
+            {menungguPutusan > 0 && (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  data-testid="lompat-putusan"
+                  className="font-medium text-amber-300 underline"
+                  onClick={() => document.getElementById('panel-putusan')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                  {menungguPutusan} menunggu putusan
+                </button>
+              </>
+            )}
           </span>
         </div>
       </Card>
+
+      {sessionId && (
+        <TarikOtomatis sesiId={sessionId} program={settings.programLatihan ?? []} onBukaImpor={() => setImporOpen(true)} />
+      )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {ORDER.map((s) => (
@@ -451,6 +494,12 @@ export default function Attendance() {
             })}
           </ul>
         </Card>
+      )}
+      {/* v2.13 — di bawah daftar supaya daftar tidak bergeser saat mengetuk H/I/S/A. */}
+      {session && (
+        <div id="panel-putusan" className="mt-4">
+          <PanelPutusan session={session} aturan={aturan} records={catatanSesi} members={members ?? []} />
+        </div>
       )}
       </>
     )}
@@ -653,7 +702,7 @@ function ChipDatang({
   const teks = [
     r.datangAt ? jamPendek(r.datangAt, session.date) : r.pulangAt ? '' : 'jam',
     r.pulangAt ? `pulang ${jamPendek(r.pulangAt, session.date)}` : '',
-    telat ? (dihitung ? (d === 'jatah' ? (pulang ? 'jatah' : 'jatah telat') : 'putusan') : 'tak dihitung') : '',
+    telat ? (dihitung ? (d === 'jatah' ? (pulang ? 'jatah' : 'jatah telat') + (r.putusanIzin === 'jatah' ? ' · putusan' : '') : 'putusan') : 'tak dihitung') : '',
     tanpaForm ? 'tanpa Form' : '',
   ]
     .filter(Boolean)
@@ -710,6 +759,22 @@ function IsianBukti({
 
 const buktiDari = (ada: boolean, tautan: string) => (ada ? tautan.trim() || 'ada' : undefined)
 
+/** v2.13 — "Diputus Danlat · 17/11 14.05 — catatan". */
+function MetaPutusan({ rec, berubah }: { rec: AttendanceRecord; berubah: boolean }) {
+  if (berubah) return <span className="mt-1 block text-[11px] text-slate-500">Putusan baru dicatat saat disimpan.</span>
+  if (!rec.putusanIzin || (!rec.putusanOleh && !rec.putusanAt)) return null
+  const jenis = rec.status === 'hadir' ? 'telat' : rec.status === 'sakit' ? 'sakit' : 'izin'
+  const d = rec.putusanAt ? new Date(rec.putusanAt) : null
+  return (
+    <span data-testid="meta-putusan" className="mt-1 block text-[11px] text-slate-500">
+      {labelPutusan(jenis, rec.putusanIzin)}
+      {rec.putusanOleh ? ` · ${rec.putusanOleh}` : ''}
+      {d ? ` · ${d.getDate()}/${d.getMonth() + 1} ${jamTitik(rec.putusanAt!)}` : ''}
+      {rec.putusanCatatan ? ` — ${rec.putusanCatatan}` : ''}
+    </span>
+  )
+}
+
 function LaporIzinModal({
   rec,
   session,
@@ -723,8 +788,9 @@ function LaporIzinModal({
   nama: string
   onClose: () => void
 }) {
+  const settings = useSettings()
   const [waktu, setWaktu] = useState('')
-  const [putusan, setPutusan] = useState<'' | 'sah' | 'tidak-sah'>('')
+  const [putusan, setPutusan] = useState<'' | Putusan>('')
   const [catatan, setCatatan] = useState('')
   const [kategori, setKategori] = useState('')
   const [buktiAda, setBuktiAda] = useState(false)
@@ -756,7 +822,7 @@ function LaporIzinModal({
     if (!rec) return
     await db.attendance.update(rec.id, {
       dilaporAt: uji.dilaporAt,
-      putusanIzin: uji.putusanIzin,
+      ...(putusan !== (rec.putusanIzin ?? '') ? ubahanPutusan(putusan || null, settings.pemutusPutusan ?? 'Danlat', Date.now()) : {}),
       kategoriIzin: uji.kategoriIzin,
       bukti: uji.bukti,
       note: catatan.trim() || undefined,
@@ -770,7 +836,9 @@ function LaporIzinModal({
         Isi jam pesan izin/sakit <b className="text-slate-200">diterima</b> (mis. cap waktu Google Form / jam pesan WA), bukan jam mencatat.{' '}
         {rec.status === 'izin'
           ? `Izin sah bila dilaporkan sebelum ${jamPendek(batas, session.date)} pada hari sesi.`
-          : `Sakit sah bila dilaporkan paling lambat ${aturan.sakitMaksJam} jam sesudah sesi mulai (${jamPendek(batas, session.date)}).`}
+          : aturan.batasSakit
+            ? `Sakit sah bila dilaporkan paling lambat ${jamPendek(batas, session.date)} pada hari sesi; sesudah itu diputus danlat.`
+            : `Sakit sah bila dilaporkan paling lambat ${aturan.sakitMaksJam} jam sesudah sesi mulai (${jamPendek(batas, session.date)}).`}
       </p>
       <label className="block text-[11px] text-slate-400">
         Dilaporkan pada
@@ -818,11 +886,12 @@ function LaporIzinModal({
       />
       <label className="block text-[11px] text-slate-400">
         Keputusan
-        <Select data-testid="lapor-putusan" value={putusan} onChange={(e) => setPutusan(e.target.value as '' | 'sah' | 'tidak-sah')}>
-          <option value="">Otomatis menurut aturan</option>
-          <option value="sah">Sah — keputusan pelatih (izin jelas & bertanggung jawab)</option>
-          <option value="tidak-sah">Tidak sah — dihitung alpa</option>
+        <Select data-testid="lapor-putusan" value={putusan} onChange={(e) => setPutusan(e.target.value as '' | Putusan)}>
+          <option value="">Menunggu putusan — sementara menurut aturan</option>
+          <option value="sah">{rec.status === 'izin' ? 'Diizinkan' : 'Disahkan'} — putusan danlat</option>
+          <option value="tidak-sah">Ditolak — dihitung alpa</option>
         </Select>
+        <MetaPutusan rec={rec} berubah={putusan !== (rec.putusanIzin ?? '')} />
       </label>
       <label className="block text-[11px] text-slate-400">
         Alasan / catatan
@@ -879,7 +948,8 @@ function DatangModal({
   const [alasan, setAlasan] = useState('')
   const [buktiAda, setBuktiAda] = useState(false)
   const [tautan, setTautan] = useState('')
-  const [putusan, setPutusan] = useState<'' | 'sah' | 'tidak-sah'>('')
+  const [putusan, setPutusan] = useState<'' | Putusan>('')
+  const settings = useSettings()
   useEffect(() => {
     if (!rec) return
     setJam(rec.datangAt ? jamTitik(rec.datangAt).replace('.', ':') : '')
@@ -911,7 +981,7 @@ function DatangModal({
       pulangAt: uji.pulangAt,
       alasanTelat: uji.alasanTelat,
       bukti: uji.bukti,
-      putusanIzin: uji.putusanIzin,
+      ...(putusan !== (rec.putusanIzin ?? '') ? ubahanPutusan(putusan || null, settings.pemutusPutusan ?? 'Danlat', Date.now()) : {}),
     })
     onClose()
   }
@@ -1005,11 +1075,13 @@ function DatangModal({
       />
       <label className="block text-[11px] text-slate-400">
         Keputusan
-        <Select data-testid="datang-putusan" value={putusan} onChange={(e) => setPutusan(e.target.value as '' | 'sah' | 'tidak-sah')}>
-          <option value="">Otomatis menurut aturan</option>
-          <option value="sah">Dihitung hadir — keputusan pelatih</option>
-          <option value="tidak-sah">Tidak dihitung hadir</option>
+        <Select data-testid="datang-putusan" value={putusan} onChange={(e) => setPutusan(e.target.value as '' | Putusan)}>
+          <option value="">Menunggu putusan — sementara menurut aturan</option>
+          <option value="jatah">Disahkan — pakai jatah telat</option>
+          <option value="sah">Dihitung hadir penuh — tanpa memakai jatah</option>
+          <option value="tidak-sah">Ditolak — tidak dihitung hadir</option>
         </Select>
+        <MetaPutusan rec={rec} berubah={putusan !== (rec.putusanIzin ?? '')} />
       </label>
       <p
         data-testid="datang-hasil"
@@ -1023,7 +1095,7 @@ function DatangModal({
           : d == null || d === 'tepat'
             ? 'Hadir tepat waktu'
             : d === 'jatah'
-              ? `${awal ? 'Pulang awal' : 'Telat'} berjatah — dihitung hadir bila jatah telat masih ada`
+              ? `${awal ? 'Pulang awal' : 'Telat'} berjatah${putusan === 'jatah' ? ' (disahkan danlat)' : ''} — dihitung hadir bila jatah telat masih ada`
               : d === 'putusan-sah'
                 ? 'Dihitung hadir — keputusan pelatih'
                 : `Tidak dihitung hadir (${labelDatang(d, uji, session, aturan)}) — dihitung alpa`}

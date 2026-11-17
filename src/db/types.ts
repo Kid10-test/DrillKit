@@ -184,6 +184,14 @@ export interface Session {
    * staf** — dikupas dari berkas yang dibagikan.
    */
   formPresensi?: Record<string, number>
+  /**
+   * v2.13 — keterangan dari Form gabungan untuk anak yang mengisi "Datang
+   * terlambat" / "Pulang lebih awal": memberId → alasan, bukti, dan rencana
+   * jam. Disimpan di sesi sampai absen fisiknya tercatat, lalu dipakai
+   * melengkapi catatan hadirnya (alasan telat & bukti). **Catatan staf** —
+   * dikupas dari berkas yang dibagikan, seperti `formPresensi`.
+   */
+  formKeterangan?: Record<string, KeteranganForm>
 
   /**
    * v2.10.1 — rundown sesi ini diambil dari berkas Google Drive (Docs/Sheets/
@@ -468,6 +476,18 @@ export interface RealisasiBlok {
 
 export type AttendanceStatus = 'hadir' | 'izin' | 'sakit' | 'alpha'
 
+/** v2.13 — keterangan telat/pulang awal dari Form gabungan (lihat `Session.formKeterangan`). */
+export interface KeteranganForm {
+  status: 'telat' | 'pulang' | 'telat-pulang'
+  alasan?: string
+  bukti?: string
+  /** Rencana jam datang/pulang yang ditulis anak (menit sejak 00.00) — hanya perkiraan. */
+  jamDatang?: number
+  jamPulang?: number
+  /** Cap waktu isian (epoch ms). */
+  capWaktu: number
+}
+
 export interface AttendanceRecord {
   id: string
   sessionId: string
@@ -482,8 +502,23 @@ export interface AttendanceRecord {
    * mulai sesi, sakit sah bila dilaporkan paling lambat N jam sesudahnya.
    */
   dilaporAt?: number
-  /** #36 — putusan pelatih yang mengalahkan aturan jam (izin "jelas & bertanggung jawab"). */
-  putusanIzin?: 'sah' | 'tidak-sah'
+  /**
+   * #36 — putusan pelatih/danlat yang mengalahkan aturan jam & bukti (izin
+   * "jelas & bertanggung jawab"). Kosong = menunggu putusan, dihitung
+   * sementara menurut aturan.
+   *  - `sah`: izin diizinkan / sakit disahkan; pada catatan hadir = dihitung
+   *    hadir penuh tanpa memakai jatah telat.
+   *  - `jatah` (v2.13): hanya catatan hadir — alasan telat/pulang awal
+   *    diterima, dihitung hadir **memakai jatah telat** (selama masih ada).
+   *  - `tidak-sah`: ditolak, dihitung alpa.
+   */
+  putusanIzin?: 'sah' | 'jatah' | 'tidak-sah'
+  /** v2.13 — siapa yang memutus (mis. "Danlat"). */
+  putusanOleh?: string
+  /** v2.13 — kapan putusan dicatat (epoch ms). */
+  putusanAt?: number
+  /** v2.13 — catatan putusan (mis. "bukti menyusul besok"). */
+  putusanCatatan?: string
   /**
    * v2.8 — jam datang (epoch ms) yang **dicatat dengan sengaja** (absen fisik
    * admin / impor CSV), bukan jam tombol ditekan. `checkInAt` tetap ada untuk
@@ -1646,6 +1681,10 @@ export interface TeamSettings {
    * supaya "Tarik isian terbaru" tidak perlu memilih berkas lagi.
    */
   sumberForm?: Partial<Record<'presensi' | 'izin' | 'datang', SumberSheetForm>>
+  /** v2.13 — nama pemutus yang dicatat di putusan izin/telat (bawaan "Danlat"). */
+  pemutusPutusan?: string
+  /** v2.13 — tarik isian Form otomatis saat Absensi dibuka (bawaan: nyala bila ada Sheet terpilih). */
+  tarikOtomatis?: boolean
 }
 
 /** v2.10.1 — pengenal aplikasi Google Cloud milik pelatih (bukan rahasia). */
@@ -1774,6 +1813,12 @@ export interface AturanPelantikan {
   wajibBukti?: boolean
   /** Batas lapor izin pada hari-H ("HH:MM"). Kosong = sebelum jam mulai sesi. */
   batasIzin?: string
+  /**
+   * v2.13 — batas lapor sakit pada hari-H ("HH:MM", mis. 15:30 = dua jam
+   * sebelum apel). Diisi → menggantikan `sakitMaksJam`; sakit sesudah jam ini
+   * diputus danlat per orang.
+   */
+  batasSakit?: string
   /** Kategori izin yang diterima musim ini. Kosong = 7 kategori bawaan. */
   kategoriIzin?: KategoriIzin[]
   /** Bergabung setelah tanggal ini → pelantikan susulan. Kosong = tanpa batas. */
