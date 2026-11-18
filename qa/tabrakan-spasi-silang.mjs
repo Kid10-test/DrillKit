@@ -186,15 +186,24 @@ try {
   )
 
   /* ---- 3. Pratinjau Kanvas & Tukar 1-Klik (2-Opt) + Undo 1 Langkah ---- */
-  await page.click('[data-testid="pratinjau-tukar-0"]')
   // Tunggu lapisannya benar-benar tergambar (bukan jeda tetap 250 ms yang
-  // pernah terlalu pendek di runner CI yang lambat — v2.4.0, PR #48).
-  await page
-    .waitForFunction(
-      () => document.querySelector('[data-testid="lapisan-pratinjau-tukar"]')?.outerHTML.includes('#10b981'),
-      { timeout: 8000 },
-    )
-    .catch(() => undefined)
+  // pernah terlalu pendek di runner CI yang lambat — v2.4.0, PR #48). v2.14.0:
+  // di runner CI klik pertama sesekali tidak sampai (tombol belum di layar),
+  // jadi tombol digulir ke tengah dulu dan klik diulang hanya bila lapisannya
+  // masih belum ada.
+  const pratinjauTergambar = () =>
+    page
+      .waitForFunction(
+        () => document.querySelector('[data-testid="lapisan-pratinjau-tukar"]')?.outerHTML.includes('#10b981'),
+        { timeout: 8000 },
+      )
+      .then(() => true)
+      .catch(() => false)
+  for (let coba = 0; coba < 3; coba++) {
+    await page.evaluate(() => document.querySelector('[data-testid="pratinjau-tukar-0"]')?.scrollIntoView({ block: 'center' }))
+    await page.click('[data-testid="pratinjau-tukar-0"]')
+    if (await pratinjauTergambar()) break
+  }
   const adaPratinjauKanvas = await page.evaluate(() => {
     const el = document.querySelector('[data-testid="lapisan-pratinjau-tukar"]')
     if (!el) return false
