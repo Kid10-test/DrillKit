@@ -43,6 +43,7 @@ const PemantauPelantikan = lazy(() => import('../components/absensi/PemantauPela
 const ImporGFormModal = lazy(() => import('../components/absensi/ImporGFormModal'))
 import PanelPutusan from '../components/absensi/PanelPutusan'
 import TarikOtomatis from '../components/absensi/TarikOtomatis'
+import PitaServer from '../components/server/PitaServer'
 import { lengkapiDariForm } from '../lib/keteranganForm'
 import { daftarPutusan, labelPutusan, ubahanPutusan, type Putusan } from '../lib/putusanDanlat'
 import {
@@ -398,6 +399,8 @@ export default function Attendance() {
           </span>
         </div>
       </Card>
+
+      <PitaServer />
 
       {sessionId && (
         <TarikOtomatis sesiId={sessionId} program={settings.programLatihan ?? []} onBukaImpor={() => setImporOpen(true)} />

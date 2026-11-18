@@ -1685,6 +1685,21 @@ export interface TeamSettings {
   pemutusPutusan?: string
   /** v2.13 — tarik isian Form otomatis saat Absensi dibuka (bawaan: nyala bila ada Sheet terpilih). */
   tarikOtomatis?: boolean
+  /**
+   * v2.14 — alamat proyek Supabase & kunci publik (publishable) untuk
+   * kehadiran bersama. Kosong = nilai bawaan build (`VITE_SUPABASE_*`). Bukan
+   * rahasia; kunci rahasia/service_role ditolak saat disimpan. Ikut backup,
+   * TIDAK ikut paket bagikan.
+   */
+  serverKehadiran?: KonfigServerTim
+}
+
+/** v2.14 — pengenal proyek Supabase untuk kehadiran bersama (bukan rahasia). */
+export interface KonfigServerTim {
+  /** https://<ref>.supabase.co */
+  url?: string
+  /** Kunci publik: `sb_publishable_…` (atau anon key lama `eyJ…`). */
+  kunci?: string
 }
 
 /** v2.10.1 — pengenal aplikasi Google Cloud milik pelatih (bukan rahasia). */

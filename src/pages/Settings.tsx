@@ -41,6 +41,8 @@ const PanelArsipMusimLazy = lazy(() =>
     default: m.PanelArsipMusim,
   })),
 )
+/** v2.14 — kehadiran bersama (Supabase); pustakanya dimuat hanya bila servernya diatur. */
+const KartuKehadiranBersama = lazy(() => import('../components/server/KartuKehadiranBersama'))
 import type { Tampilan } from '../lib/tampilan'
 import { PilihModeNama } from '../components/PilihModeNama'
 import { KartuTerbit } from '../components/KartuTerbit'
@@ -520,12 +522,19 @@ export default function Settings() {
           </div>
         </Card>
 
+        {/* v2.14 — Kehadiran bersama */}
+        <Card className="lg:col-span-2" id="kehadiran-bersama">
+          <Suspense fallback={<p className="text-xs text-slate-500">Memuat kehadiran bersama…</p>}>
+            <KartuKehadiranBersama />
+          </Suspense>
+        </Card>
+
         {/* Data */}
         <Card className="lg:col-span-2">
           <h2 className="mb-3 text-sm font-semibold text-slate-200">Kelola data</h2>
           <p className="mb-4 text-xs leading-relaxed text-slate-500">
-            Semua data tersimpan <b>hanya di perangkat ini</b> (browser). Tidak ada server, jadi gratis dan tetap
-            bisa dipakai offline. Konsekuensinya: <b>backup adalah tanggung jawab kamu</b> — ekspor berkala, simpan
+            Semua data tersimpan <b>di perangkat ini</b> (browser) dan tetap bisa dipakai offline. Server hanya
+            dipakai bila Kehadiran bersama dinyalakan, dan hanya untuk kehadiran. Konsekuensinya: <b>backup adalah tanggung jawab kamu</b> — ekspor berkala, simpan
             di Google Drive/email, dan pulihkan kalau ganti HP atau hapus data browser.
           </p>
           {/* 1b — simpan otomatis: sekali pilih berkas, aplikasi menulis sendiri. */}

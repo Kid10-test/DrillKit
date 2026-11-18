@@ -189,6 +189,8 @@ rakit src/lib/programLatsar.ts           programLatsar
 rakit src/lib/imporGForm.ts             imporGForm
 # v2.13 — putusan danlat (izin/sakit/telat/pulang), pesan WA & balasan danlat.
 rakit src/lib/putusanDanlat.ts          putusanDanlat
+# v2.14 — kehadiran bersama: peran, daftar putih field, sidik, rencana kirim, alamat kembali Google.
+rakit src/lib/kehadiranBersama.ts       kehadiranBersama
 # #34a — musim TC: H-Minus, gerbang kesiapan mundur, & titik hitung mundur terpadu.
 rakit src/lib/manajemenMusim.ts          manajemenMusim
 # v2.7.1 — roster pergantian musim: impor CSV cocok-nama, aksi massal, rekap roster.
