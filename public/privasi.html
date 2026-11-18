@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kebijakan Privasi · DrillKit</title>
+<meta name="description" content="Kebijakan privasi DrillKit: data yang tetap di perangkat, data kehadiran yang dikirim ke server, dan login Google.">
+<link rel="icon" href="./icon-192.png">
+<style>:root{--navy:#1f2a44;--oranye:#e07a1f;--abu:#666e80;--garis:#e3e6ec;--latar:#f7f8fa}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--latar);color:#1d2433;font:16px/1.65 "Lora",Georgia,"Times New Roman",serif}
+header{background:var(--navy);color:#fff}
+.wadah{max-width:760px;margin:0 auto;padding:0 20px}
+header .wadah{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;padding-bottom:14px}
+.merek{color:#fff;text-decoration:none;font:700 20px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.2px}
+.merek span{color:var(--oranye)}
+nav a{color:#d9deea;text-decoration:none;font:500 14px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin-left:16px}
+nav a[aria-current]{color:#fff;border-bottom:2px solid var(--oranye);padding-bottom:3px}
+main{background:#fff;border:1px solid var(--garis);border-radius:12px;margin:24px auto;padding:28px 28px 20px;max-width:760px}
+h1{color:var(--navy);font-size:28px;line-height:1.25;margin:0 0 6px}
+h2{color:var(--navy);font-size:19px;margin:28px 0 8px;padding-top:14px;border-top:1px solid var(--garis)}
+h3{color:var(--navy);font-size:16px;margin:18px 0 4px}
+p,li{margin:0 0 10px}
+ul{padding-left:22px;margin:0 0 10px}
+.ket{color:var(--abu);font-size:14px;margin-bottom:18px}
+.kotak{background:#fff7ef;border-left:4px solid var(--oranye);padding:12px 16px;border-radius:6px;margin:16px 0}
+table{border-collapse:collapse;width:100%;font-size:14.5px;margin:6px 0 14px}
+th,td{border:1px solid var(--garis);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#eef1f6;color:var(--navy)}
+a{color:#b85c0c}
+.tombol{display:inline-block;background:var(--oranye);color:#fff;text-decoration:none;font:600 15px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:12px 18px;border-radius:8px;margin:6px 8px 6px 0}
+.tombol.kedua{background:var(--navy)}
+footer{color:var(--abu);font:13px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:center;padding:8px 20px 32px}
+footer a{color:var(--abu)}
+@media (max-width:520px){main{border-radius:0;border-left:0;border-right:0;margin:0;padding:22px 18px}nav a{margin:0 14px 0 0}h1{font-size:24px}}
+@media print{header,footer,.tombol{display:none}main{border:0;margin:0;padding:0}}</style>
+</head>
+<body>
+<header><div class="wadah"><a class="merek" href="./tentang.html">Drill<span>Kit</span></a><nav><a href="./tentang.html">Tentang</a><a href="./privasi.html" aria-current="page">Privasi</a><a href="./ketentuan.html">Ketentuan</a></nav></div></header>
+<main>
+<h1>Kebijakan Privasi</h1>
+<p class="ket">Berlaku sejak November 2026 · DrillKit</p>
+<div class="kotak"><b>Ringkasnya:</b> hampir semua data DrillKit hanya tersimpan di perangkatmu. Yang dikirim ke server hanya data yang dibutuhkan untuk mengisi kehadiran bersama-sama — daftar anggota (nama dan section), daftar sesi, dan catatan kehadiran — dan hanya bila pemilik tim menyalakan fitur Kehadiran bersama. Data tidak dijual, tidak dipakai untuk iklan, dan tidak dibagikan ke pihak lain di luar staf tim.</div>
+
+<h2>1. Data yang tetap di perangkat</h2>
+<p>DrillKit menyimpan data di penyimpanan browser (IndexedDB) pada perangkat yang dipakai. Data berikut <b>tidak pernah</b> dikirim ke server DrillKit:</p>
+<ul>
+<li>drill, formasi, lagu, partitur, rekaman, dan metronom;</li>
+<li>nomor HP, kartu medis, kontak darurat, ukuran seragam, dan catatan pribadi anggota;</li>
+<li>evaluasi, nilai, penilaian juri, kas dan iuran, inventaris, serta arsip musim;</li>
+<li>rundown dan realisasi latihan.</li>
+</ul>
+<p>Data ini hilang bila data browser dihapus, kecuali sudah di-backup. Backup ke berkas atau ke Google Drive milik pelatih hanya terjadi bila pelatih sendiri menyalakannya.</p>
+
+<h2>2. Data yang dikirim ke server (Kehadiran bersama)</h2>
+<p>Bila Kehadiran bersama dinyalakan, data berikut disimpan di proyek Supabase milik pemilik tim:</p>
+<table>
+<tr><th>Data</th><th>Isinya</th><th>Untuk apa</th></tr>
+<tr><td>Akun staf</td><td>Alamat email Google, nama dan foto profil dari Google, waktu masuk terakhir</td><td>Mengenali siapa yang masuk dan mencocokkannya dengan undangan</td></tr>
+<tr><td>Daftar staf</td><td>Email yang diundang, peran, nama/jabatan yang ditulis pemilik</td><td>Menentukan siapa boleh melihat, mengisi, atau memutus</td></tr>
+<tr><td>Anggota</td><td>Nama, nama panggilan, kode, section, instrumen, peran di band, tahun bergabung, status aktif</td><td>Supaya semua staf melihat daftar nama yang sama</td></tr>
+<tr><td>Sesi</td><td>Judul, tanggal, jam, tempat, tanda sudah mengisi Form presensi, keterangan telat/pulang dari Form</td><td>Supaya kehadiran tercatat pada sesi yang sama</td></tr>
+<tr><td>Kehadiran</td><td>Status (hadir/izin/sakit/alpa), jam datang dan pulang, kategori dan alasan izin/telat, tautan bukti, putusan danlat beserta pemutus, waktu, dan catatannya</td><td>Mengisi, memutus, dan merekap kehadiran</td></tr>
+<tr><td>Aturan program</td><td>Jadwal program latihan, sesi wajib, peserta, dan aturan pelantikan</td><td>Supaya usul putusan dan rekap pelantikan sama di semua perangkat staf</td></tr>
+</table>
+<p>Tautan bukti izin disimpan sebagai tautan saja; berkasnya tetap di tempat asalnya (misalnya Google Drive pengunggah).</p>
+
+<h2>3. Login dengan Google</h2>
+<ul>
+<li>DrillKit hanya meminta izin dasar <b>openid</b>, <b>email</b>, dan <b>profile</b>. Izin ini tidak memberi akses ke Gmail, Google Drive, kontak, kalender, atau data Google lainnya.</li>
+<li>Email dipakai untuk mencocokkan akun dengan daftar staf yang diundang pemilik tim. Nama dan foto profil disimpan oleh layanan login (Supabase Auth) sebagaimana dikirim Google, dan tidak dipakai untuk keperluan lain.</li>
+<li>Pemakaian dan pemindahan informasi yang diterima dari Google API mematuhi <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, termasuk ketentuan Limited Use.</li>
+<li>Fitur Google Drive di DrillKit (ambil rundown, tarik isian Form, backup) adalah sambungan terpisah dengan persetujuan tersendiri, memakai izin <b>drive.file</b> — hanya berkas yang dipilih sendiri atau dibuat DrillKit — dan berjalan langsung antara browser dan Google tanpa melewati server DrillKit.</li>
+</ul>
+
+<h2>4. Siapa yang bisa melihat</h2>
+<ul>
+<li><b>Staf tim</b> sesuai perannya: pemilik, danlat, dan pencatat dapat melihat dan mengisi; PH &amp; asisten hanya melihat. Orang yang tidak diundang tidak dapat membaca apa pun, termasuk bila ia berhasil masuk dengan akun Google.</li>
+<li><b>Supabase</b> sebagai penyedia server dan login, yang menyimpan data atas nama pemilik tim. Server berada di wilayah Singapura.</li>
+<li>Tidak ada pihak lain. DrillKit tidak memasang iklan, pelacak, atau analitik pihak ketiga.</li>
+</ul>
+
+<h2>5. Lama penyimpanan dan penghapusan</h2>
+<ul>
+<li>Data kehadiran disimpan selama tim memakai Kehadiran bersama, dan dapat dihapus pemilik tim kapan saja, misalnya saat pergantian musim.</li>
+<li>Staf yang dikeluarkan dari daftar langsung kehilangan akses. Akun loginnya dapat dihapus atas permintaan.</li>
+<li>Anggota atau staf yang ingin datanya diperbaiki atau dihapus dapat menghubungi pemilik tim atau pelatih unitnya.</li>
+<li>Data di perangkat dapat dihapus sendiri lewat pengaturan browser atau menu Kelola data di DrillKit.</li>
+</ul>
+
+<h2>6. Keamanan</h2>
+<p>Semua lalu lintas memakai HTTPS. Hak akses dijaga oleh server (Row Level Security), bukan oleh aplikasi: setiap permintaan diperiksa terhadap email yang terverifikasi dan peran di daftar staf. Aplikasi hanya membawa kunci publik; kunci rahasia server tidak pernah berada di aplikasi.</p>
+
+<h2>7. Anggota di bawah umur</h2>
+<p>Sebagian anggota band bisa saja masih pelajar. Mereka tidak masuk ke DrillKit; data mereka dimasukkan oleh staf unit untuk keperluan latihan, dan dibatasi pada yang tercantum di bagian 2.</p>
+
+<h2>8. Perubahan kebijakan</h2>
+<p>Bila kebijakan ini berubah, versi terbaru ditayangkan di halaman ini beserta tanggal berlakunya. Perubahan yang menambah jenis data yang dikirim ke server akan diumumkan kepada pemilik tim sebelum berlaku.</p>
+
+<h2>9. Kontak</h2>
+<p>Pertanyaan dan permintaan terkait data dapat disampaikan kepada pemilik tim yang mengundangmu, atau kepada pengembang melalui alamat email dukungan yang tertera di layar persetujuan Google saat masuk.</p>
+
+<h2>In English (summary)</h2>
+<p>DrillKit keeps almost all data on the user's device. Only when a team owner enables Shared Attendance does it store, in the owner's Supabase project, the staff list (invited Google emails and roles), a minimal member list (name, nickname, section, active status), session list, and attendance records. Google sign-in requests only the openid, email, and profile scopes; the email is used solely to match the signed-in user with an invitation. DrillKit's use of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements. Data is not sold, not used for advertising, and not shared beyond the team's staff and the hosting provider.</p>
+</main>
+<footer>DrillKit · <a href="./">Buka aplikasi</a> · <a href="./tentang.html">Tentang</a> · <a href="./privasi.html">Kebijakan Privasi</a> · <a href="./ketentuan.html">Ketentuan Penggunaan</a></footer>
+</body>
+</html>

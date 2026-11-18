@@ -37,7 +37,7 @@ lembar hitungan ***Count Sheet Color Guard***, metronom + *tempo map* + rekaman 
 
 | Kebutuhan | Keputusan | Alasan |
 |---|---|---|
-| Harus gratis | **Tanpa server/backend** | Semua data di browser (IndexedDB). Nol biaya hosting, nol langganan. |
+| Harus gratis | **Tanpa server/backend** | Semua data di browser (IndexedDB). Nol biaya hosting, nol langganan. Satu-satunya pengecualian: **Kehadiran bersama** (v2.14, opsional) memakai proyek Supabase gratis milik pelatih, hanya untuk kehadiran — lihat `PANDUAN-KEHADIRAN-BERSAMA.md`. |
 | Harus jalan di lapangan | **PWA + offline** | Bisa di-*install* ke layar utama HP; tetap terbuka tanpa sinyal. |
 | Pelatih **dan** anggota | **Paket berbagi (file .json)** | Anggota tak perlu akun. Pelatih ekspor, anggota buka di HP masing-masing. |
 | Bisa dikembangkan sendiri | **TypeScript + modul terpisah** | Kode rapi, ada komentar di bagian yang tidak biasa. |
@@ -908,7 +908,9 @@ komputer tersebut belum mendukung `oklch()`.
 
 ## Keamanan & backup
 
-* Data **hanya** ada di perangkat/browser tempat dipakai.
+* Data **hanya** ada di perangkat/browser tempat dipakai — kecuali kehadiran bila
+  **Kehadiran bersama** dinyalakan (anggota: nama & section; sesi; catatan kehadiran;
+  daftar putihnya di `src/lib/kehadiranBersama.ts`). Kebijakan lengkap: `public/privasi.html`.
 * Karena itu **backup wajib**: **Pengaturan → Ekspor backup (JSON)**.
   Simpan di Drive/email. **Pulihkan backup** kalau ganti HP atau setelah membersihkan data browser.
 * **Pengingat backup otomatis** (`src/lib/backup.ts`): kalau sudah lewat N hari sejak backup

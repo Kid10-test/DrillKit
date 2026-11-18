@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import PenandaRilis from './components/PenandaRilis'
 import { PenjagaSimpanOtomatis } from './components/SimpanOtomatis'
 import { PenjagaBackupDrive } from './components/google/PenjagaBackupDrive'
+import { PenjagaServer } from './components/server/PenjagaServer'
 import { ErrorBoundary, ToastProvider } from './components/ui'
 import { KioskProvider } from './hooks/useKiosk'
 import { useBootstrap } from './hooks/useSettings'
@@ -91,6 +92,8 @@ export default function App() {
       <PenjagaSimpanOtomatis />
       {/* v2.10.1 — backup ke Google Drive; diam sampai pelatih menyambungkan Drive. */}
       <PenjagaBackupDrive />
+      {/* v2.14 — kehadiran bersama; diam sampai perangkat ini menyalakannya. */}
+      <PenjagaServer />
       <Layout>
         <ErrorBoundary>
         <Suspense

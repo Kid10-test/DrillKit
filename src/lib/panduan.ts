@@ -163,7 +163,7 @@ export function bodyPanduan(d: DataPanduan): string {
   bagian.push(`<h2>Yang perlu diingat</h2>
     <div class="kotak">
       <ul>
-        <li>Data tersimpan <b>hanya di perangkat ini</b> — bukan di server. Backup berkala (JSON/ZIP) itu wajib.</li>
+        <li>Data tersimpan <b>hanya di perangkat ini</b>, kecuali kehadiran bila Kehadiran bersama menyala. Backup berkala (JSON/ZIP) itu wajib.</li>
         <li>Bekerja <b>offline</b>: sekali dibuka, formasi, metronom, rekaman, &amp; partitur tetap jalan tanpa sinyal.</li>
         <li>Section tim ini: <b>${section}</b>. Standar lapangan (yard/meter &amp; patok) dan PIN diatur di <b>Pengaturan</b>.</li>
         <li>Tidak sengaja mengubah formasi? <b>Ctrl + Z</b> berulang kali; <b>Ctrl + Shift + Z</b> untuk mengulang.</li>
