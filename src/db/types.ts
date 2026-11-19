@@ -510,6 +510,8 @@ export interface AttendanceRecord {
    *    hadir penuh tanpa memakai jatah telat.
    *  - `jatah` (v2.13): hanya catatan hadir — alasan telat/pulang awal
    *    diterima, dihitung hadir **memakai jatah telat** (selama masih ada).
+   *    Sejak v2.15 tombol "terima" di panel Putusan danlat hanya menulis ini
+   *    bila `AturanPelantikan.tpDiterimaPakaiJatah`; selain itu menulis `sah`.
    *  - `tidak-sah`: ditolak, dihitung alpa.
    */
   putusanIzin?: 'sah' | 'jatah' | 'tidak-sah'
@@ -1838,6 +1840,13 @@ export interface AturanPelantikan {
   kategoriIzin?: KategoriIzin[]
   /** Bergabung setelah tanggal ini → pelantikan susulan. Kosong = tanpa batas. */
   batasGabung?: string
+  /**
+   * v2.15 — telat/pulang awal yang alasannya **diterima danlat** ikut memakai
+   * jatah telat. Kosong/false = tidak memakai jatah (Aturan Kehadiran v1 §5):
+   * diterima danlat = dihitung hadir penuh. Hanya mengubah putusan yang
+   * diambil sesudahnya; putusan lama tetap seperti tercatat.
+   */
+  tpDiterimaPakaiJatah?: boolean
   /** Sakit sah bila dilaporkan paling lambat sekian jam setelah sesi mulai. */
   sakitMaksJam: number
 }

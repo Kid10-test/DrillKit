@@ -140,7 +140,7 @@ try {
               id: 'prog_p', nama: 'Latsar CAB', mulai: a.hari, selesai: a.hari, hari: [], jamMulai: '17:30', jamSelesai: '20:15',
               tambahan: [a.hari], libur: [], fase: [], tonggak: [], sesiIds: ['s_p3'], wajibIds: ['s_p3'],
               peserta: a.anggota.map(([memberId]) => ({ memberId, bergabung: a.hari })),
-              aturan: { sakitMaksJam: 24, batasIzin: '15:00', batasSakit: '15:30', praMenit: 30, penutupMenit: 15 }, dibuat: 1, diubah: 1,
+              aturan: { sakitMaksJam: 24, batasIzin: '15:00', batasSakit: '15:30', praMenit: 30, penutupMenit: 15, tpDiterimaPakaiJatah: true }, dibuat: 1, diubah: 1,
             },
           ]
           delete t.pemutusPutusan
@@ -168,6 +168,7 @@ try {
   cek('keterangan sakit menyebut 15.30', (await teks('[data-testid="putusan-d4"]')).includes('lewat 15.30'), await teks('[data-testid="putusan-d4"]'))
   cek('tombol izin = Diizinkan, sakit/telat = Disahkan', (await teks('[data-testid="putusan-terima-d2"]')) === 'Diizinkan' && (await teks('[data-testid="putusan-terima-d1"]')) === 'Disahkan')
   cek('tautan bukti tampil', await p.$eval('[data-testid="putusan-d2"] a', (a) => a.href.includes('id=b2')).catch(() => false))
+  cek('v2.15: aturan TP tampil di panel (tetap memakai jatah)', (await teks('[data-testid="putusan-aturan-tp"]').catch(() => '')).includes('tetap memakai jatah'))
   const banner = await teks('[data-testid="info-sesi-program"]').catch(() => '')
   cek('banner: sakit ≤ 15.30', banner.includes('sakit ≤ 15.30'), banner)
 

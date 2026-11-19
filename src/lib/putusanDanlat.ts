@@ -133,13 +133,26 @@ export function daftarPutusan(
   )
 }
 
-/** Nilai yang ditulis untuk vonis "terima": telat/pulang memakai jatah, selainnya sah. */
-export function nilaiTerima(jenis: JenisPutusan): Putusan {
-  return jenis === 'telat' || jenis === 'pulang' || jenis === 'telat-pulang' ? 'jatah' : 'sah'
+/**
+ * Nilai yang ditulis untuk vonis "terima". Izin, sakit, dan hadir tanpa Form →
+ * `sah`. Telat/pulang awal → `sah` (dihitung hadir penuh, tidak memakai jatah
+ * telat — Aturan Kehadiran v1 §5), kecuali aturan program menyatakan
+ * `tpDiterimaPakaiJatah` → `jatah`. v2.13–v2.14 selalu menulis `jatah`.
+ */
+export function nilaiTerima(jenis: JenisPutusan, aturan?: Pick<AturanLengkap, 'tpDiterimaPakaiJatah'>): Putusan {
+  const tp = jenis === 'telat' || jenis === 'pulang' || jenis === 'telat-pulang'
+  return tp && aturan?.tpDiterimaPakaiJatah ? 'jatah' : 'sah'
 }
 
-export function nilaiVonis(jenis: JenisPutusan, v: Vonis): Putusan {
-  return v === 'terima' ? nilaiTerima(jenis) : 'tidak-sah'
+export function nilaiVonis(jenis: JenisPutusan, v: Vonis, aturan?: Pick<AturanLengkap, 'tpDiterimaPakaiJatah'>): Putusan {
+  return v === 'terima' ? nilaiTerima(jenis, aturan) : 'tidak-sah'
+}
+
+/** Kalimat aturan putusan telat/pulang awal untuk panel & cetakan. */
+export function teksTpDiterima(aturan: Pick<AturanLengkap, 'tpDiterimaPakaiJatah'>): string {
+  return aturan.tpDiterimaPakaiJatah
+    ? 'Telat/pulang awal yang diterima danlat tetap memakai jatah telat.'
+    : 'Telat/pulang awal yang diterima danlat dihitung hadir penuh, tanpa memakai jatah telat.'
 }
 
 export const LABEL_JENIS: Record<JenisPutusan, string> = {
@@ -162,7 +175,8 @@ export function labelPutusan(jenis: JenisPutusan, p: Putusan): string {
   if (p === 'jatah') return 'Disahkan · pakai jatah telat'
   if (jenis === 'izin') return 'Diizinkan'
   if (jenis === 'sakit') return 'Disahkan'
-  return 'Dihitung hadir penuh'
+  if (jenis === 'tanpa-form') return 'Dihitung hadir penuh'
+  return 'Disahkan · tanpa jatah'
 }
 
 /** Field yang ditulis ke catatan absensi; `null` = hapus putusan (kembali menunggu). */

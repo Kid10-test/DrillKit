@@ -115,7 +115,7 @@ export const KATEGORI_IZIN_BAKU: readonly KategoriIzin[] = [
 export type AturanLengkap = Required<
   Pick<AturanPelantikan, 'rasioHadir' | 'rasioAlpa' | 'rasioTelat' | 'toleransiMenit' | 'wajibForm' | 'wajibBukti' | 'kategoriIzin' | 'sakitMaksJam'>
 > &
-  Pick<AturanPelantikan, 'batasJatahMenit' | 'batasIzin' | 'batasSakit' | 'batasGabung' | 'praMenit' | 'penutupMenit'>
+  Pick<AturanPelantikan, 'batasJatahMenit' | 'batasIzin' | 'batasSakit' | 'batasGabung' | 'praMenit' | 'penutupMenit' | 'tpDiterimaPakaiJatah'>
 
 export const ATURAN_BAKU: AturanLengkap = {
   rasioHadir: [7, 12],
@@ -170,6 +170,7 @@ export function lengkapiAturan(a?: Partial<AturanPelantikan> | null): AturanLeng
     if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[k] = Math.round(v)
   }
   if (typeof x.batasGabung === 'string' && x.batasGabung) out.batasGabung = x.batasGabung
+  if (x.tpDiterimaPakaiJatah === true) out.tpDiterimaPakaiJatah = true
   return out
 }
 

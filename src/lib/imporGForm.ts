@@ -115,8 +115,18 @@ export function tebakKolomGForm(judul: string[]): PetaKolomGForm {
   return peta
 }
 
-/** Jawaban pengisi kolom yang sebenarnya kosong ("-", "Tdk ada", "Hadir"…). */
-const ISIAN_KOSONG = /^(|tdk ada|tidak ada|gak ada|ga ada|nihil|none|kosong|on time|hadir|tidak bisa hadir)$/
+/**
+ * Jawaban pengisi kolom yang sebenarnya kosong ("-", "Tdk ada", "Hadir"…).
+ * v2.15: juga "tepat waktu", "belum tau", "tidak", "sampai selesai" — Form
+ * P4 memuat isian seperti itu di kolom Pulang duluan dari anak yang hadir penuh.
+ */
+const ISIAN_KOSONG =
+  /^(|tdk ada|tidak ada|gak ada|ga ada|nggak ada|nihil|none|kosong|on time|ontime|tepat waktu|hadir|hadir tepat waktu|tidak bisa hadir|tidak|tdk|gak|nggak|no|belum tau|belum tahu|blm tau|tidak tau|tidak tahu|tidak pulang( duluan| awal| lebih awal)?|sampai selesai|ikut sampai selesai|full)$/
+
+/** v2.15 — sel berisi jawaban sungguhan (bukan isian pengisi seperti "-" atau "tidak ada"). */
+export function isianBermakna(teks: string | undefined): boolean {
+  return !ISIAN_KOSONG.test(norm(teks))
+}
 
 /**
  * v2.13 — alasan satu baris: kolom Alasan, kolom alasan tambahan, dan teks
@@ -202,17 +212,69 @@ export function bacaTanggalForm(teks: string, urutan: UrutanTanggal = 'dmy', tah
   return null
 }
 
-/** Jam → menit sejak tengah malam. "18.45", "18:45:10", "6:45 PM", "18". */
-export function bacaJamForm(teks: string): number | null {
-  const t = teks.trim().toLowerCase()
-  const m = t.match(/(\d{1,2})(?:[:.](\d{2}))?(?:[:.](\d{2}))?\s*(am|pm)?/)
-  if (!m) return null
-  let h = Number(m[1])
-  const mm = Number(m[2] ?? 0)
-  if (m[4] === 'pm' && h < 12) h += 12
-  if (m[4] === 'am' && h === 12) h = 0
-  if (h > 23 || mm > 59) return null
-  return h * 60 + mm
+/** Hasil baca jam: menit sejak 00.00, dan apakah AM/PM ditulis (jam 12-an jadi pasti). */
+export interface JamTerbaca {
+  menit: number
+  ampm: boolean
+}
+
+const KATA_JAM = 'jam|jm|pukul|pkl|pk|datang|tiba|sampai|menyusul|nyusul|pulang|balik'
+
+/**
+ * v2.15 — jam dari teks bebas. Urutan pencarian:
+ *  1. jam bermenit ("18.45", "18:45:10", "6:45 PM");
+ *  2. angka sesudah kata jam ("jm 6", "pukul 7 malam", "menyusul 18");
+ *  3. sel yang isinya hanya angka jam ("18", "6 pm").
+ * Angka lain diabaikan: "setelah sesi 4 menyusul jm 6" dulu terbaca 04.00.
+ * Bila ada beberapa jam, `pilih` menentukan yang dipakai — "kelas selesai
+ * 18:30, menyusul 18:40": jam datang = yang terakhir.
+ */
+export function bacaJamTeks(teks: string, pilih: 'awal' | 'akhir' = 'awal'): JamTerbaca | null {
+  const t = teks
+    .toLowerCase()
+    .replace(/\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}/g, ' ')
+    .replace(/\b(sesi|lantai|ruang|gedung|nomor|no|angkatan)\s*-?\s*\d+(?![\d:.])/g, ' ')
+  const jadi = (h: number, mm: number, ap: string | undefined, malam = false): JamTerbaca | null => {
+    if (ap === 'pm' && h < 12) h += 12
+    if (ap === 'am' && h === 12) h = 0
+    if (!ap && malam && h < 12) h += 12
+    if (h > 23 || mm > 59) return null
+    return { menit: h * 60 + mm, ampm: !!ap || malam }
+  }
+  const ambil = (daftar: JamTerbaca[]) => (daftar.length ? daftar[pilih === 'akhir' ? daftar.length - 1 : 0] : null)
+  const malam = (sisa: string) => /^\s*(malam|sore|petang)\b/.test(sisa)
+  const bermenit: JamTerbaca[] = []
+  for (const m of t.matchAll(/(?<!\d)(?<!\d[.:])(\d{1,2})[:.](\d{2})(?:[:.]\d{2}(?:\.\d+)?)?(?!\d|[.:]\d)\s*(am|pm)?/g)) {
+    const j = jadi(Number(m[1]), Number(m[2]), m[3], malam(t.slice(m.index! + m[0].length)))
+    if (j) bermenit.push(j)
+  }
+  if (bermenit.length) return ambil(bermenit)
+  const berkata: JamTerbaca[] = []
+  for (const m of t.matchAll(new RegExp(`\\b(?:${KATA_JAM})\\s*(?:jam|jm|pukul|pkl)?\\s*(\\d{1,2})(?!\\d|[.:]\\d)\\s*(am|pm)?`, 'g'))) {
+    const j = jadi(Number(m[1]), 0, m[2], malam(t.slice(m.index! + m[0].length)))
+    if (j) berkata.push(j)
+  }
+  if (berkata.length) return ambil(berkata)
+  const polos = t.match(/^\s*(\d{1,2})\s*(am|pm)?\s*(wib)?\s*$/)
+  return polos ? jadi(Number(polos[1]), 0, polos[2]) : null
+}
+
+/** Jam → menit sejak tengah malam. "18.45", "18:45:10", "6:45 PM", "18", "jm 6" (→ 06.00; lihat `jamUntukSesi`). */
+export function bacaJamForm(teks: string, pilih: 'awal' | 'akhir' = 'awal'): number | null {
+  return bacaJamTeks(teks, pilih)?.menit ?? null
+}
+
+/**
+ * v2.15 — jam dari isian untuk sesi tertentu. Jam 1–11 tanpa AM/PM pada sesi
+ * sore/malam (mulai ≥ 12.00) dibaca sebagai jam sore: "jm 6" → 18.00,
+ * "7.15" → 19.15. Jam 24-an ("18.05") dan sesi pagi tidak diubah.
+ */
+export function jamUntukSesi(teks: string, sesi: Pick<Session, 'startTime'> | null, pilih: 'awal' | 'akhir' = 'awal'): number | null {
+  const j = bacaJamTeks(teks, pilih)
+  if (!j) return null
+  const mulai = Number((sesi?.startTime ?? '').split(':')[0])
+  if (!j.ampm && sesi && Number.isFinite(mulai) && mulai >= 12 && j.menit >= 60 && j.menit < 12 * 60) return j.menit + 12 * 60
+  return j.menit
 }
 
 /** Cap waktu Google Form → epoch ms waktu setempat. */
@@ -306,12 +368,16 @@ export function bacaStatusIsian(teks: string): StatusIsianForm | null {
 export function keteranganIsian(
   teksStatus: string,
   capWaktu: number,
-  isi: { alasan?: string; bukti?: string; jamDatang?: number | null; jamPulang?: number | null },
+  isi: { alasan?: string; bukti?: string; jamDatang?: number | null; jamPulang?: number | null; pulangDiisi?: boolean },
 ): KeteranganForm | null {
-  const st = bacaStatusIsian(teksStatus)
+  let st = bacaStatusIsian(teksStatus)
+  // v2.15 — Form P4: anak yang pulang duluan memilih "Hadir Tepat Waktu" lalu
+  // mengisi kolom Pulang duluan. Kolom itu yang menentukan, bukan Status.
+  if (isi.pulangDiisi && (st === 'hadir' || st === null)) st = 'pulang'
   if (st !== 'telat' && st !== 'pulang') return null
   const t = norm(teksStatus)
-  const status: KeteranganForm['status'] = st === 'pulang' ? 'pulang' : /pulang/.test(t) ? 'telat-pulang' : 'telat'
+  const status: KeteranganForm['status'] =
+    st === 'pulang' ? 'pulang' : /pulang/.test(t) || isi.pulangDiisi ? 'telat-pulang' : 'telat'
   const k: KeteranganForm = { status, capWaktu }
   if (isi.alasan?.trim()) k.alasan = isi.alasan.trim()
   if (isi.bukti?.trim()) k.bukti = isi.bukti.trim()
@@ -447,16 +513,25 @@ export function rencanakanImporForm(o: OpsiRencanaForm): BarisRencanaForm[] {
     const tanggal = o.peta.tanggal >= 0 ? bacaTanggalForm(sel(b, o.peta.tanggal), o.urutan, tahun) : null
     const alasan = alasanIsian(b, o.peta)
     const bukti = sel(b, o.peta.bukti)
-    const jamDatang = o.peta.jam >= 0 ? bacaJamForm(sel(b, o.peta.jam)) : null
-    const jamPulang = o.peta.pulang >= 0 ? bacaJamForm(sel(b, o.peta.pulang)) : null
+    const sesi = o.sesiTetap ? (perSesi.get(o.sesiTetap) ?? null) : sesiUntukIsian(o.jenis, capWaktu, tanggal, o.sesi)
+    // v2.15 — jam dibaca menurut sesinya ("jm 6" pada latihan malam = 18.00).
+    const jamDatang = o.peta.jam >= 0 ? jamUntukSesi(sel(b, o.peta.jam), sesi, 'akhir') : null
+    const jamPulang = o.peta.pulang >= 0 ? jamUntukSesi(sel(b, o.peta.pulang), sesi) : null
+    const pulangDiisi = o.peta.pulang >= 0 && isianBermakna(sel(b, o.peta.pulang))
     const status = o.peta.status >= 0 ? bacaStatusIsian(sel(b, o.peta.status)) : null
     const teksKategori = sel(b, o.peta.kategori) || alasan
     const kategori = o.jenis === 'izin' ? (status === 'sakit' && !sel(b, o.peta.kategori) ? 'sakit' : tebakKategoriIzin(teksKategori, o.kategori)) : undefined
     const cocok = cocokkanNamaForm(nama, o.anggota)
     const memberId = o.pilihan && no in o.pilihan ? o.pilihan[no] : cocok.memberId
-    const sesi = o.sesiTetap ? (perSesi.get(o.sesiTetap) ?? null) : sesiUntukIsian(o.jenis, capWaktu, tanggal, o.sesi)
+    // v2.15 — Form tanpa kolom jam datang (Form P4): jam menyusul ditulis di kolom
+    // "Alasan Datang Terlambat (+ Jam Menyusul)". Hanya untuk keterangan telat;
+    // jam hadir tetap dari absen fisik.
+    const jamKet =
+      jamDatang ?? (o.jenis === 'presensi' && o.peta.jam < 0 && o.peta.alasan >= 0 && status === 'telat' ? jamUntukSesi(sel(b, o.peta.alasan), sesi, 'akhir') : null)
     const keterangan =
-      o.jenis === 'presensi' && capWaktu != null ? (keteranganIsian(sel(b, o.peta.status), capWaktu, { alasan, bukti, jamDatang, jamPulang }) ?? undefined) : undefined
+      o.jenis === 'presensi' && capWaktu != null
+        ? (keteranganIsian(sel(b, o.peta.status), capWaktu, { alasan, bukti, jamDatang: jamKet, jamPulang, pulangDiisi }) ?? undefined)
+        : undefined
     const dasar = { no, nama, cocok, memberId, sesiId: sesi?.id ?? null, capWaktu, jamDatang, jamPulang, status, kategori, alasan, bukti, ...(keterangan ? { keterangan } : {}) }
     const keluar = (aksi: AksiImpor, pesan: string) => hasil.push({ ...dasar, aksi, pesan })
     if (!nama) return keluar('lewati', 'Nama kosong')

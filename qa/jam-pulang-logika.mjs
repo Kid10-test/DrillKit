@@ -10,7 +10,7 @@
  * Jalankan: bash qa/bangun-logika.sh && node qa/jam-pulang-logika.mjs
  */
 import { ATURAN_BAKU, lengkapiAturan, statusDatang, kodeKehadiran, pulangAwal, menitIkut, labelDatang, jendelaDatang, intiSesi } from '/tmp/programLatsar.mjs'
-import { bacaCsvForm, tebakKolomGForm, rencanakanImporForm, terapkanImporForm, bacaStatusIsian, POLA_KOLOM, alasanIsian } from '/tmp/imporGForm.mjs'
+import { bacaCsvForm, tebakKolomGForm, rencanakanImporForm, terapkanImporForm, bacaStatusIsian, POLA_KOLOM, alasanIsian, bacaJamForm, jamUntukSesi, bacaCapWaktu, isianBermakna, keteranganIsian } from '/tmp/imporGForm.mjs'
 
 let lulus = 0
 const gagal = []
@@ -176,6 +176,55 @@ cek('Minggu: ikut 119′ → lewat batas, 120′ → jatah', statusDatang(H({ pu
 const pendek = { ...KAMIS, startTime: '18:00', endTime: '18:40' }
 cek('potongan menyisakan < 30′ → jam sesi utuh', intiSesi(pendek, AI).mulai === ms(18, 0) && intiSesi(pendek, AI).selesai === ms(18, 40))
 cek('kodeKehadiran ikut jam inti', kodeKehadiran({ id: 'x', sessionId: 'k19', memberId: 'm', status: 'hadir', datangAt: ms(17, 30), pulangAt: ms(18, 55), ...AL }, SESI_P, AI, '2026-12-01') === 'telat')
+
+console.log('== v2.15: jam dari teks bebas ==')
+const S1730 = { startTime: '17:30' }
+const PAGI = { startTime: '07:00' }
+cek('"jm 6" tanpa sesi → 06.00 (tidak menebak)', bacaJamForm('jm 6') === 360)
+cek('"setelah sesi 4 menyusul jm 6" → bukan 04.00; sesi malam → 18.00', bacaJamForm('setelah sesi 4 menyusul jm 6') === 360 && jamUntukSesi('setelah sesi 4 menyusul jm 6', S1730) === 1080)
+cek('sesi pagi: "jm 6" tetap 06.00', jamUntukSesi('jm 6', PAGI) === 360)
+cek('"7.15" pada sesi malam → 19.15, "18.05" tetap', jamUntukSesi('7.15', S1730) === 1155 && jamUntukSesi('18.05', S1730) === 1085)
+cek('AM/PM & "malam" dihormati', jamUntukSesi('6 am', S1730) === 360 && bacaJamForm('6:45 PM') === 1125 && bacaJamForm('pukul 7 malam') === 1140)
+cek('jam 12 tanpa AM/PM tidak digeser', jamUntukSesi('12.30', S1730) === 750)
+cek('jam datang: dua jam → yang terakhir', jamUntukSesi('kelas sesi 4 selesai jam 18:30, menyusul jam 18:40', S1730, 'akhir') === 1120)
+cek('jam pulang: alasan + jam', jamUntukSesi('ACC RESMI LAPORAN 19:00', S1730) === 1140 && jamUntukSesi('Latihan di gereja + 19:30', S1730) === 1170)
+cek('titik di akhir kalimat tidak menggagalkan', bacaJamForm('kelas selesai 18.30.') === 1110)
+cek('teks tanpa jam → null; angka lepas tidak dibaca jam', bacaJamForm('Mengikuti delegasi') === null && bacaJamForm('kerja kelompok 3 orang') === null && bacaJamForm('25:00') === null)
+cek('sel berisi angka saja tetap terbaca', bacaJamForm('18') === 1080 && bacaJamForm('6 pm') === 1080 && bacaJamForm('18 WIB') === 1080)
+cek('cap waktu Form tetap terbaca (tanpa sore-isasi)', bacaCapWaktu('19/11/2026 1:35:55') === new Date(2026, 10, 19, 1, 35).getTime() && bacaCapWaktu('19/11/2026 18:05:00') === new Date(2026, 10, 19, 18, 5).getTime())
+
+console.log('== v2.15: pulang awal dengan status "Hadir Tepat Waktu" ==')
+cek('isian pengisi bukan jawaban', ['', '-', '.', 'tidak ada', 'Tdk ada', 'belum tau', 'Hadir', 'tepat waktu', 'tidak pulang duluan', 'sampai selesai'].every((t) => !isianBermakna(t)))
+cek('alasan pulang = jawaban', ['Kerkom', 'ACC RESMI LAPORAN 19:00', '19.30', 'jm 7'].every((t) => isianBermakna(t)))
+const kp = keteranganIsian('Hadir Tepat Waktu', 1, { alasan: 'laporan praktikum', bukti: 'https://x', jamPulang: 1140, pulangDiisi: true })
+cek('Hadir Tepat Waktu + kolom Pulang diisi → keterangan pulang', kp?.status === 'pulang' && kp.jamPulang === 1140 && kp.alasan === 'laporan praktikum', JSON.stringify(kp))
+cek('Hadir Tepat Waktu tanpa isian Pulang → tanpa keterangan', keteranganIsian('Hadir Tepat Waktu', 1, { alasan: 'x', pulangDiisi: false }) === null)
+cek('Datang Terlambat + kolom Pulang diisi → telat-pulang', keteranganIsian('Datang Terlambat', 1, { alasan: 'x', jamDatang: 1120, jamPulang: 1170, pulangDiisi: true })?.status === 'telat-pulang')
+cek('Izin + kolom Pulang diisi → tetap tanpa keterangan presensi', keteranganIsian('Izin', 1, { alasan: 'x', pulangDiisi: true }) === null)
+// Bentuk Form P4 (nama rekaan): Status, tiga kolom alasan, tanpa kolom jam datang.
+const judulP4 = ['Timestamp', 'Nama Lengkap', 'Tanggal Latihan', 'Section', 'Status Kehadiran', 'Alasan Datang Terlambat (+ Jam Menyusul)', 'Alasan Tidak Hadir', 'Pulang Duluan (Alasan + Jam Pulang Duluan) ', 'Unggah Bukti Alasan Izin/Tidak Hadir/Pulang Duluan']
+const P4 = { ...KAMIS, id: 'p4', startTime: '17:30', endTime: '20:15' }
+const b4 = (nama, status, telat, absen, pulang, bukti = '') => ['19/11/2026 12:00:00', nama, '19/11/2026', 'Brass', status, telat, absen, pulang, bukti]
+const baris4 = [
+  b4('Budi Santoso', 'Hadir Tepat Waktu', '-', '-', 'ACC RESMI LAPORAN 19:00', 'https://drive.google.com/open?id=p1'),
+  b4('Rina Putri', 'Hadir Tepat Waktu', '-', '-', 'belum tau'),
+  b4('Yohanes Bayu', 'Datang Terlambat', 'setelah sesi 4 menyusul jm 6', '-', '-', 'https://drive.google.com/open?id=p2'),
+  b4('Dewi Lestari', 'Hadir Tepat Waktu', '-', '-', 'Kerkom'),
+]
+const p4 = tebakKolomGForm(judulP4)
+const r4 = rencanakanImporForm({ jenis: 'presensi', baris: baris4, peta: p4, urutan: 'dmy', anggota: ANG, sesi: [P4], catatan: [], kategori: KAT })
+cek('P4: Hadir Tepat Waktu + alasan & jam pulang → keterangan pulang 19.00', r4[0].keterangan?.status === 'pulang' && r4[0].keterangan.jamPulang === 1140 && r4[0].keterangan.bukti?.includes('id=p1'), JSON.stringify(r4[0].keterangan))
+cek('P4: "belum tau" di kolom Pulang → hadir biasa', r4[1].keterangan === undefined, JSON.stringify(r4[1].keterangan))
+cek('P4: telat "menyusul jm 6" → jam datang 18.00', r4[2].keterangan?.status === 'telat' && r4[2].keterangan.jamDatang === 1080, JSON.stringify(r4[2].keterangan))
+cek('P4: pulang tanpa jam → tetap keterangan pulang (alasan saja)', r4[3].keterangan?.status === 'pulang' && r4[3].keterangan.jamPulang === undefined && r4[3].keterangan.alasan === 'Kerkom', JSON.stringify(r4[3].keterangan))
+const h4 = terapkanImporForm('presensi', r4, [{ id: 'x1', sessionId: 'p4', memberId: 'm1', status: 'hadir' }], [P4], () => 'n')
+const rx = h4.catatan.find((r) => r.memberId === 'm1')
+cek('P4: catatan hadir yang ada dapat alasan & bukti dari kolom Pulang', rx?.alasanTelat === 'ACC RESMI LAPORAN 19:00' && rx.bukti?.includes('id=p1'), JSON.stringify(rx))
+cek('P4: keterangan pulang 19.00 disimpan di sesi (jam hadir tetap dari absen fisik)', h4.keterangan.p4?.m1?.status === 'pulang' && h4.keterangan.p4.m1.jamPulang === 1140 && rx.pulangAt === undefined)
+cek('P4: Rina ("belum tau") & Dewi — hanya Dewi yang punya keterangan', !h4.keterangan.p4?.m2 && h4.keterangan.p4?.m4?.status === 'pulang')
+const rxf = { ...rx, formPresensi: true, pulangAt: new Date(2026, 10, 19, 19, 0).getTime() }
+cek('P4: sesudah absen fisik pulang 19.00 → pulang awal berjatah (alasan + bukti dari Form)', statusDatang(rxf, P4, AI) === 'jatah', statusDatang(rxf, P4, AI))
+cek('P4: tanpa jam di Form izin/presensi berkolom jam, perilaku lama', rencanakanImporForm({ ...opsi('presensi') })[3].keterangan?.jamPulang === 1150)
 
 console.log(`\n${lulus} lulus, ${gagal.length} gagal`)
 if (gagal.length) process.exit(1)

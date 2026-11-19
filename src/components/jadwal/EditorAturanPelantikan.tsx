@@ -176,6 +176,15 @@ export function EditorAturanPelantikan({
           <input type="checkbox" data-testid="aturan-wajib-form" checked={a.wajibForm} onChange={(e) => ubah({ wajibForm: e.target.checked })} />
           Hadir wajib mengisi Google Form presensi
         </label>
+        <label className="flex items-center gap-1.5" title="Kosong = Aturan Kehadiran v1 §5: diterima danlat dihitung hadir penuh. Hanya berlaku untuk putusan berikutnya.">
+          <input
+            type="checkbox"
+            data-testid="aturan-tp-jatah"
+            checked={!!a.tpDiterimaPakaiJatah}
+            onChange={(e) => ubah({ tpDiterimaPakaiJatah: e.target.checked || undefined })}
+          />
+          Telat/pulang awal yang diterima danlat tetap memakai jatah telat
+        </label>
       </div>
 
       <details className="rounded-lg border border-slate-800 px-2 py-1.5" data-testid="aturan-kategori">
@@ -221,7 +230,8 @@ export function EditorAturanPelantikan({
           </span>
         ) : null}
         Datang ≤ {a.toleransiMenit} menit sesudah mulai inti = hadir; sampai {a.batasJatahMenit != null ? `${a.batasJatahMenit} menit` : 'separuh durasi sesi'}{' '}
-        dengan alasan{a.wajibBukti ? ' + bukti' : ''} = hadir memakai jatah telat; selebihnya alpa. Izin/sakit sah tidak memakai jatah alpa. Bergabung
+        dengan alasan{a.wajibBukti ? ' + bukti' : ''} = hadir memakai jatah telat; selebihnya alpa.{' '}
+        {a.tpDiterimaPakaiJatah ? 'Diterima danlat tetap memakai jatah telat.' : 'Diterima danlat = hadir penuh tanpa jatah.'} Izin/sakit sah tidak memakai jatah alpa. Bergabung
         sesudah batas → pelantikan susulan.
       </p>
     </section>
