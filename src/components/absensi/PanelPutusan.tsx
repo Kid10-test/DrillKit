@@ -16,6 +16,7 @@ import {
   labelPutusan,
   labelTerima,
   nilaiVonis,
+  teksTpDiterima,
   teksWaPutusan,
   ubahanPutusan,
   type ButirPutusan,
@@ -109,7 +110,7 @@ export default function PanelPutusan({
     const now = Date.now()
     await db.transaction('rw', db.attendance, async () => {
       for (const { b, v, catatan: c } of daftar) {
-        await db.attendance.update(b.r.id, ubahanPutusan(v ? nilaiVonis(b.jenis, v) : null, namaPemutus, now, c))
+        await db.attendance.update(b.r.id, ubahanPutusan(v ? nilaiVonis(b.jenis, v, aturan) : null, namaPemutus, now, c))
       }
     })
   }
@@ -166,7 +167,7 @@ export default function PanelPutusan({
         </label>
       </div>
       <p className="mt-1 text-[11px] text-slate-500">
-        Selama belum diputus, hitungannya sementara mengikuti aturan. Telat/pulang awal yang disahkan tetap memakai jatah telat.
+        Selama belum diputus, hitungannya sementara mengikuti aturan. <span data-testid="putusan-aturan-tp">{teksTpDiterima(aturan)}</span>
       </p>
 
       {menunggu.length > 0 && (
@@ -313,7 +314,7 @@ export default function PanelPutusan({
                 <p key={b.r.id} className={v ? '' : 'text-slate-500'}>
                   {i + 1}. {nama(b.r.memberId)} ({LABEL_JENIS[b.jenis]}) →{' '}
                   {v ? (
-                    <b className={v === 'terima' ? 'text-emerald-300' : 'text-rose-300'}>{labelPutusan(b.jenis, nilaiVonis(b.jenis, v))}</b>
+                    <b className={v === 'terima' ? 'text-emerald-300' : 'text-rose-300'}>{labelPutusan(b.jenis, nilaiVonis(b.jenis, v, aturan))}</b>
                   ) : (
                     'tidak disebut'
                   )}

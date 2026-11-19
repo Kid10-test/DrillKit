@@ -17,6 +17,8 @@ import {
   teksWaPutusan,
   bacaBalasanDanlat,
   nilaiVonis,
+  nilaiTerima,
+  teksTpDiterima,
   labelPutusan,
   ubahanPutusan,
   ringkasAturan,
@@ -87,7 +89,18 @@ cek('hadir tanpa Form → jenis tanpa-form, usul tolak', bForm?.jenis === 'tanpa
 cek('tautan bukti dikenali', butirPutusan(I({ dilaporAt: ms(13, 0), bukti: 'https://drive.google.com/open?id=abc' }), P3, A)?.tautanBukti === 'https://drive.google.com/open?id=abc')
 
 console.log('== nilai & label putusan ==')
-cek('terima izin → sah, terima telat → jatah, tolak → tidak-sah', nilaiVonis('izin', 'terima') === 'sah' && nilaiVonis('telat', 'terima') === 'jatah' && nilaiVonis('pulang', 'tolak') === 'tidak-sah')
+cek('terima izin → sah, terima telat (bawaan, Aturan v1 §5) → sah, tolak → tidak-sah', nilaiVonis('izin', 'terima') === 'sah' && nilaiVonis('telat', 'terima') === 'sah' && nilaiVonis('pulang', 'tolak') === 'tidak-sah')
+console.log('== v2.15: telat/pulang awal diterima — jatah atau tidak ==')
+const AJ = lengkapiAturan({ ...A, tpDiterimaPakaiJatah: true })
+cek('lengkapiAturan menyimpan tpDiterimaPakaiJatah', AJ.tpDiterimaPakaiJatah === true && !('tpDiterimaPakaiJatah' in lengkapiAturan({ ...A, tpDiterimaPakaiJatah: false })) && !('tpDiterimaPakaiJatah' in lengkapiAturan({ tpDiterimaPakaiJatah: 'ya' })))
+cek('bawaan: telat / pulang / telat-pulang diterima → sah', ['telat', 'pulang', 'telat-pulang'].every((j) => nilaiVonis(j, 'terima', A) === 'sah' && nilaiTerima(j) === 'sah'))
+cek('tpDiterimaPakaiJatah: telat / pulang / telat-pulang diterima → jatah', ['telat', 'pulang', 'telat-pulang'].every((j) => nilaiVonis(j, 'terima', AJ) === 'jatah'))
+cek('tpDiterimaPakaiJatah tidak mengubah izin, sakit, tanpa-form, tolak', nilaiVonis('izin', 'terima', AJ) === 'sah' && nilaiVonis('sakit', 'terima', AJ) === 'sah' && nilaiVonis('tanpa-form', 'terima', AJ) === 'sah' && nilaiVonis('telat', 'tolak', AJ) === 'tidak-sah')
+cek('label: telat sah → "Disahkan · tanpa jatah", tanpa-form sah tetap "Dihitung hadir penuh"', labelPutusan('telat', 'sah') === 'Disahkan · tanpa jatah' && labelPutusan('pulang', 'sah') === 'Disahkan · tanpa jatah' && labelPutusan('tanpa-form', 'sah') === 'Dihitung hadir penuh')
+cek('teks aturan TP mengikuti setelan', teksTpDiterima(A).includes('tanpa memakai jatah') && teksTpDiterima(AJ).includes('tetap memakai jatah'))
+const telatR = { id: 't1', sessionId: 'p3', memberId: 'm', status: 'hadir', datangAt: ms(18, 45), alasanTelat: 'asistensi', bukti: 'ada', formPresensi: true }
+cek('bawaan: telat diterima (sah) → hadir penuh, bukan jatah', statusDatang({ ...telatR, putusanIzin: nilaiVonis('telat', 'terima', A) }, P3, A) === 'putusan-sah')
+cek('tpDiterimaPakaiJatah: telat diterima → jatah', statusDatang({ ...telatR, putusanIzin: nilaiVonis('telat', 'terima', AJ) }, P3, AJ) === 'jatah')
 cek('terima hadir tanpa Form → sah', nilaiVonis('tanpa-form', 'terima') === 'sah')
 cek('label', labelPutusan('izin', 'sah') === 'Diizinkan' && labelPutusan('sakit', 'sah') === 'Disahkan' && labelPutusan('telat', 'jatah').startsWith('Disahkan') && labelPutusan('izin', 'tidak-sah') === 'Ditolak')
 const u = ubahanPutusan('sah', '  ', 123, ' bukti menyusul ')
