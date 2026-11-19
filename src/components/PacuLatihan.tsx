@@ -263,7 +263,7 @@ export function PacuLatihan({ sesi, onClose, semuaSesi }: { sesi: Session; onClo
               <p className="mt-1 text-sm text-slate-400">
                 {LABEL_BLOK[pos.blok.jenis]} · {pos.blok.menit} mnt
                 {berjalan?.nyataMulai != null
-                  ? ` · mulai ${jamDariMenit(berjalan.nyataMulai)}`
+                  ? ` · mulai ${jamDariMenit(berjalan.nyataMulai)} · sampai ${jamDariMenit(berjalan.nyataMulai + berjalan.menit)}`
                   : pos.blok.mulai != null && pos.blok.selesai != null
                     ? ` · ${jamDariMenit(pos.blok.mulai)}–${jamDariMenit(pos.blok.selesai)}`
                     : ''}
@@ -539,13 +539,25 @@ export function PacuLatihan({ sesi, onClose, semuaSesi }: { sesi: Session; onClo
                           {awal && awal.menit !== b.menit ? ` (awal ${awal.menit})` : ''}
                           {b.status === 'selesai' && b.nyataMulai != null && b.nyataSelesai != null
                             ? ` · nyata ${jamDariMenit(b.nyataMulai)}–${jamDariMenit(b.nyataSelesai)} (${Math.round(b.nyataMenit ?? 0)} mnt, ${tandaSelisih((b.nyataMenit ?? 0) - (awal?.menit ?? b.menit))})`
-                            : b.status === 'berjalan' && b.nyataMulai != null
-                              ? ` · mulai ${jamDariMenit(b.nyataMulai)}`
-                              : b.kiraMulai != null
-                                ? ` · ±${jamDariMenit(b.kiraMulai)}`
-                                : b.mulai != null && b.status === 'belum'
-                                  ? ` · ${jamDariMenit(b.mulai)}`
-                                  : ''}
+                            : ''}
+                          {/* Jam mulai–sampai dibuat lebih terang supaya pencatat waktu cukup melirik jam HP. */}
+                          {b.status === 'berjalan' && b.nyataMulai != null ? (
+                            <>
+                              {' · '}
+                              <span className="tabular-nums text-slate-200" data-testid={`jam-blok-${b.id}`}>
+                                mulai {jamDariMenit(b.nyataMulai)} · sampai {jamDariMenit(b.nyataMulai + b.menit)}
+                              </span>
+                            </>
+                          ) : b.status === 'belum' && (b.kiraMulai != null || b.mulai != null) ? (
+                            <>
+                              {' · '}
+                              <span className="tabular-nums text-slate-300" data-testid={`jam-blok-${b.id}`}>
+                                {b.kiraMulai != null
+                                  ? `±${jamDariMenit(b.kiraMulai)}–${jamDariMenit(b.kiraSelesai ?? b.kiraMulai + b.menit)}`
+                                  : `${jamDariMenit(b.mulai!)}–${jamDariMenit(b.selesai ?? b.mulai! + b.menit)}`}
+                              </span>
+                            </>
+                          ) : null}
                           {LABEL_STATUS[b.status] && b.status !== 'selesai' && b.status !== 'berjalan'
                             ? ` · ${LABEL_STATUS[b.status]}`
                             : ''}

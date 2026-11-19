@@ -177,6 +177,12 @@ let s = await sesiDb('s_v2')
 cek('rencana awal dibekukan saat Mulai pertama', s.rencanaAwal?.blok?.length === 6)
 cek('selisih tetap terlambat sesudah apel mulai', (await geser()) >= 15)
 cek('rincian: mulai terlambat', (await teks('[data-testid="rincian-geser"]')).includes('mulai terlambat'))
+// Masukan pencatat waktu P4: setiap blok menampilkan jam mulai DAN sampai.
+const jamApel = await teks('[data-testid="jam-blok-apel"]')
+const mApel = jamApel.match(/mulai (\d{2})[.:](\d{2}) · sampai (\d{2})[.:](\d{2})/)
+cek('jam blok: berjalan menampilkan mulai & sampai (jatah 10 mnt)', !!mApel && (+mApel[3] * 60 + +mApel[4]) - (+mApel[1] * 60 + +mApel[2]) === 10, jamApel)
+cek('jam blok: blok belum menampilkan rentang ±mulai–sampai', /±\d{2}[.:]\d{2}–\d{2}[.:]\d{2}/.test(await teks('[data-testid="jam-blok-klinik"]')))
+cek('kartu: blok berjalan menyebut jam sampai', (await teks('[data-testid="kartu-berjalan"]')).includes('sampai'))
 
 // ======================================================= Lanjut menutup yang berjalan
 await klik('[data-testid="tombol-lanjut"]')
