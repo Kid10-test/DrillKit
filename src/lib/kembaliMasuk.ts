@@ -21,6 +21,10 @@ export interface StatusServer {
   galat?: string
   dikirim?: number
   diterima?: number
+  /** v2.15.1 — kiriman program kosong ditahan; isinya jumlah program di server. */
+  programDitahan?: number
+  /** v2.15.1 — izin sekali pakai dari pemilik untuk mengosongkan program di server. */
+  izinkanProgramKosong?: boolean
 }
 
 export const KUNCI_STATUS = 'drillkit.server'

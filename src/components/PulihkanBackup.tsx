@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { db } from '../db/db'
 import type { Member } from '../db/types'
 import { ringkasBackup } from '../lib/bukaBerkas'
+import { LABEL_FIELD_PENGATURAN, gabungPengaturan, kalimatProgramPulih, type HasilGabungPengaturan } from '../lib/gabungPengaturan'
 import { bukaZip } from '../lib/zip'
 import type { PartiturPulih } from '../lib/partiturZip'
 export { ekstrakPartiturZip } from '../lib/partiturZip'
@@ -182,7 +183,13 @@ export async function tulisMuatanBackup(
       if (diubah.anotasiPartitur?.length) await db.anotasiPartitur.bulkPut(diubah.anotasiPartitur)
     },
   )
-  if (diubah.settings) await db.settings.put({ ...diubah.settings, key: 'team' })
+  // v2.15.1 — pengaturan DIGABUNG, bukan diganti utuh. Dulu baris ini
+  // `put({ ...berkas.settings })`, sehingga backup tanpa `programLatihan`
+  // menghapus program latihan, sambungan server, Drive, dan Sheet Form.
+  if (diubah.settings && typeof diubah.settings === 'object') {
+    const g = gabungPengaturan(await db.settings.get('team'), diubah.settings)
+    await db.settings.put(g.hasil)
+  }
 
   // #6 — pulihkan rekaman audio biner dari ZIP bila ada.
   let jmlAudio = 0
@@ -267,6 +274,17 @@ export function AlurPulihkanBackup({
   const [keputusan, setKeputusan] = useState<Record<string, KeputusanCocok>>({})
   const [lokal, setLokal] = useState<Member[]>([])
   const [sedang, setSedang] = useState(false)
+  /** v2.15.1 — perkiraan gabung pengaturan (program latihan & sambungan yang dipertahankan). */
+  const [gabung, setGabung] = useState<HasilGabungPengaturan | null>(null)
+
+  useEffect(() => {
+    let hidup = true
+    if (data.settings && typeof data.settings === 'object')
+      void db.settings.get('team').then((s) => hidup && setGabung(gabungPengaturan(s, data.settings)))
+    return () => {
+      hidup = false
+    }
+  }, [data])
 
   useEffect(() => {
     let hidup = true
@@ -466,7 +484,28 @@ export function AlurPulihkanBackup({
       )}
       {ringkas.adaPengaturan && (
         <p className="mt-2 text-[11px] text-slate-500">
-          Pengaturan tim (nama, lapangan bawaan, section) ikut dipulihkan.
+          Pengaturan tim (nama, lapangan bawaan, section) ikut digabung. Isian yang kosong di berkas tidak mengosongkan
+          isian di perangkat ini.
+        </p>
+      )}
+      {gabung && kalimatProgramPulih(gabung.program) && (
+        <p
+          data-testid={`${testId}-program`}
+          className={
+            kalimatProgramPulih(gabung.program)!.peringatan
+              ? 'mt-2 rounded-lg border border-amber-800/60 bg-amber-950/30 px-3 py-2 text-[11px] leading-relaxed text-amber-200'
+              : 'mt-2 text-[11px] leading-relaxed text-slate-400'
+          }
+        >
+          {kalimatProgramPulih(gabung.program)!.teks}
+          {kalimatProgramPulih(gabung.program)!.peringatan &&
+            ' Program yang ditimpa memakai isi berkas (tanggal, aturan hadir, daftar sesi). Bila program di perangkat ini lebih baru, batalkan dan backup dulu.'}
+        </p>
+      )}
+      {gabung && gabung.dipertahankan.length > 0 && (
+        <p data-testid={`${testId}-dipertahankan`} className="mt-1 text-[11px] leading-relaxed text-slate-500">
+          Tetap memakai isian perangkat ini:{' '}
+          {gabung.dipertahankan.map((k) => LABEL_FIELD_PENGATURAN[k] ?? k).join(', ')}.
         </p>
       )}
       {langkah === 'cocok' && (

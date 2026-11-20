@@ -280,6 +280,12 @@ bash bangun-logika.sh || exit 1
 # Google lewat ?code=, halaman Tentang/Privasi/Ketentuan) sehingga total
 # regresi penuh menjadi 184 rangkaian.
 
+# v2.15.1 — menambahkan `gabung-pengaturan-logika` (pulihkan backup
+# menggabungkan pengaturan tim per field; program latihan, pola sesi, & musim
+# TC digabung per id; sambungan perangkat tidak diganti berkas; penjaga
+# program kosong pada sinkron pemilik) sehingga total regresi penuh menjadi
+# 185 rangkaian.
+
 bash regresi.sh "$BASE" \
   mode-logika bagikan-logika perubahan-tempo-logika tempo-map-logika segmen-drill-logika grid-patok-logika uji-situs uji-rilis uji-lapangan \
   buka-berkas-logika evaluasi-logika jarak-logika kemajuan-logika kunci-layar-logika latihan-logika lomba-logika pindah-logika repertoar-logika runsheet-logika sesi-logika uji-ambang-gerak uji-csvkoordinat uji-putar-jalan \
@@ -294,7 +300,7 @@ bash regresi.sh "$BASE" \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota j1-polesan \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika mscz-logika peta-partitur-logika mscz-e2e partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika kanvas-parametrik-logika midsets-tags-pointer-palet-logika tabrakan-spasi-silang-logika perspektif-tribun-video-logika buku-saku-generasi-baru-logika perkusi-logika studio-intonasi-logika estafet-qr-logika podium-logika ranah-sesi-logika program-latsar-logika manajemen-musim-logika roster-anggota-logika kehadiran-rasio-logika pindah-musim-logika rundown-logika jam-pulang-logika sesi-ganda-logika google-drive-logika pacu-logika tempatkan-massal-logika penyusun-display-logika putusan-danlat-logika server-kehadiran-logika server-sql-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika kalender-jadwal kalender-anggota tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika mscz-logika peta-partitur-logika mscz-e2e partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika kanvas-parametrik-logika midsets-tags-pointer-palet-logika tabrakan-spasi-silang-logika perspektif-tribun-video-logika buku-saku-generasi-baru-logika perkusi-logika studio-intonasi-logika estafet-qr-logika podium-logika ranah-sesi-logika program-latsar-logika manajemen-musim-logika roster-anggota-logika kehadiran-rasio-logika pindah-musim-logika rundown-logika jam-pulang-logika sesi-ganda-logika google-drive-logika pacu-logika tempatkan-massal-logika penyusun-display-logika putusan-danlat-logika server-kehadiran-logika server-sql-logika gabung-pengaturan-logika \
   m1-birama m1-sukat-segmen m1-mode-lagu m1-tempo-lagu-drill m1-penggaris-drill \
   m2-ulang-bagian m3-setlist m5-panjang-lagu m5-panjang-lagu-ui tempo-latihan m6-klik-rekaman m6-drill-rekaman \
   ambang-gerak asisten-seksi asisten-urutan putar-jalan backup-setlist lapangan-ui \

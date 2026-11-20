@@ -19,6 +19,7 @@ import {
   kapanSinkron,
   konfigServer,
   periksaKonfigServer,
+  pesanProgramDitahan,
   refProyek,
   type PeranStaf,
   type StatusServer,
@@ -245,6 +246,38 @@ export default function KartuKehadiranBersama() {
         <p data-testid="server-galat" className="rounded-lg border border-amber-800/60 bg-amber-950/30 px-3 py-2 text-[11px] leading-relaxed text-amber-200">
           {st.galat}
         </p>
+      )}
+
+      {pemilik && !!st.programDitahan && (
+        <div data-testid="server-program-ditahan" className="rounded-lg border border-amber-800/60 bg-amber-950/30 px-3 py-2 text-[11px] leading-relaxed text-amber-200">
+          <p>{pesanProgramDitahan(st.programDitahan)}</p>
+          <div className="mt-2 flex flex-wrap justify-end gap-2">
+            <ConfirmButton
+              label="Kosongkan di server"
+              size="md"
+              testId="server-program-kosongkan"
+              disabled={!mod || !!sedang || !online}
+              message={`Hapus ${st.programDitahan} program di server? Semua perangkat staf ikut kehilangan program & aturan pelantikannya.`}
+              onConfirm={() => {
+                if (mod) void jalankan('Mengosongkan program di server…', () => mod.kosongkanProgramDiServer(), 'Program latihan di server dikosongkan')
+              }}
+            />
+            <Button
+              variant="primary"
+              data-testid="server-program-ambil"
+              disabled={!mod || !!sedang || !online}
+              onClick={() => {
+                if (!mod) return
+                void jalankan('Mengambil program dari server…', async () => {
+                  const n = await mod.ambilProgramDariServer()
+                  toast.push(`${n} program latihan dipulihkan dari server`)
+                })
+              }}
+            >
+              Ambil dari server
+            </Button>
+          </div>
+        </div>
       )}
 
       {masukAkun && (
