@@ -333,6 +333,43 @@ export function rencanakanKirim<T>(lokal: Map<string, T>, tersinkron: Record<str
   return { kirim, hapus }
 }
 
+/* ---------------------- Penjaga program kosong (v2.15.1) ------------------- */
+
+export const KUNCI_PROGRAM = kunciKerangka('konfig', 'program')
+
+/**
+ * Rencana kirim pemilik memuat program latihan **kosong** yang belum pernah
+ * disepakati kosong dengan server. Bila ya, putaran wajib memeriksa server
+ * dulu: program kosong di perangkat hampir selalu akibat pengaturan yang
+ * hilang (pulihkan backup lama, data situs terhapus, perangkat baru), bukan
+ * keputusan menghapus semua program. Tanpa penjaga ini kiriman itu menimpa
+ * program di server, lalu semua perangkat staf ikut kehilangan programnya.
+ */
+export function programKosongPerluDicek(rencana: RencanaKirim<unknown>, tersinkron: Record<string, string>): boolean {
+  const item = rencana.kirim.find((k) => k.kunci === KUNCI_PROGRAM)
+  if (!item) return false
+  const d = item.data as Partial<DataKonfig> | undefined
+  if (Array.isArray(d?.programLatihan) && d.programLatihan.length > 0) return false
+  return tersinkron[KUNCI_PROGRAM] !== sidik(dataKonfig([]))
+}
+
+/** Rencana yang sama tanpa satu kunci (kiriman ditahan). */
+export function tahanKunci<T>(rencana: RencanaKirim<T>, kunci: string): RencanaKirim<T> {
+  return { kirim: rencana.kirim.filter((k) => k.kunci !== kunci), hapus: rencana.hapus.filter((k) => k !== kunci) }
+}
+
+/** Jumlah program di baris konfig server (0 bila tidak ada, dihapus, atau rusak). */
+export function jumlahProgramServer(baris: { data?: unknown; dihapus?: boolean } | null | undefined): number {
+  if (!baris || baris.dihapus) return 0
+  const p = (baris.data as Partial<DataKonfig> | undefined)?.programLatihan
+  return Array.isArray(p) ? p.length : 0
+}
+
+/** Kalimat peringatan saat kiriman program kosong ditahan. */
+export function pesanProgramDitahan(n: number): string {
+  return `Program latihan di perangkat ini kosong, sedangkan server masih menyimpan ${n} program. Kiriman program ditahan supaya program di server tidak terhapus. Pilih “Ambil dari server” untuk memulihkannya, atau “Kosongkan di server” bila memang semua program sengaja dihapus.`
+}
+
 /** Kunci yang berubah di perangkat tetapi tidak boleh dikirim peran ini (akan dikembalikan). */
 export function kunciMenyimpang<T>(lokal: Map<string, T>, tersinkron: Record<string, string>): string[] {
   const r: string[] = []

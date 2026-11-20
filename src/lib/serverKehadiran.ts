@@ -20,6 +20,7 @@ import { uid } from './utils'
 import {
   KUNCI_KODE,
   KUNCI_MASUK,
+  KUNCI_PROGRAM,
   KUNCI_SIDIK,
   KUNCI_STATUS,
   alamatKembali,
@@ -30,6 +31,7 @@ import {
   dataKonfig,
   dataSesi,
   emailSah,
+  jumlahProgramServer,
   kenalDari,
   konfigServer,
   kunciKehadiran,
@@ -42,9 +44,11 @@ import {
   pesanGalatMasuk,
   petaKehadiran,
   petaKerangka,
+  programKosongPerluDicek,
   rencanakanKirim,
   sidik,
   sidikKosong,
+  tahanKunci,
   terapkanAnggota,
   terapkanKehadiran,
   terapkanSesi,
@@ -316,6 +320,8 @@ interface BarisKehadiran {
 export interface HasilSinkron {
   dikirim: number
   diterima: number
+  /** v2.15.1 — kiriman program kosong ditahan; jumlah program yang masih ada di server. */
+  programDitahan?: number
 }
 
 const POTONG = 300
@@ -362,7 +368,7 @@ export function sinkronkan(): Promise<HasilSinkron> {
   if (!sedangSinkron) {
     sedangSinkron = putaran()
       .then((h) => {
-        tulisStatus({ terakhir: Date.now(), galat: undefined, dikirim: h.dikirim, diterima: h.diterima })
+        tulisStatus({ terakhir: Date.now(), galat: undefined, dikirim: h.dikirim, diterima: h.diterima, programDitahan: h.programDitahan })
         return h
       })
       .catch((e) => {
@@ -389,6 +395,7 @@ async function putaran(): Promise<HasilSinkron> {
   const sd = bacaSidik(timId)
   let dikirim = 0
   let diterima = 0
+  let programDitahan: number | undefined
 
   // Potret awal perangkat — dasar untuk menolak menimpa yang diubah di tengah putaran.
   const [members, sessions, attendance, settings] = await Promise.all([
@@ -408,7 +415,18 @@ async function putaran(): Promise<HasilSinkron> {
   // 1. Pemilik mengirim kerangka (anggota, sesi, aturan).
   if (bolehKerangka(peran)) {
     const lokal = petaKerangka(members, sessions, attendance, settings?.programLatihan)
-    const r = rencanakanKirim(lokal, sd.kerangka)
+    let r = rencanakanKirim(lokal, sd.kerangka)
+    // v2.15.1 — program kosong tidak boleh menimpa program yang masih ada di
+    // server tanpa persetujuan pemilik (lihat `programKosongPerluDicek`).
+    if (programKosongPerluDicek(r, sd.kerangka)) {
+      const izin = !!bacaStatus().izinkanProgramKosong
+      const diServer = izin ? 0 : await jumlahProgramDiServer(c, timId)
+      if (diServer > 0) {
+        r = tahanKunci(r, KUNCI_PROGRAM)
+        programDitahan = diServer
+      }
+    }
+    if (bacaStatus().izinkanProgramKosong) tulisStatus({ izinkanProgramKosong: undefined })
     const baris = [
       ...r.kirim.map(({ kunci, data }) => {
         const [jenis, id] = pecahKunci(kunci)
@@ -434,6 +452,9 @@ async function putaran(): Promise<HasilSinkron> {
   diterima += await terapkanKerangka(barisKerangka, sd, sidikKerangkaAwal, false)
   sd.kursorKerangka = kursorBaru(sd.kursorKerangka, barisKerangka)
   tulisSidik(sd)
+  // Perangkat pemilik yang baru pertama sinkron langsung menerima program
+  // server di tarikan ini; peringatan "ditahan" tidak perlu muncul lagi.
+  if (programDitahan && (await db.settings.get('team'))?.programLatihan?.length) programDitahan = undefined
 
   // Kerangka yang diubah di perangkat staf (bukan pemilik) dikembalikan ke versi server.
   if (!bolehKerangka(peran)) {
@@ -482,7 +503,37 @@ async function putaran(): Promise<HasilSinkron> {
     if (menyimpang.size) diterima += await pulihkanKehadiran(c, timId, [...menyimpang], sd, sidikKehadiranAwal)
   }
 
-  return { dikirim, diterima }
+  return { dikirim, diterima, programDitahan }
+}
+
+async function jumlahProgramDiServer(c: SupabaseClient, timId: string): Promise<number> {
+  const { data, error } = await c.from('kerangka').select('data,dihapus').eq('tim_id', timId).eq('jenis', 'konfig').eq('id', 'program').limit(1)
+  if (error) throw terjemahkan(error)
+  return jumlahProgramServer(((data ?? []) as { data?: unknown; dihapus?: boolean }[])[0])
+}
+
+/**
+ * v2.15.1 — pemilik memulihkan program latihan dari server ke perangkat ini
+ * (dipakai saat kiriman program kosong ditahan). Mengembalikan jumlah program.
+ */
+export async function ambilProgramDariServer(): Promise<number> {
+  const c = await dapatKlien()
+  if (!c) throw new GalatServer('belum-diatur', 'Server kehadiran belum diatur.')
+  const st = await muatTim()
+  if (!st.timId) throw new GalatServer('belum-diundang', `Akun ${st.email ?? ''} belum diundang ke tim mana pun.`)
+  const sd = bacaSidik(st.timId)
+  const s = await db.settings.get('team')
+  const awal = new Map([[KUNCI_PROGRAM, sidik(dataKonfig(s?.programLatihan))]])
+  await pulihkanKerangka(c, st.timId, [KUNCI_PROGRAM], sd, awal)
+  tulisSidik(sd)
+  tulisStatus({ programDitahan: undefined })
+  return (await db.settings.get('team'))?.programLatihan?.length ?? 0
+}
+
+/** v2.15.1 — pemilik menyetujui program kosong menimpa server; berlaku untuk satu putaran. */
+export async function kosongkanProgramDiServer(): Promise<HasilSinkron> {
+  tulisStatus({ izinkanProgramKosong: true })
+  return sinkronkan()
 }
 
 /** Terapkan baris kerangka. `paksa` dipakai saat memulihkan isian yang menyimpang. */

@@ -191,6 +191,8 @@ rakit src/lib/imporGForm.ts             imporGForm
 rakit src/lib/putusanDanlat.ts          putusanDanlat
 # v2.14 — kehadiran bersama: peran, daftar putih field, sidik, rencana kirim, alamat kembali Google.
 rakit src/lib/kehadiranBersama.ts       kehadiranBersama
+# v2.15.1 — pulihkan backup menggabungkan pengaturan (program latihan tidak lagi terhapus).
+rakit src/lib/gabungPengaturan.ts       gabungPengaturan
 # #34a — musim TC: H-Minus, gerbang kesiapan mundur, & titik hitung mundur terpadu.
 rakit src/lib/manajemenMusim.ts          manajemenMusim
 # v2.7.1 — roster pergantian musim: impor CSV cocok-nama, aksi massal, rekap roster.
