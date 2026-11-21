@@ -30,3 +30,11 @@ qa/dl*/
 # Data pribadi milik unit (daftar nama anggota, dsb.) — JANGAN pernah terkomit:
 # repo ini publik. Simpan berkasnya di sini hanya untuk diimpor di aplikasi.
 pribadi/
+
+# Berkas yang tidak boleh ikut repo (persiapan versi berbayar, 22 Nov 2026):
+# dokumen organisasi, patch sementara, dan cache tsc. Bundel *.zip sudah
+# diabaikan di atas; bundel rilis hanya dibagikan lewat jalur pembeli.
+*.tsbuildinfo
+*.patch
+AD ART*.pdf
+out/
