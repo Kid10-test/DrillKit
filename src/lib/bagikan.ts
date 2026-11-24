@@ -49,6 +49,7 @@ export type KolomRahasia =
  * Anggota tanpa kolom rahasianya.
  *
  * Yang **tetap** dipertahankan: `id`, `code`, `name`, `panggilan`, `alias`,
+ * `aliasDilepas` (v2.15.2, supaya tautan yang dilepas tidak dipasang lagi),
  * `section`, `instrument`, `role`, `joinYear`, `active`. Semua itu diperlukan
  * supaya anggota bisa memilih namanya — lengkap maupun panggilan — dan melihat
  * formasinya di antara rekan-rekannya.

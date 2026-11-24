@@ -164,7 +164,7 @@ export type JenisKerangka = 'anggota' | 'sesi' | 'konfig'
 
 /** Field anggota yang dikirim — daftar putih. */
 export type DataAnggota = Pick<Member, 'id' | 'code' | 'name' | 'section' | 'role' | 'active'> &
-  Partial<Pick<Member, 'panggilan' | 'alias' | 'instrument' | 'joinYear'>>
+  Partial<Pick<Member, 'panggilan' | 'alias' | 'aliasDilepas' | 'instrument' | 'joinYear'>>
 
 /** Field sesi yang dikirim — daftar putih. */
 export type DataSesi = Pick<Session, 'id' | 'title' | 'type' | 'date' | 'startTime' | 'endTime'> &
@@ -192,6 +192,7 @@ export function dataAnggota(m: Member): DataAnggota {
     name: m.name,
     panggilan: m.panggilan,
     alias: m.alias,
+    aliasDilepas: m.aliasDilepas,
     section: m.section,
     instrument: m.instrument,
     role: m.role,
@@ -399,6 +400,18 @@ export function terapkanAnggota(lokal: Member | undefined, d: DataAnggota, buatT
     if (d[k] === undefined) delete (r as unknown as Record<string, unknown>)[k]
   }
   Object.assign(r, tanpaKosong({ ...d }), { instrument: d.instrument ?? '', joinYear: d.joinYear ?? dasar.joinYear })
+  // v2.15.2 — tautan yang dilepas (di perangkat ini maupun di server) digabung,
+  // tidak ditimpa: perangkat versi lama yang belum kenal field ini tidak boleh
+  // memasang lagi tautan yang sudah dilepas.
+  const dilepas = [...new Set([...(lokal?.aliasDilepas ?? []), ...(d.aliasDilepas ?? [])])]
+  if (dilepas.length) r.aliasDilepas = dilepas
+  else delete r.aliasDilepas
+  if (r.alias && r.aliasDilepas?.length) {
+    const lepas = new Set(r.aliasDilepas)
+    const sisa = r.alias.filter((a) => !lepas.has(a))
+    if (sisa.length) r.alias = sisa
+    else delete r.alias
+  }
   return r
 }
 

@@ -48,6 +48,12 @@ export interface Member {
    * pencocokan impor. Impor berikutnya langsung cocok tanpa ditanya lagi.
    */
   alias?: string[]
+  /**
+   * v2.15.2 — id yang **sengaja dilepas** dari `alias` karena ternyata orang
+   * lain (dua orang bernama mirip yang pernah tergabung). Dicatat supaya
+   * pulihkan backup lama atau impor berikutnya tidak memasang tautannya lagi.
+   */
+  aliasDilepas?: string[]
   section: Section
   /**
    * Instrumen **sekaligus perlengkapan** yang dibawa pemain. Satu kolom saja

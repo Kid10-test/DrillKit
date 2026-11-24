@@ -19,7 +19,7 @@ bash regresi.sh "$BASE" \
   uji-birama uji-panjang-lagu uji-ulang uji-gabung-musik uji-setlist uji-riwayat \
   uji-simpan-otomatis uji-kuis uji-pengingat \
   uji-transposisi uji-predikat uji-panduan-anggota \
-  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika pacu-logika tempatkan-massal-logika penyusun-display-logika \
+  nama-anggota-logika terbit-logika terbit-kunci-logika kalender-logika tempo-latihan-logika rekaman-lagu-logika pin-pelatih-logika pyware-logika partitur-logika partitur-zip-logika mxl-logika partitur-bagian-logika partitur-frasa-logika partitur-paket-bunyi-logika setoran-logika kolaborasi-perubahan-logika koreografi-lanjut-logika count-sheet-logika inventaris-logistik-logika kirab-logika penilaian-juri-logika administrasi-unit-logika pacu-logika tempatkan-massal-logika penyusun-display-logika lepas-tautan-logika \
   >> "$LOG" 2>&1
 
 echo "== BLOK 2: mode anggota, kios, & situs ==" >> "$LOG"
