@@ -133,10 +133,70 @@ function rapikanAnggota(m: Member): Member {
   const panggil = out.panggilan?.trim()
   if (panggil) out.panggilan = panggil
   else delete out.panggilan
-  const alias = unik(out.alias ?? []).filter((a) => a !== out.id)
+  const dilepas = unik(out.aliasDilepas ?? []).filter((a) => a !== out.id)
+  if (dilepas.length) out.aliasDilepas = dilepas
+  else delete out.aliasDilepas
+  const alias = unik(out.alias ?? []).filter((a) => a !== out.id && !dilepas.includes(a))
   if (alias.length) out.alias = alias
   else delete out.alias
   return out
+}
+
+/** Tautan id → anggota boleh dipakai: anggota itu tidak pernah melepas id tersebut. */
+function tautanSah(lokal: Member | undefined, idMasuk: string): Member | undefined {
+  return lokal && !(lokal.aliasDilepas ?? []).includes(idMasuk) ? lokal : undefined
+}
+
+/* ----------------------------- Lepas tautan ------------------------------- */
+
+/** Satu baris di daftar tautan pencocokan (v2.15.2). */
+export interface TautanAlias {
+  id: string
+  /** Anggota lain yang masih ada dengan id ini — tanda tautannya mungkin salah. */
+  anggota?: Pick<Member, 'id' | 'name' | 'section' | 'active' | 'code' | 'instrument'>
+  /** Anggota lain yang juga menyimpan id ini sebagai alias. */
+  jugaDi: Pick<Member, 'id' | 'name'>[]
+}
+
+/**
+ * Daftar `alias` satu anggota, lengkap dengan siapa pemilik id itu sekarang.
+ * Alias yang menunjuk anggota yang **masih ada** paling patut dicurigai:
+ * biasanya hasil gabung atau pencocokan dua orang yang namanya mirip.
+ */
+export function daftarTautan(m: Pick<Member, 'id' | 'alias'>, semua: Member[]): TautanAlias[] {
+  const byId = new Map(semua.map((x) => [x.id, x]))
+  return unik(m.alias ?? [])
+    .filter((a) => a !== m.id)
+    .map((id) => {
+      const x = byId.get(id)
+      return {
+        id,
+        ...(x ? { anggota: { id: x.id, name: x.name, section: x.section, active: x.active, code: x.code, instrument: x.instrument } } : {}),
+        jugaDi: semua.filter((y) => y.id !== m.id && (y.alias ?? []).includes(id)).map((y) => ({ id: y.id, name: y.name })),
+      }
+    })
+}
+
+/**
+ * Lepas satu id dari `alias` dan catat di `aliasDilepas`, supaya pulihkan
+ * backup lama, gabung, dan impor berikutnya tidak memasangnya kembali.
+ * Murni — penyimpanannya di pemanggil.
+ */
+export function lepasAlias<T extends Member>(m: T, id: string): T {
+  return rapikanAnggota({
+    ...m,
+    alias: (m.alias ?? []).filter((a) => a !== id),
+    aliasDilepas: unik([...(m.aliasDilepas ?? []), id]),
+  }) as T
+}
+
+/** Batalkan pelepasan (mis. salah tekan sebelum disimpan): id kembali menjadi alias. */
+export function pulihkanAlias<T extends Member>(m: T, id: string): T {
+  return rapikanAnggota({
+    ...m,
+    alias: unik([...(m.alias ?? []), id]),
+    aliasDilepas: (m.aliasDilepas ?? []).filter((a) => a !== id),
+  }) as T
 }
 
 /** 1 = sama persis, 0 = tidak mirip. Nama kosong tidak pernah "mirip". */
@@ -221,6 +281,8 @@ export function sarankanGanda(anggota: Member[], jejak: JejakAnggota): SaranGand
       const a = anggota[i]
       const b = anggota[j]
       if ((a.alias ?? []).includes(b.id) || (b.alias ?? []).includes(a.id)) continue
+      // v2.15.2 — pelatih sudah menyatakan keduanya orang berbeda.
+      if ((a.aliasDilepas ?? []).includes(b.id) || (b.aliasDilepas ?? []).includes(a.id)) continue
       const alasan: string[] = []
       let skor = 0
       if (norm(a.code) && norm(a.code) === norm(b.code)) {
@@ -797,7 +859,7 @@ export function susunSaran(masuk: Member[], lokal: Member[]): SaranBaris[] {
       panggilan: m.panggilan,
     }
     if (byId.has(m.id)) return { masuk: ringkas, otomatis: { idLokal: m.id, lewat: 'id' as const }, saran: [] }
-    const lewatAlias = byAlias.get(m.id) ?? (m.alias ?? []).map((a) => byId.get(a)).find(Boolean)
+    const lewatAlias = byAlias.get(m.id) ?? (m.alias ?? []).map((a) => tautanSah(byId.get(a), m.id)).find(Boolean)
     if (lewatAlias) {
       return { masuk: ringkas, otomatis: { idLokal: lewatAlias.id, lewat: 'alias' as const }, saran: [] }
     }
@@ -829,16 +891,20 @@ export function keputusanAwal(saran: SaranBaris[]): Record<string, KeputusanCoco
 
 function tempelPanggilan(lokal: Member, masuk: Member): Member {
   const alias = unik([...(lokal.alias ?? []), ...(masuk.alias ?? []), masuk.id]).filter((a) => a !== lokal.id)
+  const aliasDilepas = unik([...(lokal.aliasDilepas ?? []), ...(masuk.aliasDilepas ?? [])])
   let panggilan = lokal.panggilan?.trim() || ''
   if (!panggilan && norm(masuk.name) && norm(masuk.name) !== norm(lokal.name)) panggilan = masuk.name.trim()
   if (!panggilan && masuk.panggilan?.trim() && norm(masuk.panggilan) !== norm(lokal.name)) {
     panggilan = masuk.panggilan.trim()
   }
-  return rapikanAnggota({ ...lokal, panggilan: panggilan || undefined, alias })
+  return rapikanAnggota({ ...lokal, panggilan: panggilan || undefined, alias, aliasDilepas })
 }
 
 function gabungRestore(file: Member, lokal: Member): Member {
   const alias = unik([...(file.alias ?? []), ...(lokal.alias ?? [])]).filter((a) => a !== file.id)
+  // v2.15.2 — tautan yang sudah dilepas di perangkat ini tetap lepas,
+  // walau backup yang dipulihkan masih memuatnya.
+  const aliasDilepas = unik([...(file.aliasDilepas ?? []), ...(lokal.aliasDilepas ?? [])])
   return rapikanAnggota({
     ...file,
     token: file.token?.trim() ? file.token : lokal.token,
@@ -848,6 +914,7 @@ function gabungRestore(file: Member, lokal: Member): Member {
     tags: gabungDaftarTag(file.tags, lokal.tags),
     panggilan: file.panggilan?.trim() || lokal.panggilan?.trim() || undefined,
     alias,
+    aliasDilepas,
   })
 }
 
@@ -875,6 +942,7 @@ function adopsi(lokal: Member, induk: Member, tokenBaru: () => string): Member {
     induk.panggilan?.trim() ||
     ''
   const alias = unik([...(induk.alias ?? []), ...(lokal.alias ?? []), lokal.id]).filter((a) => a !== id)
+  const aliasDilepas = unik([...(induk.aliasDilepas ?? []), ...(lokal.aliasDilepas ?? [])])
   return rapikanAnggota({
     ...induk,
     id,
@@ -885,6 +953,7 @@ function adopsi(lokal: Member, induk: Member, tokenBaru: () => string): Member {
     tags: gabungDaftarTag(induk.tags, lokal.tags),
     panggilan: panggilan || undefined,
     alias,
+    aliasDilepas,
     createdAt: Math.min(lokal.createdAt || Date.now(), induk.createdAt || Date.now()),
   })
 }
@@ -926,7 +995,7 @@ function pasangkan(
     }
     const samaId = ambil(byId.get(m.id))
     if (samaId) return { masuk: m, lokal: samaId, lewat: 'id' as const }
-    const lewatAlias = ambil(byAlias.get(m.id)) ?? ambil((m.alias ?? []).map((a) => byId.get(a)).find(Boolean))
+    const lewatAlias = ambil(byAlias.get(m.id)) ?? ambil((m.alias ?? []).map((a) => tautanSah(byId.get(a), m.id)).find(Boolean))
     if (lewatAlias) return { masuk: m, lokal: lewatAlias, lewat: 'alias' as const }
     return { masuk: m, baru: true }
   })
@@ -988,10 +1057,16 @@ export function terapkanCocok(opts: {
     if (p.masuk.id === p.lokal.id && opts.timpaSamaId) {
       anggotaTulis.push(gabungRestore(p.masuk, p.lokal))
     } else {
-      const tempel = tempelPanggilan(p.lokal, p.masuk)
+      // v2.15.2 — pilihan pelatih saat impor mengalahkan tautan yang pernah dilepas.
+      const dasar =
+        p.lewat === 'pilihan' && (p.lokal.aliasDilepas ?? []).includes(p.masuk.id)
+          ? { ...p.lokal, aliasDilepas: (p.lokal.aliasDilepas ?? []).filter((a) => a !== p.masuk.id) }
+          : p.lokal
+      const tempel = tempelPanggilan(dasar, p.masuk)
       const berubah =
         tempel.panggilan !== p.lokal.panggilan ||
-        (tempel.alias ?? []).join('|') !== (p.lokal.alias ?? []).join('|')
+        (tempel.alias ?? []).join('|') !== (p.lokal.alias ?? []).join('|') ||
+        (tempel.aliasDilepas ?? []).join('|') !== (p.lokal.aliasDilepas ?? []).join('|')
       if (berubah) anggotaTulis.push(tempel)
       if (p.masuk.id !== p.lokal.id) {
         laporan.push(`${p.masuk.name} dicocokkan ke ${p.lokal.name}`)
@@ -1123,7 +1198,12 @@ export function rencanakanGabung(opts: {
   }
   const jumlah = hitungRujukan(opts.buang.id, muatan)
   const tulis = tulisUlangMuatan(muatan, peta)
-  const simpan = tempelPanggilan(opts.simpan, { ...opts.buang, name: opts.buang.name })
+  // v2.15.2 — gabung yang diminta pelatih mengalahkan tautan yang pernah dilepas.
+  const disatukan = new Set([opts.buang.id, ...(opts.buang.alias ?? [])])
+  const simpan = tempelPanggilan(
+    { ...opts.simpan, aliasDilepas: (opts.simpan.aliasDilepas ?? []).filter((a) => !disatukan.has(a)) },
+    { ...opts.buang, name: opts.buang.name, aliasDilepas: (opts.buang.aliasDilepas ?? []).filter((a) => a !== opts.simpan.id && !disatukan.has(a)) },
+  )
   // tempelPanggilan memakai nama yang dibuang sebagai panggilan. Itu yang diminta.
   const info: string[] = []
   if (simpan.panggilan && simpan.panggilan !== opts.simpan.panggilan) {

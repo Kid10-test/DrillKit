@@ -35,8 +35,11 @@ import {
   bacaBarisCsvAnggota,
   barisCsvAnggota,
   cocokCari,
+  daftarTautan,
   JUDUL_CSV_ANGGOTA,
+  lepasAlias,
   pecahCsv,
+  pulihkanAlias,
 } from '../lib/namaAnggota'
 import { kumpulkanTagRoster, punyaTag, uraiInputTag } from '../lib/tagAnggota'
 import {
@@ -719,6 +722,7 @@ export default function Members() {
         onClose={() => setOpen(false)}
         onSave={save}
         existingCodes={members.map((m) => m.code)}
+        semua={members}
       />
       <QrModal member={qrFor} onClose={() => setQrFor(null)} />
       <GabungAnggota open={gabung} anggota={members} onClose={() => setGabung(false)} />
@@ -748,12 +752,15 @@ function MemberModal({
   onClose,
   onSave,
   existingCodes,
+  semua = [],
 }: {
   open: boolean
   member: Member | null
   onClose: () => void
   onSave: (m: Member) => void
   existingCodes: string[]
+  /** v2.15.2 — semua anggota, untuk menamai tautan pencocokan (alias). */
+  semua?: Member[]
 }) {
   const [m, setM] = useState<Member | null>(member)
   const [teksTag, setTeksTag] = useState('')
@@ -884,9 +891,100 @@ function MemberModal({
         />
       </Field>
       {dupe && <p className="text-xs text-amber-400">Kode ini sudah dipakai anggota lain.</p>}
+      {member?.id && <TautanPencocokan m={m} asal={member} semua={semua} onChange={setM} />}
       {/* Catatan evaluasi hanya muncul saat menyunting anggota yang sudah tersimpan */}
       {member?.id && <MemberNotesEditor memberId={member.id} />}
     </Modal>
+  )
+}
+
+/* ------------------------- Tautan pencocokan (alias) ----------------------- */
+
+/**
+ * v2.15.2 — daftar id lama yang dicocokkan ke anggota ini, dengan tombol
+ * **Lepas** untuk tautan yang salah (dua orang berbeda yang namanya mirip
+ * pernah tergabung). Perubahan baru tersimpan saat menekan Simpan.
+ */
+function TautanPencocokan({
+  m,
+  asal,
+  semua,
+  onChange,
+}: {
+  m: Member
+  asal: Member
+  semua: Member[]
+  onChange: (m: Member) => void
+}) {
+  const tautan = daftarTautan(m, semua)
+  const baruDilepas = (m.aliasDilepas ?? []).filter((id) => (asal.alias ?? []).includes(id))
+  if (!tautan.length && !baruDilepas.length) return null
+  return (
+    <div className="mt-4 border-t border-slate-800 pt-4" data-testid="tautan-pencocokan">
+      <p className="mb-1 text-xs font-semibold text-slate-200">Tautan pencocokan</p>
+      <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
+        Id lama yang dianggap orang yang sama dengan anggota ini (hasil gabung atau pencocokan impor). Lepas hanya
+        bila ternyata orang lain. Sesudah disimpan, tautannya tidak dipasang lagi oleh pulihkan backup atau impor
+        berikutnya.
+      </p>
+      {tautan.length > 0 && (
+        <ul className="space-y-1.5">
+          {tautan.map((t) => (
+            <li
+              key={t.id}
+              data-testid="baris-tautan"
+              className={`flex items-center justify-between gap-2 rounded-lg border p-2 ${
+                t.anggota ? 'border-amber-600/60 bg-amber-950/20' : 'border-slate-800 bg-slate-950/40'
+              }`}
+            >
+              <span className="min-w-0 text-xs text-slate-200">
+                {t.anggota ? (
+                  <>
+                    <span className="font-medium">{t.anggota.name}</span>
+                    <span className="text-slate-400">
+                      {' · '}
+                      {sectionLabel(t.anggota.section)}
+                      {t.anggota.code ? ` · ${t.anggota.code}` : ''}
+                      {t.anggota.instrument ? ` · ${t.anggota.instrument}` : ''}
+                      {t.anggota.active ? '' : ' · nonaktif'}
+                    </span>
+                    <span className="block text-[11px] text-amber-400">
+                      Masih ada sebagai anggota tersendiri — periksa apakah benar orang yang sama.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-slate-400">Id lama </span>
+                    <code className="text-[11px]">{t.id}</code>
+                    <span className="text-slate-500"> (sudah digabung)</span>
+                  </>
+                )}
+                {t.jugaDi.length > 0 && (
+                  <span className="block text-[11px] text-slate-500">
+                    Juga tertaut ke: {t.jugaDi.map((x) => x.name).join(', ')}
+                  </span>
+                )}
+              </span>
+              <Button size="sm" variant="ghost" data-testid="lepas-tautan" onClick={() => onChange(lepasAlias(m, t.id))}>
+                Lepas
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {baruDilepas.length > 0 && (
+        <p className="mt-2 text-[11px] text-slate-400">
+          Akan dilepas saat disimpan: {baruDilepas.length} tautan.{' '}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => onChange(baruDilepas.reduce((x, id) => pulihkanAlias(x, id), m))}
+          >
+            Batalkan
+          </button>
+        </p>
+      )}
+    </div>
   )
 }
 
